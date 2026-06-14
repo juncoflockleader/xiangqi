@@ -19,6 +19,7 @@ The current engine is dependency-free JavaScript and includes:
 - Whole-game review with side summaries, opening-book matches, and key learning moments.
 - Game-history helpers for play sessions, reviewed move logs, position history, and repeated-position detection.
 - A backend adapter contract and async UCCI process wrapper so the JS reference engine can sit beside a native C++/WASM engine without changing the learning-app API.
+- Shared time-control budgeting for fixed movetime and clock-based `wtime`/`btime`/increment searches.
 - A minimal UCCI-style protocol adapter for GUI/app integration and engine smoke testing.
 
 ## Quick Start
@@ -181,12 +182,13 @@ Example session:
 ucci
 position fen 4k4/9/4r4/9/9/9/9/9/9/3KR4 r
 go depth 2 movetime 1000
+go depth 4 wtime 60000 btime 45000 winc 1000 binc 1000 movestogo 20
 analyze depth 2 movetime 1000 lines 3
 book
 review depth 1 movetime 500
 ```
 
-The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, `setoption name MultiPV value N`, `setoption name HashEntries value N`, `setoption name UseBook value false`, `analyze`, `probe`, `pressure`, `review`, `explain`, and `quit`. `go` info lines include counters such as `qnodes`, `qchecks`, `tthits`, `ttstores`, `ttevict`, `asp`, `asphi`, `asplo`, `ext`, `futil`, `nmp`, and `pvs` for learning-app diagnostics.
+The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, clock controls such as `wtime`, `btime`, `winc`, `binc`, and `movestogo`, `setoption name MultiPV value N`, `setoption name HashEntries value N`, `setoption name UseBook value false`, `analyze`, `probe`, `pressure`, `review`, `explain`, and `quit`. `go` info lines include counters such as `qnodes`, `qchecks`, `tthits`, `ttstores`, `ttevict`, `asp`, `asphi`, `asplo`, `ext`, `futil`, `nmp`, and `pvs` for learning-app diagnostics.
 
 ## Movegen Validation
 

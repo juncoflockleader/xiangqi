@@ -21,7 +21,10 @@ rl.on("line", (line) => {
   } else if (command === "isready") {
     write("readyok");
   } else if (command === "go") {
-    if (/\bmultipv\s+2\b/i.test(trimmed)) {
+    if (/\bwtime\s+\d+/i.test(trimmed)) {
+      write(`info string command ${trimmed}`);
+      write("info depth 2 score cp 55 nodes 321 pv h9g7 h0g2");
+    } else if (/\bmultipv\s+2\b/i.test(trimmed)) {
       write("info multipv 1 depth 2 score cp 42 nodes 123 pv h9g7 h0g2");
       write("info multipv 2 depth 2 score cp 12 nodes 123 pv h7e7 h0g2");
     } else {

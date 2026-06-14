@@ -59,6 +59,17 @@ test("UCCI UseBook option disables book selection", () => {
   assert.ok(output.some((line) => line.startsWith("info depth 1")));
 });
 
+test("UCCI go derives search time from clock controls", () => {
+  const session = new UcciSession({ depth: 1, timeLimitMs: 500 });
+  session.handleLine("setoption name UseBook value false");
+  session.handleLine("position startpos");
+  const output = session.handleLine("go depth 1 wtime 30000 btime 20000 winc 1000 binc 500 movestogo 20");
+
+  assert.equal(output.some((line) => line.includes("book Central Cannon")), false);
+  assert.ok(output.some((line) => line.startsWith("info depth 1")));
+  assert.ok(output.some((line) => line.startsWith("bestmove ")));
+});
+
 test("UCCI book command lists available opening entries", () => {
   const session = new UcciSession();
   session.handleLine("position startpos");

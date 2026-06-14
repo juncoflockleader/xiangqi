@@ -80,3 +80,31 @@ test("UCCI backend parses MultiPV analysis lines", async () => {
     await backend.close();
   }
 });
+
+test("UCCI backend forwards clock controls to native engines", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), {
+      useBook: false,
+      wtime: 60000,
+      btime: 20000,
+      winc: 1000,
+      binc: 500,
+      movestogo: 20
+    });
+
+    assert.equal(result.source, "native-ucci");
+    assert.equal(result.score, 55);
+    assert.equal(result.nodes, 321);
+    assert.ok(result.raw.some((line) => line.includes("command go depth 2 wtime 60000 btime 20000 winc 1000 binc 500 movestogo 20")));
+  } finally {
+    await backend.close();
+  }
+});

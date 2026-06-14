@@ -16,6 +16,7 @@ import {
 } from "./board.js";
 import { hashPosition } from "./hash.js";
 import { createTranspositionTable } from "./transposition.js";
+import { resolveSearchBudget } from "./time.js";
 import {
   annotateMove,
   generateCaptures,
@@ -38,7 +39,8 @@ const NULL_MOVE_MIN_DEPTH = 3;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
-  const timeLimitMs = options.timeLimitMs ?? 2000;
+  const timeBudget = resolveSearchBudget(options, position.turn);
+  const timeLimitMs = timeBudget.timeLimitMs;
   const startedAt = performanceNow();
   const deadline = startedAt + timeLimitMs;
   const table = options.transpositionTable ?? createTranspositionTable({
@@ -67,7 +69,8 @@ export function searchBestMove(position, options = {}) {
       iterations: [],
       timedOut: false,
       tableSize: table.size,
-      stats: createSearchStats()
+      stats: createSearchStats(),
+      timeBudget
     };
   }
 
@@ -139,7 +142,8 @@ export function searchBestMove(position, options = {}) {
     iterations,
     timedOut,
     tableSize: table.size,
-    stats
+    stats,
+    timeBudget
   };
 }
 

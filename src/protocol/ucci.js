@@ -6,6 +6,7 @@ import {
 } from "../board.js";
 import { createEngine } from "../engine.js";
 import { formatScore } from "../reasoning.js";
+import { resolveSearchBudget } from "../time.js";
 
 const DEFAULT_OPTIONS = Object.freeze({
   depth: 4,
@@ -136,7 +137,7 @@ export class UcciSession {
   }
 
   go(line) {
-    const options = parseGoOptions(line, this.options);
+    const options = parseGoOptions(line, this.options, this.position.turn);
     const multiPv = readTokenInteger(line.split(/\s+/), "multipv", this.options.multiPv);
     if (multiPv > 1) {
       return this.analyze(`analyze depth ${options.depth} movetime ${options.timeLimitMs} lines ${multiPv}`);
@@ -181,7 +182,7 @@ export class UcciSession {
 
   analyze(line) {
     const tokens = line.split(/\s+/);
-    const options = parseGoOptions(line.replace(/^analyze/i, "go"), this.options);
+    const options = parseGoOptions(line.replace(/^analyze/i, "go"), this.options, this.position.turn);
     const lines = readTokenInteger(tokens, "lines", readTokenInteger(tokens, "multipv", 3));
     const result = this.engine.analyzePosition(this.position, {
       ...options,
@@ -258,7 +259,7 @@ export class UcciSession {
   review(line) {
     if (this.moveHistory.length === 0) return ["info string review no moves"];
 
-    const options = parseGoOptions(line.replace(/^review/i, "go"), this.options);
+    const options = parseGoOptions(line.replace(/^review/i, "go"), this.options, this.initialPosition.turn);
     const result = this.engine.reviewGame(this.moveHistory, {
       initialPosition: this.initialPosition,
       reviewOptions: {
@@ -311,15 +312,30 @@ function formatIterationInfo(iteration) {
   return `info depth ${iteration.depth} currmove ${move} score cp ${Math.round(iteration.score)} nodes ${iteration.nodes} stable ${stable} pv ${pv}`;
 }
 
-function parseGoOptions(line, defaults) {
+function parseGoOptions(line, defaults, side = "red") {
   const tokens = line.split(/\s+/);
   const depth = readTokenInteger(tokens, "depth", defaults.depth);
-  const moveTime = readTokenInteger(tokens, "movetime", defaults.timeLimitMs);
-  const timeLimitMs = readTokenInteger(tokens, "time", moveTime);
+  const rawOptions = {
+    depth,
+    movetime: readTokenInteger(tokens, "movetime", null),
+    timeLimitMs: readTokenInteger(tokens, "time", null),
+    wtime: readTokenInteger(tokens, "wtime", null),
+    btime: readTokenInteger(tokens, "btime", null),
+    winc: readTokenInteger(tokens, "winc", null),
+    binc: readTokenInteger(tokens, "binc", null),
+    movestogo: readTokenInteger(tokens, "movestogo", null),
+    minTimeMs: defaults.minTimeMs,
+    reserveMs: defaults.reserveMs,
+    maxTimeFraction: defaults.maxTimeFraction,
+    incrementFraction: defaults.incrementFraction
+  };
+  const timeBudget = resolveSearchBudget(rawOptions, side, defaults);
 
   return {
     depth,
-    timeLimitMs
+    ...rawOptions,
+    timeLimitMs: timeBudget.timeLimitMs,
+    timeBudget
   };
 }
 

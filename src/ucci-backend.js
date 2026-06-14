@@ -13,6 +13,7 @@ import { bookMoveToCandidate } from "./book.js";
 import { createEngine } from "./engine.js";
 import { explainBookMove, explainMoveFeatures, formatScore } from "./reasoning.js";
 import { annotateMove, generateLegalMoves } from "./movegen.js";
+import { hasClockTimeControl, resolveSearchBudget } from "./time.js";
 
 const DEFAULT_UCCI_TIMEOUT_MS = 5000;
 const DEFAULT_SEARCH_TIMEOUT_MS = 30000;
@@ -37,24 +38,20 @@ export function createUcciEngineBackend(options = {}) {
       ENGINE_BACKEND_FEATURES.ASYNC_SEARCH
     ],
     chooseMove: async (position, searchOptions = {}) => {
-      const mergedOptions = {
-        ...options,
-        ...searchOptions,
+      const mergedOptions = mergeNativeOptions(options, searchOptions, {
         lines: 1,
         backendName: name
-      };
+      });
       const bookResult = maybeBookResult(referenceEngine, position, mergedOptions);
       if (bookResult) return bookResult;
       return nativeSearch(client, position, mergedOptions);
     },
     analyzePosition: async (position, searchOptions = {}) => {
       const lineCount = normalizeLineCount(searchOptions.lines ?? searchOptions.multiPv ?? searchOptions.multipv ?? options.lines ?? 3);
-      const result = await nativeSearch(client, position, {
-        ...options,
-        ...searchOptions,
+      const result = await nativeSearch(client, position, mergeNativeOptions(options, searchOptions, {
         lines: lineCount,
         backendName: name
-      });
+      }));
       const bestScore = result.score;
 
       return {
@@ -145,7 +142,9 @@ class UcciProcessClient {
       this.write(`banmoves ${bannedMoves.map(compactMove).join(" ")}`);
     }
 
-    return this.commandUntil(formatGoCommand(options), (lines) => lines.some((line) => line.startsWith("bestmove ")), options.commandTimeoutMs ?? DEFAULT_SEARCH_TIMEOUT_MS);
+    const timeBudget = resolveSearchBudget(options, options.side ?? position.turn);
+    const timeoutMs = options.commandTimeoutMs ?? Math.max(DEFAULT_SEARCH_TIMEOUT_MS, timeBudget.timeLimitMs + 5000);
+    return this.commandUntil(formatGoCommand(options), (lines) => lines.some((line) => line.startsWith("bestmove ")), timeoutMs);
   }
 
   async commandUntil(command, predicate, timeoutMs) {
@@ -242,7 +241,8 @@ class UcciProcessClient {
 }
 
 async function nativeSearch(client, position, options) {
-  const rawLines = await client.search(position, options);
+  const searchOptions = { ...options, side: position.turn };
+  const rawLines = await client.search(position, searchOptions);
   const parsed = parseUcciSearch(rawLines, position);
   const result = {
     source: "native-ucci",
@@ -520,11 +520,53 @@ function explainNativeCandidate(position, candidate, context) {
 
 function formatGoCommand(options) {
   const depth = Math.max(1, Number.parseInt(options.depth ?? 4, 10) || 4);
-  const moveTime = Math.max(1, Number.parseInt(options.timeLimitMs ?? options.movetime ?? 2000, 10) || 2000);
   const lines = normalizeLineCount(options.lines ?? options.multiPv ?? options.multipv ?? 1);
-  const parts = ["go", "depth", depth, "movetime", moveTime];
+  const explicitMoveTime = numberOption(options.timeLimitMs, options.movetime, options.moveTimeMs, options.moveTime);
+  const parts = ["go", "depth", depth];
+
+  if (hasClockTimeControl(options) && explicitMoveTime === null) {
+    addGoNumber(parts, "wtime", options.wtime ?? options.redTimeMs ?? options.redTime);
+    addGoNumber(parts, "btime", options.btime ?? options.blackTimeMs ?? options.blackTime);
+    addGoNumber(parts, "winc", options.winc ?? options.redIncrementMs ?? options.redIncrement);
+    addGoNumber(parts, "binc", options.binc ?? options.blackIncrementMs ?? options.blackIncrement);
+    addGoNumber(parts, "movestogo", options.movestogo ?? options.movesToGo);
+  } else {
+    const timeBudget = resolveSearchBudget(options, options.side);
+    parts.push("movetime", timeBudget.timeLimitMs);
+  }
+
   if (lines > 1) parts.push("multipv", lines);
   return parts.join(" ");
+}
+
+function mergeNativeOptions(baseOptions, searchOptions, extras) {
+  const merged = {
+    ...baseOptions,
+    ...searchOptions,
+    ...extras
+  };
+
+  const searchHasClock = hasClockTimeControl(searchOptions);
+  const searchHasExplicitMoveTime = numberOption(
+    searchOptions.timeLimitMs,
+    searchOptions.movetime,
+    searchOptions.moveTimeMs,
+    searchOptions.moveTime
+  ) !== null;
+
+  if (searchHasClock && !searchHasExplicitMoveTime) {
+    delete merged.timeLimitMs;
+    delete merged.movetime;
+    delete merged.moveTimeMs;
+    delete merged.moveTime;
+  }
+
+  return merged;
+}
+
+function addGoNumber(parts, name, value) {
+  const parsed = numberOption(value);
+  if (parsed !== null) parts.push(name, Math.max(0, Math.floor(parsed)));
 }
 
 function createNativeStats(parsed) {
@@ -567,6 +609,15 @@ function normalizeLineCount(value) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed)) return 1;
   return Math.max(1, Math.min(12, parsed));
+}
+
+function numberOption(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined || value === "") continue;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
 }
 
 function compactMove(move) {
