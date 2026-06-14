@@ -106,6 +106,39 @@ export function describeEngineBackend(backend) {
     description: backend.description ?? "",
     features: [...(backend.features ?? [])],
     cacheSize: typeof backend.cacheSize === "number" ? backend.cacheSize : null,
-    cacheCapacity: typeof backend.cacheCapacity === "number" ? backend.cacheCapacity : null
+    cacheCapacity: typeof backend.cacheCapacity === "number" ? backend.cacheCapacity : null,
+    status: describeEngineBackendStatus(backend)
+  };
+}
+
+export function describeEngineBackendStatus(backend) {
+  const features = backend.features ?? [];
+  const hasFallback = features.includes(ENGINE_BACKEND_FEATURES.FALLBACK);
+  const fallbackActive = Boolean(backend.fallbackActive);
+
+  return {
+    state: fallbackActive ? "fallback" : "primary",
+    native: Boolean(
+      features.includes(ENGINE_BACKEND_FEATURES.NATIVE_READY)
+        || backend.kind === "native-ucci"
+        || backend.kind === "native-uci"
+    ),
+    async: Boolean(features.includes(ENGINE_BACKEND_FEATURES.ASYNC_SEARCH)),
+    fallback: hasFallback,
+    fallbackActive,
+    fallbackReason: backend.fallbackReason ?? null,
+    primaryBackend: summarizeBackend(backend.primaryBackend),
+    fallbackBackend: summarizeBackend(backend.fallbackBackend)
+  };
+}
+
+function summarizeBackend(backend) {
+  if (!backend) return null;
+
+  return {
+    id: backend.id,
+    name: backend.name,
+    kind: backend.kind,
+    features: [...(backend.features ?? [])]
   };
 }

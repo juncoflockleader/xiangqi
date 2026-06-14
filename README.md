@@ -179,7 +179,7 @@ const backend = createLearningEngineBackend({
 });
 
 const result = await backend.chooseMove(position, { lines: 3 });
-console.log(describeEngineBackend(backend).kind);
+console.log(describeEngineBackend(backend).status);
 console.log(result.explanation.alternatives);
 console.log(result.backendFallback?.message);
 await backend.close?.();

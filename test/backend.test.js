@@ -6,6 +6,7 @@ import {
   createJavaScriptEngineBackend,
   createLearningEngineBackend,
   describeEngineBackend,
+  describeEngineBackendStatus,
   ENGINE_BACKEND_FEATURES,
   isNativeEngineBackend,
   resolveLearningEngineBackendConfig
@@ -25,6 +26,9 @@ test("javascript backend exposes the engine contract", () => {
   assert.equal(result.source, "opening-book");
   assert.equal(result.bestMove.notation, "h7-e7");
   assert.equal(description.cacheCapacity, backend.cacheCapacity);
+  assert.equal(description.status.state, "primary");
+  assert.equal(description.status.native, false);
+  assert.equal(description.status.fallback, false);
   assert.equal(typeof backend.reviewGame, "function");
   assert.equal(typeof backend.coachMove, "function");
   assert.equal(typeof backend.lessonPlan, "function");
@@ -149,6 +153,11 @@ test("learning backend factory selects a native engine when configured", async (
     });
 
     assert.equal(description.kind, "hybrid");
+    assert.equal(description.status.state, "primary");
+    assert.equal(description.status.native, true);
+    assert.equal(description.status.fallback, true);
+    assert.equal(description.status.primaryBackend.kind, "native-ucci");
+    assert.equal(description.status.fallbackBackend.kind, "javascript");
     assert.equal(isNativeEngineBackend(backend), true);
     assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.FALLBACK), true);
     assert.equal(result.source, "native-ucci");
@@ -184,6 +193,11 @@ test("learning backend factory falls back when native search is unavailable", as
 
     assert.equal(backend.kind, "hybrid");
     assert.equal(backend.fallbackActive, true);
+    const status = describeEngineBackendStatus(backend);
+
+    assert.equal(status.state, "fallback");
+    assert.equal(status.fallbackActive, true);
+    assert.ok(status.fallbackReason.includes("JavaScript Reference Engine supplied this result"));
     assert.match(result.bestMove.notation, /^[a-i][0-9]-[a-i][0-9]$/);
     assert.equal(result.backendFallback.method, "chooseMove");
     assert.equal(result.backendFallback.fallbackBackend, "javascript-reference");
