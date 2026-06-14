@@ -95,3 +95,22 @@ test("quiescence can include bounded quiet checking moves", () => {
   assert.equal(withoutChecks.stats.qchecks, 0);
   assert.ok(withChecks.stats.qnodes > withoutChecks.stats.qnodes);
 });
+
+test("search prunes shallow quiet moves with futility margins", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const withPruning = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000
+  });
+  const withoutPruning = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useFutilityPruning: false
+  });
+
+  assert.equal(withPruning.depth, 3);
+  assert.equal(withPruning.bestMove.notation, withoutPruning.bestMove.notation);
+  assert.ok(withPruning.stats.futilityPrunes > 0);
+  assert.equal(withoutPruning.stats.futilityPrunes, 0);
+  assert.ok(withPruning.nodes < withoutPruning.nodes);
+});

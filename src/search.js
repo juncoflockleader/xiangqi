@@ -30,6 +30,8 @@ const DEFAULT_MAX_EXTENSIONS = 4;
 const DEFAULT_MAX_PLY = 80;
 const DEFAULT_ASPIRATION_WINDOW = 45;
 const DEFAULT_QCHECK_DEPTH = 1;
+const FUTILITY_BASE_MARGIN = 90;
+const FUTILITY_DEPTH_MARGIN = 70;
 const NULL_MOVE_MIN_DEPTH = 3;
 
 export function searchBestMove(position, options = {}) {
@@ -92,6 +94,7 @@ export function searchBestMove(position, options = {}) {
       useAspiration: options.useAspiration !== false && !exactRootScores,
       useNullMove: options.useNullMove !== false,
       usePvs: options.usePvs !== false,
+      useFutilityPruning: options.useFutilityPruning !== false,
       useQuiescenceChecks: options.useQuiescenceChecks !== false,
       tacticalCache: new Map(),
       stats: createSearchStats(),
@@ -314,6 +317,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   let bestMove = null;
   let bestChildLine = [];
   const ordered = orderMoves(position, legalMoves, tt?.bestMove, context, ply);
+  const staticScore = inCheck ? null : evaluatePosition(position, position.turn).score;
 
   for (let index = 0; index < ordered.length; index += 1) {
     const move = ordered[index];
@@ -323,6 +327,22 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     const extension = shouldExtend({ inCheck, givesCheck, move, extensionsRemaining }) ? 1 : 0;
     const childExtensions = extensionsRemaining - extension;
     if (extension > 0) context.stats.extensions += 1;
+
+    if (shouldPruneFutility({
+      depth,
+      index,
+      move,
+      inCheck,
+      givesCheck,
+      extension,
+      alpha,
+      beta,
+      staticScore,
+      context
+    })) {
+      context.stats.futilityPrunes += 1;
+      continue;
+    }
 
     let reduction = shouldReduce({ depth, index, move, inCheck, givesCheck }) ? 1 : 0;
     if (reduction > 0) context.stats.reductions += 1;
@@ -546,6 +566,33 @@ function shouldReduce({ depth, index, move, inCheck, givesCheck }) {
   return true;
 }
 
+function shouldPruneFutility({
+  depth,
+  index,
+  move,
+  inCheck,
+  givesCheck,
+  extension,
+  alpha,
+  beta,
+  staticScore,
+  context
+}) {
+  if (!context.useFutilityPruning) return false;
+  if (staticScore === null) return false;
+  if (depth < 1 || depth > 2) return false;
+  if (index === 0) return false;
+  if (inCheck || givesCheck || extension > 0) return false;
+  if (move.captured) return false;
+  if (alpha <= -MATE_SCORE + 1000 || beta >= MATE_SCORE - 1000) return false;
+
+  return staticScore + futilityMargin(depth) <= alpha;
+}
+
+function futilityMargin(depth) {
+  return FUTILITY_BASE_MARGIN + FUTILITY_DEPTH_MARGIN * depth;
+}
+
 function shouldTryNullMove(position, depth, beta, inCheck, context, allowNullMove) {
   if (!context.useNullMove || !allowNullMove) return false;
   if (inCheck || depth < NULL_MOVE_MIN_DEPTH) return false;
@@ -633,6 +680,7 @@ function createSearchStats() {
     aspirationFailHigh: 0,
     aspirationFailLow: 0,
     extensions: 0,
+    futilityPrunes: 0,
     reductions: 0,
     lmrResearches: 0,
     pvsResearches: 0,
@@ -652,6 +700,7 @@ function mergeSearchStats(total, next) {
     aspirationFailHigh: total.aspirationFailHigh + next.aspirationFailHigh,
     aspirationFailLow: total.aspirationFailLow + next.aspirationFailLow,
     extensions: total.extensions + next.extensions,
+    futilityPrunes: total.futilityPrunes + next.futilityPrunes,
     reductions: total.reductions + next.reductions,
     lmrResearches: total.lmrResearches + next.lmrResearches,
     pvsResearches: total.pvsResearches + next.pvsResearches,

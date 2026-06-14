@@ -8,7 +8,7 @@ The current engine is dependency-free JavaScript and includes:
 - Legal move generation for generals, advisors, elephants, horses, rooks, cannons, and pawns.
 - Check detection, flying-general rules, and make/unmake-style immutable position updates.
 - Iterative-deepening negamax search with alpha-beta and principal variation search.
-- Zobrist hashing, transposition table, aspiration windows, quiescence search with bounded quiet-check search, capture/check/history-based move ordering, bounded check extensions, guarded null-move pruning, late-move reductions, repetition hooks, and root candidate analysis.
+- Zobrist hashing, transposition table, aspiration windows, quiescence search with bounded quiet-check search, capture/check/history-based move ordering, bounded check extensions, guarded null-move pruning, shallow futility pruning, late-move reductions, repetition hooks, and root candidate analysis.
 - Explainable opening-book support with deterministic book move selection and pure-search opt-out.
 - Evaluation terms for material, piece-square placement, mobility, threats, pawn progress, and king safety.
 - Capture safety analysis for distinguishing clean wins from tactically poisoned captures.
@@ -129,7 +129,7 @@ book
 review depth 1 movetime 500
 ```
 
-The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, `setoption name MultiPV value N`, `setoption name UseBook value false`, `analyze`, `probe`, `pressure`, `review`, `explain`, and `quit`. `go` info lines include counters such as `qnodes`, `qchecks`, `tthits`, `asp`, `asphi`, `asplo`, `ext`, `nmp`, and `pvs` for learning-app diagnostics.
+The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, `setoption name MultiPV value N`, `setoption name UseBook value false`, `analyze`, `probe`, `pressure`, `review`, `explain`, and `quit`. `go` info lines include counters such as `qnodes`, `qchecks`, `tthits`, `asp`, `asphi`, `asplo`, `ext`, `futil`, `nmp`, and `pvs` for learning-app diagnostics.
 
 ## Movegen Validation
 
