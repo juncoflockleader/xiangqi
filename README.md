@@ -8,8 +8,9 @@ The current engine is dependency-free JavaScript and includes:
 - Legal move generation for generals, advisors, elephants, horses, rooks, cannons, and pawns.
 - Check detection, flying-general rules, and make/unmake-style immutable position updates.
 - Iterative-deepening negamax search with alpha-beta pruning.
-- Transposition table, quiescence search, capture/check/history-based move ordering, bounded check extensions, late-move reductions, repetition hooks, and root candidate analysis.
+- Zobrist hashing, transposition table, quiescence search, capture/check/history-based move ordering, bounded check extensions, late-move reductions, repetition hooks, and root candidate analysis.
 - Evaluation terms for material, piece-square placement, mobility, threats, pawn progress, and king safety.
+- Perft helpers for validating move generation while the engine grows.
 - Explainable move output for learning-app use cases.
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
 - Game-history helpers for play sessions, reviewed move logs, position history, and repeated-position detection.
@@ -19,6 +20,7 @@ The current engine is dependency-free JavaScript and includes:
 
 ```sh
 node examples/engine-demo.mjs
+node examples/perft.mjs 2
 node bin/xiangqi-ucci.mjs
 node --test
 ```
@@ -81,6 +83,10 @@ go depth 2 movetime 1000
 ```
 
 The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `go`, `probe`, `explain`, and `quit`.
+
+## Movegen Validation
+
+`perft(position, depth)` counts legal move trees and `perftDivide(position, depth)` breaks the count down by root move. These are not gameplay features; they are guardrails for making the rules engine stronger without silently breaking Xiangqi movement, check, cannon screens, horse legs, elephant eyes, or flying-general legality.
 
 ## Engine References
 

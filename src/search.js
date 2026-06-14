@@ -12,6 +12,7 @@ import {
   positionKey,
   sameMove
 } from "./board.js";
+import { hashPosition } from "./hash.js";
 import {
   annotateMove,
   generateCaptures,
@@ -168,28 +169,29 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     return evaluatePosition(position, position.turn).score;
   }
 
-  const key = positionKey(position);
-  if (isRepetition(context, key)) {
+  const repetitionKey = positionKey(position);
+  if (isRepetition(context, repetitionKey)) {
     context.stats.repetitions += 1;
     return DRAW_SCORE;
   }
 
-  enterPosition(context, key);
+  enterPosition(context, repetitionKey);
 
   const alphaOriginal = alpha;
-  const tt = context.table.get(key);
+  const transpositionKey = hashPosition(position);
+  const tt = context.table.get(transpositionKey);
 
   if (tt && tt.depth >= depth) {
     context.stats.ttHits += 1;
     if (tt.flag === EXACT) {
       if (lineOut && tt.bestMove) lineOut.splice(0, lineOut.length, annotateMove(position, tt.bestMove));
-      leavePosition(context, key);
+      leavePosition(context, repetitionKey);
       return tt.score;
     }
     if (tt.flag === LOWER) alpha = Math.max(alpha, tt.score);
     if (tt.flag === UPPER) beta = Math.min(beta, tt.score);
     if (alpha >= beta) {
-      leavePosition(context, key);
+      leavePosition(context, repetitionKey);
       return tt.score;
     }
   }
@@ -202,7 +204,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       context.stats.extensions += 1;
     } else {
       const score = quiescence(position, alpha, beta, ply, context);
-      leavePosition(context, key);
+      leavePosition(context, repetitionKey);
       return score;
     }
   }
@@ -210,7 +212,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   const legalMoves = generateLegalMoves(position, position.turn);
 
   if (legalMoves.length === 0) {
-    leavePosition(context, key);
+    leavePosition(context, repetitionKey);
     return inCheck ? -MATE_SCORE + ply : -MATE_SCORE + ply;
   }
 
@@ -256,7 +258,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     }
 
     if (context.timedOut) {
-      leavePosition(context, key);
+      leavePosition(context, repetitionKey);
       return score;
     }
 
@@ -279,10 +281,10 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   }
 
   const flag = bestScore <= alphaOriginal ? UPPER : bestScore >= beta ? LOWER : EXACT;
-  context.table.set(key, { depth, score: bestScore, flag, bestMove });
+  context.table.set(transpositionKey, { depth, score: bestScore, flag, bestMove });
 
   if (lineOut) lineOut.splice(0, lineOut.length, ...bestChildLine);
-  leavePosition(context, key);
+  leavePosition(context, repetitionKey);
   return bestScore;
 }
 

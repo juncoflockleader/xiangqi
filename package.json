@@ -6,6 +6,7 @@
   "description": "A Xiangqi engine foundation with search, evaluation, and explainable move choices.",
   "scripts": {
     "demo": "node examples/engine-demo.mjs",
+    "perft": "node examples/perft.mjs",
     "ucci": "node bin/xiangqi-ucci.mjs",
     "test": "node --test"
   },

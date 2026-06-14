@@ -1,5 +1,6 @@
 export * from "./constants.js";
 export * from "./board.js";
+export * from "./hash.js";
 export * from "./movegen.js";
 export * from "./evaluate.js";
 export * from "./search.js";
@@ -7,3 +8,4 @@ export * from "./reasoning.js";
 export * from "./engine.js";
 export * from "./protocol/ucci.js";
 export * from "./game.js";
+export * from "./perft.js";
