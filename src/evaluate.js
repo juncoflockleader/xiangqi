@@ -42,6 +42,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     terms[piece.side].pawnStructure += pawnValue(piece, square);
     terms[piece.side].kingSafety += localDefenseValue(position, piece, square);
     terms[piece.side].coordination += coordinationValue(position, piece, square);
+    terms[piece.side].linePressure += linePressureValue(position, piece, square);
   }
 
   for (const side of [SIDES.RED, SIDES.BLACK]) {
@@ -112,7 +113,8 @@ function createTerms() {
     threats: 0,
     pawnStructure: 0,
     kingSafety: 0,
-    coordination: 0
+    coordination: 0,
+    linePressure: 0
   };
 }
 
@@ -209,6 +211,55 @@ function horseLegCoordination(position, piece, square) {
   return blockedLegs === 0 ? score + 18 : score;
 }
 
+function linePressureValue(position, piece, square) {
+  if (piece.type !== PIECES.ROOK && piece.type !== PIECES.CANNON) return 0;
+
+  const enemyKingSquare = position.board.findIndex(
+    (candidate) => candidate?.side === opponent(piece.side) && candidate.type === PIECES.KING
+  );
+  if (enemyKingSquare === -1) return 0;
+
+  const sourceFile = fileOf(square);
+  const sourceRank = rankOf(square);
+  const kingFile = fileOf(enemyKingSquare);
+  const kingRank = rankOf(enemyKingSquare);
+
+  if (sourceFile !== kingFile && sourceRank !== kingRank) return 0;
+
+  const blockers = countLineBlockers(position, square, enemyKingSquare);
+
+  if (piece.type === PIECES.ROOK) {
+    if (blockers === 0) return 90;
+    if (blockers === 1) return 36;
+    return 0;
+  }
+
+  if (blockers === 1) return 95;
+  if (blockers === 0) return 22;
+  if (blockers === 2) return 14;
+  return 0;
+}
+
+function countLineBlockers(position, from, to) {
+  const fromFile = fileOf(from);
+  const fromRank = rankOf(from);
+  const toFile = fileOf(to);
+  const toRank = rankOf(to);
+  const fileStep = Math.sign(toFile - fromFile);
+  const rankStep = Math.sign(toRank - fromRank);
+  let file = fromFile + fileStep;
+  let rank = fromRank + rankStep;
+  let blockers = 0;
+
+  while (file !== toFile || rank !== toRank) {
+    if (position.board[indexOf(file, rank)]) blockers += 1;
+    file += fileStep;
+    rank += rankStep;
+  }
+
+  return blockers;
+}
+
 function localDefenseValue(position, piece, square) {
   if (piece.type !== PIECES.ADVISOR && piece.type !== PIECES.ELEPHANT) return 0;
 
@@ -298,7 +349,8 @@ function readableTerm(term) {
     threats: "tactical pressure",
     pawnStructure: "pawn progress",
     kingSafety: "king safety",
-    coordination: "piece coordination"
+    coordination: "piece coordination",
+    linePressure: "rook and cannon line pressure"
   };
 
   return labels[term] ?? term;

@@ -32,3 +32,26 @@ test("evaluation descriptions surface horse unblocking as coordination", () => {
   assert.ok(delta.delta.coordination > 0);
   assert.ok(notes.some((note) => note.term === "coordination" && note.text.includes("piece coordination")));
 });
+
+test("evaluation rewards cannon screen pressure on the enemy general", () => {
+  const openLine = parseFen("4k4/9/9/9/9/9/9/9/9/3KC4 r");
+  const screenedLine = parseFen("4k4/9/9/9/9/4P4/9/9/9/3KC4 r");
+  const openEval = evaluatePosition(openLine, SIDES.RED, { detailed: true });
+  const screenedEval = evaluatePosition(screenedLine, SIDES.RED, { detailed: true });
+
+  assert.ok(screenedEval.terms.red.linePressure > openEval.terms.red.linePressure);
+  assert.ok(screenedEval.difference.linePressure > openEval.difference.linePressure);
+});
+
+test("evaluation descriptions surface cannon screen creation as line pressure", () => {
+  const position = parseFen("4k4/9/9/9/3P5/9/9/9/9/3KC4 r");
+  const next = applyLegalMove(position, {
+    from: coordToIndex("d4"),
+    to: coordToIndex("e4")
+  });
+  const delta = evaluateMoveDelta(position, next, SIDES.RED);
+  const notes = describeEvaluationTerms(delta.delta);
+
+  assert.ok(delta.delta.linePressure > 0);
+  assert.ok(notes.some((note) => note.term === "linePressure" && note.text.includes("line pressure")));
+});
