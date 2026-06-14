@@ -28,6 +28,7 @@ const LOWER = "lower";
 const UPPER = "upper";
 const DEFAULT_MAX_EXTENSIONS = 4;
 const DEFAULT_MAX_PLY = 80;
+const DEFAULT_ASPIRATION_WINDOW = 45;
 const NULL_MOVE_MIN_DEPTH = 3;
 
 export function searchBestMove(position, options = {}) {
@@ -39,6 +40,7 @@ export function searchBestMove(position, options = {}) {
   const history = new Map();
   const killers = new Map();
   const candidateLimit = options.candidateLimit ?? 8;
+  const exactRootScores = options.exactRootScores === true || !Number.isFinite(candidateLimit);
   const bannedMoveKeys = new Set((options.bannedMoves ?? []).map(moveKey));
   const repetitionCounts = buildRepetitionCounts(options.history ?? options.positionHistory ?? []);
   const rootMoves = generateLegalMoves(position, position.turn)
@@ -67,6 +69,7 @@ export function searchBestMove(position, options = {}) {
   let stats = createSearchStats();
   let candidates = [];
   let previousBest = null;
+  let previousScore = null;
 
   for (let depth = 1; depth <= depthLimit; depth += 1) {
     const context = {
@@ -80,6 +83,9 @@ export function searchBestMove(position, options = {}) {
       pathCounts: new Map(),
       maxExtensions: options.maxExtensions ?? DEFAULT_MAX_EXTENSIONS,
       maxPly: options.maxPly ?? DEFAULT_MAX_PLY,
+      exactRootScores,
+      aspirationWindow: options.aspirationWindow ?? DEFAULT_ASPIRATION_WINDOW,
+      useAspiration: options.useAspiration !== false && !exactRootScores,
       useNullMove: options.useNullMove !== false,
       usePvs: options.usePvs !== false,
       tacticalCache: new Map(),
@@ -88,7 +94,7 @@ export function searchBestMove(position, options = {}) {
       timedOut: false
     };
 
-    const root = searchRoot(position, depth, previousBest, context, rootMoves);
+    const root = searchDepthRoot(position, depth, previousBest, previousScore, context, rootMoves);
     nodes += context.nodes;
     stats = mergeSearchStats(stats, context.stats);
 
@@ -103,6 +109,7 @@ export function searchBestMove(position, options = {}) {
     candidates = root.candidates;
     completedDepth = depth;
     previousBest = bestMove;
+    previousScore = bestScore;
   }
 
   return {
@@ -118,9 +125,30 @@ export function searchBestMove(position, options = {}) {
   };
 }
 
-function searchRoot(position, depth, previousBest, context, rootMoves) {
-  let alpha = -INFINITY_SCORE;
-  const beta = INFINITY_SCORE;
+function searchDepthRoot(position, depth, previousBest, previousScore, context, rootMoves) {
+  if (!shouldUseAspiration(depth, previousScore, context)) {
+    return searchRoot(position, depth, previousBest, context, rootMoves, -INFINITY_SCORE, INFINITY_SCORE);
+  }
+
+  const window = context.aspirationWindow;
+  let alpha = Math.max(-INFINITY_SCORE, previousScore - window);
+  let beta = Math.min(INFINITY_SCORE, previousScore + window);
+  context.stats.aspirationSearches += 1;
+
+  let root = searchRoot(position, depth, previousBest, context, rootMoves, alpha, beta);
+
+  if (!context.timedOut && root.score <= alpha) {
+    context.stats.aspirationFailLow += 1;
+    root = searchRoot(position, depth, previousBest, context, rootMoves, -INFINITY_SCORE, INFINITY_SCORE);
+  } else if (!context.timedOut && root.score >= beta) {
+    context.stats.aspirationFailHigh += 1;
+    root = searchRoot(position, depth, previousBest, context, rootMoves, -INFINITY_SCORE, INFINITY_SCORE);
+  }
+
+  return root;
+}
+
+function searchRoot(position, depth, previousBest, context, rootMoves, alpha, beta) {
   let bestMove = null;
   let bestScore = -INFINITY_SCORE;
   let bestLine = [];
@@ -135,7 +163,9 @@ function searchRoot(position, depth, previousBest, context, rootMoves) {
 
     const next = makeMove(position, move);
     const line = [];
-    const score = normalizeScore(-negamax(next, depth - 1, -INFINITY_SCORE, INFINITY_SCORE, 1, context, line, context.maxExtensions, true));
+    const childAlpha = context.exactRootScores ? -INFINITY_SCORE : -beta;
+    const childBeta = context.exactRootScores ? INFINITY_SCORE : -alpha;
+    const score = normalizeScore(-negamax(next, depth - 1, childAlpha, childBeta, 1, context, line, context.maxExtensions, true));
     const annotated = annotateMove(position, move);
 
     candidates.push({
@@ -151,6 +181,10 @@ function searchRoot(position, depth, previousBest, context, rootMoves) {
     }
 
     alpha = Math.max(alpha, score);
+    if (!context.exactRootScores && alpha >= beta) {
+      context.stats.cutoffs += 1;
+      break;
+    }
   }
 
   candidates.sort((a, b) => b.score - a.score);
@@ -161,6 +195,13 @@ function searchRoot(position, depth, previousBest, context, rootMoves) {
     principalVariation: bestLine,
     candidates: candidates.slice(0, context.candidateLimit)
   };
+}
+
+function shouldUseAspiration(depth, previousScore, context) {
+  if (!context.useAspiration) return false;
+  if (depth <= 1 || previousScore === null) return false;
+  if (Math.abs(previousScore) >= MATE_SCORE - 1000) return false;
+  return context.aspirationWindow > 0 && context.aspirationWindow < INFINITY_SCORE;
 }
 
 function negamax(position, depth, alpha, beta, ply, context, lineOut, extensionsRemaining, allowNullMove) {
@@ -531,6 +572,9 @@ function createSearchStats() {
     qnodes: 0,
     ttHits: 0,
     cutoffs: 0,
+    aspirationSearches: 0,
+    aspirationFailHigh: 0,
+    aspirationFailLow: 0,
     extensions: 0,
     reductions: 0,
     lmrResearches: 0,
@@ -546,6 +590,9 @@ function mergeSearchStats(total, next) {
     qnodes: total.qnodes + next.qnodes,
     ttHits: total.ttHits + next.ttHits,
     cutoffs: total.cutoffs + next.cutoffs,
+    aspirationSearches: total.aspirationSearches + next.aspirationSearches,
+    aspirationFailHigh: total.aspirationFailHigh + next.aspirationFailHigh,
+    aspirationFailLow: total.aspirationFailLow + next.aspirationFailLow,
     extensions: total.extensions + next.extensions,
     reductions: total.reductions + next.reductions,
     lmrResearches: total.lmrResearches + next.lmrResearches,

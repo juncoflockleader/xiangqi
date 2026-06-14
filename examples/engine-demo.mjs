@@ -31,7 +31,7 @@ console.log("Analysis lines:");
 for (const line of analysis.lines) {
   console.log(`${line.rank}. ${line.move.notation} ${line.explanation.summary}`);
 }
-console.log(`Search stats: ${analysis.nodes} nodes, ${analysis.stats.qnodes} qnodes, ${analysis.stats.pvsResearches} PVS re-searches, ${analysis.stats.nullMovePrunes} null-move prunes`);
+console.log(`Search stats: ${analysis.nodes} nodes, ${analysis.stats.qnodes} qnodes, ${analysis.stats.aspirationSearches} aspiration searches, ${analysis.stats.pvsResearches} PVS re-searches, ${analysis.stats.nullMovePrunes} null-move prunes`);
 
 const pressure = engine.pressure(position, { limit: 2 });
 console.log("");

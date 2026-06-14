@@ -35,13 +35,31 @@ test("search treats repeated child positions as draw candidates", () => {
 });
 
 test("search uses selective pruning and PVS in quiet tactical trees", () => {
-  const position = parseFen("4k4/9/9/9/9/9/9/9/4r4/3KR4 r");
+  const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
   const result = searchBestMove(position, {
     depth: 4,
-    timeLimitMs: 1000
+    timeLimitMs: 1000,
+    useAspiration: false
   });
 
   assert.equal(result.depth, 4);
   assert.ok(result.stats.pvsResearches > 0);
   assert.ok(result.stats.nullMovePrunes > 0);
+});
+
+test("search uses aspiration windows after the first completed depth", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const result = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 1000
+  });
+  const withoutAspiration = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 1000,
+    useAspiration: false
+  });
+
+  assert.equal(result.depth, 4);
+  assert.ok(result.stats.aspirationSearches > 0);
+  assert.equal(withoutAspiration.stats.aspirationSearches, 0);
 });
