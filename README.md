@@ -19,6 +19,7 @@ The current engine is dependency-free JavaScript and includes:
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
 - Whole-game review with side summaries, opening-book matches, and key learning moments.
 - Lesson-plan generation that turns reviewed games into prompt, hint, and answer cards.
+- Position-study bundles that combine best move, candidate lines, hints, pressure, optional move review, and oracle evidence for UI screens.
 - Game-history helpers for play sessions, reviewed move logs, engine decision logs, position history, repeated-position detection with cycle/check diagnostics, and async native-backend play.
 - A backend adapter contract and async UCI/UCCI process wrapper so the JS reference engine can sit beside a native C++/WASM engine without changing the learning-app API.
 - Named engine profiles for fast play, balanced play, deeper analysis, and native UCI/UCCI analysis setups.
@@ -87,6 +88,28 @@ console.log(result.explanation.linePlan.summary);
 ```
 
 `chooseMove` returns the selected legal move, search score, principal variation, root candidates, selective-search stats, per-depth iteration trace, and a learning-friendly explanation. The explanation is based on engine-visible facts such as search score, tactical features, evaluation deltas, best-move stability across depths, and comparison against alternatives. `explanation.alternatives` includes verdicts, centipawn loss, expected replies, motifs, and concise reasons explaining why each candidate is better or worse than the top line. `explanation.confidence` gives the UI a structured score, level, label, and factor list derived from depth, candidate gaps, stability, timeout status, or opening-database evidence. `explanation.linePlan` turns the principal variation into a teaching plan with the first move, expected reply, continuation moves, tactical motifs, and score-by-ply annotations from the root side's perspective.
+
+For a learning-app screen, ask for a position study instead of stitching several
+engine calls together:
+
+```js
+const study = engine.studyPosition(position, {
+  lines: 3,
+  depth: 3,
+  timeLimitMs: 1000,
+  playedMove: "h7-e7" // optional player move to review
+});
+
+console.log(study.summary);
+console.log(study.bestMove);
+console.log(study.hints.map((hint) => hint.text));
+console.log(study.candidateLines.map((line) => [line.move, line.scoreText]));
+console.log(study.playedMoveReview?.classification);
+```
+
+`studyPosition` returns one UI-ready bundle with the selected move, explanation,
+candidate lines, progressive hints, pressure/threat summary, optional played-move
+review, and any oracle-review evidence attached by the active backend.
 
 Use named engine profiles when wiring the app:
 

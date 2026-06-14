@@ -2,6 +2,7 @@ import { moveToNotation } from "./board.js";
 import { ENGINE_BACKEND_FEATURES, createEngineBackend } from "./backend.js";
 import { createLessonPlanWithBackend } from "./lesson.js";
 import { reviewGameWithBackend } from "./review.js";
+import { studyPositionWithBackend } from "./study.js";
 
 export function createOracleReviewEngineBackend(candidateBackend, oracleBackend, options = {}) {
   validateCandidateBackend(candidateBackend);
@@ -51,6 +52,7 @@ export function createOracleReviewEngineBackend(candidateBackend, oracleBackend,
     }),
     reviewGame: (moves, gameOptions = {}) => reviewGameWithBackend(backend, moves, gameOptions),
     coachMove: (...args) => candidateBackend.coachMove?.(...args),
+    studyPosition: (position, studyOptions = {}) => studyPositionWithBackend(backend, position, studyOptions),
     lessonPlan: (moves, lessonOptions = {}) => createLessonPlanWithBackend(backend, moves, lessonOptions),
     openingBook: (...args) => candidateBackend.openingBook(...args),
     evaluate: (...args) => candidateBackend.evaluate?.(...args),

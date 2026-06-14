@@ -8,6 +8,7 @@ import { analyzeReviewMistakes } from "./mistakes.js";
 import { reviewGameWithEngine } from "./review.js";
 import { coachMoveWithEngine } from "./coach.js";
 import { createLessonPlanWithEngine } from "./lesson.js";
+import { studyPositionWithEngine } from "./study.js";
 import { resolveEngineOptions } from "./profiles.js";
 import { searchBestMove } from "./search.js";
 import { createTranspositionTable } from "./transposition.js";
@@ -150,6 +151,13 @@ export function createEngine(defaultOptions = {}) {
 
     coachMove(position, options = {}) {
       return coachMoveWithEngine(this, position, {
+        ...engineOptions,
+        ...options
+      });
+    },
+
+    studyPosition(position, options = {}) {
+      return studyPositionWithEngine(this, position, {
         ...engineOptions,
         ...options
       });

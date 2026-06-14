@@ -18,6 +18,7 @@ import { hasClockTimeControl, resolveSearchBudget } from "./time.js";
 import { reviewGameWithBackend } from "./review.js";
 import { coachMoveWithBackend } from "./coach.js";
 import { createLessonPlanWithBackend } from "./lesson.js";
+import { studyPositionWithBackend } from "./study.js";
 import { resolveEngineOptions } from "./profiles.js";
 
 const DEFAULT_UCCI_TIMEOUT_MS = 5000;
@@ -106,6 +107,7 @@ export function createUcciEngineBackend(options = {}) {
       });
     },
     coachMove: (position, coachOptions = {}) => coachMoveWithBackend(backend, position, coachOptions),
+    studyPosition: (position, studyOptions = {}) => studyPositionWithBackend(backend, position, studyOptions),
     lessonPlan: (moves, lessonOptions = {}) => {
       const { reviewOptions = {}, ...planOptions } = lessonOptions;
       return createLessonPlanWithBackend(backend, moves, {
