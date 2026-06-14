@@ -14,7 +14,7 @@ The current engine is dependency-free JavaScript and includes:
 - Static exchange analysis for distinguishing clean wins, tactically poisoned captures, and defended captures that remain sound after recaptures.
 - Immediate pressure/threat analysis for both sides.
 - Perft helpers for validating move generation while the engine grows.
-- Explainable move output for learning-app use cases, including depth-by-depth search trace and best-move stability.
+- Explainable move output for learning-app use cases, including structured confidence, depth-by-depth search trace, and best-move stability.
 - Progressive coach hints that can reveal an idea, tactical clue, candidate focus, and full best-move reasoning.
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
 - Whole-game review with side summaries, opening-book matches, and key learning moments.
@@ -47,9 +47,10 @@ const result = engine.chooseMove(position);
 
 console.log(result.bestMove.notation);
 console.log(result.explanation.summary);
+console.log(result.explanation.confidence.level);
 ```
 
-`chooseMove` returns the selected legal move, search score, principal variation, root candidates, selective-search stats, per-depth iteration trace, and a learning-friendly explanation. The explanation is based on engine-visible facts such as search score, tactical features, evaluation deltas, best-move stability across depths, and comparison against alternatives.
+`chooseMove` returns the selected legal move, search score, principal variation, root candidates, selective-search stats, per-depth iteration trace, and a learning-friendly explanation. The explanation is based on engine-visible facts such as search score, tactical features, evaluation deltas, best-move stability across depths, and comparison against alternatives. `explanation.confidence` gives the UI a structured score, level, label, and factor list derived from depth, candidate gaps, stability, timeout status, or opening-database evidence.
 
 Use named engine profiles when wiring the app:
 

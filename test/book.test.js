@@ -31,6 +31,8 @@ test("engine chooses and explains opening book moves by default", () => {
   assert.equal(result.depth, 0);
   assert.ok(result.explanation.summary.includes("book move"));
   assert.ok(result.explanation.reasons.some((reason) => reason.includes("Opening book")));
+  assert.ok(result.explanation.confidence.score >= 45);
+  assert.ok(result.explanation.confidence.factors.some((factor) => factor.kind === "book"));
 });
 
 test("opening book can be disabled for pure search", () => {
@@ -156,6 +158,7 @@ test("structured opening records preserve database priors for explanations", () 
   assert.equal(Math.round(result.book.database.expectedScore * 100), 78);
   assert.ok(result.book.database.summary.includes("80 database games"));
   assert.ok(result.explanation.reasons.some((reason) => reason.includes("sample-master-db")));
+  assert.ok(result.explanation.confidence.factors.some((factor) => factor.kind === "database-games"));
   assert.ok(result.book.tags.includes("master"));
 });
 

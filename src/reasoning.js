@@ -19,7 +19,8 @@ export function explainMove(position, searchResult) {
       summary: "No legal move is available.",
       reasons: [isInCheck(position, position.turn) ? "The side to move is checkmated." : "The side to move has no legal move."],
       alternatives: [],
-      principalVariation: []
+      principalVariation: [],
+      confidence: terminalConfidence(position)
     };
   }
 
@@ -44,6 +45,7 @@ export function explainMove(position, searchResult) {
 
   const bestLine = searchResult.principalVariation ?? [];
   const summary = `${pieceLabel(move.piece)} ${moveToNotation(move)} is preferred at depth ${searchResult.depth}, with an engine score of ${formatScore(searchResult.score)} for ${position.turn}.`;
+  const confidence = assessSearchConfidence(searchResult, { source: searchResult.source ?? "search" });
 
   return {
     summary,
@@ -52,6 +54,7 @@ export function explainMove(position, searchResult) {
     principalVariation: bestLine.map((candidate) => candidate.notation ?? moveToNotation(candidate)),
     principalVariationText: formatPrincipalVariation(bestLine),
     evaluationDelta: moveStory.evaluationDelta,
+    confidence,
     search: {
       depth: searchResult.depth,
       nodes: searchResult.nodes,
@@ -75,6 +78,7 @@ export function explainBookMove(position, bookResult) {
     ...(entry.database?.summary ? [entry.database.summary] : []),
     ...moveStory.reasons
   ];
+  const confidence = assessSearchConfidence(bookResult, { source: bookResult.source ?? "opening-book" });
 
   return {
     summary: `${pieceLabel(move.piece)} ${moveToNotation(move)} is the ${summaryType}: ${entry.name}.`,
@@ -88,6 +92,7 @@ export function explainBookMove(position, bookResult) {
     principalVariation: [moveToNotation(move)],
     principalVariationText: moveToNotation(move),
     evaluationDelta: moveStory.evaluationDelta,
+    confidence,
     search: {
       depth: 0,
       nodes: 0,
@@ -215,6 +220,99 @@ export function formatScore(score) {
   return `${pawns >= 0 ? "+" : ""}${pawns.toFixed(2)}`;
 }
 
+export function assessSearchConfidence(result, context = {}) {
+  const source = context.source ?? result.source ?? "";
+  if (source.startsWith("opening")) return assessBookConfidence(result, source);
+
+  const factors = [];
+  let score = 35;
+  const depth = result.depth ?? 0;
+  const candidates = result.candidates ?? [];
+  const iterations = result.iterations ?? [];
+  const gap = candidateScoreGap(result);
+
+  const depthImpact = Math.min(26, depth * 6);
+  score += depthImpact;
+  factors.push({
+    kind: "depth",
+    impact: depthImpact,
+    text: depth > 0 ? `Search completed depth ${depth}.` : "No completed search depth."
+  });
+
+  if (gap !== null) {
+    const gapImpact = gap >= 120 ? 20 : gap >= 60 ? 15 : gap >= 25 ? 9 : gap <= 10 ? -8 : 0;
+    score += gapImpact;
+    factors.push({
+      kind: "candidate-gap",
+      impact: gapImpact,
+      text: gapImpact > 0
+        ? `Top candidate leads the next line by ${Math.round(gap)} centipawns.`
+        : `Top candidate is close to the next line, only ${Math.round(gap)} centipawns apart.`
+    });
+  } else {
+    score -= 5;
+    factors.push({
+      kind: "candidate-gap",
+      impact: -5,
+      text: "Only one candidate line was available for comparison."
+    });
+  }
+
+  const stability = bestMoveStability(iterations);
+  if (stability.stable > 0) {
+    const impact = Math.min(18, stability.stable * 8);
+    score += impact;
+    factors.push({
+      kind: "stability",
+      impact,
+      text: `Best move stayed stable across ${stability.stable} depth transition${stability.stable === 1 ? "" : "s"}.`
+    });
+  } else if (stability.changed > 0) {
+    score -= 8;
+    factors.push({
+      kind: "stability",
+      impact: -8,
+      text: "The best move changed at the last completed depth."
+    });
+  }
+
+  if (result.timedOut) {
+    score -= 20;
+    factors.push({
+      kind: "time",
+      impact: -20,
+      text: "Search stopped on the time limit before finishing the next depth."
+    });
+  } else {
+    score += 5;
+    factors.push({
+      kind: "time",
+      impact: 5,
+      text: "Search completed its requested depth without timing out."
+    });
+  }
+
+  if (Math.abs(result.score ?? 0) > 90000) {
+    score += 18;
+    factors.push({
+      kind: "forced-score",
+      impact: 18,
+      text: "The score indicates a forced win or loss."
+    });
+  }
+
+  if (candidates.length >= 3) {
+    score += 5;
+    factors.push({
+      kind: "breadth",
+      impact: 5,
+      text: `Compared ${Math.min(candidates.length, 12)} root candidate lines.`
+    });
+  }
+
+  return buildConfidence(score, factors);
+}
+
 function explainAlternatives(candidates) {
   return candidates.slice(0, 5).map((candidate, index) => {
     const move = candidate.move;
@@ -242,6 +340,105 @@ function candidateScoreGap(searchResult) {
   const candidates = searchResult.candidates ?? [];
   if (candidates.length < 2) return null;
   return candidates[0].score - candidates[1].score;
+}
+
+function assessBookConfidence(result, source) {
+  const factors = [];
+  let score = source === "opening-heuristic" ? 46 : 62;
+  const alternatives = result.bookAlternatives ?? [];
+  const gap = alternatives.length >= 2
+    ? (alternatives[0].weight ?? 0) - (alternatives[1].weight ?? 0)
+    : null;
+  const database = result.book?.database;
+
+  factors.push({
+    kind: source === "opening-heuristic" ? "heuristic" : "book",
+    impact: source === "opening-heuristic" ? -8 : 12,
+    text: source === "opening-heuristic"
+      ? "Move comes from opening heuristics rather than an exact book position."
+      : "Move comes from an exact opening-book position."
+  });
+
+  if (gap !== null) {
+    const impact = gap >= 40 ? 16 : gap >= 15 ? 9 : gap <= 5 ? -8 : 0;
+    score += impact;
+    factors.push({
+      kind: "book-gap",
+      impact,
+      text: impact > 0
+        ? `Book weight leads the next alternative by ${Math.round(gap)} points.`
+        : `Book alternatives are close, only ${Math.round(gap)} weight points apart.`
+    });
+  }
+
+  if (database?.games) {
+    const impact = Math.min(18, Math.max(4, Math.round(Math.log10(database.games + 1) * 6)));
+    score += impact;
+    factors.push({
+      kind: "database-games",
+      impact,
+      text: `Opening prior is backed by ${Math.round(database.games)} database games.`
+    });
+  }
+
+  if (database?.expectedScore !== undefined) {
+    const expectedScore = Math.round(database.expectedScore * 100);
+    const impact = expectedScore >= 65 ? 10 : expectedScore <= 45 ? -6 : 3;
+    score += impact;
+    factors.push({
+      kind: "database-score",
+      impact,
+      text: `Database expected score is ${expectedScore}% for the side to move.`
+    });
+  }
+
+  return buildConfidence(score, factors);
+}
+
+function terminalConfidence(position) {
+  return buildConfidence(100, [{
+    kind: "terminal",
+    impact: 100,
+    text: isInCheck(position, position.turn)
+      ? "No legal move exists because the side to move is checkmated."
+      : "No legal move exists in this terminal position."
+  }]);
+}
+
+function bestMoveStability(iterations) {
+  let stable = 0;
+  let changed = 0;
+
+  for (const iteration of iterations) {
+    if (iteration.stableBestMove === true) stable += 1;
+    if (iteration.stableBestMove === false) changed += 1;
+  }
+
+  return { stable, changed };
+}
+
+function buildConfidence(rawScore, factors) {
+  const score = Math.round(Math.max(0, Math.min(100, rawScore)));
+  const level = score >= 85 ? "very-high" : score >= 70 ? "high" : score >= 45 ? "medium" : "low";
+  const label = {
+    "very-high": "Very high confidence",
+    high: "High confidence",
+    medium: "Medium confidence",
+    low: "Low confidence"
+  }[level];
+
+  return {
+    score,
+    level,
+    label,
+    factors: factors
+      .filter((factor) => factor?.text)
+      .map((factor) => ({
+        kind: factor.kind,
+        impact: Math.round(factor.impact),
+        text: factor.text
+      }))
+  };
 }
 
 function searchStabilityReason(iterations) {

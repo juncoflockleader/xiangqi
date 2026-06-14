@@ -85,6 +85,9 @@ test("engine returns a legal move and explanation", () => {
   assert.ok(result.explanation.search.stats.nodes > 0);
   assert.equal(result.explanation.search.iterations.length, result.depth);
   assert.ok(result.explanation.search.iterations.at(-1).principalVariation.length > 0);
+  assert.ok(result.explanation.confidence.score >= 0);
+  assert.ok(["low", "medium", "high", "very-high"].includes(result.explanation.confidence.level));
+  assert.ok(result.explanation.confidence.factors.some((factor) => factor.kind === "depth"));
 });
 
 test("engine sees a simple winning capture", () => {

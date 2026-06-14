@@ -11,7 +11,7 @@ import {
 import { ENGINE_BACKEND_FEATURES, createEngineBackend } from "./backend.js";
 import { bookMoveToCandidate } from "./book.js";
 import { classifyMoveLoss, createEngine } from "./engine.js";
-import { explainBookMove, explainMoveFeatures, explainReviewedMove, formatScore } from "./reasoning.js";
+import { assessSearchConfidence, explainBookMove, explainMoveFeatures, explainReviewedMove, formatScore } from "./reasoning.js";
 import { annotateMove, generateLegalMoves } from "./movegen.js";
 import { hasClockTimeControl, resolveSearchBudget } from "./time.js";
 import { reviewGameWithBackend } from "./review.js";
@@ -599,6 +599,7 @@ function explainNativeMove(position, result, backendName) {
     principalVariation,
     principalVariationText: principalVariation.join(" "),
     evaluationDelta: moveStory.evaluationDelta,
+    confidence: assessSearchConfidence(result, { source: result.source ?? result.protocol ?? "native" }),
     search: {
       depth: result.depth,
       nodes: result.nodes,
