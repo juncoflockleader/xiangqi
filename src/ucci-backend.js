@@ -740,6 +740,8 @@ function createEmptyStats() {
     mateDistanceWindows: 0,
     razorPrunes: 0,
     razorResearches: 0,
+    probCutPrunes: 0,
+    probCutSearches: 0,
     futilityPrunes: 0,
     deltaPrunes: 0,
     reductions: 0,

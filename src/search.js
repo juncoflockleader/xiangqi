@@ -45,6 +45,10 @@ const DEFAULT_SOFT_MIN_DEPTH = 2;
 const DEFAULT_SOFT_STABLE_DEPTHS = 1;
 const DEFAULT_SOFT_SCORE_GAP = 80;
 const DEFAULT_SEE_PRUNE_MARGIN = 120;
+const DEFAULT_PROBCUT_MARGIN = 170;
+const PROBCUT_MIN_DEPTH = 4;
+const PROBCUT_REDUCTION = 2;
+const PROBCUT_CAPTURE_LIMIT = 6;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -132,7 +136,9 @@ export function searchBestMove(position, options = {}) {
       useRecaptureExtensions: options.useRecaptureExtensions !== false,
       useSeePruning: options.useSeePruning !== false,
       useHistoryMalus: options.useHistoryMalus !== false,
+      useProbCut: options.useProbCut !== false,
       seePruneMargin: Math.max(0, numberOption(options.seePruneMargin, DEFAULT_SEE_PRUNE_MARGIN)),
+      probCutMargin: Math.max(0, numberOption(options.probCutMargin, DEFAULT_PROBCUT_MARGIN)),
       useSoftTimeManagement: options.useSoftTimeManagement !== false && !exactRootScores,
       softDeadline,
       softMinDepth: Math.max(1, Math.floor(numberOption(options.softMinDepth, DEFAULT_SOFT_MIN_DEPTH))),
@@ -493,6 +499,26 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       return razorScore;
     }
     context.stats.razorResearches += 1;
+  }
+
+  const probCutScore = tryProbCut({
+    position,
+    depth,
+    alpha,
+    beta,
+    ply,
+    context,
+    extensionsRemaining,
+    previousMove,
+    inCheck
+  });
+  if (context.timedOut) {
+    leavePosition(context, repetitionKey);
+    return probCutScore ?? evaluatePosition(position, position.turn).score;
+  }
+  if (probCutScore !== null) {
+    leavePosition(context, repetitionKey);
+    return probCutScore;
   }
 
   for (let index = 0; index < ordered.length; index += 1) {
@@ -897,6 +923,68 @@ function shouldPruneDelta({ position, move, standPat, alpha, context }) {
   return !givesCheck(position, move);
 }
 
+function tryProbCut({
+  position,
+  depth,
+  alpha,
+  beta,
+  ply,
+  context,
+  extensionsRemaining,
+  previousMove,
+  inCheck
+}) {
+  if (!context.useProbCut) return null;
+  if (depth < PROBCUT_MIN_DEPTH) return null;
+  if (inCheck) return null;
+  if (beta - alpha !== 1) return null;
+  if (alpha <= -MATE_SCORE + 1000 || beta >= MATE_SCORE - 1000) return null;
+
+  const threshold = beta + context.probCutMargin;
+  const reducedDepth = Math.max(0, depth - 1 - PROBCUT_REDUCTION);
+  const captures = orderMoves(position, generateCaptures(position), null, context, ply, previousMove)
+    .filter((move) => shouldVerifyProbCutCapture(position, move, context))
+    .slice(0, PROBCUT_CAPTURE_LIMIT);
+
+  for (const move of captures) {
+    if (isTimedOut(context)) {
+      context.timedOut = true;
+      return null;
+    }
+
+    context.stats.probCutSearches += 1;
+    const next = makeMove(position, move);
+    const score = normalizeScore(-negamax(
+      next,
+      reducedDepth,
+      -threshold,
+      -threshold + 1,
+      ply + 1,
+      context,
+      null,
+      extensionsRemaining,
+      false,
+      move
+    ));
+
+    if (context.timedOut) return null;
+    if (score >= threshold) {
+      context.stats.probCutPrunes += 1;
+      return threshold;
+    }
+  }
+
+  return null;
+}
+
+function shouldVerifyProbCutCapture(position, move, context) {
+  if (!move.captured) return false;
+  if (move.captured.type === PIECES.KING) return false;
+  const capture = getCaptureAnalysis(position, move, context);
+  if (!capture.isSafe && capture.exchangeScore < 0) return false;
+  return capture.exchangeScore >= 0 || PIECE_VALUES[move.captured.type] >= PIECE_VALUES[PIECES.HORSE];
+}
+
 function futilityMargin(depth) {
   return FUTILITY_BASE_MARGIN + FUTILITY_DEPTH_MARGIN * depth;
 }
@@ -1083,6 +1171,8 @@ function createSearchStats() {
     mateDistanceWindows: 0,
     razorPrunes: 0,
     razorResearches: 0,
+    probCutPrunes: 0,
+    probCutSearches: 0,
     futilityPrunes: 0,
     deltaPrunes: 0,
     reductions: 0,
@@ -1120,6 +1210,8 @@ function mergeSearchStats(total, next) {
     mateDistanceWindows: total.mateDistanceWindows + next.mateDistanceWindows,
     razorPrunes: total.razorPrunes + next.razorPrunes,
     razorResearches: total.razorResearches + next.razorResearches,
+    probCutPrunes: total.probCutPrunes + next.probCutPrunes,
+    probCutSearches: total.probCutSearches + next.probCutSearches,
     futilityPrunes: total.futilityPrunes + next.futilityPrunes,
     deltaPrunes: total.deltaPrunes + next.deltaPrunes,
     reductions: total.reductions + next.reductions,
