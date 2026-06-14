@@ -254,11 +254,12 @@ position fen 4k4/9/4r4/9/9/9/9/9/9/3KR4 r
 go depth 2 movetime 1000
 go depth 4 wtime 60000 btime 45000 winc 1000 binc 1000 movestogo 20
 analyze depth 2 movetime 1000 lines 3
+hint depth 2 movetime 1000 levels 2
 book
 review depth 1 movetime 500
 ```
 
-The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, clock controls such as `wtime`, `btime`, `winc`, `binc`, and `movestogo`, `setoption name MultiPV value N`, `setoption name HashEntries value N`, `setoption name UseBook value false`, `analyze`, `probe`, `pressure`, `review`, `explain`, and `quit`. `go` info lines include counters such as `qnodes`, `qchecks`, `tthits`, `ttstores`, `ttevict`, `asp`, `asphi`, `asplo`, `ext`, `futil`, `nmp`, and `pvs` for learning-app diagnostics.
+The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, clock controls such as `wtime`, `btime`, `winc`, `binc`, and `movestogo`, `setoption name MultiPV value N`, `setoption name HashEntries value N`, `setoption name UseBook value false`, `analyze`, `hint`/`coach`, `probe`, `pressure`, `review`, `explain`, and `quit`. `hint ... levels N` emits the progressive coach ladder up to level `N`; level 4 includes the full reveal and `bestmove`. `go` info lines include counters such as `qnodes`, `qchecks`, `tthits`, `ttstores`, `ttevict`, `asp`, `asphi`, `asplo`, `ext`, `futil`, `nmp`, and `pvs` for learning-app diagnostics.
 
 ## Movegen Validation
 

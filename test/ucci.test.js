@@ -8,6 +8,7 @@ test("UCCI session identifies itself", () => {
 
   assert.ok(output.some((line) => line.startsWith("id name")));
   assert.ok(output.some((line) => line.includes("MultiPV")));
+  assert.ok(output.some((line) => line.includes("HintLevels")));
   assert.ok(output.some((line) => line.includes("HashEntries")));
   assert.ok(output.some((line) => line.includes("UseBook")));
   assert.ok(output.includes("ucciok"));
@@ -149,4 +150,39 @@ test("UCCI review reports no moves when history is empty", () => {
   session.handleLine("position startpos");
 
   assert.deepEqual(session.handleLine("review"), ["info string review no moves"]);
+});
+
+test("UCCI hint returns progressive coach levels and reveal", () => {
+  const session = new UcciSession({ depth: 2, timeLimitMs: 1000 });
+  session.handleLine("position startpos");
+  const output = session.handleLine("hint depth 2 movetime 1000 lines 2");
+
+  assert.ok(output.some((line) => line.includes("hint side red source opening-book")));
+  assert.ok(output.some((line) => line.includes("hint level 1 concept Opening Idea")));
+  assert.ok(output.some((line) => line.includes("hint level 4 reveal Best Move")));
+  assert.ok(output.some((line) => line.includes("hint candidate 1 h7e7")));
+  assert.ok(output.some((line) => line.includes("hint best h7e7 pv h7e7")));
+  assert.ok(output.includes("bestmove h7e7"));
+});
+
+test("UCCI hint can stop before revealing the best move", () => {
+  const session = new UcciSession({ depth: 2, timeLimitMs: 1000 });
+  session.handleLine("position startpos");
+  const output = session.handleLine("coach depth 2 movetime 1000 levels 2");
+
+  assert.ok(output.some((line) => line.includes("hint level 1")));
+  assert.ok(output.some((line) => line.includes("hint level 2")));
+  assert.equal(output.some((line) => line.includes("hint level 4")), false);
+  assert.equal(output.some((line) => line.startsWith("bestmove ")), false);
+});
+
+test("UCCI HintLevels option controls default hint depth", () => {
+  const session = new UcciSession({ depth: 2, timeLimitMs: 1000 });
+  session.handleLine("setoption name HintLevels value 2");
+  session.handleLine("position startpos");
+  const output = session.handleLine("hint depth 2 movetime 1000");
+
+  assert.ok(output.some((line) => line.includes("hint level 2")));
+  assert.equal(output.some((line) => line.includes("hint level 3")), false);
+  assert.equal(output.some((line) => line.startsWith("bestmove ")), false);
 });

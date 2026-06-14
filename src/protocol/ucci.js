@@ -12,6 +12,7 @@ const DEFAULT_OPTIONS = Object.freeze({
   depth: 4,
   timeLimitMs: 2000,
   multiPv: 1,
+  hintLevels: 4,
   useBook: true,
   maxTranspositionEntries: 50_000
 });
@@ -56,6 +57,9 @@ export class UcciSession {
           return this.pressure(trimmed);
         case "review":
           return this.review(trimmed);
+        case "hint":
+        case "coach":
+          return this.hint(trimmed);
         case "explain":
           return this.explain();
         case "quit":
@@ -75,6 +79,7 @@ export class UcciSession {
       "option name Depth type spin default 4 min 1 max 8",
       "option name MoveTime type spin default 2000 min 50 max 60000",
       "option name MultiPV type spin default 1 min 1 max 12",
+      "option name HintLevels type spin default 4 min 1 max 4",
       "option name HashEntries type spin default 50000 min 128 max 1000000",
       "option name UseBook type check default true",
       "option name Explain type check default true",
@@ -95,6 +100,8 @@ export class UcciSession {
       this.options.timeLimitMs = clampInteger(value, 50, 120000, this.options.timeLimitMs);
     } else if (normalized === "multipv") {
       this.options.multiPv = clampInteger(value, 1, 12, this.options.multiPv);
+    } else if (normalized === "hintlevels") {
+      this.options.hintLevels = clampInteger(value, 1, 4, this.options.hintLevels);
     } else if (normalized === "hashentries" || normalized === "maxtranspositionentries") {
       this.options.maxTranspositionEntries = clampInteger(value, 128, 1_000_000, this.options.maxTranspositionEntries);
     } else if (normalized === "usebook") {
@@ -273,6 +280,44 @@ export class UcciSession {
 
     for (const moment of result.keyMoments.slice(0, 3)) {
       outputs.push(`info string moment ${moment.ply} ${moment.side} ${moment.notation} ${moment.classification} loss ${moment.centipawnLoss} best ${stripMoveSeparator(moment.bestMove)}: ${moment.summary}`);
+    }
+
+    return outputs;
+  }
+
+  hint(line) {
+    const tokens = line.split(/\s+/);
+    const options = parseGoOptions(line.replace(/^(hint|coach)/i, "go"), this.options, this.position.turn);
+    const lines = readTokenInteger(tokens, "lines", readTokenInteger(tokens, "multipv", 3));
+    const maxLevels = readTokenInteger(tokens, "levels", readTokenInteger(tokens, "maxlevels", this.options.hintLevels));
+    const result = this.engine.coachMove(this.position, {
+      ...options,
+      lines,
+      maxLevels: Math.max(1, Math.min(4, maxLevels)),
+      bannedMoves: this.bannedMoves,
+      useBook: this.options.useBook
+    });
+    const outputs = [
+      `info string hint side ${result.side} source ${result.source} depth ${result.depth ?? 0}`
+    ];
+
+    for (const level of result.levels) {
+      outputs.push(`info string hint level ${level.level} ${level.kind} ${level.title}: ${level.text}`);
+    }
+
+    if (!result.bestMove) {
+      outputs.push("bestmove 0000");
+      return outputs;
+    }
+
+    for (const alternative of result.alternatives.slice(0, lines)) {
+      outputs.push(`info string hint candidate ${alternative.rank} ${stripMoveSeparator(alternative.notation)} score ${alternative.score}`);
+    }
+
+    const shouldReveal = result.levels.some((level) => level.kind === "reveal");
+    if (shouldReveal) {
+      outputs.push(`info string hint best ${protocolMove(result.bestMove)} pv ${result.principalVariation.map(stripMoveSeparator).join(" ")}`);
+      outputs.push(`bestmove ${protocolMove(result.bestMove)}`);
     }
 
     return outputs;
