@@ -32,6 +32,7 @@ The current engine is dependency-free JavaScript and includes:
 npm run play
 node examples/engine-demo.mjs
 node examples/benchmark.mjs
+node examples/sparring.mjs --plies 12
 node examples/perft.mjs 2
 node bin/xiangqi-ucci.mjs
 npm test
@@ -263,6 +264,36 @@ const comparison = await compareEngineBackends([jsBackend, nativeBackend]);
 console.log(formatEngineComparisonReport(comparison));
 await nativeBackend.close();
 ```
+
+Run a repeatable sparring match:
+
+```js
+import {
+  createJavaScriptEngineBackend,
+  formatSparringReport,
+  runSparringMatch
+} from "./src/index.js";
+
+const red = createJavaScriptEngineBackend({ name: "Book+JS", depth: 2 });
+const black = createJavaScriptEngineBackend({ name: "Search-only JS", depth: 2 });
+
+const sparring = await runSparringMatch({
+  red,
+  black: {
+    engine: black,
+    searchOptions: { useBook: false }
+  }
+}, {
+  maxPlies: 20,
+  searchOptions: { timeLimitMs: 1000 }
+});
+
+console.log(formatSparringReport(sparring));
+console.log(sparring.moves[0].summary);
+console.log(sparring.aggregate.fallbackCount);
+```
+
+The sparring harness uses the same game-history layer as a play session, so every move keeps the chosen notation, position FENs, search source, score, depth, nodes, principal variation, explanation summary/reasons, backend status, and native-fallback provenance. It is meant for repeatable engine-vs-engine smoke tests before trying brittle online boards. Run `npm run spar -- --plies 20 --depth 2 --time 1000`, or set `XIANGQI_ENGINE_COMMAND` to put a native UCI/UCCI engine on both sides through the learning backend.
 
 Inspect threats without running a full search:
 

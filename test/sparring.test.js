@@ -1,0 +1,84 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  createJavaScriptEngineBackend,
+  createLearningEngineBackend,
+  formatSparringReport,
+  runSparringMatch
+} from "../src/index.js";
+
+test("sparring match runs bounded engine self-play with reasoning logs", async () => {
+  const red = createJavaScriptEngineBackend({ id: "red-test", name: "Red Test", depth: 1, timeLimitMs: 100 });
+  const black = createJavaScriptEngineBackend({ id: "black-test", name: "Black Test", depth: 1, timeLimitMs: 100 });
+  const report = await runSparringMatch({ red, black }, {
+    maxPlies: 4,
+    searchOptions: { useBook: false, depth: 1, timeLimitMs: 100 }
+  });
+  const text = formatSparringReport(report);
+
+  assert.equal(report.totalPlies, 4);
+  assert.equal(report.stopReason, "max-plies");
+  assert.equal(report.status.state, "playing");
+  assert.equal(report.players.red.name, "Red Test");
+  assert.equal(report.players.black.name, "Black Test");
+  assert.equal(report.players.red.status.state, "primary");
+  assert.ok(report.aggregate.nodes > 0);
+  assert.ok(report.aggregate.nodesPerSecond >= 0);
+  assert.equal(report.aggregate.sides.red.moves, 2);
+  assert.equal(report.aggregate.sides.black.moves, 2);
+  assert.ok(report.moves.every((move) => move.summary.includes(move.notation)));
+  assert.ok(report.moves.every((move) => move.backendStatus.state === "primary"));
+  assert.ok(text.includes("Sparring: Red Test (Red) vs Black Test (Black)"));
+  assert.ok(text.includes("after 4 plies"));
+});
+
+test("sparring match stops immediately on terminal initial positions", async () => {
+  const report = await runSparringMatch(null, {
+    initialFen: "3rkr3/9/9/9/9/9/9/9/9/4K4 r",
+    maxPlies: 10
+  });
+
+  assert.equal(report.totalPlies, 0);
+  assert.equal(report.status.state, "checkmate");
+  assert.equal(report.stopReason, "checkmate");
+  assert.equal(report.aggregate.nodes, 0);
+});
+
+test("sparring match validates player backends", async () => {
+  await assert.rejects(
+    () => runSparringMatch({ red: { chooseMove() {} }, black: { chooseMove() {}, play() {} } }),
+    /red player is missing play/
+  );
+});
+
+test("sparring match records hybrid backend fallback provenance", async () => {
+  const red = createLearningEngineBackend({
+    command: "/path/that/should/not/start",
+    profile: "native-ucci",
+    depth: 1,
+    timeLimitMs: 100,
+    startupTimeoutMs: 50,
+    commandTimeoutMs: 50,
+    javascript: {
+      profile: "fast",
+      depth: 1,
+      timeLimitMs: 100
+    }
+  });
+  const black = createJavaScriptEngineBackend({ id: "black-test", name: "Black Test", depth: 1, timeLimitMs: 100 });
+
+  try {
+    const report = await runSparringMatch({ red, black }, {
+      maxPlies: 1,
+      searchOptions: { useBook: false, depth: 1, timeLimitMs: 100 }
+    });
+
+    assert.equal(report.totalPlies, 1);
+    assert.equal(report.aggregate.fallbackCount, 1);
+    assert.equal(report.aggregate.sides.red.fallbackCount, 1);
+    assert.equal(report.moves[0].backendStatus.state, "fallback");
+    assert.equal(report.moves[0].backendFallback.fallbackBackend, "javascript-reference");
+  } finally {
+    await red.close();
+  }
+});
