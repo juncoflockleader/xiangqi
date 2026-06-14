@@ -33,6 +33,7 @@ const DEFAULT_MAX_EXTENSIONS = 4;
 const DEFAULT_MAX_PLY = 80;
 const DEFAULT_ASPIRATION_WINDOW = 45;
 const DEFAULT_QCHECK_DEPTH = 1;
+const DEFAULT_DELTA_MARGIN = 160;
 const FUTILITY_BASE_MARGIN = 90;
 const FUTILITY_DEPTH_MARGIN = 70;
 const NULL_MOVE_MIN_DEPTH = 3;
@@ -104,11 +105,13 @@ export function searchBestMove(position, options = {}) {
       exactRootScores,
       aspirationWindow: options.aspirationWindow ?? DEFAULT_ASPIRATION_WINDOW,
       qCheckDepth: options.qCheckDepth ?? DEFAULT_QCHECK_DEPTH,
+      deltaMargin: options.deltaMargin ?? DEFAULT_DELTA_MARGIN,
       useAspiration: options.useAspiration !== false && !exactRootScores,
       useNullMove: options.useNullMove !== false,
       usePvs: options.usePvs !== false,
       useCountermoves: options.useCountermoves !== false,
       useFutilityPruning: options.useFutilityPruning !== false,
+      useDeltaPruning: options.useDeltaPruning !== false,
       useQuiescenceChecks: options.useQuiescenceChecks !== false,
       tacticalCache: new Map(),
       stats: createSearchStats(),
@@ -534,8 +537,15 @@ function quiescence(position, alpha, beta, ply, context, qChecksRemaining) {
     }
     if (standPat > alpha) alpha = standPat;
 
-    const captures = orderMoves(position, generateCaptures(position), null, context, ply)
-      .filter((move) => isGoodCapture(position, move, context));
+    const captures = [];
+    for (const move of orderMoves(position, generateCaptures(position), null, context, ply)) {
+      if (!isGoodCapture(position, move, context)) continue;
+      if (shouldPruneDelta({ position, move, standPat, alpha, context })) {
+        context.stats.deltaPrunes += 1;
+        continue;
+      }
+      captures.push(move);
+    }
     const checkingMoves = quietCheckingMoves(position, context, qChecksRemaining, ply);
     moves = [...captures, ...checkingMoves];
   }
@@ -664,6 +674,15 @@ function shouldPruneFutility({
   if (alpha <= -MATE_SCORE + 1000 || beta >= MATE_SCORE - 1000) return false;
 
   return staticScore + futilityMargin(depth) <= alpha;
+}
+
+function shouldPruneDelta({ position, move, standPat, alpha, context }) {
+  if (!context.useDeltaPruning) return false;
+  if (!move.captured) return false;
+  if (move.captured.type === PIECES.KING) return false;
+  if (alpha >= MATE_SCORE - 1000) return false;
+  if (standPat + PIECE_VALUES[move.captured.type] + context.deltaMargin > alpha) return false;
+  return !givesCheck(position, move);
 }
 
 function futilityMargin(depth) {
@@ -805,6 +824,7 @@ function createSearchStats() {
     aspirationFailLow: 0,
     extensions: 0,
     futilityPrunes: 0,
+    deltaPrunes: 0,
     reductions: 0,
     lmrResearches: 0,
     pvsResearches: 0,
@@ -831,6 +851,7 @@ function mergeSearchStats(total, next) {
     aspirationFailLow: total.aspirationFailLow + next.aspirationFailLow,
     extensions: total.extensions + next.extensions,
     futilityPrunes: total.futilityPrunes + next.futilityPrunes,
+    deltaPrunes: total.deltaPrunes + next.deltaPrunes,
     reductions: total.reductions + next.reductions,
     lmrResearches: total.lmrResearches + next.lmrResearches,
     pvsResearches: total.pvsResearches + next.pvsResearches,

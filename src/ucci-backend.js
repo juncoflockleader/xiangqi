@@ -734,6 +734,7 @@ function createEmptyStats() {
     aspirationFailLow: 0,
     extensions: 0,
     futilityPrunes: 0,
+    deltaPrunes: 0,
     reductions: 0,
     lmrResearches: 0,
     pvsResearches: 0,
