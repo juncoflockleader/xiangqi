@@ -9,6 +9,8 @@ const rl = readline.createInterface({
 let currentPosition = "";
 let currentMultiPv = 1;
 let currentProtocol = "ucci";
+let pendingStopResponse = null;
+let mockWaitForStopOnceUsed = false;
 const appliedOptions = [];
 
 function write(line) {
@@ -46,41 +48,56 @@ rl.on("line", (line) => {
       write(`info string position ${currentPosition}`);
     }
 
-    if (hasOption("MockMateWdl")) {
-      const move = /\sb(?:\s|$)/.test(currentPosition) ? "h0g2" : "h9g7";
-      const reply = /\sb(?:\s|$)/.test(currentPosition) ? "h9g7" : "h0g2";
-      write(`info depth ${depth} score mate 2 wdl 980 20 0 nodes 456 pv ${nativeMove(move)} ${nativeMove(reply)}`);
-      write(`bestmove ${nativeMove(move)}`);
-    } else if (hasOption("MockRejectHeuristic") && /\sb(?:\s|$)/.test(currentPosition)) {
-      write(`info depth ${depth} score cp 240 nodes 88 pv ${nativeMove("g2e3")}`);
-      write(`bestmove ${nativeMove("g2e3")}`);
-    } else if (hasOption("MockRejectHeuristic")) {
-      write(`info depth ${depth} score cp 320 nodes 144 pv ${nativeMove("b7b3")} ${nativeMove("h2h4")}`);
-      write(`bestmove ${nativeMove("b7b3")}`);
-    } else if (/\sb(?:\s|$)/.test(currentPosition)) {
-      write(`info depth ${depth} score cp 17 nodes 77 pv ${nativeMove("h0g2")}`);
-      write(`bestmove ${nativeMove("h0g2")}`);
-    } else if (/\bwtime\s+\d+/i.test(trimmed)) {
-      write(`info string command ${trimmed}`);
-      write(`info depth ${depth} score cp 55 nodes 321 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
-      write(`bestmove ${nativeMove("h9g7")}`);
-    } else if (hasOption("MockTie")) {
-      write(`info multipv 1 depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
-      write(`info multipv 2 depth ${depth} score cp 38 nodes 123 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);
-      write(`bestmove ${nativeMove("h9g7")}`);
-    } else if (/\bmultipv\s+2\b/i.test(trimmed) || currentMultiPv === 2) {
-      write(`info multipv 1 depth 1 score cp 20 nodes 40 pv ${nativeMove("a9a8")}`);
-      write(`info multipv 2 depth 1 score cp 10 nodes 40 pv ${nativeMove("a6a5")}`);
-      write(`info multipv 1 depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
-      write(`info multipv 2 depth ${depth} score cp 12 nodes 123 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);
-      write(`bestmove ${nativeMove("h9g7")}`);
-    } else {
-      write(`info depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
-      write(`bestmove ${nativeMove("h9g7")}`);
+    const respond = () => {
+      if (hasOption("MockMateWdl")) {
+        const move = /\sb(?:\s|$)/.test(currentPosition) ? "h0g2" : "h9g7";
+        const reply = /\sb(?:\s|$)/.test(currentPosition) ? "h9g7" : "h0g2";
+        write(`info depth ${depth} score mate 2 wdl 980 20 0 nodes 456 pv ${nativeMove(move)} ${nativeMove(reply)}`);
+        write(`bestmove ${nativeMove(move)}`);
+      } else if (hasOption("MockRejectHeuristic") && /\sb(?:\s|$)/.test(currentPosition)) {
+        write(`info depth ${depth} score cp 240 nodes 88 pv ${nativeMove("g2e3")}`);
+        write(`bestmove ${nativeMove("g2e3")}`);
+      } else if (hasOption("MockRejectHeuristic")) {
+        write(`info depth ${depth} score cp 320 nodes 144 pv ${nativeMove("b7b3")} ${nativeMove("h2h4")}`);
+        write(`bestmove ${nativeMove("b7b3")}`);
+      } else if (/\sb(?:\s|$)/.test(currentPosition)) {
+        write(`info depth ${depth} score cp 17 nodes 77 pv ${nativeMove("h0g2")}`);
+        write(`bestmove ${nativeMove("h0g2")}`);
+      } else if (/\bwtime\s+\d+/i.test(trimmed)) {
+        write(`info string command ${trimmed}`);
+        write(`info depth ${depth} score cp 55 nodes 321 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+        write(`bestmove ${nativeMove("h9g7")}`);
+      } else if (hasOption("MockTie")) {
+        write(`info multipv 1 depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+        write(`info multipv 2 depth ${depth} score cp 38 nodes 123 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);
+        write(`bestmove ${nativeMove("h9g7")}`);
+      } else if (/\bmultipv\s+2\b/i.test(trimmed) || currentMultiPv === 2) {
+        write(`info multipv 1 depth 1 score cp 20 nodes 40 pv ${nativeMove("a9a8")}`);
+        write(`info multipv 2 depth 1 score cp 10 nodes 40 pv ${nativeMove("a6a5")}`);
+        write(`info multipv 1 depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+        write(`info multipv 2 depth ${depth} score cp 12 nodes 123 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);
+        write(`bestmove ${nativeMove("h9g7")}`);
+      } else {
+        write(`info depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+        write(`bestmove ${nativeMove("h9g7")}`);
+      }
+      if (hasOption("MockExitAfterBestmove")) {
+        setImmediate(() => process.exit(0));
+      }
+    };
+
+    if (hasOption("MockWaitForStopOnce") && !mockWaitForStopOnceUsed) {
+      mockWaitForStopOnceUsed = true;
+      pendingStopResponse = respond;
+      write("info string waiting for stop");
+      return;
     }
-    if (hasOption("MockExitAfterBestmove")) {
-      setImmediate(() => process.exit(0));
-    }
+
+    respond();
+  } else if (command === "stop") {
+    const respond = pendingStopResponse;
+    pendingStopResponse = null;
+    respond?.();
   } else if (command === "quit") {
     if (hasOption("MockIgnoreQuit")) return;
     write("bye");

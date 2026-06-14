@@ -175,6 +175,41 @@ test("UCCI backend serializes concurrent searches on one native process", async 
   }
 });
 
+test("UCCI backend aborts an active native search and drains bestmove", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockWaitForStopOnce: true
+    }
+  });
+  const controller = new AbortController();
+
+  try {
+    const pending = backend.chooseMove(createInitialPosition(), {
+      useBook: false,
+      signal: controller.signal
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    controller.abort("stale-position");
+
+    await assert.rejects(
+      pending,
+      (error) => error.name === "AbortError" && error.message.includes("stale-position")
+    );
+
+    const next = await backend.chooseMove(createInitialPosition(), { useBook: false });
+    assert.equal(next.bestMove.notation, "h9-g7");
+    assert.equal(next.source, "native-ucci");
+  } finally {
+    await backend.close();
+  }
+});
+
 test("UCCI backend close terminates native process that ignores quit", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,

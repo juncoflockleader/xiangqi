@@ -271,7 +271,9 @@ class UcciProcessClient {
   }
 
   async searchOnce(position, options = {}) {
+    throwIfAborted(options.signal);
     await this.ensureReady();
+    throwIfAborted(options.signal);
 
     this.write(`position fen ${toNativeFen(position, this.protocol)}`);
 
@@ -293,7 +295,16 @@ class UcciProcessClient {
 
     const timeBudget = resolveSearchBudget(protocolOptions, protocolOptions.side ?? position.turn, {}, { position });
     const timeoutMs = options.commandTimeoutMs ?? Math.max(DEFAULT_SEARCH_TIMEOUT_MS, timeBudget.timeLimitMs + 5000);
-    return this.commandUntil(formatGoCommand(protocolOptions), (lines) => lines.some((line) => line.startsWith("bestmove ")), timeoutMs);
+    return this.commandUntil(formatGoCommand(protocolOptions), (lines) => lines.some((line) => line.startsWith("bestmove ")), timeoutMs, {
+      signal: options.signal,
+      onAbort: () => {
+        try {
+          this.write("stop");
+        } catch {
+          // Process-end handlers reject waiters when the engine is already gone.
+        }
+      }
+    });
   }
 
   handleProcessEnd(child, error) {
@@ -303,10 +314,21 @@ class UcciProcessClient {
     this.rejectWaiters(error);
   }
 
-  async commandUntil(command, predicate, timeoutMs) {
+  async commandUntil(command, predicate, timeoutMs, options = {}) {
+    throwIfAborted(options.signal);
     const startIndex = this.lines.length;
-    const pending = this.waitFor(predicate, timeoutMs, startIndex, command);
+    let commandStarted = false;
+    const pending = this.waitFor(predicate, timeoutMs, startIndex, command, {
+      ...options,
+      onAbort: () => {
+        if (commandStarted) options.onAbort?.();
+      }
+    });
     this.write(command);
+    commandStarted = true;
+    if (isAbortSignalAborted(options.signal)) {
+      options.onAbort?.();
+    }
     return pending;
   }
 
@@ -326,20 +348,35 @@ class UcciProcessClient {
     }
   }
 
-  waitFor(predicate, timeoutMs, startIndex, label) {
+  waitFor(predicate, timeoutMs, startIndex, label, options = {}) {
     return new Promise((resolve, reject) => {
+      const signal = options.signal;
       const waiter = {
         startIndex,
         predicate,
         resolve,
         reject,
+        aborted: false,
+        abortError: null,
         timer: setTimeout(() => {
+          cleanup();
           this.waiters.delete(waiter);
           reject(new Error(`Timed out waiting for UCCI response to ${label}.`));
         }, timeoutMs)
       };
+      const onAbort = () => {
+        waiter.aborted = true;
+        waiter.abortError = createAbortError(signal);
+        options.onAbort?.();
+      };
+      const cleanup = () => {
+        clearTimeout(waiter.timer);
+        signal?.removeEventListener?.("abort", onAbort);
+      };
+      waiter.cleanup = cleanup;
 
       this.waiters.add(waiter);
+      signal?.addEventListener?.("abort", onAbort, { once: true });
       this.checkWaiter(waiter);
     });
   }
@@ -354,14 +391,21 @@ class UcciProcessClient {
     const collected = this.lines.slice(waiter.startIndex);
     if (!waiter.predicate(collected)) return;
 
-    clearTimeout(waiter.timer);
+    waiter.cleanup?.();
+    if (!waiter.cleanup) clearTimeout(waiter.timer);
     this.waiters.delete(waiter);
+    if (waiter.aborted) {
+      waiter.reject(waiter.abortError ?? createAbortError());
+      return;
+    }
+
     waiter.resolve(collected);
   }
 
   rejectWaiters(error) {
     for (const waiter of [...this.waiters]) {
-      clearTimeout(waiter.timer);
+      waiter.cleanup?.();
+      if (!waiter.cleanup) clearTimeout(waiter.timer);
       waiter.reject(error);
     }
     this.waiters.clear();
@@ -435,6 +479,24 @@ function isRecoverableNativeProcessError(error) {
   return message.includes("UCCI engine exited")
     || message.includes("UCCI engine process is not writable")
     || error?.code === "EPIPE";
+}
+
+function throwIfAborted(signal) {
+  if (isAbortSignalAborted(signal)) {
+    throw createAbortError(signal);
+  }
+}
+
+function isAbortSignalAborted(signal) {
+  return Boolean(signal?.aborted);
+}
+
+function createAbortError(signal) {
+  if (signal?.reason instanceof Error) return signal.reason;
+  const reason = signal?.reason ? `: ${signal.reason}` : ".";
+  const error = new Error(`Native search aborted${reason}`);
+  error.name = "AbortError";
+  return error;
 }
 
 async function nativeSearch(client, position, options) {
