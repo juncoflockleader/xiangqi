@@ -4,9 +4,14 @@ import {
   createEngineBackend,
   createInitialPosition,
   createJavaScriptEngineBackend,
+  createLearningEngineBackend,
   describeEngineBackend,
-  ENGINE_BACKEND_FEATURES
+  ENGINE_BACKEND_FEATURES,
+  isNativeEngineBackend,
+  resolveLearningEngineBackendConfig
 } from "../src/index.js";
+
+const MOCK_UCCI_PATH = new URL("../fixtures/mock-ucci.mjs", import.meta.url);
 
 test("javascript backend exposes the engine contract", () => {
   const backend = createJavaScriptEngineBackend({ depth: 1, timeLimitMs: 500 });
@@ -77,4 +82,85 @@ test("custom backend can advertise native-ready capabilities", () => {
 
   assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.NATIVE_READY), true);
   assert.equal(describeEngineBackend(backend).kind, "native-ucci");
+});
+
+test("learning backend factory falls back to the JavaScript engine", () => {
+  const config = resolveLearningEngineBackendConfig({
+    depth: 1,
+    timeLimitMs: 100,
+    native: false
+  });
+  const backend = createLearningEngineBackend({
+    depth: 1,
+    timeLimitMs: 100,
+    native: false
+  });
+  const result = backend.chooseMove(createInitialPosition());
+
+  assert.equal(config.kind, "javascript");
+  assert.equal(config.reason, "native-disabled");
+  assert.equal(backend.kind, "javascript");
+  assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.LOCAL_SEARCH), true);
+  assert.equal(isNativeEngineBackend(backend), false);
+  assert.equal(result.bestMove.notation, "h7-e7");
+});
+
+test("learning backend factory can prefer a native profile without requiring it", () => {
+  const backend = createLearningEngineBackend({
+    command: "",
+    profile: "native-uci",
+    depth: 1,
+    timeLimitMs: 100,
+    javascript: { profile: "fast" }
+  });
+
+  assert.equal(backend.kind, "javascript");
+  assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.LOCAL_SEARCH), true);
+});
+
+test("learning backend factory can disable native selection despite a command", () => {
+  const backend = createLearningEngineBackend({
+    command: process.execPath,
+    preferNative: false,
+    depth: 1,
+    timeLimitMs: 100
+  });
+
+  assert.equal(backend.kind, "javascript");
+  assert.equal(isNativeEngineBackend(backend), false);
+});
+
+test("learning backend factory selects a native engine when configured", async () => {
+  const backend = createLearningEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-ucci",
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const description = describeEngineBackend(backend);
+    const result = await backend.chooseMove(createInitialPosition(), {
+      useBook: false,
+      lines: 2
+    });
+
+    assert.equal(description.kind, "native-ucci");
+    assert.equal(isNativeEngineBackend(backend), true);
+    assert.equal(result.source, "native-ucci");
+    assert.equal(result.bestMove.notation, "h9-g7");
+    assert.equal(result.explanation.alternatives.length, 2);
+  } finally {
+    await backend.close();
+  }
+});
+
+test("learning backend factory reports explicit native misconfiguration", () => {
+  assert.throws(
+    () => resolveLearningEngineBackendConfig({ kind: "native-uci" }),
+    /native backend requires a command/
+  );
 });
