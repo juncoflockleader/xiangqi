@@ -121,6 +121,7 @@ export function searchBestMove(position, options = {}) {
       useFutilityPruning: options.useFutilityPruning !== false,
       useDeltaPruning: options.useDeltaPruning !== false,
       useQuiescenceChecks: options.useQuiescenceChecks !== false,
+      useRecaptureExtensions: options.useRecaptureExtensions !== false,
       tacticalCache: new Map(),
       stats: createSearchStats(),
       nodes: 0,
@@ -421,9 +422,20 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     const next = makeMove(position, move);
     let childLine = [];
     const givesCheck = isInCheck(next, next.turn);
-    const extension = shouldExtend({ inCheck, givesCheck, move, extensionsRemaining }) ? 1 : 0;
+    const extensionReason = extensionReasonFor({
+      inCheck,
+      givesCheck,
+      move,
+      previousMove,
+      extensionsRemaining,
+      context
+    });
+    const extension = extensionReason ? 1 : 0;
     const childExtensions = extensionsRemaining - extension;
-    if (extension > 0) context.stats.extensions += 1;
+    if (extension > 0) {
+      context.stats.extensions += 1;
+      if (extensionReason === "recapture") context.stats.recaptureExtensions += 1;
+    }
 
     if (shouldPruneFutility({
       depth,
@@ -694,11 +706,22 @@ function clampOrderingScore(score) {
   return Math.max(-200_000, Math.min(200_000, Math.round(score)));
 }
 
-function shouldExtend({ inCheck, givesCheck, move, extensionsRemaining }) {
-  if (extensionsRemaining <= 0) return false;
-  if (inCheck) return true;
-  if (givesCheck) return true;
-  return Boolean(move.captured && PIECE_VALUES[move.captured.type] >= PIECE_VALUES[move.piece.type] * 2);
+function extensionReasonFor({ inCheck, givesCheck, move, previousMove, extensionsRemaining, context }) {
+  if (extensionsRemaining <= 0) return null;
+  if (inCheck) return "in-check";
+  if (givesCheck) return "check";
+  if (isRecapture(move, previousMove, context)) return "recapture";
+  if (move.captured && PIECE_VALUES[move.captured.type] >= PIECE_VALUES[move.piece.type] * 2) return "winning-capture";
+  return null;
+}
+
+function isRecapture(move, previousMove, context) {
+  if (!context.useRecaptureExtensions) return false;
+  return Boolean(
+    move.captured
+    && previousMove?.captured
+    && move.to === previousMove.to
+  );
 }
 
 function shouldReduce({ depth, index, move, inCheck, givesCheck }) {
@@ -927,6 +950,7 @@ function createSearchStats() {
     aspirationFailHigh: 0,
     aspirationFailLow: 0,
     extensions: 0,
+    recaptureExtensions: 0,
     mateDistancePrunes: 0,
     mateDistanceWindows: 0,
     razorPrunes: 0,
@@ -960,6 +984,7 @@ function mergeSearchStats(total, next) {
     aspirationFailHigh: total.aspirationFailHigh + next.aspirationFailHigh,
     aspirationFailLow: total.aspirationFailLow + next.aspirationFailLow,
     extensions: total.extensions + next.extensions,
+    recaptureExtensions: total.recaptureExtensions + next.recaptureExtensions,
     mateDistancePrunes: total.mateDistancePrunes + next.mateDistancePrunes,
     mateDistanceWindows: total.mateDistanceWindows + next.mateDistanceWindows,
     razorPrunes: total.razorPrunes + next.razorPrunes,

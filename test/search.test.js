@@ -243,6 +243,27 @@ test("quiescence can include bounded quiet checking moves", () => {
   assert.ok(withChecks.stats.qnodes > withoutChecks.stats.qnodes);
 });
 
+test("search extends immediate recaptures", () => {
+  const position = parseFen("4k4/9/4h4/4c4/4P4/9/4C4/9/9/4K4 r");
+  const result = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false
+  });
+  const disabled = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useRecaptureExtensions: false
+  });
+
+  assert.equal(result.depth, 3);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.ok(result.stats.recaptureExtensions > 0);
+  assert.equal(disabled.stats.recaptureExtensions, 0);
+  assert.ok(result.nodes > disabled.nodes);
+});
+
 test("quiescence can delta-prune hopeless captures", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const withPruning = searchBestMove(position, {
