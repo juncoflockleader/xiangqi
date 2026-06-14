@@ -108,7 +108,17 @@ test("UCCI backend chooseMove can include native MultiPV alternatives", async ()
     assert.equal(result.candidates[0].move.notation, "h9-g7");
     assert.equal(result.candidates[1].move.notation, "h7-e7");
     assert.equal(result.explanation.alternatives.length, 2);
+    assert.equal(result.explanation.alternatives[0].verdict, "best");
+    assert.equal(result.explanation.alternatives[0].centipawnLoss, 0);
+    assert.equal(result.explanation.alternatives[0].expectedReply, "h0-g2");
+    assert.equal(result.explanation.alternatives[0].linePlanSummary, result.explanation.linePlan.summary);
+    assert.ok(Array.isArray(result.explanation.alternatives[0].motifs));
     assert.equal(result.explanation.alternatives[1].move, "h7-e7");
+    assert.equal(result.explanation.alternatives[1].centipawnLoss, 30);
+    assert.equal(result.explanation.alternatives[1].verdict, "playable");
+    assert.ok(result.explanation.alternatives[1].reasons[0].includes("top native line"));
+    assert.ok(result.explanation.alternatives[1].principalVariationText.includes("h7-e7"));
+    assert.ok(result.explanation.alternatives[1].note.includes("native UCCI line 2"));
     assert.ok(result.raw.some((line) => line.includes("multipv 2")));
   } finally {
     await backend.close();

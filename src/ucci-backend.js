@@ -594,12 +594,7 @@ function explainNativeMove(position, result, backendName) {
   return {
     summary: `${pieceLabel(move.piece)} ${moveToNotation(move)} is selected by ${backendName} at depth ${result.depth}, with a reported score of ${formatScore(result.score)}.`,
     reasons: unique(reasons).slice(0, 7),
-    alternatives: result.candidates.slice(0, 5).map((candidate, index) => ({
-      rank: index + 1,
-      move: candidate.move.notation,
-      score: Math.round(candidate.score),
-      note: `native ${protocolLabel} line ${candidate.native?.multipv ?? index + 1} at depth ${candidate.native?.depth ?? result.depth}`
-    })),
+    alternatives: explainNativeAlternatives(position, result, backendName, protocolLabel),
     principalVariation,
     principalVariationText: principalVariation.join(" "),
     linePlan: buildLinePlan(position, result.principalVariation),
@@ -614,6 +609,41 @@ function explainNativeMove(position, result, backendName) {
       iterations: result.iterations
     }
   };
+}
+
+function explainNativeAlternatives(position, result, backendName, protocolLabel) {
+  const bestScore = result.candidates[0]?.score ?? result.score ?? 0;
+
+  return result.candidates.slice(0, 5).map((candidate, index) => {
+    const explanation = explainNativeCandidate(position, candidate, {
+      rank: index + 1,
+      bestScore,
+      depth: candidate.native?.depth ?? result.depth,
+      backendName
+    });
+    const linePlan = explanation.linePlan;
+    const centipawnLoss = explanation.centipawnLoss;
+    const contrast = nativeAlternativeContrast(index, centipawnLoss);
+
+    return {
+      rank: index + 1,
+      move: candidate.move.notation ?? moveToNotation(candidate.move),
+      score: Math.round(candidate.score),
+      centipawnLoss,
+      verdict: nativeAlternativeVerdict(index, centipawnLoss),
+      summary: explanation.summary,
+      reasons: unique([
+        contrast,
+        ...explanation.reasons
+      ]).slice(0, 5),
+      expectedReply: linePlan.expectedReply,
+      motifs: linePlan.motifs,
+      linePlanSummary: linePlan.summary,
+      principalVariation: explanation.principalVariation,
+      principalVariationText: explanation.principalVariationText,
+      note: `${contrast}; native ${protocolLabel} line ${candidate.native?.multipv ?? index + 1} at depth ${candidate.native?.depth ?? result.depth}`
+    };
+  });
 }
 
 function explainNativeCandidate(position, candidate, context) {
@@ -633,10 +663,26 @@ function explainNativeCandidate(position, candidate, context) {
     reasons: unique(reasons).slice(0, 7),
     principalVariation,
     principalVariationText: principalVariation.join(" "),
-    linePlan: buildLinePlan(position, candidate.principalVariation ?? [candidate.move]),
+    linePlan: buildLinePlan(position, candidate.principalVariation ?? [candidate.move], {
+      perspective: position.turn
+    }),
     evaluationDelta: moveStory.evaluationDelta,
     centipawnLoss
   };
+}
+
+function nativeAlternativeVerdict(index, centipawnLoss) {
+  if (index === 0) return "best";
+  if (centipawnLoss <= 15) return "tied";
+  if (centipawnLoss <= 90) return "playable";
+  if (centipawnLoss <= 250) return "inferior";
+  return "poor";
+}
+
+function nativeAlternativeContrast(index, centipawnLoss) {
+  if (index === 0) return "top native line";
+  if (centipawnLoss <= 15) return `roughly tied with the top native line, trailing by ${centipawnLoss} centipawns`;
+  return `trails the top native line by ${centipawnLoss} centipawns`;
 }
 
 function formatGoCommand(options) {
