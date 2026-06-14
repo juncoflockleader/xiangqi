@@ -279,11 +279,66 @@ function printDecision(decision, options = {}) {
     printOracleReview(decision.oracleReview);
   }
 
-  if (options.includeReasons && decision.explanation?.reasons?.length) {
-    for (const reason of decision.explanation.reasons.slice(0, 4)) {
+  if (!options.includeReasons) return;
+
+  printConfidence(decision.explanation?.confidence);
+  printComparison(decision.explanation?.comparison);
+  printAlternatives(decision.explanation?.alternatives);
+
+  if (decision.explanation?.reasons?.length) {
+    console.log("Reasons:");
+    for (const reason of decision.explanation.reasons.slice(0, 5)) {
       console.log(`- ${reason}`);
     }
   }
+}
+
+function printConfidence(confidence) {
+  if (!confidence) return;
+  const score = Number.isFinite(confidence.score)
+    ? ` (${Math.round(confidence.score)}/100)`
+    : "";
+  console.log(`Confidence: ${confidence.label ?? confidence.level ?? "unknown"}${score}.`);
+
+  const factors = (confidence.factors ?? []).slice(0, 3);
+  for (const factor of factors) {
+    console.log(`  ${factor.kind}: ${factor.text}`);
+  }
+}
+
+function printComparison(comparison) {
+  if (!comparison?.reason) return;
+  console.log(`Comparison: ${comparison.reason}`);
+  if (comparison.bestLineText || comparison.nextLineText) {
+    const best = comparison.bestLineText ? `best ${comparison.bestLineText}` : null;
+    const next = comparison.nextLineText ? `next ${comparison.nextLineText}` : null;
+    console.log(`  Lines: ${[best, next].filter(Boolean).join(" | ")}`);
+  }
+}
+
+function printAlternatives(alternatives) {
+  if (!alternatives?.length) return;
+
+  console.log("Alternatives:");
+  for (const alternative of alternatives.slice(0, 5)) {
+    const score = scoreTextForAlternative(alternative);
+    const verdict = alternative.verdict ? `${alternative.verdict}, ` : "";
+    const loss = Number.isFinite(alternative.centipawnLoss)
+      ? `, loss ${alternative.centipawnLoss} cp`
+      : "";
+    const reply = alternative.expectedReply ? `, expects ${alternative.expectedReply}` : "";
+    const wdl = alternative.wdl?.text ? `, WDL ${alternative.wdl.text}` : "";
+    console.log(`  ${alternative.rank}. ${alternative.move}: ${verdict}${score}${loss}${reply}${wdl}`);
+    if (alternative.linePlanSummary) {
+      console.log(`     ${alternative.linePlanSummary}`);
+    }
+  }
+}
+
+function scoreTextForAlternative(alternative) {
+  if (alternative.scoreDetail?.text) return alternative.scoreDetail.text;
+  if (Number.isFinite(alternative.score)) return formatCentipawns(alternative.score);
+  return "unscored";
 }
 
 function printOracleReview(review) {
@@ -342,6 +397,7 @@ Options:
   --profile name        Engine profile. Default: fast.
   --depth n             Search depth. Default: 2.
   --time ms             Move time budget. Default: 750.
+  --lines n             Candidate lines to compare. Default: 3.
   --book file           Load opening book data from JSON, CSV/TSV, or text.
   --book-format format  Book format: auto, json, csv, tsv, text.
   --engine-command cmd  Use a native UCI/UCCI engine for play, with JS fallback.
@@ -379,6 +435,7 @@ function searchOptions() {
   return {
     depth: options.depth,
     timeLimitMs: options.timeLimitMs,
+    lines: options.lines,
     useBook: options.useBook,
     ...(options.oracleCommand
       ? {
@@ -397,6 +454,7 @@ function parseArgs(args) {
     profile: "fast",
     depth: 2,
     timeLimitMs: 750,
+    lines: numberFromEnv(process.env.XIANGQI_ENGINE_LINES, 3),
     bookPath: process.env.XIANGQI_OPENING_BOOK,
     bookFormat: process.env.XIANGQI_OPENING_BOOK_FORMAT ?? "auto",
     engineCommand: process.env.XIANGQI_ENGINE_COMMAND,
@@ -452,6 +510,11 @@ function parseArgs(args) {
     }
     if (arg === "--time") {
       parsed.timeLimitMs = parsePositiveInteger(requireValue(args, index, arg), arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--lines") {
+      parsed.lines = parsePositiveInteger(requireValue(args, index, arg), arg);
       index += 1;
       continue;
     }
@@ -568,6 +631,7 @@ function parseArgs(args) {
   applyNativePreset(parsed, "oracle");
   assertPresetResolved(parsed, "engine");
   assertPresetResolved(parsed, "oracle");
+  parsed.lines = assertPositiveInteger(parsed.lines, "lines");
   parsed.engineProtocol = parseProtocol(parsed.engineProtocol, "XIANGQI_ENGINE_PROTOCOL");
   parsed.oracleProtocol = parseProtocol(parsed.oracleProtocol, "XIANGQI_ORACLE_ENGINE_PROTOCOL");
   parsed.startupTimeoutMs = assertPositiveInteger(parsed.startupTimeoutMs, "startup timeout");
@@ -753,6 +817,11 @@ function formatColumns(values, columns) {
 function formatMoveForDisplay(move) {
   if (typeof move === "string") return move;
   return move?.notation ?? "";
+}
+
+function formatCentipawns(value) {
+  const rounded = Math.round(value ?? 0);
+  return `${rounded >= 0 ? "+" : ""}${rounded} cp`;
 }
 
 function capitalize(value) {

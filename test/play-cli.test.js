@@ -77,6 +77,30 @@ test("play CLI can use a native UCI engine backend", async () => {
   assert.match(result.stdout, /selected by Native UCI Engine/);
 });
 
+test("play CLI best command shows structured engine reasoning", async () => {
+  const result = await runPlayCli([
+    "--side", "red",
+    "--engine-command", process.execPath,
+    "--engine-arg", MOCK_UCCI_PATH,
+    "--engine-protocol", "uci",
+    "--startup-timeout", "1000",
+    "--command-timeout", "1000",
+    "--depth", "2",
+    "--time", "100",
+    "--lines", "2",
+    "--no-book"
+  ], "best\nquit\n");
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /Best move: h9-g7/);
+  assert.match(result.stdout, /Confidence: Medium confidence/);
+  assert.match(result.stdout, /Comparison: Native MultiPV rates h9-g7 30 centipawns above the next candidate h7-e7\./);
+  assert.match(result.stdout, /Alternatives:/);
+  assert.match(result.stdout, /1\. h9-g7: best, \+0\.42, loss 0 cp, expects h0-g2/);
+  assert.match(result.stdout, /2\. h7-e7: playable, \+0\.12, loss 30 cp, expects h0-g2/);
+  assert.match(result.stdout, /Reasons:/);
+});
+
 test("play CLI can use the Pikafish native preset", async () => {
   const result = await runPlayCli([
     "--side", "black",
