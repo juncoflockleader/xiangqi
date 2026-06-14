@@ -152,6 +152,34 @@ test("UCCI review reports no moves when history is empty", () => {
   assert.deepEqual(session.handleLine("review"), ["info string review no moves"]);
 });
 
+test("UCCI lesson summarizes reviewed move history as cards", () => {
+  const session = new UcciSession({ depth: 1, timeLimitMs: 500 });
+  session.handleLine("position startpos moves h7e7 h0g2");
+  const output = session.handleLine("lesson depth 1 movetime 500 cards 1");
+
+  assert.ok(output.some((line) => line.includes("lesson cards 1")));
+  assert.ok(output.some((line) => line.includes("lesson 1 opening")));
+  assert.ok(output.some((line) => line.includes("prompt:")));
+  assert.ok(output.some((line) => line.includes("hint 1")));
+  assert.ok(output.some((line) => line.includes("answer")));
+});
+
+test("UCCI lesson can filter opening-book cards", () => {
+  const session = new UcciSession({ depth: 1, timeLimitMs: 500 });
+  session.handleLine("position startpos moves h7e7 h0g2");
+  const output = session.handleLine("lessons depth 1 movetime 500 book false");
+
+  assert.ok(output.some((line) => line.includes("lesson cards 0")));
+  assert.equal(output.some((line) => line.includes("lesson 1 ")), false);
+});
+
+test("UCCI lesson reports no moves when history is empty", () => {
+  const session = new UcciSession();
+  session.handleLine("position startpos");
+
+  assert.deepEqual(session.handleLine("lesson"), ["info string lesson no moves"]);
+});
+
 test("UCCI hint returns progressive coach levels and reveal", () => {
   const session = new UcciSession({ depth: 2, timeLimitMs: 1000 });
   session.handleLine("position startpos");

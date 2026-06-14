@@ -57,6 +57,9 @@ export class UcciSession {
           return this.pressure(trimmed);
         case "review":
           return this.review(trimmed);
+        case "lesson":
+        case "lessons":
+          return this.lesson(trimmed);
         case "hint":
         case "coach":
           return this.hint(trimmed);
@@ -285,6 +288,42 @@ export class UcciSession {
     return outputs;
   }
 
+  lesson(line) {
+    if (this.moveHistory.length === 0) return ["info string lesson no moves"];
+
+    const tokens = line.split(/\s+/);
+    const options = parseGoOptions(line.replace(/^lessons?/i, "go"), this.options, this.initialPosition.turn);
+    const maxCards = readTokenInteger(tokens, "cards", readTokenInteger(tokens, "maxcards", 3));
+    const includeBook = readTokenBoolean(tokens, "book", true);
+    const includeModelMoves = readTokenBoolean(tokens, "model", false);
+    const result = this.engine.lessonPlan(this.moveHistory, {
+      initialPosition: this.initialPosition,
+      reviewOptions: {
+        ...options,
+        useBook: this.options.useBook
+      },
+      lessonOptions: {
+        maxCards: Math.max(1, Math.min(12, maxCards)),
+        includeBook,
+        includeModelMoves
+      }
+    });
+    const outputs = [
+      `info string lesson cards ${result.summary.totalCards} avgcp ${result.averageCentipawnLoss} highimpact ${result.summary.highImpact}`
+    ];
+
+    for (const card of result.cards) {
+      outputs.push(`info string lesson ${card.rank} ${card.type} ply ${card.ply} side ${card.side} played ${stripMoveSeparator(card.playedMove)} best ${stripMoveSeparator(card.bestMove)} loss ${card.centipawnLoss} tags ${card.tags.join(",")}`);
+      outputs.push(`info string lesson ${card.rank} prompt: ${card.prompt}`);
+      for (const hint of card.hints) {
+        outputs.push(`info string lesson ${card.rank} hint ${hint.level} ${hint.kind}: ${hint.text}`);
+      }
+      outputs.push(`info string lesson ${card.rank} answer ${stripMoveSeparator(card.answer.move)}: ${card.answer.summary}`);
+    }
+
+    return outputs;
+  }
+
   hint(line) {
     const tokens = line.split(/\s+/);
     const options = parseGoOptions(line.replace(/^(hint|coach)/i, "go"), this.options, this.position.turn);
@@ -390,6 +429,12 @@ function readTokenInteger(tokens, name, fallback) {
 
   const value = Number.parseInt(tokens[index + 1], 10);
   return Number.isFinite(value) ? value : fallback;
+}
+
+function readTokenBoolean(tokens, name, fallback) {
+  const index = tokens.findIndex((token) => token.toLowerCase() === name);
+  if (index === -1 || index + 1 >= tokens.length) return fallback;
+  return parseBoolean(tokens[index + 1], fallback);
 }
 
 function readSetOptionField(line, field, untilField = null) {
