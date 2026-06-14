@@ -1,4 +1,5 @@
 import { moveToNotation } from "./board.js";
+import { summarizeAlternativeEvidence, summarizeComparisonEvidence } from "./explanation-artifacts.js";
 
 const SEVERE_CLASSIFICATIONS = Object.freeze(["blunder", "mistake", "inaccuracy"]);
 const POSITIVE_CLASSIFICATIONS = Object.freeze(["best", "excellent"]);
@@ -84,6 +85,8 @@ function createLessonCard(move, rank) {
     bestScoreDetail: scoreDetailFor(move.review.bestAnalysis),
     bestScoreText: scoreTextFor(move.review.bestAnalysis ?? { score: move.review.bestScore }),
     bestWdl: move.review.bestAnalysis?.wdl ?? null,
+    bestComparison: comparisonFor(move.review),
+    bestAlternatives: alternativesFor(move.review),
     mistakes: move.review.mistakes,
     tags,
     hints: lessonHints(move, type, bestMove),
@@ -94,6 +97,8 @@ function createLessonCard(move, rank) {
       bestScoreDetail: scoreDetailFor(move.review.bestAnalysis),
       bestScoreText: scoreTextFor(move.review.bestAnalysis ?? { score: move.review.bestScore }),
       bestWdl: move.review.bestAnalysis?.wdl ?? null,
+      bestComparison: comparisonFor(move.review),
+      bestAlternatives: alternativesFor(move.review),
       summary: move.review.explanation.summary,
       reasons: move.review.explanation.reasons,
       principalVariation: move.review.principalVariation ?? []
@@ -240,6 +245,14 @@ function scoreDetailFor(entry) {
 
 function scoreTextFor(entry) {
   return scoreDetailFor(entry)?.text ?? formatCentipawns(entry?.score);
+}
+
+function comparisonFor(review) {
+  return summarizeComparisonEvidence(review.bestComparison ?? review.bestAnalysis?.explanation?.comparison);
+}
+
+function alternativesFor(review) {
+  return summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives);
 }
 
 function formatCentipawns(value) {

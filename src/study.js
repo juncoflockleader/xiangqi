@@ -1,4 +1,5 @@
 import { moveToNotation, toFen } from "./board.js";
+import { summarizeAlternativeEvidence, summarizeComparisonEvidence } from "./explanation-artifacts.js";
 
 const DEFAULT_STUDY_LINES = 3;
 
@@ -186,8 +187,8 @@ function summarizeDecision(decision) {
     reasons: [...(decision.explanation?.reasons ?? [])],
     confidence: decision.explanation?.confidence ?? null,
     linePlan: decision.explanation?.linePlan ?? null,
-    comparison: summarizeComparison(decision.explanation?.comparison),
-    alternatives: summarizeDecisionAlternatives(decision.explanation?.alternatives),
+    comparison: summarizeComparisonEvidence(decision.explanation?.comparison),
+    alternatives: summarizeAlternativeEvidence(decision.explanation?.alternatives),
     principalVariation: (decision.principalVariation ?? []).map(notationFor).filter(Boolean),
     oracleReview: decision.oracleReview ?? decision.explanation?.oracleReview ?? null,
     backendFallback: decision.backendFallback ?? null
@@ -244,6 +245,8 @@ function summarizeReview(review) {
     bestScoreDetail: scoreDetailFor(review.bestAnalysis),
     bestScoreText: scoreTextFor(review.bestAnalysis ?? { score: review.bestScore }),
     bestWdl: review.bestAnalysis?.wdl ?? null,
+    bestComparison: summarizeComparisonEvidence(review.bestComparison ?? review.bestAnalysis?.explanation?.comparison),
+    bestAlternatives: summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives),
     depth: review.depth ?? 0,
     nodes: review.nodes ?? 0,
     summary: review.explanation?.summary ?? "",
@@ -323,50 +326,6 @@ function nextStudySteps({ decision, coach, playedMoveReview, pressure }) {
     });
   }
   return steps.slice(0, 4);
-}
-
-function summarizeComparison(comparison) {
-  if (!comparison) return null;
-
-  return {
-    ...comparison,
-    bestLine: [...(comparison.bestLine ?? [])],
-    nextLine: [...(comparison.nextLine ?? [])]
-  };
-}
-
-function summarizeDecisionAlternatives(alternatives) {
-  return (alternatives ?? []).map((alternative) => ({
-    rank: alternative.rank,
-    move: alternative.move,
-    score: Math.round(alternative.score ?? 0),
-    scoreDetail: scoreDetailFor(alternative),
-    scoreText: scoreTextForAlternative(alternative),
-    wdl: alternative.wdl ?? null,
-    centipawnLoss: Number.isFinite(alternative.centipawnLoss)
-      ? Math.round(alternative.centipawnLoss)
-      : null,
-    verdict: alternative.verdict ?? null,
-    summary: alternative.summary ?? "",
-    reasons: [...(alternative.reasons ?? [])],
-    expectedReply: alternative.expectedReply ?? null,
-    motifs: [...(alternative.motifs ?? [])],
-    linePlanSummary: alternative.linePlanSummary ?? "",
-    principalVariation: [...(alternative.principalVariation ?? [])],
-    principalVariationText: alternative.principalVariationText ?? "",
-    note: alternative.note ?? ""
-  }));
-}
-
-function scoreTextForAlternative(alternative) {
-  const detail = scoreDetailFor(alternative);
-  if (detail?.text) return detail.text;
-
-  if (Number.isFinite(alternative.centipawnLoss) || alternative.verdict) {
-    return formatCentipawns(alternative.score);
-  }
-
-  return `score ${Math.round(alternative.score ?? 0)}`;
 }
 
 function sharedStudyOptions(options) {

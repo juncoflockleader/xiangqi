@@ -12,6 +12,7 @@ export * from "./movegen.js";
 export * from "./evaluate.js";
 export * from "./search.js";
 export * from "./reasoning.js";
+export * from "./explanation-artifacts.js";
 export * from "./engine.js";
 export * from "./backend.js";
 export * from "./backend-factory.js";

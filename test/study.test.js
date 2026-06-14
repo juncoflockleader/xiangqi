@@ -163,3 +163,37 @@ test("backend position study preserves structured decision alternatives", async 
     await backend.close();
   }
 });
+
+test("backend position study preserves played-move review alternatives", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-ucci",
+    depth: 2,
+    timeLimitMs: 100,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const study = await studyPositionWithBackend(backend, createInitialPosition(), {
+      useBook: false,
+      depth: 2,
+      timeLimitMs: 100,
+      lines: 2,
+      playedMove: "h7-e7",
+      reviewOptions: {
+        lines: 2
+      }
+    });
+
+    assert.equal(study.playedMoveReview.bestMove, "h9-g7");
+    assert.equal(study.playedMoveReview.bestComparison.bestMove, "h9-g7");
+    assert.equal(study.playedMoveReview.bestComparison.nextMove, "h7-e7");
+    assert.equal(study.playedMoveReview.bestAlternatives.length, 2);
+    assert.equal(study.playedMoveReview.bestAlternatives[1].move, "h7-e7");
+    assert.equal(study.playedMoveReview.bestAlternatives[1].verdict, "playable");
+  } finally {
+    await backend.close();
+  }
+});

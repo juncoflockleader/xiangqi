@@ -8,6 +8,7 @@ import {
 } from "./board.js";
 import { generateLegalMoves } from "./movegen.js";
 import { gameStatus } from "./game.js";
+import { summarizeAlternativeEvidence, summarizeComparisonEvidence } from "./explanation-artifacts.js";
 
 const CLASSIFICATIONS = Object.freeze([
   "best",
@@ -218,6 +219,8 @@ function selectKeyMoments(moves, limit) {
       bestScoreDetail: scoreDetailFor(item.review.bestAnalysis),
       bestScoreText: scoreTextFor(item.review.bestAnalysis ?? { score: item.review.bestScore }),
       bestWdl: item.review.bestAnalysis?.wdl ?? null,
+      bestComparison: comparisonFor(item.review),
+      bestAlternatives: alternativesFor(item.review),
       mistakes: item.review.mistakes,
       book: item.book,
       summary: item.review.explanation.summary,
@@ -251,6 +254,14 @@ function scoreDetailFor(entry) {
 
 function scoreTextFor(entry) {
   return scoreDetailFor(entry)?.text ?? formatCentipawns(entry?.score);
+}
+
+function comparisonFor(review) {
+  return summarizeComparisonEvidence(review.bestComparison ?? review.bestAnalysis?.explanation?.comparison);
+}
+
+function alternativesFor(review) {
+  return summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives);
 }
 
 function formatCentipawns(value) {

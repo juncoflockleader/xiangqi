@@ -127,3 +127,37 @@ test("game study preserves native score evidence across learning artifacts", asy
     await backend.close();
   }
 });
+
+test("game study preserves native review comparison evidence", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-ucci",
+    depth: 2,
+    timeLimitMs: 100,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const study = await createGameStudyWithBackend(backend, ["h7-e7"], {
+      maxPositionStudies: 1,
+      reviewOptions: { depth: 2, timeLimitMs: 100, lines: 2 },
+      lessonOptions: { maxCards: 1 },
+      studyOptions: {
+        depth: 2,
+        timeLimitMs: 100,
+        lines: 1,
+        includePressure: false
+      }
+    });
+
+    assert.equal(study.keyMoments[0].bestComparison.bestMove, "h9-g7");
+    assert.equal(study.keyMoments[0].bestAlternatives.length, 2);
+    assert.equal(study.lessonPlan.cards[0].bestComparison.nextMove, "h7-e7");
+    assert.equal(study.positionStudies[0].gameMoment.bestComparison.bestMove, "h9-g7");
+    assert.equal(study.positionStudies[0].gameMoment.bestAlternatives[1].verdict, "playable");
+  } finally {
+    await backend.close();
+  }
+});

@@ -1,4 +1,5 @@
 import { parseFen, toFen } from "./board.js";
+import { summarizeAlternativeEvidence, summarizeComparisonEvidence } from "./explanation-artifacts.js";
 import { createLessonPlanFromReview } from "./lesson.js";
 import { studyPositionWithBackend, studyPositionWithEngine } from "./study.js";
 
@@ -157,6 +158,8 @@ function attachGameMoment(study, move) {
       bestScoreDetail: scoreDetailFor(move.review.bestAnalysis),
       bestScoreText: scoreTextFor(move.review.bestAnalysis ?? { score: move.review.bestScore }),
       bestWdl: move.review.bestAnalysis?.wdl ?? null,
+      bestComparison: comparisonFor(move.review),
+      bestAlternatives: alternativesFor(move.review),
       book: move.book
     }
   };
@@ -241,6 +244,14 @@ function scoreDetailFor(entry) {
 
 function scoreTextFor(entry) {
   return scoreDetailFor(entry)?.text ?? formatCentipawns(entry?.score);
+}
+
+function comparisonFor(review) {
+  return summarizeComparisonEvidence(review.bestComparison ?? review.bestAnalysis?.explanation?.comparison);
+}
+
+function alternativesFor(review) {
+  return summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives);
 }
 
 function formatCentipawns(value) {

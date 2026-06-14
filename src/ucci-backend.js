@@ -121,7 +121,7 @@ export function createUcciEngineBackend(options = {}) {
     },
     reviewMove: async (position, move, reviewOptions = {}) => nativeReviewMove(client, position, move, mergeNativeOptions(backendOptions, reviewOptions, {
       backendName: name,
-      lines: 1,
+      lines: resolveNativeReviewLines(backendOptions, reviewOptions),
       protocol,
       useBook: false
     })),
@@ -131,7 +131,7 @@ export function createUcciEngineBackend(options = {}) {
         ...gameReviewOptions,
         reviewOptions: mergeNativeOptions(backendOptions, reviewOptions, {
           backendName: name,
-          lines: 1,
+          lines: resolveNativeReviewLines(backendOptions, reviewOptions),
           protocol,
           useBook: false
         })
@@ -145,7 +145,7 @@ export function createUcciEngineBackend(options = {}) {
         ...planOptions,
         reviewOptions: mergeNativeOptions(backendOptions, reviewOptions, {
           backendName: name,
-          lines: 1,
+          lines: resolveNativeReviewLines(backendOptions, reviewOptions),
           protocol,
           useBook: false
         })
@@ -157,7 +157,7 @@ export function createUcciEngineBackend(options = {}) {
         ...studyPlanOptions,
         reviewOptions: mergeNativeOptions(backendOptions, reviewOptions, {
           backendName: name,
-          lines: 1,
+          lines: resolveNativeReviewLines(backendOptions, reviewOptions),
           protocol,
           useBook: false
         }),
@@ -438,6 +438,8 @@ async function nativeReviewMove(client, position, moveOrNotation, options) {
     principalVariation: playedCandidate.principalVariation.map((pvMove) => pvMove.notation ?? moveToNotation(pvMove)),
     bestAnalysis,
     bestExplanation: bestAnalysis.explanation,
+    bestComparison: bestAnalysis.explanation?.comparison ?? null,
+    bestAlternatives: bestAnalysis.explanation?.alternatives ?? [],
     depth: bestAnalysis.depth,
     nodes: bestAnalysis.nodes + (playedCandidate.nodes ?? 0)
   };
@@ -1233,6 +1235,19 @@ function resolveNativeChooseMoveLines(baseOptions, searchOptions) {
       ?? searchOptions.explanationLines
       ?? baseOptions.chooseMoveLines
       ?? baseOptions.explanationLines
+      ?? baseOptions.lines
+      ?? 1
+  );
+}
+
+function resolveNativeReviewLines(baseOptions, reviewOptions) {
+  return normalizeLineCount(
+    reviewOptions.reviewLines
+      ?? reviewOptions.lines
+      ?? reviewOptions.multiPv
+      ?? reviewOptions.multipv
+      ?? reviewOptions.explanationLines
+      ?? baseOptions.reviewLines
       ?? baseOptions.lines
       ?? 1
   );

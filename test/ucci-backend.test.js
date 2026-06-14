@@ -448,7 +448,8 @@ test("UCCI backend reviews moves with native search scores", async () => {
   try {
     const review = await backend.reviewMove(createInitialPosition(), "h7-e7", {
       depth: 2,
-      timeLimitMs: 500
+      timeLimitMs: 500,
+      lines: 2
     });
 
     assert.equal(review.source, "native-ucci");
@@ -459,6 +460,10 @@ test("UCCI backend reviews moves with native search scores", async () => {
     assert.equal(review.classification, "good");
     assert.equal(review.mistakes.primary, "none");
     assert.deepEqual(review.principalVariation, ["h7-e7", "h0-g2"]);
+    assert.equal(review.bestComparison.bestMove, "h9-g7");
+    assert.equal(review.bestComparison.nextMove, "h7-e7");
+    assert.equal(review.bestAlternatives.length, 2);
+    assert.equal(review.bestAlternatives[1].verdict, "playable");
     assert.ok(review.bestExplanation.summary.includes("Native UCCI Engine"));
     assert.ok(review.explanation.reasons.some((reason) => reason.includes("h9-g7")));
   } finally {
@@ -477,7 +482,7 @@ test("UCCI backend reviews games with native move reviews", async () => {
 
   try {
     const review = await backend.reviewGame(["h7-e7"], {
-      reviewOptions: { depth: 2, timeLimitMs: 500 }
+      reviewOptions: { depth: 2, timeLimitMs: 500, lines: 2 }
     });
 
     assert.equal(review.moves.length, 1);
@@ -486,6 +491,8 @@ test("UCCI backend reviews games with native move reviews", async () => {
     assert.equal(review.moves[0].review.source, "native-ucci");
     assert.equal(review.moves[0].review.bestMove.notation, "h9-g7");
     assert.equal(review.keyMoments[0].notation, "h7-e7");
+    assert.equal(review.keyMoments[0].bestComparison.bestMove, "h9-g7");
+    assert.equal(review.keyMoments[0].bestAlternatives.length, 2);
     assert.equal(review.status.state, "playing");
   } finally {
     await backend.close();
@@ -503,14 +510,17 @@ test("UCCI backend creates lesson plans from native reviews", async () => {
 
   try {
     const plan = await backend.lessonPlan(["h7-e7"], {
-      reviewOptions: { depth: 2, timeLimitMs: 500 },
+      reviewOptions: { depth: 2, timeLimitMs: 500, lines: 2 },
       lessonOptions: { maxCards: 1 }
     });
 
     assert.equal(plan.cards.length, 1);
     assert.equal(plan.cards[0].type, "opening");
     assert.equal(plan.cards[0].bestMove, "h9-g7");
+    assert.equal(plan.cards[0].bestComparison.nextMove, "h7-e7");
+    assert.equal(plan.cards[0].bestAlternatives.length, 2);
     assert.equal(plan.cards[0].answer.move, "h7-e7");
+    assert.equal(plan.cards[0].answer.bestComparison.bestMove, "h9-g7");
     assert.equal(plan.cards[0].answer.principalVariation[0], "h7-e7");
   } finally {
     await backend.close();
@@ -529,7 +539,7 @@ test("UCCI backend creates full game studies from native reviews", async () => {
   try {
     const study = await backend.gameStudy(["h7-e7"], {
       maxPositionStudies: 0,
-      reviewOptions: { depth: 2, timeLimitMs: 500 },
+      reviewOptions: { depth: 2, timeLimitMs: 500, lines: 2 },
       lessonOptions: { maxCards: 1 }
     });
 
@@ -537,6 +547,8 @@ test("UCCI backend creates full game studies from native reviews", async () => {
     assert.equal(study.summary.totalMoves, 1);
     assert.equal(study.review.moves[0].review.source, "native-ucci");
     assert.equal(study.lessonPlan.cards[0].bestMove, "h9-g7");
+    assert.equal(study.keyMoments[0].bestComparison.bestMove, "h9-g7");
+    assert.equal(study.lessonPlan.cards[0].bestAlternatives.length, 2);
     assert.equal(study.positionStudies.length, 0);
   } finally {
     await backend.close();
