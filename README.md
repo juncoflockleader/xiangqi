@@ -163,8 +163,13 @@ after online sparring or imported game records:
 
 ```sh
 npm run study:game -- --moves "h7-e7 h0-g2 h9-g7" --json
+npm run study:game -- --moves "1.C2=5 n8+7 2.N2+3 p7+1"
 npm run study:game -- --file ./game.json --max-position-studies 3
 ```
+
+The game-study importer accepts coordinate notation and common western Xiangqi
+notation (`C2=5`, `n8+7`, `R8+4`), so move lists copied from sites such as
+Xiangqi.com can be reviewed without hand-converting every move.
 
 Use named engine profiles when wiring the app:
 

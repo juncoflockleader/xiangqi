@@ -6,7 +6,8 @@ import {
   createOracleReviewEngineBackend,
   createUcciEngineBackend,
   describeEngineBackend,
-  formatGameStudy
+  formatGameStudy,
+  parseGameMoveText
 } from "../src/index.js";
 import {
   parseNativeEngineOption,
@@ -394,40 +395,11 @@ async function loadMoves(options) {
   }
   if (options.positionalMoves.length > 0) parts.push(options.positionalMoves.join(" "));
 
-  const moves = parts.flatMap(parseMovesText);
+  const moves = parseGameMoveText(parts.join(" "));
   if (moves.length === 0) {
     throw new Error("Game study requires moves. Pass coordinate moves as args, --moves, or --file.");
   }
   return moves;
-}
-
-function parseMovesText(text) {
-  const trimmed = String(text ?? "").trim();
-  if (!trimmed) return [];
-
-  const parsed = parseMovesJson(trimmed);
-  if (parsed) return parsed;
-
-  return trimmed
-    .split(/[\s,;]+/)
-    .map((token) => token.trim())
-    .filter(Boolean)
-    .filter((token) => !/^\d+\.*$/.test(token))
-    .filter((token) => /^[a-i][0-9]-?[a-i][0-9]$/i.test(token));
-}
-
-function parseMovesJson(text) {
-  if (!/^\s*[\[{"]/.test(text)) return null;
-  try {
-    const data = JSON.parse(text);
-    if (Array.isArray(data)) return data.map(String);
-    if (typeof data === "string") return parseMovesText(data);
-    if (Array.isArray(data?.moves)) return data.moves.map(String);
-    if (typeof data?.moves === "string") return parseMovesText(data.moves);
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 function reportOptions(options, moves) {
@@ -459,12 +431,13 @@ function printUsage() {
   console.log(`
 Usage:
   npm run study:game -- h7-e7 h0-g2 h9-g7
+  npm run study:game -- --moves "1.C2=5 n8+7 2.N2+3 p7+1"
   npm run study:game -- --moves "h7-e7 h0-g2 h9-g7" --json
   npm run study:game -- --file ./game.json --max-position-studies 3
   npm run study:game -- --engine-command /path/to/pikafish --engine-protocol uci --file ./game.txt
 
 Options:
-  --moves text             Coordinate moves, separated by spaces or commas.
+  --moves text             Coordinate or western Xiangqi moves.
   --file file              Load moves from text, JSON array, or {"moves":[...]}.
   --moves-file file        Alias for --file.
   --profile name           Engine profile. Default: balanced.

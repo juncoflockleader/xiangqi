@@ -28,6 +28,20 @@ test("game study CLI prints a readable game learning report", async () => {
   assert.match(stdout, /Next steps:/);
 });
 
+test("game study CLI imports western Xiangqi notation", async () => {
+  const { stdout } = await runGameStudyCli([
+    "--depth", "1",
+    "--time", "100",
+    "--max-position-studies", "0",
+    "--moves", "1.C2=5 n8+7 2.N2+3 p7+1",
+    "--json"
+  ]);
+  const report = JSON.parse(stdout);
+
+  assert.deepEqual(report.options.moves, ["h7-e7", "h0-g2", "h9-g7", "g3-g4"]);
+  assert.equal(report.study.summary.totalMoves, 4);
+});
+
 test("game study CLI emits JSON from a move file", async () => {
   const dir = await mkdtemp(join(tmpdir(), "xiangqi-game-study-"));
   const file = join(dir, "game.json");
