@@ -29,12 +29,19 @@ The current engine is dependency-free JavaScript and includes:
 ## Quick Start
 
 ```sh
+npm run play
 node examples/engine-demo.mjs
 node examples/benchmark.mjs
 node examples/perft.mjs 2
 node bin/xiangqi-ucci.mjs
 npm test
 ```
+
+For an interactive terminal game, run `npm run play`. The default demo lets you play
+red against the fast JavaScript engine; use `npm run play -- --side black`,
+`--depth 3`, `--time 1500`, or `--no-book` to experiment. Moves use coordinate
+notation such as `h9-g7` or `h9g7`, and the `hint`, `best`, and `why` commands
+show the learning-oriented explanation layer while you play.
 
 ## API Sketch
 
