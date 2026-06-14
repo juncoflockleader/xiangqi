@@ -11,6 +11,7 @@
     "bench:oracle": "node examples/oracle-benchmark.mjs",
     "book:oracle": "node examples/oracle-opening.mjs",
     "spar": "node examples/sparring.mjs",
+    "install:pikafish": "node examples/install-pikafish.mjs",
     "probe:native": "node examples/native-probe.mjs",
     "study": "node examples/study-position.mjs",
     "study:game": "node examples/game-study.mjs",

@@ -1,4 +1,5 @@
 node_modules/
 coverage/
+.engines/
 .DS_Store
 *.log
