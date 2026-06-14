@@ -57,6 +57,7 @@ export function createEngine(defaultOptions = {}) {
         move: candidate.move,
         score: Math.round(candidate.score),
         centipawnLoss: Math.max(0, Math.round(bestScore - candidate.score)),
+        repetition: candidate.repetition ?? null,
         principalVariation: candidate.principalVariation.map((pvMove) => pvMove.notation ?? moveToNotation(pvMove)),
         explanation: explainCandidateMove(position, candidate, {
           rank: index + 1,

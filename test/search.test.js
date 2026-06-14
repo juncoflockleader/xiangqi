@@ -43,6 +43,31 @@ test("search treats repeated child positions as draw candidates", () => {
   });
 });
 
+test("engine explains draw-assumed repetition candidates", () => {
+  const position = parseFen("4k4/9/9/9/9/9/9/9/9/3K5 r");
+  const move = generateLegalMoves(position)[0];
+  const repeatedChild = makeMove(position, move);
+  const engine = createEngine({ depth: 1, timeLimitMs: 1000 });
+  const result = engine.chooseMove(position, {
+    useBook: false,
+    depth: 1,
+    timeLimitMs: 1000,
+    history: [repeatedChild, repeatedChild]
+  });
+  const analysis = engine.analyzePosition(position, {
+    lines: 2,
+    depth: 1,
+    timeLimitMs: 1000,
+    history: [repeatedChild, repeatedChild]
+  });
+
+  assert.equal(result.bestMove.notation, move.notation);
+  assert.ok(result.explanation.reasons.some((reason) => reason.includes("draw-assumed repetition")));
+  assert.equal(result.explanation.alternatives[0].note, "repeats a known position for a draw-assumed score");
+  assert.equal(analysis.lines[0].repetition.kind, "repeated-position");
+  assert.ok(analysis.lines[0].explanation.reasons.some((reason) => reason.includes("draw-assumed repetition")));
+});
+
 test("search keeps static root candidates when the deadline expires before depth one", () => {
   const result = searchBestMove(createInitialPosition(), {
     depth: 8,

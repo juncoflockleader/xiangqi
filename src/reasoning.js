@@ -4,7 +4,8 @@ import {
   moveToNotation,
   opponent,
   parseMoveNotation,
-  pieceLabel
+  pieceLabel,
+  sameMove
 } from "./board.js";
 import { evaluateMoveDelta, describeCapture, describeEvaluationTerms } from "./evaluate.js";
 import { generateLegalMoves, isInCheck } from "./movegen.js";
@@ -33,6 +34,10 @@ export function explainMove(position, searchResult) {
   if (candidateGap !== null && candidateGap >= 25) {
     reasons.push(`Search rates this ${Math.round(candidateGap)} centipawns better than the next candidate.`);
   }
+
+  const bestCandidate = findCandidate(searchResult.candidates ?? [], move);
+  const repetitionReason = explainRepetition(bestCandidate?.repetition);
+  if (repetitionReason) reasons.push(repetitionReason);
 
   const stability = searchStabilityReason(searchResult.iterations ?? []);
   if (stability) reasons.push(stability);
@@ -216,6 +221,9 @@ export function explainCandidateMove(position, candidate, context = {}) {
     reasons.push(`This line trails the top move by about ${centipawnLoss} centipawns.`);
   }
 
+  const repetitionReason = explainRepetition(candidate.repetition);
+  if (repetitionReason) reasons.push(repetitionReason);
+
   reasons.push(...moveStory.reasons);
 
   return {
@@ -391,6 +399,9 @@ function explainAlternatives(candidates) {
     const move = candidate.move;
     const tactical = [];
 
+    if (candidate.repetition) {
+      tactical.push("repeats a known position for a draw-assumed score");
+    }
     if (move.captured) {
       tactical.push(`captures ${PIECE_NAMES[move.captured.type]}`);
     }
@@ -407,6 +418,18 @@ function explainAlternatives(candidates) {
         : `${PIECE_NAMES[move.piece.type]} move with search score ${formatScore(candidate.score)}`
     };
   });
+}
+
+function explainRepetition(repetition) {
+  if (!repetition) return null;
+
+  const count = repetition.projectedCount ?? null;
+  const countText = count ? ` for occurrence ${count}` : "";
+  return `This line repeats a known position${countText} and is scored with draw-assumed repetition handling.`;
+}
+
+function findCandidate(candidates, move) {
+  return candidates.find((candidate) => sameMove(candidate.move, move)) ?? null;
 }
 
 function emptyLinePlan() {
