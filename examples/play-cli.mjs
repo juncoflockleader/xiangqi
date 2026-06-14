@@ -653,7 +653,7 @@ function assertPresetResolved(options, kind) {
 
   const flag = kind === "engine" ? "--engine-preset" : "--oracle-preset";
   const commandFlag = kind === "engine" ? "--engine-command" : "--oracle-command";
-  throw new Error(`${flag} ${options[`${prefix}Preset`]} did not resolve a native command. Set ${commandFlag}, XIANGQI_${kind === "engine" ? "ENGINE" : "ORACLE_ENGINE"}_COMMAND, PIKAFISH_COMMAND, or PIKAFISH_HOME.`);
+  throw new Error(`${flag} ${options[`${prefix}Preset`]} did not resolve a native command. Run npm run install:pikafish, or set ${commandFlag}, XIANGQI_${kind === "engine" ? "ENGINE" : "ORACLE_ENGINE"}_COMMAND, PIKAFISH_COMMAND, or PIKAFISH_HOME.`);
 }
 
 function applyNativePreset(options, kind) {

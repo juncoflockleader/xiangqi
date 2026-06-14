@@ -49,6 +49,9 @@ async function buildInstallPlan(options) {
   const installDir = resolve(installRoot, tag);
   const archivePath = resolve(installDir, asset.name);
   const digest = parseDigest(asset.digest);
+  const commandPrefix = installRoot === resolve(DEFAULT_DEST)
+    ? ""
+    : `PIKAFISH_HOME=${shellQuote(installDir)} `;
   const preset = resolveNativeEnginePreset("pikafish", {
     home: installDir,
     platform: options.platform,
@@ -80,9 +83,9 @@ async function buildInstallPlan(options) {
       PIKAFISH_HOME: installDir
     },
     next: {
-      probe: `PIKAFISH_HOME=${shellQuote(installDir)} npm run probe:native -- --preset pikafish --lines 3`,
-      play: `PIKAFISH_HOME=${shellQuote(installDir)} npm run play -- --side black --engine-preset pikafish`,
-      sparring: `PIKAFISH_HOME=${shellQuote(installDir)} npm run spar -- --red-preset pikafish --black-depth 2 --plies 12`
+      probe: `${commandPrefix}npm run probe:native -- --preset pikafish --lines 3`,
+      play: `${commandPrefix}npm run play -- --side black --engine-preset pikafish`,
+      sparring: `${commandPrefix}npm run spar -- --red-preset pikafish --black-depth 2 --plies 12`
     }
   };
 }

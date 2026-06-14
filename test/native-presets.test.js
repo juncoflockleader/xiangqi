@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   listNativeEnginePresets,
   mergeNativeEngineOptions,
@@ -49,6 +52,49 @@ test("Pikafish preset can infer local bundle paths from home", () => {
   ]);
 });
 
+test("Pikafish preset discovers the latest local installer bundle", () => {
+  const root = mkdtempSync(join(tmpdir(), "xiangqi-pikafish-preset-"));
+
+  try {
+    createPikafishBundle(root, "Pikafish-2025-01-02");
+    const latest = createPikafishBundle(root, "Pikafish-2026-01-02");
+    const preset = resolveNativeEnginePreset("pikafish", {
+      env: {},
+      installRoot: root,
+      platform: "darwin",
+      arch: "arm64"
+    });
+
+    assert.equal(preset.command, latest.command);
+    assert.equal(preset.cwd, latest.home);
+    assert.deepEqual(preset.engineOptions, [
+      { name: "UCI_ShowWDL", value: true },
+      { name: "EvalFile", value: latest.evalFile }
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Pikafish preset can disable local installer discovery", () => {
+  const root = mkdtempSync(join(tmpdir(), "xiangqi-pikafish-preset-"));
+
+  try {
+    createPikafishBundle(root, "Pikafish-2026-01-02");
+    const preset = resolveNativeEnginePreset("pikafish", {
+      env: {},
+      installRoot: root,
+      autoDiscover: false,
+      platform: "darwin",
+      arch: "arm64"
+    });
+
+    assert.equal(preset.command, undefined);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("explicit native options override preset defaults", () => {
   const preset = resolveNativeEnginePreset("pikafish", {
     command: "/engines/pikafish",
@@ -78,3 +124,14 @@ test("native option merging deduplicates by option name", () => {
     ]
   );
 });
+
+function createPikafishBundle(root, tag) {
+  const home = join(root, tag);
+  const command = join(home, "MacOS", "pikafish-apple-silicon");
+  const evalFile = join(home, "pikafish.nnue");
+  mkdirSync(join(home, "MacOS"), { recursive: true });
+  writeFileSync(command, "#!/bin/sh\n", "utf8");
+  chmodSync(command, 0o755);
+  writeFileSync(evalFile, "nnue", "utf8");
+  return { home, command, evalFile };
+}

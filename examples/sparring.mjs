@@ -555,7 +555,7 @@ function assertPresetResolved(side, options) {
 
   const flag = side === "referee" ? "--referee-preset" : `--${side}-preset`;
   const commandFlag = side === "referee" ? "--referee-command" : `--${side}-command`;
-  throw new Error(`${flag} ${presetName} did not resolve a native command. Set ${commandFlag}, --native-command, XIANGQI_${side.toUpperCase()}_ENGINE_COMMAND, PIKAFISH_COMMAND, or PIKAFISH_HOME.`);
+  throw new Error(`${flag} ${presetName} did not resolve a native command. Run npm run install:pikafish, or set ${commandFlag}, --native-command, XIANGQI_${side.toUpperCase()}_ENGINE_COMMAND, PIKAFISH_COMMAND, or PIKAFISH_HOME.`);
 }
 
 function commandForPresetSide(side, options) {

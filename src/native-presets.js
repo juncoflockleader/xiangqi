@@ -1,3 +1,8 @@
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
+
+const DEFAULT_PIKAFISH_INSTALL_ROOT = ".engines/pikafish";
+
 const PRESETS = Object.freeze({
   pikafish: Object.freeze({
     id: "pikafish",
@@ -54,11 +59,21 @@ export function mergeNativeEngineOptions(...groups) {
 
 function resolvePikafishPreset(preset, options) {
   const env = options.env ?? defaultEnv();
-  const home = firstText(
+  const explicitCommand = firstText(
+    options.command,
+    env.XIANGQI_PIKAFISH_COMMAND,
+    env.PIKAFISH_COMMAND,
+    env.XIANGQI_ENGINE_COMMAND
+  );
+  const configuredHome = firstText(
     options.home,
     options.engineHome,
     env.XIANGQI_PIKAFISH_HOME,
     env.PIKAFISH_HOME
+  );
+  const home = firstText(
+    configuredHome,
+    explicitCommand ? null : discoverPikafishHome(options, env)
   );
   const command = firstText(
     options.command,
@@ -91,6 +106,62 @@ function resolvePikafishPreset(preset, options) {
       options.engineOptions
     )
   };
+}
+
+function discoverPikafishHome(options, env) {
+  if (!shouldDiscoverPikafish(options, env)) return undefined;
+
+  const installRoot = firstText(
+    options.installRoot,
+    options.pikafishInstallRoot,
+    env.XIANGQI_PIKAFISH_INSTALL_DIR,
+    DEFAULT_PIKAFISH_INSTALL_ROOT
+  );
+  const root = resolvePath(options.baseDir ?? defaultCwd(), installRoot);
+  const direct = pikafishInstallCandidate(root, options);
+  if (direct) return direct.home;
+
+  let entries;
+  try {
+    entries = readdirSync(root, { withFileTypes: true });
+  } catch {
+    return undefined;
+  }
+
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => pikafishInstallCandidate(joinPath(root, entry.name), options, entry.name))
+    .filter(Boolean)
+    .sort(comparePikafishInstallCandidates)[0]?.home;
+}
+
+function shouldDiscoverPikafish(options, env) {
+  if (options.discover === false || options.autoDiscover === false) return false;
+  return !isFalseLike(env.XIANGQI_PIKAFISH_AUTO_DISCOVER);
+}
+
+function pikafishInstallCandidate(home, options, name = "") {
+  const command = inferPikafishCommand(home, options);
+  if (!existsSync(command)) return null;
+  const stat = safeStat(command) ?? safeStat(home);
+  return {
+    home,
+    name,
+    mtimeMs: stat?.mtimeMs ?? 0
+  };
+}
+
+function comparePikafishInstallCandidates(a, b) {
+  if (b.mtimeMs !== a.mtimeMs) return b.mtimeMs - a.mtimeMs;
+  return b.name.localeCompare(a.name);
+}
+
+function safeStat(path) {
+  try {
+    return statSync(path);
+  } catch {
+    return null;
+  }
 }
 
 function resolveGenericPreset(preset, options) {
@@ -168,6 +239,16 @@ function firstText(...values) {
 
 function defaultEnv() {
   return typeof process !== "undefined" && process.env ? process.env : {};
+}
+
+function defaultCwd() {
+  return typeof process !== "undefined" && typeof process.cwd === "function"
+    ? process.cwd()
+    : ".";
+}
+
+function isFalseLike(value) {
+  return ["0", "false", "no", "off"].includes(String(value ?? "").trim().toLowerCase());
 }
 
 function inferPikafishCommand(home, options) {

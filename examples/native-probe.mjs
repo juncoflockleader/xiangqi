@@ -31,7 +31,7 @@ if (options.help) {
 applyNativePreset(options);
 
 if (!options.command) {
-  console.error("Native probe requires --command, XIANGQI_ENGINE_COMMAND, or a preset/env combination that resolves a command.");
+  console.error("Native probe requires --command, XIANGQI_ENGINE_COMMAND, a discoverable preset install, or a preset/env combination that resolves a command.");
   console.error("");
   printUsage();
   process.exit(1);

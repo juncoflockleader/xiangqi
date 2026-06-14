@@ -173,6 +173,7 @@ test("sparring CLI reports an unresolved native preset command", async () => {
         ...process.env,
         XIANGQI_ENGINE_COMMAND: "",
         XIANGQI_RED_ENGINE_COMMAND: "",
+        XIANGQI_PIKAFISH_AUTO_DISCOVER: "false",
         XIANGQI_PIKAFISH_COMMAND: "",
         XIANGQI_PIKAFISH_HOME: "",
         PIKAFISH_COMMAND: "",

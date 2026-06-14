@@ -130,6 +130,7 @@ test("play CLI reports an unresolved native preset command", async () => {
     "--time", "100"
   ], "quit\n", {
     XIANGQI_ENGINE_COMMAND: "",
+    XIANGQI_PIKAFISH_AUTO_DISCOVER: "false",
     XIANGQI_PIKAFISH_COMMAND: "",
     XIANGQI_PIKAFISH_HOME: "",
     PIKAFISH_COMMAND: "",

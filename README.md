@@ -96,15 +96,15 @@ optional NNUE/eval file as `EvalFile`:
 ```sh
 npm run install:pikafish
 
-PIKAFISH_HOME=.engines/pikafish/<tag> npm run play -- \
+npm run play -- \
   --side black \
   --engine-preset pikafish
 
-PIKAFISH_HOME=.engines/pikafish/<tag> npm run probe:native -- \
+npm run probe:native -- \
   --preset pikafish \
   --lines 3
 
-PIKAFISH_HOME=.engines/pikafish/<tag> npm run spar -- \
+npm run spar -- \
   --red-preset pikafish \
   --black-depth 2 \
   --plies 12
@@ -112,11 +112,13 @@ PIKAFISH_HOME=.engines/pikafish/<tag> npm run spar -- \
 
 `npm run install:pikafish` downloads the latest official release metadata,
 selects the release archive, verifies its SHA-256 digest when GitHub publishes
-one, extracts it under `.engines/pikafish/<tag>`, and prints ready-to-run
-commands that set `PIKAFISH_HOME` for that exact tag. If you unpack a Pikafish
-bundle locally, `PIKAFISH_HOME=/path/to/bundle` lets the preset infer the macOS
-Apple Silicon binary path and `pikafish.nnue`; use `PIKAFISH_COMMAND` or
-explicit `--command` when the bundle layout differs.
+one, and extracts it under `.engines/pikafish/<tag>`. The `pikafish` preset
+auto-discovers the newest runnable bundle in `.engines/pikafish`, so the
+probe/play/sparring commands work without extra environment variables after the
+default install. If you unpack a Pikafish bundle locally, `PIKAFISH_HOME=/path/to/bundle`
+lets the preset infer the macOS Apple Silicon binary path and `pikafish.nnue`;
+use `PIKAFISH_COMMAND`, `XIANGQI_PIKAFISH_AUTO_DISCOVER=false`, or explicit
+`--command` when the bundle layout differs.
 
 Or keep the fast local engine for move choice while a stronger oracle grades
 engine picks and player move reviews:
