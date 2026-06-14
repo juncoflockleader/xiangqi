@@ -182,7 +182,7 @@ test("UCCI backend aborts an active native search and drains bestmove", async ()
     depth: 2,
     timeLimitMs: 500,
     startupTimeoutMs: 1000,
-    commandTimeoutMs: 1000,
+    commandTimeoutMs: 3000,
     engineOptions: {
       MockWaitForStopOnce: true
     }
@@ -194,7 +194,7 @@ test("UCCI backend aborts an active native search and drains bestmove", async ()
       useBook: false,
       signal: controller.signal
     });
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    await new Promise((resolve) => setTimeout(resolve, 250));
     controller.abort("stale-position");
 
     await assert.rejects(

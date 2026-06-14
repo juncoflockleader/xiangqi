@@ -377,6 +377,9 @@ class UcciProcessClient {
 
       this.waiters.add(waiter);
       signal?.addEventListener?.("abort", onAbort, { once: true });
+      if (isAbortSignalAborted(signal)) {
+        onAbort();
+      }
       this.checkWaiter(waiter);
     });
   }
