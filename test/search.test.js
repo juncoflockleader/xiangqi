@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  MATE_SCORE,
   createEngine,
   generateLegalMoves,
   makeMove,
@@ -32,6 +33,18 @@ test("search treats repeated child positions as draw candidates", () => {
 
   assert.ok(result.stats.repetitions >= 1);
   assert.equal(repeatedCandidate.score, 0);
+});
+
+test("search scores no-legal-move stalemate as a Xiangqi loss", () => {
+  const position = parseFen("3rkr3/9/9/9/9/9/9/4p4/9/4K4 r");
+  const result = searchBestMove(position, {
+    depth: 1,
+    timeLimitMs: 1000
+  });
+
+  assert.equal(generateLegalMoves(position).length, 0);
+  assert.equal(result.bestMove, null);
+  assert.equal(result.score, -MATE_SCORE);
 });
 
 test("search uses selective pruning and PVS in quiet tactical trees", () => {

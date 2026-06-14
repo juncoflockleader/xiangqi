@@ -61,7 +61,7 @@ export function searchBestMove(position, options = {}) {
   if (rootMoves.length === 0) {
     return {
       bestMove: null,
-      score: isInCheck(position, position.turn) ? -MATE_SCORE : DRAW_SCORE,
+      score: -MATE_SCORE,
       depth: 0,
       nodes: 0,
       principalVariation: [],

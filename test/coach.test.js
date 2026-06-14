@@ -49,3 +49,12 @@ test("coach move handles positions with no legal move", () => {
   assert.equal(hint.levels[0].kind, "status");
   assert.equal(hint.alternatives.length, 0);
 });
+
+test("coach move explains no-legal-move stalemate as losing in Xiangqi", () => {
+  const position = parseFen("3rkr3/9/9/9/9/9/9/4p4/9/4K4 r");
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  const hint = engine.coachMove(position, { useBook: false });
+
+  assert.equal(hint.bestMove, null);
+  assert.ok(hint.explanation.reasons.some((reason) => reason.includes("having no legal move loses")));
+});

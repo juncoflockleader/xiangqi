@@ -18,7 +18,7 @@ export function explainMove(position, searchResult) {
   if (!move) {
     return {
       summary: "No legal move is available.",
-      reasons: [isInCheck(position, position.turn) ? "The side to move is checkmated." : "The side to move has no legal move."],
+      reasons: [terminalNoMoveReason(position)],
       alternatives: [],
       principalVariation: [],
       linePlan: emptyLinePlan(),
@@ -508,10 +508,14 @@ function terminalConfidence(position) {
   return buildConfidence(100, [{
     kind: "terminal",
     impact: 100,
-    text: isInCheck(position, position.turn)
-      ? "No legal move exists because the side to move is checkmated."
-      : "No legal move exists in this terminal position."
+    text: terminalNoMoveReason(position)
   }]);
+}
+
+function terminalNoMoveReason(position) {
+  return isInCheck(position, position.turn)
+    ? "No legal move exists because the side to move is checkmated."
+    : "In Xiangqi, having no legal move loses even when the general is not currently in check.";
 }
 
 function bestMoveStability(iterations) {

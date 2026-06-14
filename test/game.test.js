@@ -11,7 +11,8 @@ import {
   historyKeys,
   parseFen,
   playGameMove,
-  playGameMoveAsync
+  playGameMoveAsync,
+  SIDES
 } from "../src/index.js";
 
 test("game history records moves and position keys", () => {
@@ -102,6 +103,17 @@ test("choose-and-play preserves terminal no-move decisions", () => {
   assert.equal(next.moves.length, 0);
   assert.equal(next.lastDecision.bestMove, null);
   assert.equal(gameStatus(next).state, "checkmate");
+});
+
+test("game status treats Xiangqi stalemate as a loss for the side to move", () => {
+  const game = createGame(parseFen("3rkr3/9/9/9/9/9/9/4p4/9/4K4 r"));
+  const status = gameStatus(game);
+
+  assert.equal(status.state, "stalemate");
+  assert.equal(status.outcome, "loss");
+  assert.equal(status.loser, SIDES.RED);
+  assert.equal(status.winner, SIDES.BLACK);
+  assert.equal(status.inCheck, false);
 });
 
 test("game status detects a repeated position", () => {

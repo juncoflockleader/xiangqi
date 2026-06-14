@@ -257,6 +257,8 @@ game = await chooseAndPlayGameMoveAsync(game, nativeBackend, {
 });
 ```
 
+`gameStatus` reports `state`, `legalMoves`, repetition count, check status, and terminal `winner`/`loser` metadata. Xiangqi stalemate is treated as a loss for the side to move, so both checkmate and no-legal-move stalemate are scored as losing terminal positions.
+
 Review a completed or partial game:
 
 ```js

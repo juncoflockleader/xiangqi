@@ -1,6 +1,7 @@
 import {
   createInitialPosition,
   moveToNotation,
+  opponent,
   parseMoveNotation,
   positionKey,
   sameMove,
@@ -104,17 +105,24 @@ export function gameStatus(game) {
   const repetitionCount = game.positionCounts.get(key) ?? 0;
 
   if (legalMoves.length === 0) {
+    const inCheck = isInCheck(game.position, game.position.turn);
     return {
-      state: isInCheck(game.position, game.position.turn) ? "checkmate" : "stalemate",
+      state: inCheck ? "checkmate" : "stalemate",
+      outcome: "loss",
+      winner: opponent(game.position.turn),
+      loser: game.position.turn,
       legalMoves: 0,
       repetitionCount,
-      inCheck: isInCheck(game.position, game.position.turn)
+      inCheck
     };
   }
 
   if (repetitionCount >= 3) {
     return {
       state: "repetition",
+      outcome: "draw",
+      winner: null,
+      loser: null,
       legalMoves: legalMoves.length,
       repetitionCount,
       inCheck: isInCheck(game.position, game.position.turn)
@@ -123,6 +131,9 @@ export function gameStatus(game) {
 
   return {
     state: "playing",
+    outcome: null,
+    winner: null,
+    loser: null,
     legalMoves: legalMoves.length,
     repetitionCount,
     inCheck: isInCheck(game.position, game.position.turn)
