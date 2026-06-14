@@ -262,7 +262,8 @@ function maybeBookResult(position, options, tableSize) {
       name: bookHit.entry.name,
       idea: bookHit.entry.idea,
       tags: bookHit.entry.tags,
-      weight: bookHit.entry.weight
+      weight: bookHit.entry.weight,
+      database: bookHit.entry.database
     },
     bookAlternatives: bookHit.entries
   };

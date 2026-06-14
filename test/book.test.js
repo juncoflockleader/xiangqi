@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import {
   createEngine,
   createInitialPosition,
+  createOpeningBookFromRecords,
   createOpeningBookFromText,
   DEFAULT_OPENING_BOOK,
   lookupOpeningBook,
-  mergeOpeningBooks
+  mergeOpeningBooks,
+  positionKey
 } from "../src/index.js";
 
 test("opening book returns legal annotated entries from the initial position", () => {
@@ -120,4 +122,91 @@ test("imported opening data can merge with the curated default book", () => {
   assert.equal(result.bestMove.notation, "b9-c7");
   assert.equal(result.book.weight, 127);
   assert.ok(result.book.tags.includes("database"));
+});
+
+test("structured opening records preserve database priors for explanations", () => {
+  const imported = createOpeningBookFromRecords([
+    {
+      moves: ["h7-e7"],
+      games: 80,
+      redWinRate: 0.68,
+      drawRate: 0.2,
+      blackWinRate: 0.12,
+      engineScore: 32,
+      source: "sample-master-db",
+      year: 2026,
+      name: "Database Central Cannon",
+      tags: ["master"]
+    },
+    {
+      moves: ["b9-c7"],
+      games: 90,
+      redWinRate: 0.4,
+      drawRate: 0.2,
+      blackWinRate: 0.4,
+      name: "Database Horse Opening"
+    }
+  ]);
+  const engine = createEngine({ book: imported, openingHeuristics: false, depth: 1, timeLimitMs: 500 });
+  const result = engine.chooseMove(createInitialPosition());
+
+  assert.equal(result.source, "opening-book");
+  assert.equal(result.bestMove.notation, "h7-e7");
+  assert.equal(result.book.database.games, 80);
+  assert.equal(Math.round(result.book.database.expectedScore * 100), 78);
+  assert.ok(result.book.database.summary.includes("80 database games"));
+  assert.ok(result.explanation.reasons.some((reason) => reason.includes("sample-master-db")));
+  assert.ok(result.book.tags.includes("master"));
+});
+
+test("structured opening lines weight replies for the side to move", () => {
+  const imported = createOpeningBookFromRecords([
+    {
+      moves: ["h7-e7", "h0-g2"],
+      games: 100,
+      redWinRate: 0.62,
+      drawRate: 0.18,
+      blackWinRate: 0.2,
+      name: "Central Cannon Red-Favored Line"
+    },
+    {
+      moves: ["h7-e7", "b0-c2"],
+      games: 90,
+      redWinRate: 0.3,
+      drawRate: 0.2,
+      blackWinRate: 0.5,
+      name: "Central Cannon Black-Resilient Line"
+    }
+  ]);
+  const engine = createEngine({ book: imported, openingHeuristics: false, depth: 1, timeLimitMs: 500 });
+  const afterCentralCannon = engine.play(createInitialPosition(), "h7-e7");
+  const reply = engine.openingBook(afterCentralCannon);
+
+  assert.equal(reply.move.notation, "b0-c2");
+  assert.equal(reply.entry.name, "Central Cannon Black-Resilient Line");
+  assert.equal(Math.round(reply.entry.database.expectedScore * 100), 60);
+  assert.ok(reply.entry.weight > reply.entries.find((entry) => entry.notation === "h0-g2").weight);
+});
+
+test("structured opening records can target a specific FEN position", () => {
+  const helper = createEngine({ depth: 1, timeLimitMs: 500 });
+  const afterCentralCannon = helper.play(createInitialPosition(), "h7-e7");
+  const imported = createOpeningBookFromRecords([
+    {
+      fen: positionKey(afterCentralCannon),
+      move: "b0-c2",
+      games: 40,
+      redWinRate: 0.28,
+      drawRate: 0.2,
+      blackWinRate: 0.52,
+      source: "position-table",
+      name: "Position Table Left Screen Horse"
+    }
+  ]);
+  const engine = createEngine({ book: imported, openingHeuristics: false, depth: 1, timeLimitMs: 500 });
+  const reply = engine.openingBook(afterCentralCannon);
+
+  assert.equal(reply.move.notation, "b0-c2");
+  assert.equal(reply.entry.database.side, "black");
+  assert.equal(reply.entry.database.source, "position-table");
 });

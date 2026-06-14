@@ -178,6 +178,15 @@ export function createOpeningBook(data = {}, options = {}) {
     addOpeningLine(positions, entries, { initialPosition, aggregate: aggregateLines });
   }
 
+  const aggregateRecords = options.aggregateRecords !== false;
+  for (const record of spec.records ?? options.records ?? []) {
+    addOpeningRecord(positions, record, {
+      initialPosition,
+      defaults: lineDefaults,
+      aggregate: aggregateRecords
+    });
+  }
+
   return freezeOpeningPositions(positions);
 }
 
@@ -188,7 +197,19 @@ export function createOpeningBookFromText(text, options = {}) {
     initialPosition: options.initialPosition,
     initialFen: options.initialFen,
     defaults: options.defaults,
+    records: options.records,
     lines: parseOpeningBookText(text)
+  }, options);
+}
+
+export function createOpeningBookFromRecords(records, options = {}) {
+  return createOpeningBook({
+    baseBook: options.baseBook,
+    positions: options.positions,
+    initialPosition: options.initialPosition,
+    initialFen: options.initialFen,
+    defaults: options.defaults,
+    records
   }, options);
 }
 
@@ -246,7 +267,8 @@ export function bookMoveToCandidate(entry) {
       name: entry.name,
       idea: entry.idea,
       tags: entry.tags,
-      weight: entry.weight
+      weight: entry.weight,
+      database: entry.database
     }
   };
 }
@@ -264,13 +286,15 @@ function resolveBookEntry(position, entry, legalMoves) {
 }
 
 function freezeBookEntry(entry) {
+  const database = freezeDatabaseMetadata(entry.database);
   return Object.freeze({
     ...entry,
     move: canonicalMoveNotation(entry.move),
     name: entry.name ?? "Imported Opening Continuation",
     weight: normalizeWeight(entry.weight),
     idea: entry.idea ?? "This continuation comes from imported opening data and is weighted by its source frequency.",
-    tags: Object.freeze(normalizeTags(entry.tags))
+    tags: Object.freeze(normalizeTags(entry.tags)),
+    ...(database ? { database } : {})
   });
 }
 
@@ -344,8 +368,204 @@ function mergeBookEntries(existing, incoming) {
     ...existing,
     weight: existing.weight + incoming.weight,
     tags: uniqueTags([...existing.tags, ...incoming.tags]),
-    sources: (existing.sources ?? 1) + (incoming.sources ?? 1)
+    sources: (existing.sources ?? 1) + (incoming.sources ?? 1),
+    database: mergeDatabaseMetadata(existing.database, incoming.database)
   });
+}
+
+function addOpeningRecord(positions, record, options = {}) {
+  if (!record) return;
+
+  if (isOpeningLineRecord(record)) {
+    addOpeningLineRecord(positions, record, options);
+    return;
+  }
+
+  if (!record.move) {
+    throw new Error("Opening database record requires either a move or a moves array.");
+  }
+
+  const position = normalizeInitialPosition(record.key ?? record.fen ?? options.initialPosition);
+  const key = record.key ?? record.fen ?? positionKey(position);
+  const entry = normalizeDatabaseMove(record, record.move, position.turn, 0, options.defaults);
+  addEntries(positions, key, [entry], { aggregate: options.aggregate });
+}
+
+function addOpeningLineRecord(positions, record, options = {}) {
+  const moves = normalizeRecordMoves(record);
+  let position = normalizeRecordInitialPosition(record, options);
+
+  for (let index = 0; index < moves.length; index += 1) {
+    const moveSpec = moves[index];
+    const move = typeof moveSpec === "string" ? moveSpec : moveSpec.move ?? moveSpec.notation;
+    const entry = normalizeDatabaseMove(record, moveSpec, position.turn, index, options.defaults);
+    addEntries(positions, positionKey(position), [entry], { aggregate: options.aggregate });
+    position = applyBookMove(position, move ?? entry.move);
+  }
+}
+
+function isOpeningLineRecord(record) {
+  return Array.isArray(record)
+    || typeof record === "string"
+    || Array.isArray(record.moves)
+    || typeof record.moves === "string"
+    || Array.isArray(record.line)
+    || typeof record.line === "string"
+    || Array.isArray(record.pv)
+    || typeof record.pv === "string";
+}
+
+function normalizeRecordMoves(record) {
+  if (Array.isArray(record)) return record;
+  if (typeof record === "string") return record.trim().split(/\s+/).filter(Boolean);
+
+  const moves = record.moves ?? record.line ?? record.pv;
+  if (Array.isArray(moves)) return moves;
+  if (typeof moves === "string") return moves.trim().split(/\s+/).filter(Boolean);
+
+  throw new Error("Opening database line record requires moves.");
+}
+
+function normalizeRecordInitialPosition(record, options) {
+  const explicit = record.initialPosition
+    ?? record.initialFen
+    ?? (record.moves || record.line || record.pv ? record.fen ?? record.key : null);
+
+  return normalizeInitialPosition(explicit ?? options.initialPosition);
+}
+
+function normalizeDatabaseMove(record, moveSpec, side, index, defaults = {}) {
+  const moveRecord = typeof moveSpec === "string"
+    ? { move: moveSpec }
+    : moveSpec;
+  const move = moveRecord.move ?? moveRecord.notation;
+  if (!move) {
+    throw new Error(`Opening database record ${index + 1} has no move.`);
+  }
+
+  const metadata = {
+    ...defaults,
+    ...record,
+    ...moveRecord
+  };
+  const database = freezeDatabaseMetadata(normalizeDatabaseMetadata(metadata, side));
+  const name = metadata.name
+    ?? metadata.opening
+    ?? metadata.label
+    ?? `Database Opening Continuation ${index + 1}`;
+  const idea = metadata.idea
+    ?? database.summary
+    ?? "This continuation is weighted by structured opening-database popularity and result statistics.";
+  const tags = uniqueTags([
+    ...normalizeTags(defaults.tags),
+    ...normalizeTags(record.tags),
+    ...normalizeTags(moveRecord.tags),
+    "imported",
+    "database"
+  ]);
+
+  return freezeBookEntry({
+    move,
+    name,
+    idea,
+    tags,
+    weight: recordWeight(metadata, database),
+    database
+  });
+}
+
+function normalizeDatabaseMetadata(record, side) {
+  const games = normalizeOptionalNumber(record.games ?? record.count ?? record.frequency ?? record.played);
+  const redWins = normalizeOptionalNumber(record.redWins ?? record.redWin ?? record.red);
+  const blackWins = normalizeOptionalNumber(record.blackWins ?? record.blackWin ?? record.black);
+  const draws = normalizeOptionalNumber(record.draws ?? record.draw);
+  const resultGames = games ?? sumDefined(redWins, blackWins, draws);
+  const redWinRate = normalizeRate(record.redWinRate ?? record.redRate, redWins, resultGames);
+  const blackWinRate = normalizeRate(record.blackWinRate ?? record.blackRate, blackWins, resultGames);
+  const drawRate = normalizeRate(record.drawRate, draws, resultGames);
+  const sideWinRate = normalizeRate(record.sideWinRate ?? record.winRate);
+  const sideLossRate = normalizeRate(record.sideLossRate ?? record.lossRate);
+  const expectedScore = normalizeExpectedScore(record.expectedScore ?? record.expected)
+    ?? expectedScoreForSide({
+      side,
+      redWinRate,
+      blackWinRate,
+      drawRate,
+      sideWinRate,
+      sideLossRate
+    });
+  const engineScore = normalizeOptionalNumber(record.engineScore ?? record.cp ?? record.centipawns);
+  const source = record.source
+    ?? (typeof record.database === "string" ? record.database : record.database?.source)
+    ?? record.db;
+  const year = normalizeOptionalNumber(record.year);
+
+  return {
+    side,
+    ...(resultGames ? { games: resultGames } : {}),
+    ...(redWinRate !== null ? { redWinRate } : {}),
+    ...(drawRate !== null ? { drawRate } : {}),
+    ...(blackWinRate !== null ? { blackWinRate } : {}),
+    ...(expectedScore !== null ? { expectedScore } : {}),
+    ...(engineScore !== null ? { engineScore } : {}),
+    ...(source ? { source } : {}),
+    ...(year ? { year } : {})
+  };
+}
+
+function recordWeight(record, database) {
+  if (record.weight !== undefined) return normalizeWeight(record.weight);
+
+  const popularity = normalizeWeight(database.games ?? record.count ?? record.frequency ?? 1);
+  const resultBonus = database.expectedScore === undefined
+    ? 0
+    : Math.round((database.expectedScore - 0.5) * 120);
+  const engineBonus = database.engineScore === undefined
+    ? 0
+    : Math.round(clamp(database.engineScore, -200, 200) / 4);
+
+  return Math.max(1, popularity + resultBonus + engineBonus);
+}
+
+function freezeDatabaseMetadata(database) {
+  if (!database) return null;
+  const normalized = {
+    ...database
+  };
+  const summary = database.summary ?? summarizeDatabaseMetadata(normalized);
+  if (summary) normalized.summary = summary;
+  return Object.freeze(normalized);
+}
+
+function mergeDatabaseMetadata(existing, incoming) {
+  if (!existing) return incoming;
+  if (!incoming) return existing;
+
+  const games = (existing.games ?? 0) + (incoming.games ?? 0);
+  const weightA = existing.games ?? 1;
+  const weightB = incoming.games ?? 1;
+  const source = uniqueTags([existing.source, incoming.source]).join(", ");
+  const merged = {
+    side: existing.side ?? incoming.side,
+    ...(games > 0 ? { games } : {}),
+    ...mergeWeightedRate("redWinRate", existing, incoming, weightA, weightB),
+    ...mergeWeightedRate("drawRate", existing, incoming, weightA, weightB),
+    ...mergeWeightedRate("blackWinRate", existing, incoming, weightA, weightB),
+    ...mergeWeightedRate("expectedScore", existing, incoming, weightA, weightB),
+    ...mergeWeightedRate("engineScore", existing, incoming, weightA, weightB),
+    ...(source ? { source } : {})
+  };
+
+  return freezeDatabaseMetadata(merged);
+}
+
+function mergeWeightedRate(key, a, b, weightA, weightB) {
+  if (a[key] === undefined && b[key] === undefined) return {};
+  if (a[key] === undefined) return { [key]: b[key] };
+  if (b[key] === undefined) return { [key]: a[key] };
+  return {
+    [key]: ((a[key] * weightA) + (b[key] * weightB)) / (weightA + weightB)
+  };
 }
 
 function normalizeOpeningLine(line, defaults = {}) {
@@ -451,6 +671,71 @@ function canonicalMoveNotation(move) {
 function normalizeWeight(value) {
   const parsed = Number(value ?? 1);
   return Number.isFinite(parsed) ? Math.max(1, parsed) : 1;
+}
+
+function normalizeOptionalNumber(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(String(value).replace(/%$/, ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function sumDefined(...values) {
+  const present = values.filter((value) => value !== null && value !== undefined);
+  if (present.length === 0) return null;
+  return present.reduce((sum, value) => sum + value, 0);
+}
+
+function normalizeRate(value, count = null, total = null) {
+  let parsed = normalizeOptionalNumber(value);
+  if (parsed === null && count !== null && total) {
+    parsed = count / total;
+  }
+  if (parsed === null) return null;
+  if (parsed > 1) parsed /= 100;
+  return clamp(parsed, 0, 1);
+}
+
+function normalizeExpectedScore(value) {
+  const parsed = normalizeRate(value);
+  return parsed === null ? null : parsed;
+}
+
+function expectedScoreForSide({
+  side,
+  redWinRate,
+  blackWinRate,
+  drawRate,
+  sideWinRate,
+  sideLossRate
+}) {
+  if (sideWinRate !== null) {
+    const inferredDraw = drawRate ?? (sideLossRate !== null ? Math.max(0, 1 - sideWinRate - sideLossRate) : 0);
+    return clamp(sideWinRate + inferredDraw * 0.5, 0, 1);
+  }
+
+  if (redWinRate === null && blackWinRate === null && drawRate === null) return null;
+  const winRate = side === SIDES.RED ? redWinRate : blackWinRate;
+  if (winRate === null) return null;
+  return clamp(winRate + (drawRate ?? 0) * 0.5, 0, 1);
+}
+
+function summarizeDatabaseMetadata(database) {
+  const parts = [];
+  if (database.games) parts.push(`${Math.round(database.games)} database games`);
+  if (database.expectedScore !== undefined) {
+    parts.push(`${Math.round(database.expectedScore * 100)}% expected score for ${database.side}`);
+  }
+  if (database.engineScore !== undefined) {
+    parts.push(`engine prior ${database.engineScore >= 0 ? "+" : ""}${Math.round(database.engineScore)} cp`);
+  }
+  if (database.source) parts.push(`source ${database.source}`);
+  if (database.year) parts.push(String(Math.round(database.year)));
+
+  return parts.length > 0 ? `Database prior: ${parts.join(", ")}.` : null;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function normalizeTags(tags) {

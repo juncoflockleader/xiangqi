@@ -72,6 +72,7 @@ export function explainBookMove(position, bookResult) {
   const reasons = [
     `${label}: ${entry.name}.`,
     entry.idea,
+    ...(entry.database?.summary ? [entry.database.summary] : []),
     ...moveStory.reasons
   ];
 

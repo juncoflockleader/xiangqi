@@ -80,6 +80,7 @@ Import or merge opening data:
 ```js
 import {
   createEngine,
+  createOpeningBookFromRecords,
   createOpeningBookFromText,
   DEFAULT_OPENING_BOOK,
   mergeOpeningBooks
@@ -92,9 +93,21 @@ const imported = createOpeningBookFromText(`
 
 const book = mergeOpeningBooks(DEFAULT_OPENING_BOOK, imported);
 const engine = createEngine({ book });
+
+const databaseBook = createOpeningBookFromRecords([
+  {
+    moves: ["h7-e7", "h0-g2"],
+    games: 1200,
+    redWinRate: 0.54,
+    drawRate: 0.24,
+    blackWinRate: 0.22,
+    source: "master-game-db",
+    name: "Central Cannon Main Line"
+  }
+]);
 ```
 
-The text importer accepts move lines plus optional `weight`, `count`, `frequency`, or `games` metadata. Repeated lines aggregate their weights, which makes it suitable for converting a larger opening database into engine heuristics.
+The text importer accepts move lines plus optional `weight`, `count`, `frequency`, or `games` metadata. The structured-record importer also accepts common database priors such as `games`, `redWinRate`, `drawRate`, `blackWinRate`, `engineScore`, `source`, and `year`; it weights each continuation for the side to move and carries a database summary into the explanation. Repeated lines aggregate their weights, which makes it suitable for converting a larger opening database into engine heuristics.
 
 Choose an engine backend:
 
