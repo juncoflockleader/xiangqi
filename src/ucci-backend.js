@@ -201,27 +201,35 @@ class UcciProcessClient {
   }
 
   start() {
-    if (this.child) return;
+    if (this.child && !isChildExited(this.child)) return;
+    this.child = null;
+    this.ready = false;
+    this.lines = [];
+    this.stderr = "";
 
-    this.child = spawn(this.command, this.args, {
+    const child = spawn(this.command, this.args, {
       cwd: this.cwd,
       env: this.env ? { ...process.env, ...this.env } : process.env,
       shell: this.shell,
       stdio: ["pipe", "pipe", "pipe"]
     });
 
-    this.child.stdout.setEncoding("utf8");
-    this.child.stderr.setEncoding("utf8");
-    this.child.stdout.on("data", (chunk) => this.acceptOutput(chunk));
-    this.child.stderr.on("data", (chunk) => {
+    this.child = child;
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => this.acceptOutput(chunk));
+    child.stderr.on("data", (chunk) => {
       this.stderr += chunk;
     });
-    this.child.on("exit", (code, signal) => this.rejectWaiters(new Error(`UCCI engine exited with code ${code ?? "null"} signal ${signal ?? "null"}.`)));
-    this.child.on("error", (error) => this.rejectWaiters(error));
+    child.on("exit", (code, signal) => {
+      this.handleProcessEnd(child, new Error(`UCCI engine exited with code ${code ?? "null"} signal ${signal ?? "null"}.`));
+    });
+    child.on("error", (error) => this.handleProcessEnd(child, error));
   }
 
   async ensureReady() {
-    if (this.ready) return;
+    if (this.ready && this.child && !isChildExited(this.child) && this.child.stdin.writable) return;
+    this.ready = false;
     this.start();
 
     const handshake = this.protocol === "uci"
@@ -239,6 +247,19 @@ class UcciProcessClient {
   }
 
   async search(position, options = {}) {
+    try {
+      return await this.searchOnce(position, options);
+    } catch (error) {
+      if (options.restartOnExit === false || !isRecoverableNativeProcessError(error)) {
+        throw error;
+      }
+
+      await this.close();
+      return this.searchOnce(position, options);
+    }
+  }
+
+  async searchOnce(position, options = {}) {
     await this.ensureReady();
 
     this.write(`position fen ${toNativeFen(position, this.protocol)}`);
@@ -262,6 +283,13 @@ class UcciProcessClient {
     const timeBudget = resolveSearchBudget(protocolOptions, protocolOptions.side ?? position.turn, {}, { position });
     const timeoutMs = options.commandTimeoutMs ?? Math.max(DEFAULT_SEARCH_TIMEOUT_MS, timeBudget.timeLimitMs + 5000);
     return this.commandUntil(formatGoCommand(protocolOptions), (lines) => lines.some((line) => line.startsWith("bestmove ")), timeoutMs);
+  }
+
+  handleProcessEnd(child, error) {
+    if (this.child !== child) return;
+    this.child = null;
+    this.ready = false;
+    this.rejectWaiters(error);
   }
 
   async commandUntil(command, predicate, timeoutMs) {
@@ -341,14 +369,20 @@ class UcciProcessClient {
     await new Promise((resolve) => {
       let settled = false;
       let timer = null;
+      const onStdinError = () => {
+        terminateChild(child);
+        finish();
+      };
       const finish = () => {
         if (settled) return;
         settled = true;
         if (timer) clearTimeout(timer);
+        child.off("exit", finish);
         resolve();
       };
 
       child.once("exit", finish);
+      child.stdin.once("error", onStdinError);
       if (isChildExited(child)) {
         finish();
         return;
@@ -383,6 +417,13 @@ function terminateChild(child) {
   } catch {
     // The process may exit between the state check and kill call.
   }
+}
+
+function isRecoverableNativeProcessError(error) {
+  const message = String(error?.message ?? "");
+  return message.includes("UCCI engine exited")
+    || message.includes("UCCI engine process is not writable")
+    || error?.code === "EPIPE";
 }
 
 async function nativeSearch(client, position, options) {

@@ -121,6 +121,33 @@ test("UCCI backend close resolves when native process already exited", async () 
   await backend.close();
 });
 
+test("UCCI backend restarts native process after it exits between searches", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    closeTimeoutMs: 25,
+    engineOptions: {
+      MockExitAfterBestmove: true
+    }
+  });
+
+  try {
+    const first = await backend.chooseMove(createInitialPosition(), { useBook: false });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    const second = await backend.chooseMove(createInitialPosition(), { useBook: false });
+
+    assert.equal(first.bestMove.notation, "h9-g7");
+    assert.equal(second.bestMove.notation, "h9-g7");
+    assert.ok(second.raw.some((line) => line.includes("MockExitAfterBestmove")));
+  } finally {
+    await backend.close();
+  }
+});
+
 test("UCCI backend close terminates native process that ignores quit", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,
