@@ -50,7 +50,8 @@ red against the fast JavaScript engine; use `npm run play -- --side black`,
 `--depth 3`, `--time 1500`, `--book ./oracle-opening-book.json`, or `--no-book`
 to experiment. Moves use coordinate notation such as `h9-g7` or `h9g7`, and the
 `hint`, `best`, and `why` commands show the learning-oriented explanation layer
-while you play.
+while you play. Engine turns print the principal-variation plan, and `best`/`why`
+expand it into per-ply score and motif steps.
 
 For a one-position learning report, run `npm run study`. It prints the best move,
 candidate lines, progressive hints, pressure, and an optional review of a move
@@ -162,6 +163,7 @@ console.log(study.bestMove);
 console.log(study.hints.map((hint) => hint.text));
 console.log(study.openingCandidates.map((candidate) => candidate.move));
 console.log(study.candidateLines.map((line) => [line.move, line.scoreText]));
+console.log(study.decision.linePlan.summary);
 console.log(study.searchDisagreement?.summary);
 console.log(study.playedMoveReview?.classification);
 console.log(study.practiceFocus?.title);

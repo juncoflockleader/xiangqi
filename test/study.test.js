@@ -78,6 +78,7 @@ test("position study separates opening candidates from search candidates", () =>
   assert.equal(study.nextSteps[0].kind, "opening-search-check");
   assert.match(text, /Opening candidates:/);
   assert.match(text, /Search check: b7-b0 is the top search candidate, while h9-g7 is the opening-book choice\./);
+  assert.match(text, /Plan: Start with h9-g7; theme: creates threat\./);
 });
 
 test("position study can include a played move review", () => {

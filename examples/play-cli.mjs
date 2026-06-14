@@ -270,6 +270,9 @@ function printDecision(decision, options = {}) {
     ? decision.principalVariation.map(formatMoveForDisplay).join(" ")
     : decision.explanation?.principalVariationText;
   if (pv) console.log(`Line: ${pv}`);
+  printLinePlan(decision.explanation?.linePlan, {
+    includeSteps: options.includeReasons
+  });
 
   if (decision.oracleReview) {
     printOracleReview(decision.oracleReview);
@@ -286,6 +289,20 @@ function printDecision(decision, options = {}) {
     for (const reason of decision.explanation.reasons.slice(0, 5)) {
       console.log(`- ${reason}`);
     }
+  }
+}
+
+function printLinePlan(linePlan, options = {}) {
+  if (!linePlan?.summary || !linePlan.moves?.length) return;
+  console.log(`Plan: ${linePlan.summary}`);
+  if (!options.includeSteps) return;
+
+  for (const step of linePlan.moves.slice(0, 5)) {
+    const role = step.role.replace("-", " ");
+    const motifs = step.motifs?.length
+      ? ` [${step.motifs.slice(0, 3).join(", ")}]`
+      : "";
+    console.log(`  ${step.ply}. ${capitalize(step.side)} ${role} ${step.move}: ${step.scoreBeforeText} -> ${step.scoreAfterText} (${step.scoreDeltaText})${motifs}`);
   }
 }
 

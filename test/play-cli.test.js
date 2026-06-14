@@ -93,6 +93,9 @@ test("play CLI best command shows structured engine reasoning", async () => {
 
   assert.equal(result.code, 0, result.stderr);
   assert.match(result.stdout, /Best move: h9-g7/);
+  assert.match(result.stdout, /Plan: Start with h9-g7; expect h0-g2; theme: creates threat\./);
+  assert.match(result.stdout, /1\. Red engine choice h9-g7: \+0\.00 -> \+0\.39 \(\+39 centipawns\) \[creates threat\]/);
+  assert.match(result.stdout, /2\. Black expected reply h0-g2: \+0\.39 -> \+0\.00 \(-39 centipawns\) \[creates threat\]/);
   assert.match(result.stdout, /Confidence: Medium confidence/);
   assert.match(result.stdout, /Comparison: Native MultiPV rates h9-g7 30 centipawns above the next candidate h7-e7\./);
   assert.match(result.stdout, /Alternatives:/);

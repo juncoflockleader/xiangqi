@@ -125,6 +125,10 @@ export function formatPositionStudy(study) {
     lines.push(`Search check: ${study.searchDisagreement.searchMove} is the top search candidate, while ${study.searchDisagreement.openingMove} is the opening-book choice.`);
   }
 
+  if (study.decision?.linePlan?.summary) {
+    lines.push(`Plan: ${study.decision.linePlan.summary}`);
+  }
+
   const openingCandidates = study.openingCandidates ?? [];
   if (openingCandidates.length > 0) {
     lines.push("Opening candidates:");
