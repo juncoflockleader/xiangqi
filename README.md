@@ -163,7 +163,7 @@ await nativeBackend.close();
 
 For app wiring, use `createLearningEngineBackend` to prefer a configured native
 engine and fall back to the JavaScript reference engine when no native command is
-available:
+available or when the native process cannot start during a turn:
 
 ```js
 const backend = createLearningEngineBackend({
@@ -181,12 +181,15 @@ const backend = createLearningEngineBackend({
 const result = await backend.chooseMove(position, { lines: 3 });
 console.log(describeEngineBackend(backend).kind);
 console.log(result.explanation.alternatives);
+console.log(result.backendFallback?.message);
 await backend.close?.();
 ```
 
-Set `native: false` to force the JS learning engine, or pass a nested
-`native: { command, args, protocol }` object when the app keeps native-engine
-configuration separate from shared search options.
+Set `native: false` or `preferNative: false` to force the JS learning engine, or
+pass a nested `native: { command, args, protocol }` object when the app keeps
+native-engine configuration separate from shared search options. Set
+`fallbackOnNativeError: false` for strict native behavior that reports process
+errors instead of recovering with the JS reference engine.
 
 The JavaScript backend is the reference learning engine. The native backend is async because it talks to an external UCI/UCCI process; UCCI is the default, and `protocol: "uci"` supports UCI-style engines such as Pikafish. By default it checks the JS/imported opening book before starting native search, and `useBook: false` forces a pure native search. Native `reviewMove` and `reviewGame` compare played moves against the external engine's preferred moves, then use the JS explanation layer to turn score gaps into learning feedback. The built-in backends expose `chooseMove`, `analyzePosition`, `reviewMove`, `reviewGame`, `coachMove`, `lessonPlan`, `openingBook`, `play`, and `legalMoves`, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
 

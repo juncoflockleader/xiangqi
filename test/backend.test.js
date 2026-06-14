@@ -148,14 +148,65 @@ test("learning backend factory selects a native engine when configured", async (
       lines: 2
     });
 
-    assert.equal(description.kind, "native-ucci");
+    assert.equal(description.kind, "hybrid");
     assert.equal(isNativeEngineBackend(backend), true);
+    assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.FALLBACK), true);
     assert.equal(result.source, "native-ucci");
     assert.equal(result.bestMove.notation, "h9-g7");
     assert.equal(result.explanation.alternatives.length, 2);
+    assert.equal(result.backendFallback, undefined);
   } finally {
     await backend.close();
   }
+});
+
+test("learning backend factory falls back when native search is unavailable", async () => {
+  const backend = createLearningEngineBackend({
+    command: "/path/that/should/not/start",
+    profile: "native-ucci",
+    depth: 1,
+    timeLimitMs: 100,
+    startupTimeoutMs: 50,
+    commandTimeoutMs: 50,
+    javascript: {
+      profile: "fast",
+      depth: 1,
+      timeLimitMs: 100
+    }
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), {
+      useBook: false,
+      depth: 1,
+      timeLimitMs: 100
+    });
+
+    assert.equal(backend.kind, "hybrid");
+    assert.equal(backend.fallbackActive, true);
+    assert.match(result.bestMove.notation, /^[a-i][0-9]-[a-i][0-9]$/);
+    assert.equal(result.backendFallback.method, "chooseMove");
+    assert.equal(result.backendFallback.fallbackBackend, "javascript-reference");
+    assert.ok(result.backendFallback.message.length > 0);
+    assert.ok(result.explanation.reasons[0].includes("JavaScript Reference Engine supplied this result"));
+  } finally {
+    await backend.close();
+  }
+});
+
+test("learning backend factory can expose strict native behavior", async () => {
+  const backend = createLearningEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-ucci",
+    fallbackOnNativeError: false,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  assert.equal(backend.kind, "native-ucci");
+  assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.FALLBACK), false);
+  await backend.close();
 });
 
 test("learning backend factory reports explicit native misconfiguration", () => {
