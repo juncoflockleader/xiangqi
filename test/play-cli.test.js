@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { INITIAL_FEN } from "../src/index.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const MOCK_UCCI_PATH = "fixtures/mock-ucci.mjs";
 
 test("play CLI can load an oracle opening artifact as its book", async () => {
   const dir = await mkdtemp(join(tmpdir(), "xiangqi-play-book-"));
@@ -54,6 +55,47 @@ test("play CLI can load an oracle opening artifact as its book", async () => {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("play CLI can use a native UCI engine backend", async () => {
+  const result = await runPlayCli([
+    "--side", "black",
+    "--engine-command", process.execPath,
+    "--engine-arg", MOCK_UCCI_PATH,
+    "--engine-protocol", "uci",
+    "--startup-timeout", "1000",
+    "--command-timeout", "1000",
+    "--depth", "2",
+    "--time", "100",
+    "--no-book"
+  ], "quit\n");
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /Engine backend: .*hybrid/);
+  assert.match(result.stdout, /Native engine: uci /);
+  assert.match(result.stdout, /Engine played h9-g7/);
+  assert.match(result.stdout, /selected by Native UCI Engine/);
+});
+
+test("play CLI can show an oracle review for the current engine pick", async () => {
+  const result = await runPlayCli([
+    "--side", "black",
+    "--oracle-command", process.execPath,
+    "--oracle-arg", MOCK_UCCI_PATH,
+    "--oracle-protocol", "ucci",
+    "--oracle-depth", "2",
+    "--oracle-time", "100",
+    "--startup-timeout", "1000",
+    "--command-timeout", "1000",
+    "--depth", "1",
+    "--time", "100"
+  ], "quit\n");
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /Engine backend: .*Oracle Review/);
+  assert.match(result.stdout, /Oracle reviewer: ucci /);
+  assert.match(result.stdout, /Engine played h7-e7/);
+  assert.match(result.stdout, /Oracle review: good, 59 cp loss; oracle preferred h9-g7\./);
 });
 
 function runPlayCli(args, input) {

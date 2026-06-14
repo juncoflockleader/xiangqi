@@ -48,6 +48,29 @@ to experiment. Moves use coordinate notation such as `h9-g7` or `h9g7`, and the
 `hint`, `best`, and `why` commands show the learning-oriented explanation layer
 while you play.
 
+The same demo can play through a native UCI/UCCI engine, with JavaScript fallback
+by default:
+
+```sh
+npm run play -- --side black \
+  --engine-command /path/to/pikafish \
+  --engine-protocol uci \
+  --engine-option Threads=4 \
+  --engine-option Hash=512 \
+  --engine-option EvalFile=/path/to/pikafish.nnue
+```
+
+Or keep the fast local engine for the move choice while a stronger oracle grades
+each engine pick:
+
+```sh
+npm run play -- --side black \
+  --oracle-command /path/to/pikafish \
+  --oracle-protocol uci \
+  --oracle-depth 8 \
+  --oracle-time 3000
+```
+
 ## API Sketch
 
 ```js

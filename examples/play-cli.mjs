@@ -5,20 +5,27 @@ import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import {
   SIDES,
-  chooseAndPlayGameMove,
-  chooseGameMove,
-  createEngine,
+  chooseAndPlayGameMoveAsync,
+  chooseGameMoveAsync,
+  createLearningEngineBackend,
   createGame,
   createOpeningBookFromCsv,
   createOpeningBookFromOracleArtifact,
   createOpeningBookFromText,
+  createOracleReviewEngineBackend,
+  createUcciEngineBackend,
   formatBoard,
   gameStatus,
   historyKeys,
   opponent,
-  playGameMove,
+  playGameMoveAsync,
   toFen
 } from "../src/index.js";
+import {
+  parseNativeEngineOption,
+  parseNativeEngineOptions,
+  splitEnvArgs
+} from "./native-cli-options.mjs";
 
 let options;
 try {
@@ -43,12 +50,7 @@ try {
   process.exit(1);
 }
 
-const engine = createEngine({
-  profile: options.profile,
-  depth: options.depth,
-  timeLimitMs: options.timeLimitMs,
-  ...(openingBook ? { book: openingBook } : {})
-});
+const engine = createPlayBackend(options, openingBook);
 const rl = createInterface({ input, output });
 const engineSide = opponent(options.playerSide);
 let game = createGame();
@@ -61,6 +63,13 @@ rl.on("close", () => {
 
 console.log("Xiangqi CLI demo");
 console.log(`You are ${options.playerSide}; engine is ${engineSide}.`);
+console.log(`Engine backend: ${engine.name} (${engine.kind}).`);
+if (options.engineCommand) {
+  console.log(`Native engine: ${options.engineProtocol} ${options.engineCommand}`);
+}
+if (options.oracleCommand) {
+  console.log(`Oracle reviewer: ${options.oracleProtocol} ${options.oracleCommand}`);
+}
 if (options.bookPath) {
   console.log(`Opening book: ${options.bookPath} (${resolveBookFormat(options.bookPath, options.bookFormat)})`);
 }
@@ -88,18 +97,19 @@ try {
     if (!command) continue;
 
     if (isQuitCommand(command)) break;
-    if (handleCommand(command)) continue;
+    if (await handleCommand(command)) continue;
 
-    playPlayerMove(command);
+    await playPlayerMove(command);
   }
 } finally {
   rl.close();
+  await engine.close?.();
 }
 
-function playPlayerMove(command) {
+async function playPlayerMove(command) {
   const before = game;
   try {
-    game = playGameMove(game, engine, command, {
+    game = await playGameMoveAsync(game, engine, command, {
       actor: "player",
       reviewOptions: searchOptions()
     });
@@ -137,7 +147,7 @@ async function playEngineTurn() {
   const before = game;
   const startedAt = Date.now();
   console.log(`Engine thinking as ${engineSide}...`);
-  game = chooseAndPlayGameMove(game, engine, {
+  game = await chooseAndPlayGameMoveAsync(game, engine, {
     actor: "engine",
     review: false,
     searchOptions: searchOptions()
@@ -158,7 +168,7 @@ async function playEngineTurn() {
   printPosition(game);
 }
 
-function handleCommand(command) {
+async function handleCommand(command) {
   const normalized = command.toLowerCase();
 
   if (normalized === "help" || normalized === "?") {
@@ -172,12 +182,12 @@ function handleCommand(command) {
   }
 
   if (normalized === "hint") {
-    printHint();
+    await printHint();
     return true;
   }
 
   if (normalized === "best") {
-    printBestMove();
+    await printBestMove();
     return true;
   }
 
@@ -229,8 +239,8 @@ function printLegalMoves() {
   console.log(formatColumns(moves, 8));
 }
 
-function printHint() {
-  const hint = engine.coachMove(game.position, {
+async function printHint() {
+  const hint = await engine.coachMove(game.position, {
     ...searchOptions(),
     history: historyKeys(game)
   });
@@ -240,8 +250,8 @@ function printHint() {
   }
 }
 
-function printBestMove() {
-  const decision = chooseGameMove(game, engine, searchOptions());
+async function printBestMove() {
+  const decision = await chooseGameMoveAsync(game, engine, searchOptions());
   console.log(`Best move: ${decision.bestMove?.notation ?? "none"}`);
   printDecision(decision, { includeReasons: true });
 }
@@ -258,11 +268,31 @@ function printDecision(decision, options = {}) {
     : decision.explanation?.principalVariationText;
   if (pv) console.log(`Line: ${pv}`);
 
+  if (decision.oracleReview) {
+    printOracleReview(decision.oracleReview);
+  }
+
   if (options.includeReasons && decision.explanation?.reasons?.length) {
     for (const reason of decision.explanation.reasons.slice(0, 4)) {
       console.log(`- ${reason}`);
     }
   }
+}
+
+function printOracleReview(review) {
+  if (!review) return;
+  if (review.status === "unavailable") {
+    console.log(`Oracle review: unavailable (${review.error}).`);
+    return;
+  }
+
+  const loss = Number.isFinite(review.centipawnLoss)
+    ? `${review.centipawnLoss} cp loss`
+    : "unscored";
+  const best = review.isBestMove
+    ? "oracle agrees"
+    : `oracle preferred ${review.bestMove ?? "another move"}`;
+  console.log(`Oracle review: ${review.classification}, ${loss}; ${best}.`);
 }
 
 function printReview(review) {
@@ -293,6 +323,8 @@ Usage:
   npm run play -- --side black
   npm run play -- --depth 3 --time 1500 --no-book
   npm run play -- --side black --book ./oracle-opening-book.json
+  npm run play -- --engine-command /path/to/pikafish --engine-protocol uci
+  npm run play -- --oracle-command /path/to/pikafish --oracle-protocol uci
 
 Options:
   --side red|black      Choose your side. Default: red.
@@ -301,6 +333,19 @@ Options:
   --time ms             Move time budget. Default: 750.
   --book file           Load opening book data from JSON, CSV/TSV, or text.
   --book-format format  Book format: auto, json, csv, tsv, text.
+  --engine-command cmd  Use a native UCI/UCCI engine for play, with JS fallback.
+  --engine-arg value    Append one native engine argument.
+  --engine-args values  Append whitespace-separated native engine arguments.
+  --engine-protocol p   Native play protocol: uci or ucci. Default: uci.
+  --engine-option opt   Set native play option, name=value.
+  --strict-native       Report native process errors instead of falling back.
+  --oracle-command cmd  Ask a native oracle to review each engine pick.
+  --oracle-arg value    Append one oracle process argument.
+  --oracle-args values  Append whitespace-separated oracle process arguments.
+  --oracle-protocol p   Oracle protocol: uci or ucci. Default: uci.
+  --oracle-option opt   Set native oracle option, name=value.
+  --oracle-depth n      Oracle review depth. Default: max(depth, 2).
+  --oracle-time ms      Oracle review time. Default: max(time, 1000).
   --no-book             Disable opening book moves.
 
 Commands during play:
@@ -319,7 +364,15 @@ function searchOptions() {
   return {
     depth: options.depth,
     timeLimitMs: options.timeLimitMs,
-    useBook: options.useBook
+    useBook: options.useBook,
+    ...(options.oracleCommand
+      ? {
+          oracleReviewOptions: {
+            depth: options.oracleDepth,
+            timeLimitMs: options.oracleTimeLimitMs
+          }
+        }
+      : {})
   };
 }
 
@@ -331,6 +384,24 @@ function parseArgs(args) {
     timeLimitMs: 750,
     bookPath: process.env.XIANGQI_OPENING_BOOK,
     bookFormat: process.env.XIANGQI_OPENING_BOOK_FORMAT ?? "auto",
+    engineCommand: process.env.XIANGQI_ENGINE_COMMAND,
+    engineArgs: splitEnvArgs(process.env.XIANGQI_ENGINE_ARGS),
+    engineProtocol: process.env.XIANGQI_ENGINE_PROTOCOL ?? "uci",
+    engineOptions: parseNativeEngineOptions(process.env.XIANGQI_ENGINE_OPTIONS, "XIANGQI_ENGINE_OPTIONS"),
+    startupTimeoutMs: numberFromEnv(process.env.XIANGQI_ENGINE_STARTUP_TIMEOUT_MS, 5000),
+    commandTimeoutMs: numberFromEnv(process.env.XIANGQI_ENGINE_COMMAND_TIMEOUT_MS, 30000),
+    strictNative: false,
+    oracleCommand: process.env.XIANGQI_ORACLE_ENGINE_COMMAND,
+    oracleArgs: splitEnvArgs(process.env.XIANGQI_ORACLE_ENGINE_ARGS),
+    oracleProtocol: process.env.XIANGQI_ORACLE_ENGINE_PROTOCOL ?? process.env.XIANGQI_ENGINE_PROTOCOL ?? "uci",
+    oracleEngineOptions: parseNativeEngineOptions(
+      process.env.XIANGQI_ORACLE_ENGINE_OPTIONS,
+      "XIANGQI_ORACLE_ENGINE_OPTIONS"
+    ),
+    oracleDepth: numberFromEnv(process.env.XIANGQI_ORACLE_DEPTH, null),
+    oracleTimeLimitMs: numberFromEnv(process.env.XIANGQI_ORACLE_TIME_MS, null),
+    oracleStartupTimeoutMs: numberFromEnv(process.env.XIANGQI_ORACLE_STARTUP_TIMEOUT_MS, null),
+    oracleCommandTimeoutMs: numberFromEnv(process.env.XIANGQI_ORACLE_COMMAND_TIMEOUT_MS, null),
     useBook: true,
     help: false
   };
@@ -375,11 +446,97 @@ function parseArgs(args) {
       index += 1;
       continue;
     }
+    if (arg === "--engine-command" || arg === "--native-command") {
+      parsed.engineCommand = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--engine-arg" || arg === "--native-arg") {
+      parsed.engineArgs.push(requireValue(args, index, arg));
+      index += 1;
+      continue;
+    }
+    if (arg === "--engine-args" || arg === "--native-args") {
+      parsed.engineArgs.push(...splitEnvArgs(requireValue(args, index, arg)));
+      index += 1;
+      continue;
+    }
+    if (arg === "--engine-protocol" || arg === "--native-protocol") {
+      parsed.engineProtocol = parseProtocol(requireValue(args, index, arg), arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--engine-option" || arg === "--native-option") {
+      parsed.engineOptions.push(parseNativeEngineOption(requireValue(args, index, arg), arg));
+      index += 1;
+      continue;
+    }
+    if (arg === "--startup-timeout") {
+      parsed.startupTimeoutMs = parsePositiveInteger(requireValue(args, index, arg), arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--command-timeout") {
+      parsed.commandTimeoutMs = parsePositiveInteger(requireValue(args, index, arg), arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--strict-native") {
+      parsed.strictNative = true;
+      continue;
+    }
+    if (arg === "--oracle-command") {
+      parsed.oracleCommand = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--oracle-arg") {
+      parsed.oracleArgs.push(requireValue(args, index, arg));
+      index += 1;
+      continue;
+    }
+    if (arg === "--oracle-args") {
+      parsed.oracleArgs.push(...splitEnvArgs(requireValue(args, index, arg)));
+      index += 1;
+      continue;
+    }
+    if (arg === "--oracle-protocol") {
+      parsed.oracleProtocol = parseProtocol(requireValue(args, index, arg), arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--oracle-option") {
+      parsed.oracleEngineOptions.push(parseNativeEngineOption(requireValue(args, index, arg), arg));
+      index += 1;
+      continue;
+    }
+    if (arg === "--oracle-depth") {
+      parsed.oracleDepth = parsePositiveInteger(requireValue(args, index, arg), arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--oracle-time") {
+      parsed.oracleTimeLimitMs = parsePositiveInteger(requireValue(args, index, arg), arg);
+      index += 1;
+      continue;
+    }
 
     throw new Error(`Unknown option: ${arg}`);
   }
 
   parsed.bookFormat = parseBookFormat(parsed.bookFormat);
+  parsed.engineProtocol = parseProtocol(parsed.engineProtocol, "XIANGQI_ENGINE_PROTOCOL");
+  parsed.oracleProtocol = parseProtocol(parsed.oracleProtocol, "XIANGQI_ORACLE_ENGINE_PROTOCOL");
+  parsed.startupTimeoutMs = assertPositiveInteger(parsed.startupTimeoutMs, "startup timeout");
+  parsed.commandTimeoutMs = assertPositiveInteger(parsed.commandTimeoutMs, "command timeout");
+  parsed.oracleDepth ??= Math.max(parsed.depth, 2);
+  parsed.oracleTimeLimitMs ??= Math.max(parsed.timeLimitMs, 1000);
+  parsed.oracleStartupTimeoutMs ??= parsed.startupTimeoutMs;
+  parsed.oracleCommandTimeoutMs ??= parsed.commandTimeoutMs;
+  parsed.oracleDepth = assertPositiveInteger(parsed.oracleDepth, "oracle depth");
+  parsed.oracleTimeLimitMs = assertPositiveInteger(parsed.oracleTimeLimitMs, "oracle time");
+  parsed.oracleStartupTimeoutMs = assertPositiveInteger(parsed.oracleStartupTimeoutMs, "oracle startup timeout");
+  parsed.oracleCommandTimeoutMs = assertPositiveInteger(parsed.oracleCommandTimeoutMs, "oracle command timeout");
   return parsed;
 }
 
@@ -402,6 +559,64 @@ function parsePositiveInteger(value, option) {
     throw new Error(`${option} must be a positive integer.`);
   }
   return parsed;
+}
+
+function assertPositiveInteger(value, name) {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer.`);
+  }
+  return value;
+}
+
+function parseProtocol(value, source) {
+  const protocol = String(value).toLowerCase();
+  if (protocol === "uci" || protocol === "ucci") return protocol;
+  throw new Error(`${source} must be uci or ucci.`);
+}
+
+function numberFromEnv(value, fallback) {
+  if (value === undefined || value === "") return fallback;
+  return Number(value);
+}
+
+function createPlayBackend(options, openingBook) {
+  const base = createLearningEngineBackend({
+    profile: options.profile,
+    depth: options.depth,
+    timeLimitMs: options.timeLimitMs,
+    ...(openingBook ? { book: openingBook } : {}),
+    command: options.engineCommand,
+    args: options.engineArgs,
+    protocol: options.engineProtocol,
+    engineOptions: options.engineOptions,
+    startupTimeoutMs: options.startupTimeoutMs,
+    commandTimeoutMs: options.commandTimeoutMs,
+    fallbackOnNativeError: !options.strictNative
+  });
+
+  if (!options.oracleCommand) return base;
+
+  const oracle = createUcciEngineBackend({
+    id: "play-oracle",
+    name: "Play Oracle",
+    command: options.oracleCommand,
+    args: options.oracleArgs,
+    protocol: options.oracleProtocol,
+    profile: options.oracleProtocol === "uci" ? "native-uci" : "native-ucci",
+    depth: options.oracleDepth,
+    timeLimitMs: options.oracleTimeLimitMs,
+    startupTimeoutMs: options.oracleStartupTimeoutMs,
+    commandTimeoutMs: options.oracleCommandTimeoutMs,
+    engineOptions: options.oracleEngineOptions
+  });
+
+  return createOracleReviewEngineBackend(base, oracle, {
+    name: `${base.name} with Oracle Review`,
+    oracleReviewOptions: {
+      depth: options.oracleDepth,
+      timeLimitMs: options.oracleTimeLimitMs
+    }
+  });
 }
 
 async function loadOpeningBook(options) {
