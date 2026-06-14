@@ -37,7 +37,7 @@ console.log("Analysis lines:");
 for (const line of analysis.lines) {
   console.log(`${line.rank}. ${line.move.notation} ${line.explanation.summary}`);
 }
-console.log(`Search stats: ${analysis.nodes} nodes, ${analysis.stats.qnodes} qnodes, ${analysis.stats.qchecks} quiet checks, ${analysis.stats.ttStores} TT stores, ${analysis.stats.ttEvictions} TT evictions, ${analysis.stats.aspirationSearches} aspiration searches, ${analysis.stats.futilityPrunes} futility prunes, ${analysis.stats.pvsResearches} PVS re-searches, ${analysis.stats.nullMovePrunes} null-move prunes`);
+console.log(`Search stats: ${analysis.nodes} nodes, ${analysis.stats.qnodes} qnodes, ${analysis.stats.qchecks} quiet checks, ${analysis.stats.ttStores} TT stores, ${analysis.stats.ttEvictions} TT evictions, ${analysis.stats.aspirationSearches} aspiration searches, ${analysis.stats.futilityPrunes} futility prunes, ${analysis.stats.pvsResearches} PVS re-searches, ${analysis.stats.nullMovePrunes} null-move prunes, ${analysis.stats.countermoveHits} countermove hits`);
 const latestIteration = analysis.explanation.search.iterations.at(-1);
 if (latestIteration) {
   const stability = latestIteration.stableBestMove === null ? "initial pick" : latestIteration.stableBestMove ? "stable" : "changed";

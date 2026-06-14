@@ -195,3 +195,25 @@ test("search prunes shallow quiet moves with futility margins", () => {
   assert.equal(withoutPruning.stats.futilityPrunes, 0);
   assert.ok(withPruning.nodes < withoutPruning.nodes);
 });
+
+test("search can order replies with the countermove heuristic", () => {
+  const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
+  const result = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false
+  });
+  const disabled = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useCountermoves: false
+  });
+
+  assert.equal(result.depth, 3);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.ok(result.stats.countermoveStores > 0);
+  assert.ok(result.stats.countermoveHits > 0);
+  assert.equal(disabled.stats.countermoveStores, 0);
+  assert.equal(disabled.stats.countermoveHits, 0);
+});

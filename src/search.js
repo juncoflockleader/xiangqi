@@ -50,6 +50,7 @@ export function searchBestMove(position, options = {}) {
   table.nextGeneration?.();
   const history = new Map();
   const killers = new Map();
+  const countermoves = new Map();
   const candidateLimit = options.candidateLimit ?? 8;
   const exactRootScores = options.exactRootScores === true || !Number.isFinite(candidateLimit);
   const bannedMoveKeys = new Set((options.bannedMoves ?? []).map(moveKey));
@@ -93,6 +94,7 @@ export function searchBestMove(position, options = {}) {
       table,
       history,
       killers,
+      countermoves,
       candidateLimit,
       priorityMoveKeys,
       repetitionCounts: new Map(repetitionCounts),
@@ -105,6 +107,7 @@ export function searchBestMove(position, options = {}) {
       useAspiration: options.useAspiration !== false && !exactRootScores,
       useNullMove: options.useNullMove !== false,
       usePvs: options.usePvs !== false,
+      useCountermoves: options.useCountermoves !== false,
       useFutilityPruning: options.useFutilityPruning !== false,
       useQuiescenceChecks: options.useQuiescenceChecks !== false,
       tacticalCache: new Map(),
@@ -200,7 +203,7 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
     const line = [];
     const childAlpha = context.exactRootScores ? -INFINITY_SCORE : -beta;
     const childBeta = context.exactRootScores ? INFINITY_SCORE : -alpha;
-    const score = normalizeScore(-negamax(next, depth - 1, childAlpha, childBeta, 1, context, line, context.maxExtensions, true));
+    const score = normalizeScore(-negamax(next, depth - 1, childAlpha, childBeta, 1, context, line, context.maxExtensions, true, move));
     const annotated = annotateMove(position, move);
 
     candidates.push({
@@ -283,7 +286,7 @@ function staticRootFallback(position, rootMoves, candidateLimit) {
   };
 }
 
-function negamax(position, depth, alpha, beta, ply, context, lineOut, extensionsRemaining, allowNullMove) {
+function negamax(position, depth, alpha, beta, ply, context, lineOut, extensionsRemaining, allowNullMove, previousMove = null) {
   context.nodes += 1;
   context.stats.nodes += 1;
   if (isTimedOut(context)) {
@@ -347,7 +350,8 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       context,
       null,
       extensionsRemaining,
-      false
+      false,
+      null
     ));
 
     if (context.timedOut) {
@@ -372,7 +376,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   let bestScore = -INFINITY_SCORE;
   let bestMove = null;
   let bestChildLine = [];
-  const ordered = orderMoves(position, legalMoves, tt?.bestMove, context, ply);
+  const ordered = orderMoves(position, legalMoves, tt?.bestMove, context, ply, previousMove);
   const staticScore = inCheck ? null : evaluatePosition(position, position.turn).score;
 
   for (let index = 0; index < ordered.length; index += 1) {
@@ -416,7 +420,8 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
         context,
         childLine,
         childExtensions,
-        true
+        true,
+        move
       ));
     } else {
       score = normalizeScore(-negamax(
@@ -428,7 +433,8 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
         context,
         childLine,
         childExtensions,
-        true
+        true,
+        move
       ));
     }
 
@@ -445,7 +451,8 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
         context,
         childLine,
         childExtensions,
-        true
+        true,
+        move
       ));
     }
 
@@ -461,7 +468,8 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
         context,
         childLine,
         childExtensions,
-        true
+        true,
+        move
       ));
     }
 
@@ -482,6 +490,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       context.stats.cutoffs += 1;
       if (!move.captured) {
         rememberKiller(context.killers, ply, move);
+        rememberCountermove(context, previousMove, move);
         bumpHistory(context.history, move, depth * depth);
       }
       break;
@@ -565,15 +574,22 @@ function givesCheck(position, move) {
   return isInCheck(next, next.turn);
 }
 
-function orderMoves(position, moves, principalMove, context, ply) {
-  return [...moves].sort((a, b) => moveOrderingScore(position, b, principalMove, context, ply) - moveOrderingScore(position, a, principalMove, context, ply));
+function orderMoves(position, moves, principalMove, context, ply, previousMove = null) {
+  return moves
+    .map((move) => ({
+      move,
+      score: moveOrderingScore(position, move, principalMove, context, ply, previousMove)
+    }))
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.move);
 }
 
-function moveOrderingScore(position, move, principalMove, context, ply) {
+function moveOrderingScore(position, move, principalMove, context, ply, previousMove) {
   let score = 0;
 
   if (context.priorityMoveKeys?.has(moveKey(move))) score += 1_500_000;
   if (sameMove(move, principalMove)) score += 1_000_000;
+  if (isCountermove(context, previousMove, move)) score += 30_000;
   if (move.captured) {
     const capture = getCaptureAnalysis(position, move, context);
     score += 100_000 + (PIECE_VALUES[move.captured.type] * 10 - PIECE_VALUES[move.piece.type]);
@@ -691,6 +707,20 @@ function isKiller(killers, ply, move) {
   return (killers.get(ply) ?? []).some((candidate) => sameMove(candidate, move));
 }
 
+function rememberCountermove(context, previousMove, reply) {
+  if (!context.useCountermoves || !previousMove) return;
+  context.countermoves.set(moveKey(previousMove), reply);
+  context.stats.countermoveStores += 1;
+}
+
+function isCountermove(context, previousMove, move) {
+  if (!context.useCountermoves || !previousMove) return false;
+  const reply = context.countermoves.get(moveKey(previousMove));
+  if (!sameMove(reply, move)) return false;
+  context.stats.countermoveHits += 1;
+  return true;
+}
+
 function bumpHistory(history, move, amount) {
   const key = moveKey(move);
   history.set(key, (history.get(key) ?? 0) + amount);
@@ -779,6 +809,8 @@ function createSearchStats() {
     lmrResearches: 0,
     pvsResearches: 0,
     nullMovePrunes: 0,
+    countermoveStores: 0,
+    countermoveHits: 0,
     repetitions: 0
   };
 }
@@ -803,6 +835,8 @@ function mergeSearchStats(total, next) {
     lmrResearches: total.lmrResearches + next.lmrResearches,
     pvsResearches: total.pvsResearches + next.pvsResearches,
     nullMovePrunes: total.nullMovePrunes + next.nullMovePrunes,
+    countermoveStores: total.countermoveStores + next.countermoveStores,
+    countermoveHits: total.countermoveHits + next.countermoveHits,
     repetitions: total.repetitions + next.repetitions
   };
 }

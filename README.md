@@ -8,7 +8,7 @@ The current engine is dependency-free JavaScript and includes:
 - Legal move generation for generals, advisors, elephants, horses, rooks, cannons, and pawns.
 - Check detection, flying-general rules, and make/unmake-style immutable position updates.
 - Iterative-deepening negamax search with alpha-beta and principal variation search.
-- Zobrist hashing, bounded depth-preferred transposition table, aspiration windows, quiescence search with bounded quiet-check search, capture/check/history-based move ordering, bounded check extensions, guarded null-move pruning, shallow futility pruning, late-move reductions, repetition diagnostics, and root candidate analysis.
+- Zobrist hashing, bounded depth-preferred transposition table, aspiration windows, quiescence search with bounded quiet-check search, capture/check/history/countermove-based move ordering, bounded check extensions, guarded null-move pruning, shallow futility pruning, late-move reductions, repetition diagnostics, and root candidate analysis.
 - Explainable opening-book support with a curated early repertoire, heuristic fallback for off-book opening positions, deterministic selection, and pure-search opt-out.
 - Evaluation terms for material, piece-square placement, mobility, threats, pawn progress, and king safety.
 - Static exchange analysis for distinguishing clean wins, tactically poisoned captures, and defended captures that remain sound after recaptures.
