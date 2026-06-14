@@ -14,6 +14,7 @@ import {
   sameMove
 } from "./board.js";
 import { hashPosition } from "./hash.js";
+import { createTranspositionTable } from "./transposition.js";
 import {
   annotateMove,
   generateCaptures,
@@ -39,7 +40,11 @@ export function searchBestMove(position, options = {}) {
   const timeLimitMs = options.timeLimitMs ?? 2000;
   const startedAt = performanceNow();
   const deadline = startedAt + timeLimitMs;
-  const table = options.transpositionTable ?? new Map();
+  const table = options.transpositionTable ?? createTranspositionTable({
+    maxEntries: options.maxTranspositionEntries ?? options.ttSize,
+    replacementSample: options.transpositionReplacementSample
+  });
+  table.nextGeneration?.();
   const history = new Map();
   const killers = new Map();
   const candidateLimit = options.candidateLimit ?? 8;
@@ -433,7 +438,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   }
 
   const flag = bestScore <= alphaOriginal ? UPPER : bestScore >= beta ? LOWER : EXACT;
-  context.table.set(transpositionKey, { depth, score: bestScore, flag, bestMove });
+  storeTransposition(context, transpositionKey, { depth, score: bestScore, flag, bestMove });
 
   if (lineOut) lineOut.splice(0, lineOut.length, ...bestChildLine);
   leavePosition(context, repetitionKey);
@@ -650,6 +655,20 @@ function buildRepetitionCounts(history) {
   return counts;
 }
 
+function storeTransposition(context, key, entry) {
+  const result = context.table.set(key, entry);
+
+  if (!result || typeof result !== "object" || !("stored" in result)) {
+    context.stats.ttStores += 1;
+    return;
+  }
+
+  if (result.stored) context.stats.ttStores += 1;
+  if (result.replaced) context.stats.ttReplacements += 1;
+  if (result.evicted) context.stats.ttEvictions += 1;
+  if (!result.stored) context.stats.ttSkips += 1;
+}
+
 function isRepetition(context, key) {
   const previous = context.repetitionCounts.get(key) ?? 0;
   const currentPath = context.pathCounts.get(key) ?? 0;
@@ -675,6 +694,10 @@ function createSearchStats() {
     qnodes: 0,
     qchecks: 0,
     ttHits: 0,
+    ttStores: 0,
+    ttReplacements: 0,
+    ttEvictions: 0,
+    ttSkips: 0,
     cutoffs: 0,
     aspirationSearches: 0,
     aspirationFailHigh: 0,
@@ -695,6 +718,10 @@ function mergeSearchStats(total, next) {
     qnodes: total.qnodes + next.qnodes,
     qchecks: total.qchecks + next.qchecks,
     ttHits: total.ttHits + next.ttHits,
+    ttStores: total.ttStores + next.ttStores,
+    ttReplacements: total.ttReplacements + next.ttReplacements,
+    ttEvictions: total.ttEvictions + next.ttEvictions,
+    ttSkips: total.ttSkips + next.ttSkips,
     cutoffs: total.cutoffs + next.cutoffs,
     aspirationSearches: total.aspirationSearches + next.aspirationSearches,
     aspirationFailHigh: total.aspirationFailHigh + next.aspirationFailHigh,

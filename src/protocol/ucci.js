@@ -11,7 +11,8 @@ const DEFAULT_OPTIONS = Object.freeze({
   depth: 4,
   timeLimitMs: 2000,
   multiPv: 1,
-  useBook: true
+  useBook: true,
+  maxTranspositionEntries: 50_000
 });
 
 export class UcciSession {
@@ -73,6 +74,7 @@ export class UcciSession {
       "option name Depth type spin default 4 min 1 max 8",
       "option name MoveTime type spin default 2000 min 50 max 60000",
       "option name MultiPV type spin default 1 min 1 max 12",
+      "option name HashEntries type spin default 50000 min 128 max 1000000",
       "option name UseBook type check default true",
       "option name Explain type check default true",
       "ucciok"
@@ -92,6 +94,8 @@ export class UcciSession {
       this.options.timeLimitMs = clampInteger(value, 50, 120000, this.options.timeLimitMs);
     } else if (normalized === "multipv") {
       this.options.multiPv = clampInteger(value, 1, 12, this.options.multiPv);
+    } else if (normalized === "hashentries" || normalized === "maxtranspositionentries") {
+      this.options.maxTranspositionEntries = clampInteger(value, 128, 1_000_000, this.options.maxTranspositionEntries);
     } else if (normalized === "usebook") {
       this.options.useBook = parseBoolean(value, this.options.useBook);
     }
@@ -163,7 +167,7 @@ export class UcciSession {
     }
 
     outputs.push(
-      `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes} qnodes ${result.stats.qnodes} qchecks ${result.stats.qchecks} tthits ${result.stats.ttHits} asp ${result.stats.aspirationSearches} asphi ${result.stats.aspirationFailHigh} asplo ${result.stats.aspirationFailLow} ext ${result.stats.extensions} futil ${result.stats.futilityPrunes} nmp ${result.stats.nullMovePrunes} pvs ${result.stats.pvsResearches} pv ${pv}`,
+      `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes} qnodes ${result.stats.qnodes} qchecks ${result.stats.qchecks} tthits ${result.stats.ttHits} ttstores ${result.stats.ttStores} ttevict ${result.stats.ttEvictions} asp ${result.stats.aspirationSearches} asphi ${result.stats.aspirationFailHigh} asplo ${result.stats.aspirationFailLow} ext ${result.stats.extensions} futil ${result.stats.futilityPrunes} nmp ${result.stats.nullMovePrunes} pvs ${result.stats.pvsResearches} pv ${pv}`,
       `info string ${result.explanation.summary}`
     );
 

@@ -6,9 +6,13 @@ import { analyzePressure } from "./pressure.js";
 import { explainBookMove, explainCandidateMove, explainMove, explainReviewedMove } from "./reasoning.js";
 import { reviewGameWithEngine } from "./review.js";
 import { searchBestMove } from "./search.js";
+import { createTranspositionTable } from "./transposition.js";
 
 export function createEngine(defaultOptions = {}) {
-  const transpositionTable = new Map();
+  const transpositionTable = createTranspositionTable({
+    maxEntries: defaultOptions.maxTranspositionEntries ?? defaultOptions.ttSize,
+    replacementSample: defaultOptions.transpositionReplacementSample
+  });
 
   return {
     chooseMove(position, options = {}) {
@@ -139,6 +143,10 @@ export function createEngine(defaultOptions = {}) {
 
     get cacheSize() {
       return transpositionTable.size;
+    },
+
+    get cacheCapacity() {
+      return transpositionTable.maxEntries;
     }
   };
 }
@@ -204,6 +212,10 @@ function maybeBookResult(position, options, tableSize) {
       qnodes: 0,
       qchecks: 0,
       ttHits: 0,
+      ttStores: 0,
+      ttReplacements: 0,
+      ttEvictions: 0,
+      ttSkips: 0,
       cutoffs: 0,
       aspirationSearches: 0,
       aspirationFailHigh: 0,

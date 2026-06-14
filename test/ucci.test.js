@@ -8,6 +8,7 @@ test("UCCI session identifies itself", () => {
 
   assert.ok(output.some((line) => line.startsWith("id name")));
   assert.ok(output.some((line) => line.includes("MultiPV")));
+  assert.ok(output.some((line) => line.includes("HashEntries")));
   assert.ok(output.some((line) => line.includes("UseBook")));
   assert.ok(output.includes("ucciok"));
 });
@@ -22,9 +23,21 @@ test("UCCI session searches a FEN position", () => {
   assert.ok(output.some((line) => line.includes("stable true")));
   assert.ok(output.some((line) => line.includes("nodes")));
   assert.ok(output.some((line) => line.includes("qchecks")));
+  assert.ok(output.some((line) => line.includes("ttstores")));
   assert.ok(output.some((line) => line.includes("futil")));
   assert.ok(output.includes("bestmove e9e2"));
   assert.ok(output.some((line) => line.includes("reason: Wins a rook")));
+});
+
+test("UCCI HashEntries option bounds the transposition cache", () => {
+  const session = new UcciSession({ depth: 3, timeLimitMs: 1000 });
+  session.handleLine("setoption name HashEntries value 128");
+  session.handleLine("position fen 2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const output = session.handleLine("go depth 3 movetime 1000");
+
+  assert.equal(session.engine.cacheCapacity, 128);
+  assert.ok(session.engine.cacheSize <= 128);
+  assert.ok(output.some((line) => line.includes("ttstores")));
 });
 
 test("UCCI go uses the opening book from startpos by default", () => {
