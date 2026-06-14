@@ -1,6 +1,7 @@
 import { applyLegalMove, annotateMove, generateLegalMoves, legalMovesWithNotation } from "./movegen.js";
 import { moveToNotation, parseMoveNotation, sameMove } from "./board.js";
 import { evaluatePosition } from "./evaluate.js";
+import { analyzePressure } from "./pressure.js";
 import { explainCandidateMove, explainMove, explainReviewedMove } from "./reasoning.js";
 import { searchBestMove } from "./search.js";
 
@@ -96,6 +97,10 @@ export function createEngine(defaultOptions = {}) {
       return evaluatePosition(position, options.perspective ?? position.turn, {
         detailed: options.detailed ?? true
       });
+    },
+
+    pressure(position, options = {}) {
+      return analyzePressure(position, options);
     },
 
     legalMoves(position) {

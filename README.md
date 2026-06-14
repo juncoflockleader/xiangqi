@@ -11,6 +11,7 @@ The current engine is dependency-free JavaScript and includes:
 - Zobrist hashing, transposition table, quiescence search, capture/check/history-based move ordering, bounded check extensions, late-move reductions, repetition hooks, and root candidate analysis.
 - Evaluation terms for material, piece-square placement, mobility, threats, pawn progress, and king safety.
 - Capture safety analysis for distinguishing clean wins from tactically poisoned captures.
+- Immediate pressure/threat analysis for both sides.
 - Perft helpers for validating move generation while the engine grows.
 - Explainable move output for learning-app use cases.
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
@@ -65,6 +66,15 @@ for (const line of analysis.lines) {
 
 `analyzePosition` returns ranked candidate lines with scores, centipawn loss against the best move, principal variations, and individual explanations.
 
+Inspect threats without running a full search:
+
+```js
+const pressure = engine.pressure(position);
+
+console.log(pressure.threats[0]?.summary);
+console.log(pressure.opponentThreats[0]?.summary);
+```
+
 Track a play session:
 
 ```js
@@ -96,7 +106,7 @@ go depth 2 movetime 1000
 analyze depth 2 movetime 1000 lines 3
 ```
 
-The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `go`, `go ... multipv N`, `setoption name MultiPV value N`, `analyze`, `probe`, `explain`, and `quit`.
+The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `go`, `go ... multipv N`, `setoption name MultiPV value N`, `analyze`, `probe`, `pressure`, `explain`, and `quit`.
 
 ## Movegen Validation
 

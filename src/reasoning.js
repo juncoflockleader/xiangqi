@@ -7,6 +7,7 @@ import {
 } from "./board.js";
 import { evaluateMoveDelta, describeCapture, describeEvaluationTerms } from "./evaluate.js";
 import { generateLegalMoves, isInCheck } from "./movegen.js";
+import { analyzeThreats, topThreat } from "./pressure.js";
 import { formatPrincipalVariation } from "./search.js";
 import { analyzeCapture } from "./tactics.js";
 
@@ -59,6 +60,9 @@ export function explainMoveFeatures(position, move) {
   const delta = evaluateMoveDelta(position, next, position.turn);
   const termNotes = describeEvaluationTerms(delta.delta);
   const legalReplyCount = generateLegalMoves(next, next.turn).length;
+  const beforeOpponentThreat = topThreat(position, opponent(position.turn));
+  const afterOpponentThreat = topThreat(next, next.turn);
+  const createdThreat = analyzeThreats(next, position.turn, { limit: 1 })[0] ?? null;
   const reasons = [];
   const capture = describeCapture(move);
   const captureAnalysis = analyzeCapture(position, move);
@@ -74,6 +78,12 @@ export function explainMoveFeatures(position, move) {
   if (move.givesCheck || isInCheck(next, opponent(position.turn))) reasons.push("It gives check and forces the opponent to answer immediately.");
   if (isInCheck(position, position.turn)) reasons.push("It resolves the current check while keeping active play.");
   if (legalReplyCount <= 3) reasons.push(`It sharply limits the opponent to ${legalReplyCount} legal replies.`);
+  if (createdThreat && createdThreat.score >= 400) {
+    reasons.push(`It creates an immediate threat: ${createdThreat.summary}`);
+  }
+  if (beforeOpponentThreat && (!afterOpponentThreat || afterOpponentThreat.score + 120 < beforeOpponentThreat.score)) {
+    reasons.push(`It reduces the opponent's strongest immediate threat: ${beforeOpponentThreat.summary}`);
+  }
   if (Math.abs(delta.deltaScore) >= 20) {
     reasons.push(`${delta.deltaScore >= 0 ? "Static evaluation improves" : "Static evaluation accepts a short-term cost"} by ${Math.abs(Math.round(delta.deltaScore))} centipawns.`);
   }

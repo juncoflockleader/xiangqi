@@ -68,3 +68,13 @@ test("UCCI position startpos accepts moves", () => {
   assert.deepEqual(output, []);
   assert.ok(session.position);
 });
+
+test("UCCI pressure reports immediate threats", () => {
+  const session = new UcciSession({ depth: 1, timeLimitMs: 500 });
+  session.handleLine("position fen 4k4/9/4r4/9/9/9/9/9/9/3KR4 r");
+  const output = session.handleLine("pressure limit 1");
+
+  assert.ok(output.some((line) => line.includes("pressure side red")));
+  assert.ok(output.some((line) => line.includes("threat e9e2") || line.includes("threat e9-e2")));
+  assert.ok(output.some((line) => line.includes("opponent-threat")));
+});

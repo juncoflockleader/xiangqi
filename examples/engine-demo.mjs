@@ -32,6 +32,13 @@ for (const line of analysis.lines) {
   console.log(`${line.rank}. ${line.move.notation} ${line.explanation.summary}`);
 }
 
+const pressure = engine.pressure(position, { limit: 2 });
+console.log("");
+console.log("Immediate pressure:");
+for (const threat of pressure.threats) {
+  console.log(`- ${threat.summary}`);
+}
+
 const reviewPosition = engine.play(position, "a9-a8");
 const review = engine.reviewMove(reviewPosition, "a0-a1", { depth: 2, timeLimitMs: 500 });
 

@@ -45,6 +45,8 @@ export class UcciSession {
           return this.analyze(trimmed);
         case "probe":
           return this.probe(trimmed);
+        case "pressure":
+          return this.pressure(trimmed);
         case "explain":
           return this.explain();
         case "quit":
@@ -189,6 +191,25 @@ export class UcciSession {
       ...setPositionOutput,
       `info string probe score ${formatScore(result.score)} best ${result.bestMove ? protocolMove(result.bestMove) : "0000"}`
     ];
+  }
+
+  pressure(line) {
+    const tokens = line.split(/\s+/);
+    const limit = readTokenInteger(tokens, "limit", 3);
+    const pressure = this.engine.pressure(this.position, { limit });
+    const outputs = [
+      `info string pressure side ${pressure.side} incheck ${pressure.inCheck ? "true" : "false"}`
+    ];
+
+    for (const threat of pressure.threats) {
+      outputs.push(`info string threat ${threat.notation}: ${threat.summary}`);
+    }
+
+    for (const threat of pressure.opponentThreats) {
+      outputs.push(`info string opponent-threat ${threat.notation}: ${threat.summary}`);
+    }
+
+    return outputs;
   }
 
   explain() {
