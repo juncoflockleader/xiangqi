@@ -88,6 +88,8 @@ test("engine returns a legal move and explanation", () => {
   assert.ok(result.explanation.confidence.score >= 0);
   assert.ok(["low", "medium", "high", "very-high"].includes(result.explanation.confidence.level));
   assert.ok(result.explanation.confidence.factors.some((factor) => factor.kind === "depth"));
+  assert.equal(result.explanation.linePlan.firstMove, result.bestMove.notation);
+  assert.equal(result.explanation.linePlan.moves[0].role, "engine-choice");
 });
 
 test("engine sees a simple winning capture", () => {

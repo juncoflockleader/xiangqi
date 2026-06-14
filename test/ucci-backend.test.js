@@ -56,6 +56,8 @@ test("UCCI backend searches through an external process", async () => {
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("UCCI search")));
     assert.ok(result.explanation.confidence.score >= 0);
     assert.ok(result.explanation.confidence.factors.some((factor) => factor.kind === "depth"));
+    assert.equal(result.explanation.linePlan.firstMove, "h9-g7");
+    assert.equal(result.explanation.linePlan.expectedReply, "h0-g2");
   } finally {
     await backend.close();
   }

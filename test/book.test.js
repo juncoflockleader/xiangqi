@@ -33,6 +33,8 @@ test("engine chooses and explains opening book moves by default", () => {
   assert.ok(result.explanation.reasons.some((reason) => reason.includes("Opening book")));
   assert.ok(result.explanation.confidence.score >= 45);
   assert.ok(result.explanation.confidence.factors.some((factor) => factor.kind === "book"));
+  assert.equal(result.explanation.linePlan.firstMove, "h7-e7");
+  assert.equal(result.explanation.linePlan.moves[0].role, "opening-choice");
 });
 
 test("opening book can be disabled for pure search", () => {

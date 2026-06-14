@@ -11,7 +11,7 @@ import {
 import { ENGINE_BACKEND_FEATURES, createEngineBackend } from "./backend.js";
 import { bookMoveToCandidate } from "./book.js";
 import { classifyMoveLoss, createEngine } from "./engine.js";
-import { assessSearchConfidence, explainBookMove, explainMoveFeatures, explainReviewedMove, formatScore } from "./reasoning.js";
+import { assessSearchConfidence, buildLinePlan, explainBookMove, explainMoveFeatures, explainReviewedMove, formatScore } from "./reasoning.js";
 import { annotateMove, generateLegalMoves } from "./movegen.js";
 import { hasClockTimeControl, resolveSearchBudget } from "./time.js";
 import { reviewGameWithBackend } from "./review.js";
@@ -570,7 +570,8 @@ function explainNativeMove(position, result, backendName) {
       summary: `${backendName} found no legal move.`,
       reasons: [`The native ${protocolLabel} backend returned bestmove 0000.`],
       alternatives: [],
-      principalVariation: []
+      principalVariation: [],
+      linePlan: buildLinePlan(position, [])
     };
   }
 
@@ -598,6 +599,7 @@ function explainNativeMove(position, result, backendName) {
     })),
     principalVariation,
     principalVariationText: principalVariation.join(" "),
+    linePlan: buildLinePlan(position, result.principalVariation),
     evaluationDelta: moveStory.evaluationDelta,
     confidence: assessSearchConfidence(result, { source: result.source ?? result.protocol ?? "native" }),
     search: {
@@ -628,6 +630,7 @@ function explainNativeCandidate(position, candidate, context) {
     reasons: unique(reasons).slice(0, 7),
     principalVariation,
     principalVariationText: principalVariation.join(" "),
+    linePlan: buildLinePlan(position, candidate.principalVariation ?? [candidate.move]),
     evaluationDelta: moveStory.evaluationDelta,
     centipawnLoss
   };

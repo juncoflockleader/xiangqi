@@ -3,6 +3,7 @@ import {
   makeMove,
   moveToNotation,
   opponent,
+  parseMoveNotation,
   pieceLabel
 } from "./board.js";
 import { evaluateMoveDelta, describeCapture, describeEvaluationTerms } from "./evaluate.js";
@@ -20,6 +21,7 @@ export function explainMove(position, searchResult) {
       reasons: [isInCheck(position, position.turn) ? "The side to move is checkmated." : "The side to move has no legal move."],
       alternatives: [],
       principalVariation: [],
+      linePlan: emptyLinePlan(),
       confidence: terminalConfidence(position)
     };
   }
@@ -53,6 +55,7 @@ export function explainMove(position, searchResult) {
     alternatives: explainAlternatives(searchResult.candidates ?? []),
     principalVariation: bestLine.map((candidate) => candidate.notation ?? moveToNotation(candidate)),
     principalVariationText: formatPrincipalVariation(bestLine),
+    linePlan: buildLinePlan(position, bestLine),
     evaluationDelta: moveStory.evaluationDelta,
     confidence,
     search: {
@@ -91,6 +94,7 @@ export function explainBookMove(position, bookResult) {
     })),
     principalVariation: [moveToNotation(move)],
     principalVariationText: moveToNotation(move),
+    linePlan: buildLinePlan(position, [move], { source: bookResult.source ?? "opening-book" }),
     evaluationDelta: moveStory.evaluationDelta,
     confidence,
     search: {
@@ -209,6 +213,7 @@ export function explainCandidateMove(position, candidate, context = {}) {
     reasons: unique(reasons).slice(0, 7),
     principalVariation,
     principalVariationText: principalVariation.join(" "),
+    linePlan: buildLinePlan(position, candidate.principalVariation ?? [candidate.move]),
     evaluationDelta: moveStory.evaluationDelta,
     centipawnLoss
   };
@@ -313,6 +318,64 @@ export function assessSearchConfidence(result, context = {}) {
   return buildConfidence(score, factors);
 }
 
+export function buildLinePlan(position, line = [], options = {}) {
+  if (!line || line.length === 0) return emptyLinePlan();
+
+  let current = position;
+  const moves = [];
+  const motifs = [];
+
+  for (let index = 0; index < line.length; index += 1) {
+    const rawMove = line[index];
+    const notation = lineMoveNotation(rawMove);
+    const legalMove = generateLegalMoves(current, current.turn)
+      .find((candidate) => (candidate.notation ?? moveToNotation(candidate)) === notation);
+
+    if (!legalMove) break;
+
+    const annotated = {
+      ...legalMove,
+      notation
+    };
+    const role = lineMoveRole(index, options.source);
+    const stepMotifs = lineMoveMotifs(current, annotated);
+    motifs.push(...stepMotifs);
+    moves.push({
+      ply: index + 1,
+      side: current.turn,
+      role,
+      move: notation,
+      piece: PIECE_NAMES[annotated.piece.type],
+      summary: `${capitalize(role.replace("-", " "))}: ${pieceLabel(annotated.piece)} ${notation}`,
+      motifs: stepMotifs
+    });
+
+    current = makeMove(current, legalMove);
+  }
+
+  if (moves.length === 0) return emptyLinePlan();
+
+  const first = moves[0];
+  const reply = moves[1] ?? null;
+  const continuation = moves.slice(2).map((move) => move.move);
+  const uniqueMotifs = unique(motifs);
+
+  return {
+    summary: summarizeLinePlan(first, reply, continuation, uniqueMotifs),
+    firstMove: first.move,
+    expectedReply: reply?.move ?? null,
+    continuation,
+    moves,
+    motifs: uniqueMotifs
+  };
+}
+
+function lineMoveNotation(move) {
+  return typeof move === "string"
+    ? moveToNotation(parseMoveNotation(move))
+    : move.notation ?? moveToNotation(move);
+}
+
 function explainAlternatives(candidates) {
   return candidates.slice(0, 5).map((candidate, index) => {
     const move = candidate.move;
@@ -334,6 +397,52 @@ function explainAlternatives(candidates) {
         : `${PIECE_NAMES[move.piece.type]} move with search score ${formatScore(candidate.score)}`
     };
   });
+}
+
+function emptyLinePlan() {
+  return {
+    summary: "No principal variation is available.",
+    firstMove: null,
+    expectedReply: null,
+    continuation: [],
+    moves: [],
+    motifs: []
+  };
+}
+
+function lineMoveRole(index, source = "") {
+  if (index === 0 && source.startsWith("opening")) return "opening-choice";
+  if (index === 0) return "engine-choice";
+  if (index === 1) return "expected-reply";
+  return "continuation";
+}
+
+function lineMoveMotifs(position, move) {
+  const next = makeMove(position, move);
+  const motifs = [];
+
+  if (move.captured) motifs.push(`wins ${PIECE_NAMES[move.captured.type]}`);
+  if (move.givesCheck || isInCheck(next, next.turn)) motifs.push("check");
+
+  const capture = analyzeCapture(position, move);
+  if (capture?.isSafe) motifs.push("safe capture");
+  if (capture && capture.exchangeScore < 0) motifs.push("recapture risk");
+
+  const threat = analyzeThreats(next, position.turn, { limit: 1 })[0];
+  if (threat && threat.score >= 400) motifs.push("creates threat");
+
+  const replies = generateLegalMoves(next, next.turn).length;
+  if (replies <= 3) motifs.push("limits replies");
+
+  return unique(motifs);
+}
+
+function summarizeLinePlan(first, reply, continuation, motifs) {
+  const parts = [`Start with ${first.move}`];
+  if (reply) parts.push(`expect ${reply.move}`);
+  if (continuation.length > 0) parts.push(`continue ${continuation.slice(0, 3).join(" ")}`);
+  if (motifs.length > 0) parts.push(`theme: ${motifs.slice(0, 3).join(", ")}`);
+  return `${parts.join("; ")}.`;
 }
 
 function candidateScoreGap(searchResult) {

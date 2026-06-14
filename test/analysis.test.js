@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   analyzePosition,
+  buildLinePlan,
   createEngine,
   createInitialPosition,
   parseFen
@@ -17,6 +18,8 @@ test("engine analyzes multiple candidate lines with explanations", () => {
   assert.equal(analysis.lines[0].move.notation, analysis.bestMove.notation);
   assert.equal(analysis.lines[0].centipawnLoss, 0);
   assert.ok(analysis.lines[0].explanation.summary.includes("Candidate 1"));
+  assert.equal(analysis.lines[0].explanation.linePlan.firstMove, analysis.lines[0].move.notation);
+  assert.ok(analysis.lines[0].explanation.linePlan.moves.length > 0);
   assert.ok(analysis.lines.every((line) => line.principalVariation.length > 0));
 });
 
@@ -26,6 +29,7 @@ test("standalone analyzePosition helper mirrors engine analysis", () => {
 
   assert.equal(analysis.lines.length, 2);
   assert.ok(analysis.explanation.summary.includes(analysis.bestMove.notation));
+  assert.equal(analysis.explanation.linePlan.firstMove, analysis.bestMove.notation);
 });
 
 test("analysis line count is clamped to a useful range", () => {
@@ -34,4 +38,13 @@ test("analysis line count is clamped to a useful range", () => {
 
   assert.equal(engine.analyzePosition(position, { lines: 0 }).lines.length, 1);
   assert.equal(engine.analyzePosition(position, { lines: 99 }).lines.length, 12);
+});
+
+test("line plans can be built from move notation strings", () => {
+  const plan = buildLinePlan(createInitialPosition(), ["h7e7", "h0g2"]);
+
+  assert.equal(plan.firstMove, "h7-e7");
+  assert.equal(plan.expectedReply, "h0-g2");
+  assert.equal(plan.moves[0].role, "engine-choice");
+  assert.ok(plan.summary.includes("h7-e7"));
 });
