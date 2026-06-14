@@ -2,11 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   ENGINE_BENCHMARKS,
+  compareEngineToOracle,
   compareEngineBackends,
   createJavaScriptEngineBackend,
   createLearningEngineBackend,
   formatBenchmarkReport,
   formatEngineComparisonReport,
+  formatOracleComparisonReport,
   runBenchmarkSuite
 } from "../src/index.js";
 
@@ -107,9 +109,122 @@ test("engine comparison reports fallback backend usage", async () => {
   }
 });
 
+test("oracle comparison grades candidate moves with oracle review", async () => {
+  const candidate = createJavaScriptEngineBackend({ name: "Candidate JS", depth: 1, timeLimitMs: 100 });
+  const oracle = createJavaScriptEngineBackend({ name: "Oracle JS", depth: 1, timeLimitMs: 100 });
+  const comparison = await compareEngineToOracle(candidate, oracle, {
+    tag: "opening",
+    searchOptions: { useBook: true, depth: 1, timeLimitMs: 100 },
+    oracleSearchOptions: { useBook: true, depth: 1, timeLimitMs: 100 },
+    oracleReviewOptions: { depth: 1, timeLimitMs: 100 }
+  });
+  const text = formatOracleComparisonReport(comparison);
+
+  assert.equal(comparison.total, 1);
+  assert.equal(comparison.exactMatches, 1);
+  assert.equal(comparison.acceptable, 1);
+  assert.equal(comparison.results[0].candidateMove, "h7-e7");
+  assert.equal(comparison.results[0].oracleMove, "h7-e7");
+  assert.equal(comparison.results[0].oracleReview.classification, "best");
+  assert.ok(comparison.aggregate.averageCentipawnLoss >= 0);
+  assert.ok(text.includes("Oracle comparison:"));
+  assert.ok(text.includes("PASS book-central-cannon"));
+});
+
+test("oracle comparison surfaces review-needed disagreements", async () => {
+  const base = createJavaScriptEngineBackend({ depth: 1, timeLimitMs: 100 });
+  const candidate = createScriptedBenchmarkBackend(base, "a9-a8");
+  const oracle = createScriptedOracleBackend(base, "h7-e7", {
+    classification: "blunder",
+    centipawnLoss: 180
+  });
+  const comparison = await compareEngineToOracle(candidate, oracle, {
+    tag: "opening",
+    acceptableLossCp: 60
+  });
+  const text = formatOracleComparisonReport(comparison);
+  const result = comparison.results[0];
+
+  assert.equal(comparison.exactMatches, 0);
+  assert.equal(comparison.acceptable, 0);
+  assert.equal(comparison.failed, 1);
+  assert.equal(result.candidateMove, "a9-a8");
+  assert.equal(result.oracleMove, "h7-e7");
+  assert.equal(result.oracleReview.centipawnLoss, 180);
+  assert.equal(result.oracleReview.classification, "blunder");
+  assert.ok(text.includes("REVIEW book-central-cannon"));
+  assert.ok(text.includes("candidate a9-a8 vs oracle h7-e7"));
+});
+
 test("engine comparison rejects entries without chooseMove", async () => {
   await assert.rejects(
     () => compareEngineBackends([{ id: "bad-engine" }]),
     /missing chooseMove/
   );
 });
+
+function createScriptedBenchmarkBackend(base, notation) {
+  return {
+    id: "scripted-candidate",
+    name: "Scripted Candidate",
+    kind: "scripted",
+    features: base.features,
+    chooseMove(position) {
+      const move = base.legalMoves(position).find((candidate) => candidate.notation === notation);
+      return {
+        bestMove: move,
+        source: "scripted",
+        score: 0,
+        depth: 0,
+        nodes: 0,
+        principalVariation: move ? [move] : [],
+        explanation: {
+          summary: `Scripted candidate chooses ${notation}.`,
+          reasons: [`Scripted benchmark forces ${notation}.`]
+        }
+      };
+    }
+  };
+}
+
+function createScriptedOracleBackend(base, notation, reviewResult) {
+  return {
+    id: "scripted-oracle",
+    name: "Scripted Oracle",
+    kind: "scripted",
+    features: base.features,
+    chooseMove(position) {
+      const move = base.legalMoves(position).find((candidate) => candidate.notation === notation);
+      return {
+        bestMove: move,
+        source: "oracle",
+        score: 100,
+        depth: 1,
+        nodes: 10,
+        principalVariation: move ? [move] : [],
+        explanation: {
+          summary: `Scripted oracle prefers ${notation}.`,
+          reasons: [`Scripted oracle uses ${notation} as the benchmark answer.`]
+        }
+      };
+    },
+    reviewMove(position, playedNotation) {
+      const played = base.legalMoves(position).find((move) => move.notation === playedNotation);
+      const bestMove = base.legalMoves(position).find((move) => move.notation === notation);
+      return {
+        move: played,
+        bestMove,
+        classification: reviewResult.classification,
+        centipawnLoss: reviewResult.centipawnLoss,
+        playedScore: -reviewResult.centipawnLoss,
+        bestScore: 0,
+        depth: 1,
+        nodes: 12,
+        explanation: {
+          summary: `${playedNotation} loses ${reviewResult.centipawnLoss} centipawns against the oracle.`,
+          reasons: [`The oracle prefers ${notation}.`]
+        }
+      };
+    }
+  };
+}

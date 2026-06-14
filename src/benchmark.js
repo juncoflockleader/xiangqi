@@ -118,6 +118,42 @@ export async function compareEngineBackends(backends, options = {}) {
   };
 }
 
+export async function compareEngineToOracle(candidate, oracle, options = {}) {
+  const candidateEntry = normalizeOracleEntry(candidate, "candidate");
+  const oracleEntry = normalizeOracleEntry(oracle, "oracle");
+  const benchmarks = filterBenchmarks(options.benchmarks ?? ENGINE_BENCHMARKS, options);
+  const acceptableLossCp = options.acceptableLossCp ?? 60;
+  const startedAt = performanceNow();
+  const results = [];
+
+  for (const benchmark of benchmarks) {
+    results.push(await compareBenchmarkToOracle(candidateEntry, oracleEntry, benchmark, {
+      ...options,
+      acceptableLossCp
+    }));
+  }
+
+  const elapsedMs = Math.round(performanceNow() - startedAt);
+  const exactMatches = results.filter((result) => result.exactMatch).length;
+  const acceptable = results.filter((result) => result.acceptable).length;
+  const reviewed = results.filter((result) => result.oracleReview).length;
+  const aggregate = aggregateOracleResults(results, elapsedMs);
+
+  return {
+    candidate: summarizeComparisonEntry(candidateEntry),
+    oracle: summarizeComparisonEntry(oracleEntry),
+    total: results.length,
+    exactMatches,
+    acceptable,
+    reviewed,
+    failed: results.length - acceptable,
+    acceptableLossCp,
+    elapsedMs,
+    aggregate,
+    results
+  };
+}
+
 export function formatBenchmarkReport(report) {
   const lines = [
     `Benchmarks: ${report.solved}/${report.total} solved in ${report.elapsedMs}ms (${formatNodes(report.aggregate?.nodes)} nodes, ${formatNodes(report.aggregate?.nodesPerSecond)}/s)`
@@ -133,6 +169,28 @@ export function formatBenchmarkReport(report) {
     const stats = `depth ${result.depth}, ${formatNodes(result.nodes)} nodes, ${result.elapsedMs}ms`;
     lines.push(`  ${stats}`);
     if (result.summary) lines.push(`  ${result.summary}`);
+  }
+
+  return lines.join("\n");
+}
+
+export function formatOracleComparisonReport(report) {
+  const averageLoss = report.aggregate.averageCentipawnLoss === null
+    ? "n/a"
+    : `${report.aggregate.averageCentipawnLoss} cp`;
+  const lines = [
+    `Oracle comparison: ${report.candidate.name} vs ${report.oracle.name}`,
+    `${report.acceptable}/${report.total} within ${report.acceptableLossCp} cp, ${report.exactMatches}/${report.total} exact, avg loss ${averageLoss} in ${report.elapsedMs}ms`
+  ];
+
+  for (const result of report.results) {
+    const status = result.acceptable ? "PASS" : "REVIEW";
+    const loss = result.oracleReview ? `${result.oracleReview.centipawnLoss} cp` : "unreviewed";
+    const classification = result.oracleReview?.classification ? `, ${result.oracleReview.classification}` : "";
+    lines.push(`${status} ${result.id}: candidate ${result.candidateMove ?? "none"} vs oracle ${result.oracleMove ?? "none"} (${loss}${classification})`);
+    if (result.candidateSummary) lines.push(`  Candidate: ${result.candidateSummary}`);
+    if (result.oracleSummary) lines.push(`  Oracle: ${result.oracleSummary}`);
+    if (result.oracleReview?.summary) lines.push(`  Review: ${result.oracleReview.summary}`);
   }
 
   return lines.join("\n");
@@ -155,6 +213,77 @@ export function formatEngineComparisonReport(comparison) {
   }
 
   return lines.join("\n");
+}
+
+async function compareBenchmarkToOracle(candidateEntry, oracleEntry, benchmark, options) {
+  const position = parseFen(benchmark.fen);
+  const candidateOptions = {
+    ...(benchmark.options ?? {}),
+    ...(options.searchOptions ?? {}),
+    ...(candidateEntry.searchOptions ?? {})
+  };
+  const oracleOptions = {
+    ...(benchmark.options ?? {}),
+    useBook: false,
+    ...(options.oracleSearchOptions ?? {}),
+    ...(oracleEntry.searchOptions ?? {})
+  };
+  const reviewOptions = {
+    ...(oracleOptions ?? {}),
+    ...(options.oracleReviewOptions ?? {})
+  };
+  const startedAt = performanceNow();
+  const candidateDecision = await candidateEntry.engine.chooseMove(position, candidateOptions);
+  const oracleDecision = await oracleEntry.engine.chooseMove(position, oracleOptions);
+  const candidateMove = notationFor(candidateDecision.bestMove);
+  const oracleMove = notationFor(oracleDecision.bestMove);
+  const exactMatch = Boolean(candidateMove && oracleMove && candidateMove === oracleMove);
+  const rawOracleReview = candidateMove
+    ? await oracleEntry.engine.reviewMove(position, candidateMove, reviewOptions)
+    : null;
+  const oracleReview = exactMatch
+    ? normalizeExactOracleReview(rawOracleReview, candidateMove)
+    : rawOracleReview;
+  const centipawnLoss = oracleReview?.centipawnLoss ?? null;
+  const acceptable = exactMatch || (typeof centipawnLoss === "number" && centipawnLoss <= options.acceptableLossCp);
+  const elapsedMs = Math.round(performanceNow() - startedAt);
+
+  return {
+    id: benchmark.id,
+    name: benchmark.name,
+    fen: benchmark.fen,
+    tags: [...(benchmark.tags ?? [])],
+    lesson: benchmark.lesson,
+    candidateMove,
+    oracleMove,
+    exactMatch,
+    acceptable,
+    acceptableLossCp: options.acceptableLossCp,
+    centipawnLoss,
+    elapsedMs,
+    candidate: summarizeOracleDecision(candidateDecision),
+    oracle: summarizeOracleDecision(oracleDecision),
+    candidateSummary: candidateDecision.explanation?.summary ?? "",
+    oracleSummary: oracleDecision.explanation?.summary ?? "",
+    candidateReasons: [...(candidateDecision.explanation?.reasons ?? [])],
+    oracleReasons: [...(oracleDecision.explanation?.reasons ?? [])],
+    oracleReview: oracleReview ? summarizeOracleReview(oracleReview) : null
+  };
+}
+
+function normalizeExactOracleReview(review, candidateMove) {
+  if (!review) return review;
+  return {
+    ...review,
+    playedScore: review.bestScore ?? review.playedScore,
+    centipawnLoss: 0,
+    classification: "best",
+    isBestMove: true,
+    explanation: {
+      ...(review.explanation ?? {}),
+      summary: `${candidateMove} matches the oracle's selected move.`
+    }
+  };
 }
 
 async function runBenchmark(engine, benchmark, options) {
@@ -200,6 +329,65 @@ async function runBenchmark(engine, benchmark, options) {
   };
 }
 
+function normalizeOracleEntry(entry, role) {
+  const engine = entry?.engine ?? entry?.backend ?? entry;
+  if (!engine?.chooseMove) {
+    throw new Error(`${capitalize(role)} engine is missing chooseMove.`);
+  }
+  if (role === "oracle" && typeof engine.reviewMove !== "function") {
+    throw new Error("Oracle engine is missing reviewMove.");
+  }
+
+  return {
+    id: entry.id ?? engine.id ?? role,
+    name: entry.name ?? engine.name ?? capitalize(role),
+    kind: entry.kind ?? engine.kind ?? "custom",
+    features: [...(entry.features ?? engine.features ?? [])],
+    searchOptions: entry.searchOptions ?? {},
+    engine
+  };
+}
+
+function summarizeComparisonEntry(entry) {
+  return {
+    id: entry.id,
+    name: entry.name,
+    kind: entry.kind,
+    features: [...entry.features],
+    status: entry.engine ? describeEngineBackendStatus(entry.engine) : null
+  };
+}
+
+function summarizeOracleDecision(decision) {
+  return {
+    move: notationFor(decision.bestMove),
+    source: decision.source ?? "search",
+    score: Math.round(decision.score ?? 0),
+    depth: decision.depth ?? 0,
+    nodes: decision.nodes ?? 0,
+    principalVariation: (decision.principalVariation ?? []).map(notationFor),
+    summary: decision.explanation?.summary ?? "",
+    reasons: [...(decision.explanation?.reasons ?? [])],
+    backendFallback: decision.backendFallback ?? null
+  };
+}
+
+function summarizeOracleReview(review) {
+  return {
+    move: notationFor(review.move),
+    bestMove: notationFor(review.bestMove),
+    classification: review.classification,
+    centipawnLoss: review.centipawnLoss,
+    playedScore: review.playedScore,
+    bestScore: review.bestScore,
+    depth: review.depth,
+    nodes: review.nodes,
+    mistakes: review.mistakes ?? null,
+    summary: review.explanation?.summary ?? "",
+    reasons: [...(review.explanation?.reasons ?? [])]
+  };
+}
+
 function normalizeEngine(engineOrOptions, options) {
   if (engineOrOptions?.chooseMove) return engineOrOptions;
   return createEngine({
@@ -236,6 +424,21 @@ function filterBenchmarks(benchmarks, options) {
   return benchmarks.filter((benchmark) => benchmark.tags?.includes(tag));
 }
 
+function aggregateOracleResults(results, elapsedMs) {
+  const reviewed = results.filter((result) => typeof result.centipawnLoss === "number");
+  const totalLoss = sum(reviewed, (result) => result.centipawnLoss);
+  const nodes = sum(results, (result) => (result.candidate.nodes ?? 0) + (result.oracle.nodes ?? 0) + (result.oracleReview?.nodes ?? 0));
+  const nodesPerSecond = elapsedMs > 0 ? Math.round(nodes * 1000 / elapsedMs) : nodes;
+
+  return {
+    nodes,
+    nodesPerSecond,
+    averageCentipawnLoss: reviewed.length === 0 ? null : Number((totalLoss / reviewed.length).toFixed(2)),
+    maxCentipawnLoss: reviewed.length === 0 ? null : Math.max(...reviewed.map((result) => result.centipawnLoss)),
+    reviewed: reviewed.length
+  };
+}
+
 function aggregateBenchmarkResults(results, elapsedMs) {
   const nodes = sum(results, (result) => result.nodes);
   const qnodes = sum(results, (result) => result.stats?.qnodes ?? 0);
@@ -262,6 +465,15 @@ function aggregateStats(results) {
     }
   }
   return totals;
+}
+
+function notationFor(move) {
+  if (!move) return null;
+  return move.notation ?? moveToNotation(move);
+}
+
+function capitalize(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function sum(items, valueFn) {

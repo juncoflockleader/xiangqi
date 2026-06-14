@@ -8,6 +8,7 @@
     "demo": "node examples/engine-demo.mjs",
     "play": "node examples/play-cli.mjs",
     "bench": "node examples/benchmark.mjs",
+    "bench:oracle": "node examples/oracle-benchmark.mjs",
     "spar": "node examples/sparring.mjs",
     "probe:native": "node examples/native-probe.mjs",
     "perft": "node examples/perft.mjs",

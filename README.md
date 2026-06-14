@@ -32,6 +32,7 @@ The current engine is dependency-free JavaScript and includes:
 npm run play
 node examples/engine-demo.mjs
 node examples/benchmark.mjs
+node examples/oracle-benchmark.mjs --help
 node examples/sparring.mjs --plies 12
 node examples/native-probe.mjs --help
 node examples/perft.mjs 2
@@ -273,6 +274,24 @@ console.log(formatBenchmarkReport(report));
 ```
 
 The benchmark suite is intentionally small for now: it checks the opening layer, a clean tactical capture, and an immediate forcing win. It reports aggregate nodes, nodes per second, average depth, timeout count, and summed search stats, making it a regression guardrail for search changes and a foundation for comparing the JS reference backend with stronger native engines later.
+
+Compare the JavaScript learning engine to a native oracle:
+
+```sh
+XIANGQI_ORACLE_ENGINE_COMMAND=/path/to/pikafish \
+npm run bench:oracle -- --oracle-protocol uci \
+  --oracle-option Threads=4 \
+  --oracle-option Hash=512 \
+  --oracle-option EvalFile=/path/to/pikafish.nnue \
+  --oracle-depth 8 \
+  --oracle-time 3000 \
+  --acceptable-loss 60
+```
+
+The oracle benchmark lets the JavaScript candidate move first, asks the native
+engine for its own best move, then uses the oracle review path to grade the
+candidate move by centipawn loss and classification. Use `--tag opening`,
+`--tag tactic`, or `--json` for focused regression runs.
 
 Compare backends on the same benchmark suite:
 
