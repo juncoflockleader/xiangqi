@@ -33,6 +33,7 @@ npm run play
 node examples/engine-demo.mjs
 node examples/benchmark.mjs
 node examples/oracle-benchmark.mjs --help
+node examples/oracle-opening.mjs --help
 node examples/sparring.mjs --plies 12
 node examples/native-probe.mjs --help
 node examples/perft.mjs 2
@@ -126,6 +127,28 @@ const csvBook = createOpeningBookFromCsv(`
 ```
 
 The text importer accepts move lines plus optional `weight`, `count`, `frequency`, or `games` metadata. The structured-record importer also accepts common database priors such as `games`, `redWinRate`, `drawRate`, `blackWinRate`, `engineScore`, `source`, and `year`; the CSV/TSV importer recognizes common headers such as `moves`, `red_win_rate`, `draw_rate`, `black_win_rate`, `cp`, `source`, `name`, and `tags`. Imported records weight each continuation for the side to move and carry a database summary into the explanation. Repeated lines aggregate their weights, which makes it suitable for converting a larger opening database into engine heuristics.
+
+Generate opening records from a native oracle when no curated opening database is
+available yet:
+
+```sh
+XIANGQI_ORACLE_ENGINE_COMMAND=/path/to/pikafish \
+npm run book:oracle -- --protocol uci \
+  --option Threads=4 \
+  --option Hash=512 \
+  --option EvalFile=/path/to/pikafish.nnue \
+  --plies 16 \
+  --lines 3 \
+  --depth 8 \
+  --time 3000 \
+  --records-only > oracle-opening-records.json
+```
+
+The command follows the oracle's best line for the requested opening plies and
+records the top MultiPV alternatives at each visited position. The JSON array is
+compatible with `createOpeningBookFromRecords`, so it can be inspected, merged,
+or turned into a small first-pass book without hard-coding native-engine choices
+into the default repertoire.
 
 Choose an engine backend:
 
