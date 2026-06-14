@@ -113,11 +113,15 @@ export function explainMoveFeatures(position, move) {
 
   if (captureAnalysis && captureAnalysis.exchangeScore < 0) {
     reasons.push(capitalize(captureAnalysis.summary));
+  } else if (captureAnalysis?.recaptures.length > 0) {
+    reasons.push(capitalize(captureAnalysis.summary));
   } else if (capture) {
     reasons.push(capitalize(capture));
   }
-  if (captureAnalysis?.isSafe) {
+  if (captureAnalysis?.isSafe && captureAnalysis.recaptures.length === 0) {
     reasons.push("The capture is tactically safe against immediate recapture.");
+  } else if (captureAnalysis?.isSafe && captureAnalysis.recaptures.length > 0) {
+    reasons.push(`Static exchange evaluation keeps the capture at ${formatSignedCentipawns(captureAnalysis.exchangeScore)} after recaptures.`);
   }
   if (move.givesCheck || isInCheck(next, opponent(position.turn))) reasons.push("It gives check and forces the opponent to answer immediately.");
   if (isInCheck(position, position.turn)) reasons.push("It resolves the current check while keeping active play.");
@@ -271,6 +275,10 @@ function summarizeIterations(iterations) {
 
 function capitalize(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function formatSignedCentipawns(score) {
+  return `${score >= 0 ? "+" : ""}${Math.round(score)} centipawns`;
 }
 
 function unique(items) {

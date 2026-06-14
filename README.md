@@ -11,7 +11,7 @@ The current engine is dependency-free JavaScript and includes:
 - Zobrist hashing, bounded depth-preferred transposition table, aspiration windows, quiescence search with bounded quiet-check search, capture/check/history-based move ordering, bounded check extensions, guarded null-move pruning, shallow futility pruning, late-move reductions, repetition hooks, and root candidate analysis.
 - Explainable opening-book support with a curated early repertoire, heuristic fallback for off-book opening positions, deterministic selection, and pure-search opt-out.
 - Evaluation terms for material, piece-square placement, mobility, threats, pawn progress, and king safety.
-- Capture safety analysis for distinguishing clean wins from tactically poisoned captures.
+- Static exchange analysis for distinguishing clean wins, tactically poisoned captures, and defended captures that remain sound after recaptures.
 - Immediate pressure/threat analysis for both sides.
 - Perft helpers for validating move generation while the engine grows.
 - Explainable move output for learning-app use cases, including depth-by-depth search trace and best-move stability.

@@ -27,10 +27,34 @@ test("capture analysis detects immediate recapture risk", () => {
   assert.equal(analysis.cheapestRecapture.notation, "e2-e5");
 });
 
+test("capture analysis follows multi-ply static exchange sequences", () => {
+  const position = parseFen("4k4/9/4r4/9/9/4p4/4R4/9/9/3KR4 r");
+  const move = generateLegalMoves(position).find((candidate) => candidate.notation === "e6-e5");
+  const analysis = analyzeCapture(position, move);
+
+  assert.equal(analysis.isSafe, true);
+  assert.equal(analysis.exchangeScore, 90);
+  assert.deepEqual(analysis.exchangeLine.map((entry) => entry.notation), [
+    "e6-e5",
+    "e2-e5",
+    "e9-e5"
+  ]);
+  assert.equal(analysis.summary.includes("full exchange remains acceptable"), true);
+});
+
 test("move explanations mention recapture risk for unsafe captures", () => {
   const position = parseFen("4k4/9/4r4/9/9/4p4/4R4/9/9/3K5 r");
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });
   const review = engine.reviewMove(position, "e6-e5", { depth: 1, timeLimitMs: 500 });
 
   assert.ok(review.explanation.move.reasons.some((reason) => reason.includes("can recapture")));
+});
+
+test("move explanations surface favorable defended captures", () => {
+  const position = parseFen("4k4/9/4r4/9/9/4p4/4R4/9/9/3KR4 r");
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  const review = engine.reviewMove(position, "e6-e5", { depth: 1, timeLimitMs: 500 });
+
+  assert.ok(review.explanation.move.reasons.some((reason) => reason.includes("full exchange remains acceptable")));
+  assert.ok(review.explanation.move.reasons.some((reason) => reason.includes("+90 centipawns")));
 });
