@@ -11,6 +11,7 @@ import {
   forwardDelta,
   hasCrossedRiver,
   indexOf,
+  isInside,
   opponent,
   rankOf
 } from "./board.js";
@@ -40,6 +41,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     terms[piece.side].placement += placementValue(piece, square);
     terms[piece.side].pawnStructure += pawnValue(piece, square);
     terms[piece.side].kingSafety += localDefenseValue(position, piece, square);
+    terms[piece.side].coordination += coordinationValue(position, piece, square);
   }
 
   for (const side of [SIDES.RED, SIDES.BLACK]) {
@@ -109,7 +111,8 @@ function createTerms() {
     mobility: 0,
     threats: 0,
     pawnStructure: 0,
-    kingSafety: 0
+    kingSafety: 0,
+    coordination: 0
   };
 }
 
@@ -172,6 +175,38 @@ function pawnValue(piece, square) {
   const centralPassedBonus = Math.max(0, 3 - Math.abs(file - 4)) * 8;
   const lastRankPenalty = (piece.side === SIDES.RED ? rank === 0 : rank === BOARD_RANKS - 1) ? -18 : 0;
   return riverBonus + centralPassedBonus + lastRankPenalty;
+}
+
+function coordinationValue(position, piece, square) {
+  if (piece.type === PIECES.HORSE) {
+    return horseLegCoordination(position, piece, square);
+  }
+
+  return 0;
+}
+
+function horseLegCoordination(position, piece, square) {
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  const legSquares = [
+    [file, rank - 1],
+    [file + 1, rank],
+    [file, rank + 1],
+    [file - 1, rank]
+  ];
+  let blockedLegs = 0;
+  let score = 0;
+
+  for (const [legFile, legRank] of legSquares) {
+    if (!isInside(legFile, legRank)) continue;
+    const blocker = position.board[indexOf(legFile, legRank)];
+    if (!blocker) continue;
+
+    blockedLegs += 1;
+    score -= blocker.side === piece.side ? 18 : 10;
+  }
+
+  return blockedLegs === 0 ? score + 18 : score;
 }
 
 function localDefenseValue(position, piece, square) {
@@ -262,7 +297,8 @@ function readableTerm(term) {
     mobility: "mobility",
     threats: "tactical pressure",
     pawnStructure: "pawn progress",
-    kingSafety: "king safety"
+    kingSafety: "king safety",
+    coordination: "piece coordination"
   };
 
   return labels[term] ?? term;
