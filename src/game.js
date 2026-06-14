@@ -7,6 +7,7 @@ import {
   sameMove,
   toFen
 } from "./board.js";
+import { describeEngineBackendStatus } from "./backend.js";
 import { SIDES } from "./constants.js";
 import { generateLegalMoves, isInCheck } from "./movegen.js";
 
@@ -235,7 +236,7 @@ function appendGameMove(game, engine, before, legalMove, details) {
         notation,
         positionBefore: toFen(before),
         positionAfter: toFen(after),
-        decision: details.decision ? summarizeDecision(details.decision) : null,
+        decision: details.decision ? summarizeDecision(details.decision, engine) : null,
         review: details.review
       }
     ],
@@ -244,7 +245,7 @@ function appendGameMove(game, engine, before, legalMove, details) {
   };
 }
 
-function summarizeDecision(decision) {
+function summarizeDecision(decision, engine = null) {
   return {
     source: decision.source ?? "search",
     bestMove: decision.bestMove ?? null,
@@ -253,7 +254,9 @@ function summarizeDecision(decision) {
     nodes: decision.nodes ?? 0,
     principalVariation: (decision.principalVariation ?? [])
       .map((move) => move.notation ?? moveToNotation(move)),
-    explanation: decision.explanation ?? null
+    explanation: decision.explanation ?? null,
+    backendFallback: decision.backendFallback ?? null,
+    backendStatus: engine ? describeEngineBackendStatus(engine) : null
   };
 }
 

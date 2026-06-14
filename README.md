@@ -293,6 +293,8 @@ game = chooseAndPlayGameMove(game, engine, {
 
 console.log(game.moves.at(-1).review.explanation.summary);
 console.log(game.moves.at(-1).decision.explanation.summary);
+console.log(game.moves.at(-1).decision.backendStatus);
+console.log(game.moves.at(-1).decision.backendFallback);
 console.log(gameStatus(game));
 
 game = await playGameMoveAsync(game, nativeBackend, "h9-g7");

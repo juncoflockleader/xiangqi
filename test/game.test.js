@@ -7,6 +7,7 @@ import {
   chooseGameMoveAsync,
   createEngine,
   createGame,
+  createLearningEngineBackend,
   gameStatus,
   historyKeys,
   parseFen,
@@ -53,6 +54,9 @@ test("game helper chooses and applies an engine move with explanation metadata",
   assert.equal(game.moves.length, 1);
   assert.equal(game.moves[0].actor, "engine");
   assert.equal(game.moves[0].notation, game.moves[0].decision.bestMove.notation);
+  assert.equal(game.moves[0].decision.backendStatus.state, "primary");
+  assert.equal(game.moves[0].decision.backendStatus.native, false);
+  assert.equal(game.moves[0].decision.backendFallback, null);
   assert.ok(game.moves[0].decision.explanation.summary.includes(game.moves[0].notation));
   assert.ok(game.moves[0].review.explanation.summary.includes(game.moves[0].notation));
 });
@@ -91,6 +95,39 @@ test("async game helpers support native-style backends", async () => {
   assert.equal(game.moves.length, 2);
   assert.equal(game.moves[1].actor, "engine");
   assert.equal(game.moves[1].review, null);
+});
+
+test("async game helper records backend fallback provenance", async () => {
+  const backend = createLearningEngineBackend({
+    command: "/path/that/should/not/start",
+    profile: "native-ucci",
+    depth: 1,
+    timeLimitMs: 100,
+    startupTimeoutMs: 50,
+    commandTimeoutMs: 50,
+    javascript: {
+      profile: "fast",
+      depth: 1,
+      timeLimitMs: 100
+    }
+  });
+
+  try {
+    const game = await chooseAndPlayGameMoveAsync(createGame(), backend, {
+      searchOptions: { useBook: false, depth: 1, timeLimitMs: 100 },
+      review: false
+    });
+    const decision = game.moves[0].decision;
+
+    assert.equal(game.moves.length, 1);
+    assert.equal(decision.backendStatus.state, "fallback");
+    assert.equal(decision.backendStatus.fallbackActive, true);
+    assert.equal(decision.backendFallback.method, "chooseMove");
+    assert.equal(decision.backendFallback.fallbackBackend, "javascript-reference");
+    assert.ok(decision.explanation.reasons[0].includes("JavaScript Reference Engine supplied this result"));
+  } finally {
+    await backend.close();
+  }
 });
 
 test("choose-and-play preserves terminal no-move decisions", () => {
