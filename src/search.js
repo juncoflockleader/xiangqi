@@ -116,6 +116,7 @@ export function searchBestMove(position, options = {}) {
       usePvs: options.usePvs !== false,
       useCountermoves: options.useCountermoves !== false,
       useRootScoreOrdering: options.useRootScoreOrdering !== false,
+      useMateDistancePruning: options.useMateDistancePruning !== false,
       useRazoring: options.useRazoring !== false,
       useFutilityPruning: options.useFutilityPruning !== false,
       useDeltaPruning: options.useDeltaPruning !== false,
@@ -318,6 +319,14 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   }
 
   enterPosition(context, repetitionKey);
+
+  const mateWindow = applyMateDistanceWindow(alpha, beta, ply, context);
+  if (mateWindow.pruned) {
+    leavePosition(context, repetitionKey);
+    return mateWindow.score;
+  }
+  alpha = mateWindow.alpha;
+  beta = mateWindow.beta;
 
   const alphaOriginal = alpha;
   const transpositionKey = hashPosition(position);
@@ -552,6 +561,11 @@ function quiescence(position, alpha, beta, ply, context, qChecksRemaining) {
     return evaluatePosition(position, position.turn).score;
   }
 
+  const mateWindow = applyMateDistanceWindow(alpha, beta, ply, context);
+  if (mateWindow.pruned) return mateWindow.score;
+  alpha = mateWindow.alpha;
+  beta = mateWindow.beta;
+
   const inCheck = isInCheck(position, position.turn);
   let moves;
 
@@ -756,6 +770,41 @@ function nullMoveReduction(depth) {
   return depth >= 5 ? 3 : 2;
 }
 
+function applyMateDistanceWindow(alpha, beta, ply, context) {
+  if (!context.useMateDistancePruning || ply <= 0) {
+    return { alpha, beta, pruned: false, score: null };
+  }
+
+  let adjustedAlpha = alpha;
+  let adjustedBeta = beta;
+  const lowerBound = -MATE_SCORE + ply;
+  const upperBound = MATE_SCORE - ply;
+
+  if (adjustedAlpha < lowerBound) adjustedAlpha = lowerBound;
+  if (adjustedBeta > upperBound) adjustedBeta = upperBound;
+
+  if (adjustedAlpha !== alpha || adjustedBeta !== beta) {
+    context.stats.mateDistanceWindows += 1;
+  }
+
+  if (adjustedAlpha >= adjustedBeta) {
+    context.stats.mateDistancePrunes += 1;
+    return {
+      alpha: adjustedAlpha,
+      beta: adjustedBeta,
+      pruned: true,
+      score: adjustedAlpha
+    };
+  }
+
+  return {
+    alpha: adjustedAlpha,
+    beta: adjustedBeta,
+    pruned: false,
+    score: null
+  };
+}
+
 function makeNullMove(position) {
   return {
     ...position,
@@ -878,6 +927,8 @@ function createSearchStats() {
     aspirationFailHigh: 0,
     aspirationFailLow: 0,
     extensions: 0,
+    mateDistancePrunes: 0,
+    mateDistanceWindows: 0,
     razorPrunes: 0,
     razorResearches: 0,
     futilityPrunes: 0,
@@ -909,6 +960,8 @@ function mergeSearchStats(total, next) {
     aspirationFailHigh: total.aspirationFailHigh + next.aspirationFailHigh,
     aspirationFailLow: total.aspirationFailLow + next.aspirationFailLow,
     extensions: total.extensions + next.extensions,
+    mateDistancePrunes: total.mateDistancePrunes + next.mateDistancePrunes,
+    mateDistanceWindows: total.mateDistanceWindows + next.mateDistanceWindows,
     razorPrunes: total.razorPrunes + next.razorPrunes,
     razorResearches: total.razorResearches + next.razorResearches,
     futilityPrunes: total.futilityPrunes + next.futilityPrunes,

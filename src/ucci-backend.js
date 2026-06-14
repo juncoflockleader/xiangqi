@@ -733,6 +733,8 @@ function createEmptyStats() {
     aspirationFailHigh: 0,
     aspirationFailLow: 0,
     extensions: 0,
+    mateDistancePrunes: 0,
+    mateDistanceWindows: 0,
     razorPrunes: 0,
     razorResearches: 0,
     futilityPrunes: 0,

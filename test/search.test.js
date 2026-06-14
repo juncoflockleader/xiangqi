@@ -139,6 +139,28 @@ test("search restores mate distance when probing the transposition table", () =>
   assert.ok(result.stats.ttHits >= 1);
 });
 
+test("search prunes mate-distance windows after finding a forced mate", () => {
+  const position = parseFen("4k4/9/9/9/9/9/9/9/9/3KR4 r");
+  const withPruning = searchBestMove(position, {
+    depth: 2,
+    timeLimitMs: 1000,
+    useAspiration: false
+  });
+  const withoutPruning = searchBestMove(position, {
+    depth: 2,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useMateDistancePruning: false
+  });
+
+  assert.equal(withPruning.bestMove.notation, "e9-e0");
+  assert.equal(withPruning.score, MATE_SCORE - 1);
+  assert.equal(withPruning.score, withoutPruning.score);
+  assert.ok(withPruning.stats.mateDistancePrunes > 0);
+  assert.equal(withoutPruning.stats.mateDistancePrunes, 0);
+  assert.ok(withPruning.nodes < withoutPruning.nodes);
+});
+
 test("search uses selective pruning and PVS in quiet tactical trees", () => {
   const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
   const result = searchBestMove(position, {
