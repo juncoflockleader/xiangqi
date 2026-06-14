@@ -77,6 +77,45 @@ test("play CLI can use a native UCI engine backend", async () => {
   assert.match(result.stdout, /selected by Native UCI Engine/);
 });
 
+test("play CLI can use the Pikafish native preset", async () => {
+  const result = await runPlayCli([
+    "--side", "black",
+    "--engine-preset", "pikafish",
+    "--engine-command", process.execPath,
+    "--engine-arg", MOCK_UCCI_PATH,
+    "--engine-eval-file", "pikafish.nnue",
+    "--engine-option", "MockMateWdl=true",
+    "--startup-timeout", "1000",
+    "--command-timeout", "1000",
+    "--depth", "2",
+    "--time", "100",
+    "--no-book"
+  ], "quit\n");
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /Native engine: uci /);
+  assert.match(result.stdout, /Engine preset: Pikafish/);
+  assert.match(result.stdout, /Engine played h9-g7/);
+  assert.match(result.stdout, /reported score of mate in 2/);
+});
+
+test("play CLI reports an unresolved native preset command", async () => {
+  const result = await runPlayCli([
+    "--engine-preset", "pikafish",
+    "--depth", "1",
+    "--time", "100"
+  ], "quit\n", {
+    XIANGQI_ENGINE_COMMAND: "",
+    XIANGQI_PIKAFISH_COMMAND: "",
+    XIANGQI_PIKAFISH_HOME: "",
+    PIKAFISH_COMMAND: "",
+    PIKAFISH_HOME: ""
+  });
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /--engine-preset pikafish did not resolve a native command/);
+});
+
 test("play CLI can show an oracle review for the current engine pick", async () => {
   const result = await runPlayCli([
     "--side", "black",
@@ -119,11 +158,15 @@ test("play CLI uses the oracle reviewer for player move feedback", async () => {
   assert.match(result.stdout, /Engine preferred h9-g7\./);
 });
 
-function runPlayCli(args, input) {
+function runPlayCli(args, input, env = {}) {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(process.execPath, ["examples/play-cli.mjs", ...args], {
       cwd: root,
-      stdio: ["pipe", "pipe", "pipe"]
+      stdio: ["pipe", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        ...env
+      }
     });
     let stdout = "";
     let stderr = "";

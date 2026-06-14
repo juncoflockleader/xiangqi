@@ -50,6 +50,36 @@ test("native probe CLI verifies a configured UCI backend", async () => {
   assert.equal(report.review.bestScoreDetail.kind, "cp");
 });
 
+test("native probe CLI applies the Pikafish preset", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "examples/native-probe.mjs",
+    "--preset", "pikafish",
+    "--command", process.execPath,
+    "--arg", "fixtures/mock-ucci.mjs",
+    "--eval-file", "pikafish.nnue",
+    "--depth", "2",
+    "--time", "100",
+    "--lines", "1",
+    "--option", "MockMateWdl=true",
+    "--json"
+  ], {
+    cwd: root,
+    timeout: 5000
+  });
+  const report = JSON.parse(stdout);
+
+  assert.equal(report.preset, "pikafish");
+  assert.equal(report.presetName, "Pikafish");
+  assert.equal(report.protocol, "uci");
+  assert.deepEqual(report.nativeOptions, [
+    { name: "UCI_ShowWDL", value: true },
+    { name: "EvalFile", value: "pikafish.nnue" },
+    { name: "MockMateWdl", value: true }
+  ]);
+  assert.equal(report.scoreDetail.text, "mate in 2");
+  assert.equal(report.wdl.text, "98% win, 2% draw, 0% loss");
+});
+
 test("native probe CLI explains missing command configuration", async () => {
   await assert.rejects(
     () => execFileAsync(process.execPath, [
@@ -65,7 +95,7 @@ test("native probe CLI explains missing command configuration", async () => {
     }),
     (error) => {
       assert.equal(error.code, 1);
-      assert.match(error.stderr, /requires --command or XIANGQI_ENGINE_COMMAND/);
+      assert.match(error.stderr, /requires --command, XIANGQI_ENGINE_COMMAND/);
       return true;
     }
   );

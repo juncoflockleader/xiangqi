@@ -19,6 +19,7 @@ import {
   historyKeys,
   opponent,
   playGameMoveAsync,
+  resolveNativeEnginePreset,
   toFen
 } from "../src/index.js";
 import {
@@ -67,8 +68,14 @@ console.log(`Engine backend: ${engine.name} (${engine.kind}).`);
 if (options.engineCommand) {
   console.log(`Native engine: ${options.engineProtocol} ${options.engineCommand}`);
 }
+if (options.enginePresetName) {
+  console.log(`Engine preset: ${options.enginePresetName}`);
+}
 if (options.oracleCommand) {
   console.log(`Oracle reviewer: ${options.oracleProtocol} ${options.oracleCommand}`);
+}
+if (options.oraclePresetName) {
+  console.log(`Oracle preset: ${options.oraclePresetName}`);
 }
 if (options.bookPath) {
   console.log(`Opening book: ${options.bookPath} (${resolveBookFormat(options.bookPath, options.bookFormat)})`);
@@ -327,6 +334,7 @@ Usage:
   npm run play -- --depth 3 --time 1500 --no-book
   npm run play -- --side black --book ./oracle-opening-book.json
   npm run play -- --engine-command /path/to/pikafish --engine-protocol uci
+  npm run play -- --engine-preset pikafish --engine-command /path/to/pikafish --engine-eval-file /path/to/pikafish.nnue
   npm run play -- --oracle-command /path/to/pikafish --oracle-protocol uci
 
 Options:
@@ -340,12 +348,16 @@ Options:
   --engine-arg value    Append one native engine argument.
   --engine-args values  Append whitespace-separated native engine arguments.
   --engine-protocol p   Native play protocol: uci or ucci. Default: uci.
+  --engine-preset name  Apply a native play preset, e.g. pikafish.
+  --engine-eval-file f  NNUE/eval file for native play presets.
   --engine-option opt   Set native play option, name=value.
   --strict-native       Report native process errors instead of falling back.
   --oracle-command cmd  Ask a native oracle to review each engine pick.
   --oracle-arg value    Append one oracle process argument.
   --oracle-args values  Append whitespace-separated oracle process arguments.
   --oracle-protocol p   Oracle protocol: uci or ucci. Default: uci.
+  --oracle-preset name  Apply a native oracle preset, e.g. pikafish.
+  --oracle-eval-file f  NNUE/eval file for native oracle presets.
   --oracle-option opt   Set native oracle option, name=value.
   --oracle-depth n      Oracle review depth. Default: max(depth, 2).
   --oracle-time ms      Oracle review time. Default: max(time, 1000).
@@ -390,6 +402,8 @@ function parseArgs(args) {
     engineCommand: process.env.XIANGQI_ENGINE_COMMAND,
     engineArgs: splitEnvArgs(process.env.XIANGQI_ENGINE_ARGS),
     engineProtocol: process.env.XIANGQI_ENGINE_PROTOCOL ?? "uci",
+    enginePreset: process.env.XIANGQI_ENGINE_PRESET,
+    engineEvalFile: process.env.XIANGQI_ENGINE_EVAL_FILE,
     engineOptions: parseNativeEngineOptions(process.env.XIANGQI_ENGINE_OPTIONS, "XIANGQI_ENGINE_OPTIONS"),
     startupTimeoutMs: numberFromEnv(process.env.XIANGQI_ENGINE_STARTUP_TIMEOUT_MS, 5000),
     commandTimeoutMs: numberFromEnv(process.env.XIANGQI_ENGINE_COMMAND_TIMEOUT_MS, 30000),
@@ -397,6 +411,8 @@ function parseArgs(args) {
     oracleCommand: process.env.XIANGQI_ORACLE_ENGINE_COMMAND,
     oracleArgs: splitEnvArgs(process.env.XIANGQI_ORACLE_ENGINE_ARGS),
     oracleProtocol: process.env.XIANGQI_ORACLE_ENGINE_PROTOCOL ?? process.env.XIANGQI_ENGINE_PROTOCOL ?? "uci",
+    oraclePreset: process.env.XIANGQI_ORACLE_ENGINE_PRESET,
+    oracleEvalFile: process.env.XIANGQI_ORACLE_ENGINE_EVAL_FILE,
     oracleEngineOptions: parseNativeEngineOptions(
       process.env.XIANGQI_ORACLE_ENGINE_OPTIONS,
       "XIANGQI_ORACLE_ENGINE_OPTIONS"
@@ -469,6 +485,16 @@ function parseArgs(args) {
       index += 1;
       continue;
     }
+    if (arg === "--engine-preset" || arg === "--native-preset") {
+      parsed.enginePreset = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--engine-eval-file" || arg === "--native-eval-file") {
+      parsed.engineEvalFile = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
     if (arg === "--engine-option" || arg === "--native-option") {
       parsed.engineOptions.push(parseNativeEngineOption(requireValue(args, index, arg), arg));
       index += 1;
@@ -508,6 +534,16 @@ function parseArgs(args) {
       index += 1;
       continue;
     }
+    if (arg === "--oracle-preset") {
+      parsed.oraclePreset = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--oracle-eval-file") {
+      parsed.oracleEvalFile = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
     if (arg === "--oracle-option") {
       parsed.oracleEngineOptions.push(parseNativeEngineOption(requireValue(args, index, arg), arg));
       index += 1;
@@ -528,6 +564,10 @@ function parseArgs(args) {
   }
 
   parsed.bookFormat = parseBookFormat(parsed.bookFormat);
+  applyNativePreset(parsed, "engine");
+  applyNativePreset(parsed, "oracle");
+  assertPresetResolved(parsed, "engine");
+  assertPresetResolved(parsed, "oracle");
   parsed.engineProtocol = parseProtocol(parsed.engineProtocol, "XIANGQI_ENGINE_PROTOCOL");
   parsed.oracleProtocol = parseProtocol(parsed.oracleProtocol, "XIANGQI_ORACLE_ENGINE_PROTOCOL");
   parsed.startupTimeoutMs = assertPositiveInteger(parsed.startupTimeoutMs, "startup timeout");
@@ -541,6 +581,38 @@ function parseArgs(args) {
   parsed.oracleStartupTimeoutMs = assertPositiveInteger(parsed.oracleStartupTimeoutMs, "oracle startup timeout");
   parsed.oracleCommandTimeoutMs = assertPositiveInteger(parsed.oracleCommandTimeoutMs, "oracle command timeout");
   return parsed;
+}
+
+function assertPresetResolved(options, kind) {
+  const prefix = kind === "engine" ? "engine" : "oracle";
+  if (!options[`${prefix}Preset`] || options[`${prefix}Command`]) return;
+
+  const flag = kind === "engine" ? "--engine-preset" : "--oracle-preset";
+  const commandFlag = kind === "engine" ? "--engine-command" : "--oracle-command";
+  throw new Error(`${flag} ${options[`${prefix}Preset`]} did not resolve a native command. Set ${commandFlag}, XIANGQI_${kind === "engine" ? "ENGINE" : "ORACLE_ENGINE"}_COMMAND, PIKAFISH_COMMAND, or PIKAFISH_HOME.`);
+}
+
+function applyNativePreset(options, kind) {
+  const presetName = kind === "engine" ? options.enginePreset : options.oraclePreset;
+  if (!presetName) return;
+
+  const prefix = kind === "engine" ? "engine" : "oracle";
+  const optionKey = kind === "engine" ? "engineOptions" : "oracleEngineOptions";
+  const preset = resolveNativeEnginePreset(presetName, {
+    command: options[`${prefix}Command`],
+    args: options[`${prefix}Args`],
+    protocol: options[`${prefix}Protocol`],
+    evalFile: options[`${prefix}EvalFile`],
+    engineOptions: options[optionKey],
+    env: process.env
+  });
+
+  options[`${prefix}Preset`] = preset.preset;
+  options[`${prefix}PresetName`] = preset.name;
+  options[`${prefix}Command`] = preset.command;
+  options[`${prefix}Args`] = preset.args;
+  options[`${prefix}Protocol`] = preset.protocol;
+  options[optionKey] = preset.engineOptions;
 }
 
 function parseSide(value) {

@@ -3,7 +3,8 @@ import {
   createInitialPosition,
   createUcciEngineBackend,
   describeEngineBackend,
-  parseFen
+  parseFen,
+  resolveNativeEnginePreset
 } from "../src/index.js";
 import {
   formatNativeOptions,
@@ -27,8 +28,10 @@ if (options.help) {
   process.exit(0);
 }
 
+applyNativePreset(options);
+
 if (!options.command) {
-  console.error("Native probe requires --command or XIANGQI_ENGINE_COMMAND.");
+  console.error("Native probe requires --command, XIANGQI_ENGINE_COMMAND, or a preset/env combination that resolves a command.");
   console.error("");
   printUsage();
   process.exit(1);
@@ -74,7 +77,9 @@ function parseArgs(args) {
   const options = {
     command: process.env.XIANGQI_ENGINE_COMMAND,
     args: splitEnvArgs(process.env.XIANGQI_ENGINE_ARGS),
-    protocol: process.env.XIANGQI_ENGINE_PROTOCOL ?? "uci",
+    protocol: process.env.XIANGQI_ENGINE_PROTOCOL,
+    preset: process.env.XIANGQI_ENGINE_PRESET,
+    evalFile: process.env.XIANGQI_ENGINE_EVAL_FILE,
     depth: numberFromEnv(process.env.XIANGQI_ENGINE_DEPTH, 4),
     timeLimitMs: numberFromEnv(process.env.XIANGQI_ENGINE_TIME_MS, 1000),
     lines: numberFromEnv(process.env.XIANGQI_ENGINE_LINES, 3),
@@ -112,6 +117,14 @@ function parseArgs(args) {
       options.protocol = args[++index];
       continue;
     }
+    if (arg === "--preset") {
+      options.preset = args[++index];
+      continue;
+    }
+    if (arg === "--eval-file") {
+      options.evalFile = args[++index];
+      continue;
+    }
     if (arg === "--option") {
       options.engineOptions.push(parseNativeEngineOption(args[++index], "--option"));
       continue;
@@ -147,6 +160,7 @@ function parseArgs(args) {
     throw new Error(`Unknown option: ${arg}`);
   }
 
+  options.protocol ??= "uci";
   assertProtocol(options.protocol);
   assertPositiveInteger(options.depth, "depth");
   assertPositiveInteger(options.timeLimitMs, "time");
@@ -156,9 +170,31 @@ function parseArgs(args) {
   return options;
 }
 
+function applyNativePreset(options) {
+  if (!options.preset) return;
+
+  const preset = resolveNativeEnginePreset(options.preset, {
+    command: options.command,
+    args: options.args,
+    protocol: options.protocol,
+    evalFile: options.evalFile,
+    engineOptions: options.engineOptions,
+    env: process.env
+  });
+
+  options.preset = preset.preset;
+  options.presetName = preset.name;
+  options.command = preset.command;
+  options.args = preset.args;
+  options.protocol = preset.protocol;
+  options.engineOptions = preset.engineOptions;
+}
+
 function buildProbeReport(backend, decision, review, options) {
   return {
     ok: true,
+    preset: options.preset ?? null,
+    presetName: options.presetName ?? null,
     command: options.command,
     args: [...options.args],
     protocol: options.protocol,
@@ -202,6 +238,7 @@ function buildProbeReport(backend, decision, review, options) {
 function formatProbeReport(report) {
   const lines = [
     `Native probe: ${report.backend.name} (${report.backend.kind})`,
+    ...(report.presetName ? [`Preset: ${report.presetName}`] : []),
     `Protocol: ${report.protocol}`,
     `Options: ${report.nativeOptions.length > 0 ? formatNativeOptions(report.nativeOptions) : "none"}`,
     `Best move: ${report.bestMove} (${report.source}, d${report.depth}, ${formatNodes(report.nodes)} nodes, ${formatScoreDetail(report)})`
@@ -283,6 +320,8 @@ Options:
   --arg VALUE            Append one native process argument
   --args VALUES          Append whitespace-separated native process arguments
   --protocol uci|ucci    Native protocol (default: uci)
+  --preset NAME          Apply a native engine preset, e.g. pikafish
+  --eval-file FILE       NNUE/eval file for presets that support one
   --option OPT           Set a native option (name=value or button name)
   --depth N              Native search depth (default: 4)
   --time MS              Native movetime in ms (default: 1000)
@@ -293,7 +332,8 @@ Options:
 
 Environment:
   XIANGQI_ENGINE_COMMAND, XIANGQI_ENGINE_ARGS, XIANGQI_ENGINE_PROTOCOL,
-  XIANGQI_ENGINE_OPTIONS, XIANGQI_ENGINE_DEPTH, XIANGQI_ENGINE_TIME_MS,
-  XIANGQI_ENGINE_LINES, XIANGQI_PROBE_FEN, XIANGQI_PROBE_REVIEW_MOVE
+  XIANGQI_ENGINE_PRESET, XIANGQI_ENGINE_EVAL_FILE, XIANGQI_ENGINE_OPTIONS,
+  XIANGQI_ENGINE_DEPTH, XIANGQI_ENGINE_TIME_MS, XIANGQI_ENGINE_LINES,
+  XIANGQI_PROBE_FEN, XIANGQI_PROBE_REVIEW_MOVE
 `);
 }

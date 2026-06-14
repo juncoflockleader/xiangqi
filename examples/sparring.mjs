@@ -3,6 +3,7 @@ import {
   createJavaScriptEngineBackend,
   createLearningEngineBackend,
   formatSparringReport,
+  resolveNativeEnginePreset,
   runSparringMatch
 } from "../src/index.js";
 import {
@@ -68,9 +69,10 @@ try {
 }
 
 function createBackend(side, options) {
+  const preset = resolvePresetForSide(side, options);
   const command = side === "red"
-    ? options.redCommand ?? options.nativeCommand
-    : options.blackCommand ?? options.nativeCommand;
+    ? options.redCommand ?? options.nativeCommand ?? preset?.command
+    : options.blackCommand ?? options.nativeCommand ?? preset?.command;
   const depth = searchDepthFor(side, options, Boolean(command));
   const timeLimitMs = searchTimeFor(side, options, Boolean(command));
 
@@ -100,7 +102,7 @@ function createBackend(side, options) {
     },
     engine: createLearningEngineBackend({
       command,
-      args: side === "red" ? options.redArgs : options.blackArgs,
+      args: side === "red" ? nonEmptyArgs(options.redArgs, preset?.args) : nonEmptyArgs(options.blackArgs, preset?.args),
       engineOptions: engineOptionsFor(side, options),
       profile: protocol === "uci" ? "native-uci" : "native-ucci",
       protocol,
@@ -116,7 +118,8 @@ function createBackend(side, options) {
 }
 
 function createRefereeBackend(options) {
-  const command = options.refereeCommand;
+  const preset = resolvePresetForSide("referee", options);
+  const command = options.refereeCommand ?? preset?.command;
   if (!options.referee && !command) return null;
 
   if (!command) {
@@ -136,10 +139,10 @@ function createRefereeBackend(options) {
     name: "Referee Native",
     engine: createLearningEngineBackend({
       command,
-      args: options.refereeArgs,
+      args: nonEmptyArgs(options.refereeArgs, preset?.args),
       engineOptions: engineOptionsFor("referee", options),
-      profile: options.refereeProtocol === "uci" ? "native-uci" : "native-ucci",
-      protocol: options.refereeProtocol,
+      profile: protocolFor("referee", options) === "uci" ? "native-uci" : "native-ucci",
+      protocol: protocolFor("referee", options),
       depth: options.refereeDepth,
       timeLimitMs: options.refereeTimeLimitMs,
       javascript: {
@@ -158,7 +161,15 @@ function parseArgs(args) {
     maxPlies: 20,
     maxMoves: 40,
     useBook: true,
-    protocol: "ucci",
+    protocol: process.env.XIANGQI_ENGINE_PROTOCOL,
+    nativePreset: process.env.XIANGQI_ENGINE_PRESET,
+    redPreset: process.env.XIANGQI_RED_ENGINE_PRESET,
+    blackPreset: process.env.XIANGQI_BLACK_ENGINE_PRESET,
+    refereePreset: process.env.XIANGQI_REFEREE_ENGINE_PRESET,
+    nativeEvalFile: process.env.XIANGQI_ENGINE_EVAL_FILE,
+    redEvalFile: process.env.XIANGQI_RED_ENGINE_EVAL_FILE,
+    blackEvalFile: process.env.XIANGQI_BLACK_ENGINE_EVAL_FILE,
+    refereeEvalFile: process.env.XIANGQI_REFEREE_ENGINE_EVAL_FILE,
     redProtocol: process.env.XIANGQI_RED_ENGINE_PROTOCOL,
     blackProtocol: process.env.XIANGQI_BLACK_ENGINE_PROTOCOL,
     nativeCommand: process.env.XIANGQI_ENGINE_COMMAND,
@@ -166,7 +177,7 @@ function parseArgs(args) {
     blackCommand: process.env.XIANGQI_BLACK_ENGINE_COMMAND,
     referee: Boolean(process.env.XIANGQI_REFEREE_ENGINE_COMMAND),
     refereeCommand: process.env.XIANGQI_REFEREE_ENGINE_COMMAND,
-    refereeProtocol: process.env.XIANGQI_REFEREE_ENGINE_PROTOCOL ?? "ucci",
+    refereeProtocol: process.env.XIANGQI_REFEREE_ENGINE_PROTOCOL,
     redArgs: splitEnvArgs(process.env.XIANGQI_RED_ENGINE_ARGS ?? process.env.XIANGQI_ENGINE_ARGS),
     blackArgs: splitEnvArgs(process.env.XIANGQI_BLACK_ENGINE_ARGS ?? process.env.XIANGQI_ENGINE_ARGS),
     refereeArgs: splitEnvArgs(process.env.XIANGQI_REFEREE_ENGINE_ARGS),
@@ -196,6 +207,40 @@ function parseArgs(args) {
     }
     if (arg === "--native-option") {
       options.nativeOptions.push(parseNativeEngineOption(args[++index], "--native-option"));
+      continue;
+    }
+    if (arg === "--preset" || arg === "--native-preset") {
+      options.nativePreset = args[++index];
+      continue;
+    }
+    if (arg === "--red-preset") {
+      options.redPreset = args[++index];
+      continue;
+    }
+    if (arg === "--black-preset") {
+      options.blackPreset = args[++index];
+      continue;
+    }
+    if (arg === "--referee-preset") {
+      options.refereePreset = args[++index];
+      options.referee = true;
+      continue;
+    }
+    if (arg === "--eval-file" || arg === "--native-eval-file") {
+      options.nativeEvalFile = args[++index];
+      continue;
+    }
+    if (arg === "--red-eval-file") {
+      options.redEvalFile = args[++index];
+      continue;
+    }
+    if (arg === "--black-eval-file") {
+      options.blackEvalFile = args[++index];
+      continue;
+    }
+    if (arg === "--referee-eval-file") {
+      options.refereeEvalFile = args[++index];
+      options.referee = true;
       continue;
     }
     if (arg === "--red-option") {
@@ -317,10 +362,13 @@ function parseArgs(args) {
   assertPositiveInteger(options.refereeTimeLimitMs, "referee-time");
   assertNonNegativeInteger(options.maxPlies, "plies");
   assertNonNegativeInteger(options.maxMoves, "moves");
-  assertProtocol(options.protocol, "protocol");
+  assertProtocol(options.protocol ?? "ucci", "protocol");
   assertOptionalProtocol(options.redProtocol, "red-protocol");
   assertOptionalProtocol(options.blackProtocol, "black-protocol");
-  assertProtocol(options.refereeProtocol, "referee-protocol");
+  assertProtocol(options.refereeProtocol ?? "ucci", "referee-protocol");
+  assertPresetResolved("red", options);
+  assertPresetResolved("black", options);
+  assertPresetResolved("referee", options);
 
   return options;
 }
@@ -361,24 +409,28 @@ function assertOptionalProtocol(value, name) {
 }
 
 function engineOptionsFor(side, options) {
+  const preset = resolvePresetForSide(side, options);
   const sideOptions = side === "red"
     ? options.redOptions
     : side === "black"
       ? options.blackOptions
       : options.refereeOptions;
-  return [...options.nativeOptions, ...sideOptions];
+  return [...(preset?.engineOptions ?? []), ...options.nativeOptions, ...sideOptions];
 }
 
 function hasNativeCommand(side, options) {
+  const preset = resolvePresetForSide(side, options);
   return Boolean(side === "red"
-    ? options.redCommand ?? options.nativeCommand
-    : options.blackCommand ?? options.nativeCommand);
+    ? options.redCommand ?? options.nativeCommand ?? preset?.command
+    : options.blackCommand ?? options.nativeCommand ?? preset?.command);
 }
 
 function protocolFor(side, options) {
+  const preset = resolvePresetForSide(side, options);
+  if (side === "referee") return options.refereeProtocol ?? preset?.protocol ?? "ucci";
   return side === "red"
-    ? options.redProtocol ?? options.protocol
-    : options.blackProtocol ?? options.protocol;
+    ? options.redProtocol ?? options.protocol ?? preset?.protocol ?? "ucci"
+    : options.blackProtocol ?? options.protocol ?? preset?.protocol ?? "ucci";
 }
 
 function searchDepthFor(side, options, native) {
@@ -418,10 +470,18 @@ Options:
   --red-command CMD      Use a native command only for Red
   --black-command CMD    Use a native command only for Black
   --referee-command CMD  Use a native UCI/UCCI command as the referee
-  --protocol uci|ucci    Native protocol (default: ucci)
+  --protocol uci|ucci    Native protocol (default: ucci unless preset overrides)
   --red-protocol P       Red native protocol, uci or ucci
   --black-protocol P     Black native protocol, uci or ucci
   --referee-protocol P   Referee protocol, uci or ucci (default: ucci)
+  --preset NAME          Apply a native preset to all native players, e.g. pikafish
+  --red-preset NAME      Apply a native preset only to Red
+  --black-preset NAME    Apply a native preset only to Black
+  --referee-preset NAME  Apply a native preset to the referee
+  --eval-file FILE       NNUE/eval file for presets that support one
+  --red-eval-file FILE   Red NNUE/eval file override
+  --black-eval-file FILE Black NNUE/eval file override
+  --referee-eval-file F  Referee NNUE/eval file override
   --native-option OPT    Set a native option for all native backends (name=value)
   --red-option OPT       Set a Red native option, after --native-option values
   --black-option OPT     Set a Black native option, after --native-option values
@@ -429,7 +489,10 @@ Options:
 
 Environment:
   XIANGQI_ENGINE_COMMAND, XIANGQI_RED_ENGINE_COMMAND, XIANGQI_BLACK_ENGINE_COMMAND,
-  XIANGQI_REFEREE_ENGINE_COMMAND, XIANGQI_ENGINE_OPTIONS,
+  XIANGQI_REFEREE_ENGINE_COMMAND, XIANGQI_ENGINE_PRESET,
+  XIANGQI_RED_ENGINE_PRESET, XIANGQI_BLACK_ENGINE_PRESET,
+  XIANGQI_REFEREE_ENGINE_PRESET, XIANGQI_ENGINE_EVAL_FILE,
+  XIANGQI_ENGINE_OPTIONS,
   XIANGQI_RED_ENGINE_OPTIONS, XIANGQI_BLACK_ENGINE_OPTIONS,
   XIANGQI_RED_ENGINE_PROTOCOL, XIANGQI_BLACK_ENGINE_PROTOCOL,
   XIANGQI_RED_DEPTH, XIANGQI_BLACK_DEPTH, XIANGQI_RED_TIME_MS, XIANGQI_BLACK_TIME_MS,
@@ -439,4 +502,66 @@ Environment:
 
 function capitalize(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function resolvePresetForSide(side, options) {
+  const presetName = side === "red"
+    ? options.redPreset ?? options.nativePreset
+    : side === "black"
+      ? options.blackPreset ?? options.nativePreset
+      : options.refereePreset;
+  if (!presetName) return null;
+
+  return resolveNativeEnginePreset(presetName, {
+    command: commandForPresetSide(side, options),
+    args: argsForPresetSide(side, options),
+    protocol: protocolOverrideForPresetSide(side, options),
+    evalFile: evalFileForPresetSide(side, options),
+    engineOptions: [],
+    env: process.env
+  });
+}
+
+function assertPresetResolved(side, options) {
+  const presetName = side === "red"
+    ? options.redPreset ?? options.nativePreset
+    : side === "black"
+      ? options.blackPreset ?? options.nativePreset
+      : options.refereePreset;
+  if (!presetName) return;
+
+  const preset = resolvePresetForSide(side, options);
+  if (preset?.command) return;
+
+  const flag = side === "referee" ? "--referee-preset" : `--${side}-preset`;
+  const commandFlag = side === "referee" ? "--referee-command" : `--${side}-command`;
+  throw new Error(`${flag} ${presetName} did not resolve a native command. Set ${commandFlag}, --native-command, XIANGQI_${side.toUpperCase()}_ENGINE_COMMAND, PIKAFISH_COMMAND, or PIKAFISH_HOME.`);
+}
+
+function commandForPresetSide(side, options) {
+  if (side === "red") return options.redCommand ?? options.nativeCommand;
+  if (side === "black") return options.blackCommand ?? options.nativeCommand;
+  return options.refereeCommand;
+}
+
+function argsForPresetSide(side, options) {
+  if (side === "red") return options.redArgs;
+  if (side === "black") return options.blackArgs;
+  return options.refereeArgs;
+}
+
+function protocolOverrideForPresetSide(side, options) {
+  if (side === "red") return options.redProtocol ?? options.protocol;
+  if (side === "black") return options.blackProtocol ?? options.protocol;
+  return options.refereeProtocol;
+}
+
+function evalFileForPresetSide(side, options) {
+  if (side === "red") return options.redEvalFile ?? options.nativeEvalFile;
+  if (side === "black") return options.blackEvalFile ?? options.nativeEvalFile;
+  return options.refereeEvalFile ?? options.nativeEvalFile;
+}
+
+function nonEmptyArgs(primary, fallback) {
+  return primary.length > 0 ? primary : fallback ?? [];
 }

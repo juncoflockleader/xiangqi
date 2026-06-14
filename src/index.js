@@ -15,6 +15,7 @@ export * from "./reasoning.js";
 export * from "./engine.js";
 export * from "./backend.js";
 export * from "./backend-factory.js";
+export * from "./native-presets.js";
 export * from "./ucci-backend.js";
 export * from "./benchmark.js";
 export * from "./opening-oracle.js";

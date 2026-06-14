@@ -88,3 +88,78 @@ test("sparring CLI supports asymmetric native opponent settings", async () => {
   assert.ok(stdout.includes("(Black Native, d4, native-uci)"));
   assert.ok(stdout.includes("Native options: Black MockDepthFromGo=true"));
 });
+
+test("sparring CLI applies Pikafish preset to a native player", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "examples/sparring.mjs",
+    "--plies", "1",
+    "--depth", "1",
+    "--time", "100",
+    "--no-book",
+    "--red-preset", "pikafish",
+    "--red-eval-file", "pikafish.nnue",
+    "--red-option", "MockMateWdl=true"
+  ], {
+    cwd: root,
+    timeout: 5000,
+    env: {
+      ...process.env,
+      XIANGQI_RED_ENGINE_COMMAND: process.execPath,
+      XIANGQI_RED_ENGINE_ARGS: "fixtures/mock-ucci.mjs"
+    }
+  });
+
+  assert.ok(stdout.includes("Sparring: Red Native (Red) vs Black JS (Black)"));
+  assert.ok(stdout.includes("(Red Native, d2, native-uci)"));
+  assert.ok(stdout.includes("Native options: Red UCI_ShowWDL=true, EvalFile=pikafish.nnue, MockMateWdl=true"));
+});
+
+test("sparring generic preset does not create an implicit referee", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "examples/sparring.mjs",
+    "--plies", "1",
+    "--depth", "1",
+    "--time", "100",
+    "--no-book",
+    "--preset", "pikafish",
+    "--native-command", process.execPath,
+    "--native-option", "MockMateWdl=true"
+  ], {
+    cwd: root,
+    timeout: 5000,
+    env: {
+      ...process.env,
+      XIANGQI_ENGINE_ARGS: "fixtures/mock-ucci.mjs"
+    }
+  });
+
+  assert.ok(stdout.includes("Sparring: Red Native (Red) vs Black Native (Black)"));
+  assert.ok(!stdout.includes("Referee:"));
+});
+
+test("sparring CLI reports an unresolved native preset command", async () => {
+  await assert.rejects(
+    () => execFileAsync(process.execPath, [
+      "examples/sparring.mjs",
+      "--plies", "1",
+      "--red-preset", "pikafish"
+    ], {
+      cwd: root,
+      timeout: 5000,
+      env: {
+        ...process.env,
+        XIANGQI_ENGINE_COMMAND: "",
+        XIANGQI_RED_ENGINE_COMMAND: "",
+        XIANGQI_PIKAFISH_COMMAND: "",
+        XIANGQI_PIKAFISH_HOME: "",
+        PIKAFISH_COMMAND: "",
+        PIKAFISH_HOME: ""
+      }
+    }),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /--red-preset pikafish did not resolve a native command/);
+      return true;
+    }
+  );
+});

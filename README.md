@@ -88,6 +88,35 @@ npm run play -- --side black \
   --engine-option EvalFile=/path/to/pikafish.nnue
 ```
 
+For Pikafish-style UCI engines, the play, native probe, and sparring demos also
+have a `pikafish` preset. It selects UCI, requests WDL output, and wires an
+optional NNUE/eval file as `EvalFile`:
+
+```sh
+npm run play -- \
+  --side black \
+  --engine-preset pikafish \
+  --engine-command /path/to/pikafish \
+  --engine-eval-file /path/to/pikafish.nnue
+
+npm run probe:native -- \
+  --preset pikafish \
+  --command /path/to/pikafish \
+  --eval-file /path/to/pikafish.nnue \
+  --lines 3
+
+npm run spar -- \
+  --red-preset pikafish \
+  --red-command /path/to/pikafish \
+  --red-eval-file /path/to/pikafish.nnue \
+  --black-depth 2 \
+  --plies 12
+```
+
+If you unpack a Pikafish bundle locally, `PIKAFISH_HOME=/path/to/bundle` lets the
+preset infer the macOS Apple Silicon binary path and `pikafish.nnue`; use
+`PIKAFISH_COMMAND` or explicit `--command` when the bundle layout differs.
+
 Or keep the fast local engine for move choice while a stronger oracle grades
 engine picks and player move reviews:
 
