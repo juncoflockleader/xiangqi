@@ -5,7 +5,8 @@ import {
   compareEngineToOracle,
   createJavaScriptEngineBackend,
   createUcciEngineBackend,
-  formatOracleComparisonReport
+  formatOracleComparisonReport,
+  resolveNativeEnginePreset
 } from "../src/index.js";
 import {
   parseNativeEngineOption,
@@ -28,8 +29,10 @@ if (options.help) {
   process.exit(0);
 }
 
+applyOraclePreset(options);
+
 if (!options.oracleCommand) {
-  console.error("Oracle benchmark requires --oracle-command, XIANGQI_ORACLE_ENGINE_COMMAND, or XIANGQI_ENGINE_COMMAND.");
+  console.error("Oracle benchmark requires --oracle-command, XIANGQI_ORACLE_ENGINE_COMMAND, XIANGQI_ENGINE_COMMAND, or a preset/env combination that resolves a command.");
   console.error("");
   printUsage();
   process.exit(1);
@@ -108,6 +111,9 @@ function parseArgs(args) {
     oracleCommand: process.env.XIANGQI_ORACLE_ENGINE_COMMAND ?? process.env.XIANGQI_ENGINE_COMMAND,
     oracleArgs: splitEnvArgs(process.env.XIANGQI_ORACLE_ENGINE_ARGS ?? process.env.XIANGQI_ENGINE_ARGS),
     oracleProtocol: process.env.XIANGQI_ORACLE_ENGINE_PROTOCOL ?? process.env.XIANGQI_ENGINE_PROTOCOL ?? "uci",
+    oraclePreset: process.env.XIANGQI_ORACLE_ENGINE_PRESET ?? process.env.XIANGQI_ENGINE_PRESET,
+    oracleEvalFile: process.env.XIANGQI_ORACLE_ENGINE_EVAL_FILE ?? process.env.XIANGQI_ENGINE_EVAL_FILE,
+    oracleNameExplicit: false,
     oracleDepth: numberFromEnv(process.env.XIANGQI_ORACLE_DEPTH, 6),
     oracleTimeLimitMs: numberFromEnv(process.env.XIANGQI_ORACLE_TIME_MS, 2000),
     oracleOptions: parseNativeEngineOptions(
@@ -170,6 +176,14 @@ function parseArgs(args) {
       options.oracleProtocol = args[++index];
       continue;
     }
+    if (arg === "--oracle-preset") {
+      options.oraclePreset = args[++index];
+      continue;
+    }
+    if (arg === "--oracle-eval-file") {
+      options.oracleEvalFile = args[++index];
+      continue;
+    }
     if (arg === "--oracle-option") {
       options.oracleOptions.push(parseNativeEngineOption(args[++index], "--oracle-option"));
       continue;
@@ -221,6 +235,28 @@ function parseArgs(args) {
   return options;
 }
 
+function applyOraclePreset(options) {
+  if (!options.oraclePreset) return;
+
+  const preset = resolveNativeEnginePreset(options.oraclePreset, {
+    command: options.oracleCommand,
+    args: options.oracleArgs,
+    protocol: options.oracleProtocol,
+    evalFile: options.oracleEvalFile,
+    engineOptions: options.oracleOptions,
+    env: process.env
+  });
+
+  options.oraclePreset = preset.preset;
+  options.oracleCommand = preset.command;
+  options.oracleArgs = preset.args;
+  options.oracleProtocol = preset.protocol;
+  options.oracleOptions = preset.engineOptions;
+  if (!options.oracleNameExplicit) {
+    options.oracleName = preset.name;
+  }
+}
+
 async function loadBenchmarkSuite(options) {
   if (!options.benchmarkPath) return undefined;
 
@@ -267,6 +303,8 @@ Options:
   --oracle-arg VALUE         Append one oracle process argument
   --oracle-args VALUES       Append whitespace-separated oracle process args
   --oracle-protocol uci|ucci Oracle protocol (default: uci)
+  --oracle-preset NAME       Apply a native oracle preset, e.g. pikafish
+  --oracle-eval-file FILE    NNUE/eval file for oracle presets that support one
   --oracle-option OPT        Set an oracle option (name=value or button name)
   --oracle-depth N           Oracle search/review depth (default: 6)
   --oracle-time MS           Oracle movetime in ms (default: 2000)
@@ -284,7 +322,8 @@ Options:
 
 Environment:
   XIANGQI_ORACLE_ENGINE_COMMAND, XIANGQI_ORACLE_ENGINE_ARGS,
-  XIANGQI_ORACLE_ENGINE_PROTOCOL, XIANGQI_ORACLE_ENGINE_OPTIONS,
+  XIANGQI_ORACLE_ENGINE_PROTOCOL, XIANGQI_ORACLE_ENGINE_PRESET,
+  XIANGQI_ORACLE_ENGINE_EVAL_FILE, XIANGQI_ORACLE_ENGINE_OPTIONS,
   XIANGQI_ORACLE_DEPTH, XIANGQI_ORACLE_TIME_MS, XIANGQI_BENCHMARK_TAG
 `);
 }

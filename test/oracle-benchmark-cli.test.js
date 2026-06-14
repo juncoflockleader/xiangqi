@@ -39,6 +39,32 @@ test("oracle benchmark CLI compares JavaScript candidate to native oracle", asyn
   assert.ok(report.aggregate.averageCentipawnLoss >= 0);
 });
 
+test("oracle benchmark CLI applies the Pikafish oracle preset", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "examples/oracle-benchmark.mjs",
+    "--oracle-preset", "pikafish",
+    "--oracle-command", process.execPath,
+    "--oracle-arg", "fixtures/mock-ucci.mjs",
+    "--oracle-eval-file", "pikafish.nnue",
+    "--oracle-depth", "2",
+    "--oracle-time", "100",
+    "--candidate-depth", "1",
+    "--candidate-time", "100",
+    "--tag", "opening",
+    "--oracle-option", "Threads=2",
+    "--json"
+  ], {
+    cwd: root,
+    timeout: 5000
+  });
+  const report = JSON.parse(stdout);
+
+  assert.equal(report.oracle.name, "Pikafish");
+  assert.equal(report.oracle.kind, "native-uci");
+  assert.equal(report.results[0].oracleMove, "h9-g7");
+  assert.match(report.results[0].oracleSummary, /Pikafish/);
+});
+
 test("oracle benchmark CLI can load custom positions without expected moves", async () => {
   const dir = await mkdtemp(join(tmpdir(), "xiangqi-oracle-benchmark-cli-"));
   const suitePath = join(dir, "suite.json");
@@ -93,7 +119,10 @@ test("oracle benchmark CLI explains missing oracle command configuration", async
       env: {
         ...process.env,
         XIANGQI_ENGINE_COMMAND: "",
-        XIANGQI_ORACLE_ENGINE_COMMAND: ""
+        XIANGQI_ENGINE_PRESET: "",
+        XIANGQI_ORACLE_ENGINE_COMMAND: "",
+        XIANGQI_ORACLE_ENGINE_PRESET: "",
+        XIANGQI_PIKAFISH_AUTO_DISCOVER: "false"
       }
     }),
     (error) => {

@@ -5,7 +5,8 @@ import {
   createOracleOpeningBookArtifact,
   createUcciEngineBackend,
   formatOracleOpeningBookReport,
-  generateOracleOpeningBookRecords
+  generateOracleOpeningBookRecords,
+  resolveNativeEnginePreset
 } from "../src/index.js";
 import {
   parseNativeEngineOption,
@@ -28,8 +29,10 @@ if (options.help) {
   process.exit(0);
 }
 
+applyNativePreset(options);
+
 if (!options.command) {
-  console.error("Oracle opening generation requires --command, XIANGQI_ORACLE_ENGINE_COMMAND, or XIANGQI_ENGINE_COMMAND.");
+  console.error("Oracle opening generation requires --command, XIANGQI_ORACLE_ENGINE_COMMAND, XIANGQI_ENGINE_COMMAND, or a preset/env combination that resolves a command.");
   console.error("");
   printUsage();
   process.exit(1);
@@ -68,6 +71,7 @@ try {
         lines: options.lines,
         depth: options.depth,
         timeLimitMs: options.timeLimitMs,
+        preset: options.preset ?? null,
         engineOptions: options.engineOptions
       }
     });
@@ -95,11 +99,14 @@ function parseArgs(args) {
     command: process.env.XIANGQI_ORACLE_ENGINE_COMMAND ?? process.env.XIANGQI_ENGINE_COMMAND,
     args: splitEnvArgs(process.env.XIANGQI_ORACLE_ENGINE_ARGS ?? process.env.XIANGQI_ENGINE_ARGS),
     protocol: process.env.XIANGQI_ORACLE_ENGINE_PROTOCOL ?? process.env.XIANGQI_ENGINE_PROTOCOL ?? "uci",
+    preset: process.env.XIANGQI_ORACLE_ENGINE_PRESET ?? process.env.XIANGQI_ENGINE_PRESET,
+    evalFile: process.env.XIANGQI_ORACLE_ENGINE_EVAL_FILE ?? process.env.XIANGQI_ENGINE_EVAL_FILE,
     engineOptions: parseNativeEngineOptions(
       process.env.XIANGQI_ORACLE_ENGINE_OPTIONS ?? process.env.XIANGQI_ENGINE_OPTIONS,
       "XIANGQI_ORACLE_ENGINE_OPTIONS"
     ),
     source: process.env.XIANGQI_ORACLE_SOURCE ?? "Native Oracle",
+    sourceExplicit: Boolean(process.env.XIANGQI_ORACLE_SOURCE),
     plies: numberFromEnv(process.env.XIANGQI_ORACLE_OPENING_PLIES, 12),
     lines: numberFromEnv(process.env.XIANGQI_ORACLE_LINES, 3),
     depth: numberFromEnv(process.env.XIANGQI_ORACLE_DEPTH, 6),
@@ -144,12 +151,21 @@ function parseArgs(args) {
       options.protocol = args[++index];
       continue;
     }
+    if (arg === "--preset") {
+      options.preset = args[++index];
+      continue;
+    }
+    if (arg === "--eval-file") {
+      options.evalFile = args[++index];
+      continue;
+    }
     if (arg === "--option") {
       options.engineOptions.push(parseNativeEngineOption(args[++index], "--option"));
       continue;
     }
     if (arg === "--source") {
       options.source = args[++index];
+      options.sourceExplicit = true;
       continue;
     }
     if (arg === "--plies") {
@@ -205,6 +221,28 @@ function parseArgs(args) {
   return options;
 }
 
+function applyNativePreset(options) {
+  if (!options.preset) return;
+
+  const preset = resolveNativeEnginePreset(options.preset, {
+    command: options.command,
+    args: options.args,
+    protocol: options.protocol,
+    evalFile: options.evalFile,
+    engineOptions: options.engineOptions,
+    env: process.env
+  });
+
+  options.preset = preset.preset;
+  options.command = preset.command;
+  options.args = preset.args;
+  options.protocol = preset.protocol;
+  options.engineOptions = preset.engineOptions;
+  if (!options.sourceExplicit) {
+    options.source = preset.name;
+  }
+}
+
 function numberFromEnv(value, fallback) {
   if (value === undefined || value === "") return fallback;
   return Number(value);
@@ -240,6 +278,8 @@ Options:
   --arg VALUE          Append one native process argument
   --args VALUES        Append whitespace-separated native process arguments
   --protocol uci|ucci  Native protocol (default: uci)
+  --preset NAME        Apply a native engine preset, e.g. pikafish
+  --eval-file FILE     NNUE/eval file for presets that support one
   --option OPT         Set a native option (name=value or button name)
   --source NAME        Source label written into generated records
   --plies N            Main-line plies to follow (default: 12)
@@ -253,7 +293,8 @@ Options:
 
 Environment:
   XIANGQI_ORACLE_ENGINE_COMMAND, XIANGQI_ORACLE_ENGINE_ARGS,
-  XIANGQI_ORACLE_ENGINE_PROTOCOL, XIANGQI_ORACLE_ENGINE_OPTIONS,
+  XIANGQI_ORACLE_ENGINE_PROTOCOL, XIANGQI_ORACLE_ENGINE_PRESET,
+  XIANGQI_ORACLE_ENGINE_EVAL_FILE, XIANGQI_ORACLE_ENGINE_OPTIONS,
   XIANGQI_ORACLE_OPENING_PLIES, XIANGQI_ORACLE_LINES,
   XIANGQI_ORACLE_DEPTH, XIANGQI_ORACLE_TIME_MS,
   XIANGQI_ORACLE_OPENING_OUT

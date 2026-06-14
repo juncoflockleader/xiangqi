@@ -278,11 +278,9 @@ Generate opening records from a native oracle when no curated opening database i
 available yet:
 
 ```sh
-XIANGQI_ORACLE_ENGINE_COMMAND=/path/to/pikafish \
-npm run book:oracle -- --protocol uci \
+npm run book:oracle -- --preset pikafish \
   --option Threads=4 \
   --option Hash=512 \
-  --option EvalFile=/path/to/pikafish.nnue \
   --plies 16 \
   --lines 3 \
   --depth 8 \
@@ -538,11 +536,9 @@ npm run bench -- --benchmarks ./benchmarks.json --json
 Compare the JavaScript learning engine to a native oracle:
 
 ```sh
-XIANGQI_ORACLE_ENGINE_COMMAND=/path/to/pikafish \
-npm run bench:oracle -- --oracle-protocol uci \
+npm run bench:oracle -- --oracle-preset pikafish \
   --oracle-option Threads=4 \
   --oracle-option Hash=512 \
-  --oracle-option EvalFile=/path/to/pikafish.nnue \
   --oracle-depth 8 \
   --oracle-time 3000 \
   --acceptable-loss 60

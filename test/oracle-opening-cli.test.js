@@ -38,6 +38,31 @@ test("oracle opening CLI prints importable records", async () => {
   assert.ok(records.some((record) => record.rank === 2));
 });
 
+test("oracle opening CLI applies the Pikafish preset", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "examples/oracle-opening.mjs",
+    "--preset", "pikafish",
+    "--command", process.execPath,
+    "--arg", "fixtures/mock-ucci.mjs",
+    "--eval-file", "pikafish.nnue",
+    "--plies", "2",
+    "--lines", "1",
+    "--depth", "2",
+    "--time", "100",
+    "--option", "Threads=2",
+    "--json"
+  ], {
+    cwd: root,
+    timeout: 5000
+  });
+  const report = JSON.parse(stdout);
+
+  assert.equal(report.source, "Pikafish");
+  assert.equal(report.records[0].source, "Pikafish");
+  assert.equal(report.records[0].move, "h9-g7");
+  assert.equal(report.records[0].rank, 1);
+});
+
 test("oracle opening CLI writes reusable artifact files", async () => {
   const dir = await mkdtemp(join(tmpdir(), "xiangqi-oracle-book-"));
   const outFile = join(dir, "book.json");
@@ -85,7 +110,10 @@ test("oracle opening CLI explains missing native command", async () => {
       env: {
         ...process.env,
         XIANGQI_ENGINE_COMMAND: "",
-        XIANGQI_ORACLE_ENGINE_COMMAND: ""
+        XIANGQI_ENGINE_PRESET: "",
+        XIANGQI_ORACLE_ENGINE_COMMAND: "",
+        XIANGQI_ORACLE_ENGINE_PRESET: "",
+        XIANGQI_PIKAFISH_AUTO_DISCOVER: "false"
       }
     }),
     (error) => {
