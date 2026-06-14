@@ -82,7 +82,7 @@ const book = engine.openingBook(position);
 const exactOnly = engine.openingBook(position, { openingHeuristics: false });
 ```
 
-The built-in book is intentionally small but structured as opening data: named entries, ideas, tags, and multi-ply lines. When an early position is not in the exact table, the engine can fall back to opening heuristics such as developing horses, contesting the central file, and activating rooks. This is a bridge toward importing a larger Xiangqi opening database later.
+The built-in book is intentionally small but structured as opening data: named entries, ideas, tags, and multi-ply lines. When an early position is not in the exact table, the engine can fall back to opening heuristics such as developing horses, contesting the central file, and activating rooks. Heuristic opening moves are tactically validated by search before play by default; set `validateOpeningHeuristics: false` to inspect the raw heuristic recommendation, or tune `openingHeuristicValidationDepth`, `openingHeuristicValidationTimeMs`, and `openingHeuristicMaxCentipawnLoss` for different play profiles. This is a bridge toward importing a larger Xiangqi opening database later.
 
 Import or merge opening data:
 

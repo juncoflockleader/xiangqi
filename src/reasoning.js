@@ -34,6 +34,12 @@ export function explainMove(position, searchResult) {
 
   const moveStory = explainMoveFeatures(position, move);
   const reasons = [...moveStory.reasons];
+  const validation = searchResult.openingHeuristicValidation;
+  if (validation?.status === "rejected") {
+    reasons.push(
+      `Rejected opening heuristic ${validation.heuristicMove} because search found it loses about ${validation.centipawnLoss} centipawns compared with ${validation.searchBestMove}.`
+    );
+  }
 
   const candidateGap = candidateScoreGap(searchResult);
   if (candidateGap !== null && candidateGap >= 25) {
@@ -80,7 +86,8 @@ export function explainMove(position, searchResult) {
       timedOut: searchResult.timedOut,
       tableSize: searchResult.tableSize,
       stats: searchResult.stats,
-      iterations: summarizeIterations(searchResult.iterations ?? [])
+      iterations: summarizeIterations(searchResult.iterations ?? []),
+      openingHeuristicValidation: searchResult.openingHeuristicValidation ?? null
     }
   };
 }
@@ -95,6 +102,7 @@ export function explainBookMove(position, bookResult) {
     `${label}: ${entry.name}.`,
     entry.idea,
     ...(entry.database?.summary ? [entry.database.summary] : []),
+    ...openingHeuristicValidationReasons(bookResult.openingHeuristicValidation),
     ...moveStory.reasons
   ];
   const confidence = assessSearchConfidence(bookResult, { source: bookResult.source ?? "opening-book" });
@@ -123,7 +131,8 @@ export function explainBookMove(position, bookResult) {
       tableSize: bookResult.tableSize,
       stats: bookResult.stats,
       iterations: [],
-      source: bookResult.source ?? "opening-book"
+      source: bookResult.source ?? "opening-book",
+      openingHeuristicValidation: bookResult.openingHeuristicValidation ?? null
     }
   };
 }
@@ -597,7 +606,37 @@ function assessBookConfidence(result, source) {
     });
   }
 
+  if (result.openingHeuristicValidation) {
+    const validation = result.openingHeuristicValidation;
+    const loss = validation.centipawnLoss ?? null;
+    const accepted = validation.status === "accepted";
+    const impact = accepted ? 12 : -10;
+    score += impact;
+    factors.push({
+      kind: "heuristic-validation",
+      impact,
+      text: accepted
+        ? `Tactical validation kept the heuristic within ${loss} centipawns of search.`
+        : "Tactical validation was inconclusive, so this heuristic has lower confidence."
+    });
+  }
+
   return buildConfidence(score, factors);
+}
+
+function openingHeuristicValidationReasons(validation) {
+  if (!validation) return [];
+  if (validation.status === "accepted") {
+    return [
+      `A tactical validation search to depth ${validation.searchDepth} kept this heuristic within ${validation.centipawnLoss} centipawns of ${validation.searchBestMove}.`
+    ];
+  }
+  if (validation.status === "inconclusive") {
+    return [
+      "The tactical validation search was inconclusive, so treat this heuristic as a low-confidence opening guide."
+    ];
+  }
+  return [];
 }
 
 function terminalConfidence(position) {

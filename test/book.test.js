@@ -82,15 +82,53 @@ test("opening book follows named deeper central cannon lines", () => {
   assert.equal(result.book.name, "Double Screen Horses");
 });
 
-test("opening heuristics cover early positions outside exact book", () => {
+test("opening heuristics cover early positions outside exact book when requested raw", () => {
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });
   const position = engine.play(createInitialPosition(), "a9-a8");
-  const result = engine.chooseMove(position);
+  const result = engine.chooseMove(position, { validateOpeningHeuristics: false });
 
   assert.equal(result.source, "opening-heuristic");
   assert.ok(["b0-c2", "h0-g2"].includes(result.bestMove.notation));
   assert.ok(result.book.tags.includes("heuristic"));
   assert.ok(result.explanation.reasons.some((reason) => reason.includes("Opening heuristic")));
+});
+
+test("opening heuristic validation rejects immediate tactical losses", () => {
+  const engine = createEngine({ depth: 2, timeLimitMs: 2000 });
+  const position = engine.play(createInitialPosition(), "a9-a8");
+  const raw = engine.chooseMove(position, { validateOpeningHeuristics: false });
+  const result = engine.chooseMove(position, {
+    openingHeuristicValidationDepth: 1,
+    openingHeuristicValidationTimeMs: 2000
+  });
+
+  assert.equal(raw.source, "opening-heuristic");
+  assert.notEqual(result.source, "opening-heuristic");
+  assert.equal(result.openingHeuristicValidation.status, "rejected");
+  assert.equal(result.openingHeuristicValidation.heuristicMove, raw.bestMove.notation);
+  assert.ok(result.openingHeuristicValidation.centipawnLoss > result.openingHeuristicValidation.maxCentipawnLoss);
+});
+
+test("opening heuristic validation avoids the Hu bot central cannon trap", () => {
+  const engine = createEngine({ depth: 3, timeLimitMs: 4000 });
+  let position = createInitialPosition();
+  for (const move of ["h7-e7", "h0-g2", "h9-g7", "g3-g4", "b9-c7", "i0-h0"]) {
+    position = engine.play(position, move);
+  }
+
+  const raw = engine.chooseMove(position, { validateOpeningHeuristics: false });
+  const result = engine.chooseMove(position, {
+    openingHeuristicValidationDepth: 2,
+    openingHeuristicValidationTimeMs: 4000
+  });
+
+  assert.equal(raw.source, "opening-heuristic");
+  assert.equal(raw.bestMove.notation, "e7-e3");
+  assert.equal(result.openingHeuristicValidation.status, "rejected");
+  assert.equal(result.openingHeuristicValidation.heuristicMove, "e7-e3");
+  assert.notEqual(result.bestMove.notation, "e7-e3");
+  assert.ok(result.openingHeuristicValidation.centipawnLoss >= 300);
+  assert.ok(result.explanation.summary.includes(result.bestMove.notation));
 });
 
 test("opening book can be imported from weighted text lines", () => {

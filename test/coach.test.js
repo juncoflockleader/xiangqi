@@ -40,6 +40,26 @@ test("coach move can use pure search for tactical positions", () => {
   assert.ok(hint.explanation.summary.includes("e9-e2"));
 });
 
+test("coach move validates heuristic openings before teaching them", () => {
+  const engine = createEngine({ depth: 3, timeLimitMs: 4000 });
+  let position = createInitialPosition();
+  for (const move of ["h7-e7", "h0-g2", "h9-g7", "g3-g4", "b9-c7", "i0-h0"]) {
+    position = engine.play(position, move);
+  }
+
+  const raw = engine.coachMove(position, { validateOpeningHeuristics: false });
+  const hint = engine.coachMove(position, {
+    openingHeuristicValidationDepth: 2,
+    openingHeuristicValidationTimeMs: 4000
+  });
+
+  assert.equal(raw.source, "opening-heuristic");
+  assert.equal(raw.bestMove.notation, "e7-e3");
+  assert.equal(hint.source, "search");
+  assert.notEqual(hint.bestMove.notation, "e7-e3");
+  assert.equal(hint.search.openingHeuristicValidation.status, "rejected");
+});
+
 test("coach move handles positions with no legal move", () => {
   const position = parseFen("3rkr3/9/9/9/9/9/9/9/9/4K4 r");
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });

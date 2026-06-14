@@ -32,7 +32,7 @@ function chooseCoachResult(engine, position, options) {
 }
 
 async function chooseCoachResultAsync(backend, position, options) {
-  const bookResult = maybeCoachBookResult(backend, position, options);
+  const bookResult = await maybeCoachBookResultAsync(backend, position, options);
   if (bookResult) return bookResult;
 
   return backend.analyzePosition(position, {
@@ -46,6 +46,9 @@ function maybeCoachBookResult(engine, position, options) {
 
   const bookHit = engine.openingBook(position, options.bookOptions ?? options);
   if (!bookHit) return null;
+  if (shouldGuardCoachHeuristic(bookHit, options) && typeof engine.chooseMove === "function") {
+    return engine.chooseMove(position, options);
+  }
 
   const candidates = bookHit.entries.map(bookMoveToCandidate);
   const result = {
@@ -69,6 +72,22 @@ function maybeCoachBookResult(engine, position, options) {
     ...result,
     explanation: explainBookMove(position, result)
   };
+}
+
+async function maybeCoachBookResultAsync(backend, position, options) {
+  if (options.useBook === false) return null;
+
+  const bookHit = backend.openingBook(position, options.bookOptions ?? options);
+  if (!bookHit) return null;
+  if (shouldGuardCoachHeuristic(bookHit, options) && typeof backend.chooseMove === "function") {
+    return backend.chooseMove(position, options);
+  }
+
+  return maybeCoachBookResult(backend, position, options);
+}
+
+function shouldGuardCoachHeuristic(bookHit, options) {
+  return bookHit.source === "opening-heuristic" && options.validateOpeningHeuristics !== false;
 }
 
 function buildCoachMove(position, result, options) {
@@ -108,10 +127,12 @@ function buildCoachMove(position, result, options) {
     principalVariation,
     principalVariationText: principalVariation.join(" "),
     explanation: result.explanation,
+    openingHeuristicValidation: result.openingHeuristicValidation ?? null,
     search: result.explanation?.search ?? {
       depth: result.depth ?? 0,
       nodes: result.nodes ?? 0,
-      source: result.source ?? "search"
+      source: result.source ?? "search",
+      openingHeuristicValidation: result.openingHeuristicValidation ?? null
     }
   };
 }

@@ -23,7 +23,30 @@ export function createEngine(defaultOptions = {}) {
     chooseMove(position, options = {}) {
       const mergedOptions = { ...engineOptions, ...options };
       const bookResult = maybeBookResult(position, mergedOptions, transpositionTable.size);
-      if (bookResult) return bookResult;
+      if (bookResult) {
+        const validation = validateOpeningHeuristic(position, bookResult, mergedOptions, transpositionTable);
+        if (!validation) return bookResult;
+        if (validation.accepted) {
+          const accepted = {
+            ...bookResult,
+            openingHeuristicValidation: validation.summary
+          };
+          return {
+            ...accepted,
+            explanation: explainBookMove(position, accepted)
+          };
+        }
+
+        const guardedSearch = {
+          ...validation.search,
+          openingHeuristicValidation: validation.summary
+        };
+
+        return {
+          ...guardedSearch,
+          explanation: explainMove(position, guardedSearch)
+        };
+      }
 
       const search = searchBestMove(position, {
         ...mergedOptions,
@@ -284,5 +307,50 @@ function maybeBookResult(position, options, tableSize) {
   return {
     ...result,
     explanation: explainBookMove(position, result)
+  };
+}
+
+function validateOpeningHeuristic(position, bookResult, options, transpositionTable) {
+  if (bookResult.source !== "opening-heuristic") return null;
+  if (options.validateOpeningHeuristics === false) return null;
+
+  const search = searchBestMove(position, {
+    ...options,
+    depth: options.openingHeuristicValidationDepth
+      ?? Math.max(2, Math.min(options.depth ?? 4, 3)),
+    timeLimitMs: options.openingHeuristicValidationTimeMs
+      ?? Math.max(options.timeLimitMs ?? 1000, 750),
+    useBook: false,
+    candidateLimit: Number.POSITIVE_INFINITY,
+    exactRootScores: true,
+    priorityMoves: [bookResult.bestMove],
+    transpositionTable
+  });
+  const candidate = search.candidates.find((entry) => sameMove(entry.move, bookResult.bestMove));
+  const maxLoss = options.openingHeuristicMaxCentipawnLoss ?? 160;
+  const centipawnLoss = candidate
+    ? Math.max(0, Math.round(search.score - candidate.score))
+    : Number.POSITIVE_INFINITY;
+  const conclusive = search.depth >= 1 && candidate && !search.fallback;
+  const accepted = !conclusive || centipawnLoss <= maxLoss;
+
+  return {
+    accepted,
+    search,
+    summary: {
+      status: accepted ? (conclusive ? "accepted" : "inconclusive") : "rejected",
+      reason: accepted
+        ? (conclusive ? "within-threshold" : "inconclusive-search")
+        : "tactical-loss",
+      heuristicMove: bookResult.bestMove.notation,
+      searchBestMove: search.bestMove?.notation ?? null,
+      searchDepth: search.depth,
+      searchScore: Math.round(search.score),
+      heuristicScore: candidate ? Math.round(candidate.score) : null,
+      centipawnLoss: Number.isFinite(centipawnLoss) ? centipawnLoss : null,
+      maxCentipawnLoss: maxLoss,
+      nodes: search.nodes,
+      timedOut: search.timedOut
+    }
   };
 }
