@@ -10,8 +10,8 @@ import {
 } from "./board.js";
 import { ENGINE_BACKEND_FEATURES, createEngineBackend } from "./backend.js";
 import { bookMoveToCandidate } from "./book.js";
-import { createEngine } from "./engine.js";
-import { explainBookMove, explainMoveFeatures, formatScore } from "./reasoning.js";
+import { classifyMoveLoss, createEngine } from "./engine.js";
+import { explainBookMove, explainMoveFeatures, explainReviewedMove, formatScore } from "./reasoning.js";
 import { annotateMove, generateLegalMoves } from "./movegen.js";
 import { hasClockTimeControl, resolveSearchBudget } from "./time.js";
 
@@ -35,7 +35,11 @@ export function createUcciEngineBackend(options = {}) {
     features: [
       ENGINE_BACKEND_FEATURES.UCCI_COMPATIBLE,
       ENGINE_BACKEND_FEATURES.NATIVE_READY,
-      ENGINE_BACKEND_FEATURES.ASYNC_SEARCH
+      ENGINE_BACKEND_FEATURES.ASYNC_SEARCH,
+      ENGINE_BACKEND_FEATURES.EXPLANATION,
+      ENGINE_BACKEND_FEATURES.OPENING_BOOK,
+      ENGINE_BACKEND_FEATURES.REVIEW,
+      ENGINE_BACKEND_FEATURES.PRESSURE
     ],
     chooseMove: async (position, searchOptions = {}) => {
       const mergedOptions = mergeNativeOptions(options, searchOptions, {
@@ -71,7 +75,11 @@ export function createUcciEngineBackend(options = {}) {
         }))
       };
     },
-    reviewMove: (position, move, reviewOptions = {}) => referenceEngine.reviewMove(position, move, reviewOptions),
+    reviewMove: async (position, move, reviewOptions = {}) => nativeReviewMove(client, position, move, mergeNativeOptions(options, reviewOptions, {
+      backendName: name,
+      lines: 1,
+      useBook: false
+    })),
     openingBook: (position, bookOptions = {}) => referenceEngine.openingBook(position, bookOptions),
     evaluate: (position, evaluationOptions = {}) => referenceEngine.evaluate(position, evaluationOptions),
     pressure: (position, pressureOptions = {}) => referenceEngine.pressure(position, pressureOptions),
@@ -262,6 +270,55 @@ async function nativeSearch(client, position, options) {
   return {
     ...result,
     explanation: explainNativeMove(position, result, options.backendName)
+  };
+}
+
+async function nativeReviewMove(client, position, moveOrNotation, options) {
+  const move = resolveLegalMove(position, moveOrNotation);
+  const bestAnalysis = await nativeSearch(client, position, options);
+  const bestMove = bestAnalysis.bestMove;
+  const isBestMove = sameMove(move, bestMove);
+  const playedCandidate = isBestMove
+    ? {
+        score: bestAnalysis.score,
+        principalVariation: bestAnalysis.principalVariation
+      }
+    : await analyzePlayedNativeMove(client, position, move, options);
+  const centipawnLoss = Math.max(0, bestAnalysis.score - playedCandidate.score);
+  const reviewed = {
+    source: "native-ucci",
+    move,
+    bestMove,
+    bestScore: Math.round(bestAnalysis.score),
+    playedScore: Math.round(playedCandidate.score),
+    centipawnLoss: Math.round(centipawnLoss),
+    classification: isBestMove ? "best" : classifyMoveLoss(Math.max(16, centipawnLoss)),
+    isBestMove,
+    principalVariation: playedCandidate.principalVariation.map((pvMove) => pvMove.notation ?? moveToNotation(pvMove)),
+    bestAnalysis,
+    bestExplanation: bestAnalysis.explanation,
+    depth: bestAnalysis.depth,
+    nodes: bestAnalysis.nodes + (playedCandidate.nodes ?? 0)
+  };
+
+  return {
+    ...reviewed,
+    explanation: explainReviewedMove(position, reviewed)
+  };
+}
+
+async function analyzePlayedNativeMove(client, position, move, options) {
+  const after = makeMove(position, move);
+  const reply = await nativeSearch(client, after, options);
+  const annotated = annotateMove(position, move);
+
+  return {
+    score: normalizeScore(-reply.score),
+    nodes: reply.nodes,
+    principalVariation: [
+      annotated,
+      ...reply.principalVariation
+    ]
   };
 }
 
@@ -628,6 +685,10 @@ function moveKeyMatches(left, right) {
   if (!left || !right) return false;
   if (left === "0000" || right === "0000") return false;
   return moveKey(parseMoveNotation(left)) === moveKey(parseMoveNotation(right));
+}
+
+function normalizeScore(score) {
+  return Object.is(score, -0) ? 0 : score;
 }
 
 function unique(items) {

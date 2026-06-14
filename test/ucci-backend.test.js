@@ -44,6 +44,8 @@ test("UCCI backend searches through an external process", async () => {
 
     assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.NATIVE_READY), true);
     assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.ASYNC_SEARCH), true);
+    assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.REVIEW), true);
+    assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.EXPLANATION), true);
     assert.equal(description.kind, "native-ucci");
     assert.equal(result.source, "native-ucci");
     assert.equal(result.bestMove.notation, "h9-g7");
@@ -104,6 +106,35 @@ test("UCCI backend forwards clock controls to native engines", async () => {
     assert.equal(result.score, 55);
     assert.equal(result.nodes, 321);
     assert.ok(result.raw.some((line) => line.includes("command go depth 2 wtime 60000 btime 20000 winc 1000 binc 500 movestogo 20")));
+  } finally {
+    await backend.close();
+  }
+});
+
+test("UCCI backend reviews moves with native search scores", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const review = await backend.reviewMove(createInitialPosition(), "h7-e7", {
+      depth: 2,
+      timeLimitMs: 500
+    });
+
+    assert.equal(review.source, "native-ucci");
+    assert.equal(review.bestMove.notation, "h9-g7");
+    assert.equal(review.bestScore, 42);
+    assert.equal(review.playedScore, -17);
+    assert.equal(review.centipawnLoss, 59);
+    assert.equal(review.classification, "good");
+    assert.deepEqual(review.principalVariation, ["h7-e7", "h0-g2"]);
+    assert.ok(review.bestExplanation.summary.includes("Native UCCI Engine"));
+    assert.ok(review.explanation.reasons.some((reason) => reason.includes("h9-g7")));
   } finally {
     await backend.close();
   }
