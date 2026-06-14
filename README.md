@@ -192,14 +192,15 @@ const gameStudy = engine.gameStudy(["h7-e7", "h0-g2", "h9-g7"], {
 
 console.log(gameStudy.summary);
 console.log(gameStudy.lessonPlan.cards[0]?.prompt);
+console.log(gameStudy.keyMoments[0]?.bestLinePlan?.summary);
 console.log(gameStudy.positionStudies[0]?.summary);
 console.log(gameStudy.practiceFocus[0]?.title);
 ```
 
 `gameStudy` returns the full move review, compact key moments, lesson cards,
 position-study bundles for selected plies, aggregated practice focus, final FEN,
-and next-step prompts so a learning UI can move from game recap into focused
-practice.
+preferred-line plans for key moments and lesson cards, and next-step prompts so
+a learning UI can move from game recap into focused practice.
 
 You can also generate the same artifact from the command line, which is handy
 after online sparring or imported game records:

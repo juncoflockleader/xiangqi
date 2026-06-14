@@ -73,8 +73,11 @@ test("lesson cards preserve native best-line score evidence", async () => {
     assert.equal(card.bestScoreDetail.text, "mate in 2");
     assert.equal(card.bestScoreText, "mate in 2");
     assert.equal(card.bestWdl.text, "98% win, 2% draw, 0% loss");
+    assert.equal(card.bestLinePlan.firstMove, "h9-g7");
+    assert.equal(card.bestLinePlan.expectedReply, "h0-g2");
     assert.equal(card.answer.bestScoreDetail.text, "mate in 2");
     assert.equal(card.answer.bestWdl.text, "98% win, 2% draw, 0% loss");
+    assert.equal(card.answer.bestLinePlan.summary, card.bestLinePlan.summary);
   } finally {
     await backend.close();
   }

@@ -41,6 +41,7 @@ test("game study bundles review, lesson cards, and position studies", () => {
   assert.equal(study.practiceFocus[0].examples.length, 2);
   assert.ok(study.nextSteps.some((step) => step.kind === "practice"));
   assert.match(formatted, /Practice focus:/);
+  assert.match(formatted, /Best plan: Start with/);
   assert.equal(study.positionStudies[0].type, "position-study");
   assert.equal(study.positionStudies[0].gameMoment.ply, study.keyMoments[0].ply);
   assert.ok(study.positionStudies[0].playedMoveReview);
@@ -161,9 +162,13 @@ test("game study preserves native review comparison evidence", async () => {
 
     assert.equal(study.keyMoments[0].bestComparison.bestMove, "h9-g7");
     assert.equal(study.keyMoments[0].bestAlternatives.length, 2);
+    assert.equal(study.keyMoments[0].bestLinePlan.firstMove, "h9-g7");
+    assert.equal(study.keyMoments[0].bestLinePlan.expectedReply, "h0-g2");
     assert.equal(study.lessonPlan.cards[0].bestComparison.nextMove, "h7-e7");
+    assert.equal(study.lessonPlan.cards[0].bestLinePlan.summary, study.keyMoments[0].bestLinePlan.summary);
     assert.equal(study.positionStudies[0].gameMoment.bestComparison.bestMove, "h9-g7");
     assert.equal(study.positionStudies[0].gameMoment.bestAlternatives[1].verdict, "playable");
+    assert.equal(study.positionStudies[0].gameMoment.bestLinePlan.summary, study.keyMoments[0].bestLinePlan.summary);
   } finally {
     await backend.close();
   }

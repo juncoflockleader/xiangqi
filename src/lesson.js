@@ -1,5 +1,5 @@
 import { moveToNotation } from "./board.js";
-import { summarizeAlternativeEvidence, summarizeComparisonEvidence } from "./explanation-artifacts.js";
+import { summarizeAlternativeEvidence, summarizeComparisonEvidence, summarizeLinePlanEvidence } from "./explanation-artifacts.js";
 
 const SEVERE_CLASSIFICATIONS = Object.freeze(["blunder", "mistake", "inaccuracy"]);
 const POSITIVE_CLASSIFICATIONS = Object.freeze(["best", "excellent"]);
@@ -87,6 +87,7 @@ function createLessonCard(move, rank) {
     bestWdl: move.review.bestAnalysis?.wdl ?? null,
     bestComparison: comparisonFor(move.review),
     bestAlternatives: alternativesFor(move.review),
+    bestLinePlan: bestLinePlanFor(move.review),
     mistakes: move.review.mistakes,
     tags,
     hints: lessonHints(move, type, bestMove),
@@ -99,6 +100,7 @@ function createLessonCard(move, rank) {
       bestWdl: move.review.bestAnalysis?.wdl ?? null,
       bestComparison: comparisonFor(move.review),
       bestAlternatives: alternativesFor(move.review),
+      bestLinePlan: bestLinePlanFor(move.review),
       summary: move.review.explanation.summary,
       reasons: move.review.explanation.reasons,
       principalVariation: move.review.principalVariation ?? []
@@ -253,6 +255,10 @@ function comparisonFor(review) {
 
 function alternativesFor(review) {
   return summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives);
+}
+
+function bestLinePlanFor(review) {
+  return summarizeLinePlanEvidence(review.bestExplanation?.linePlan ?? review.bestAnalysis?.explanation?.linePlan);
 }
 
 function formatCentipawns(value) {

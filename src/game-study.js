@@ -1,5 +1,5 @@
 import { parseFen, toFen } from "./board.js";
-import { summarizeAlternativeEvidence, summarizeComparisonEvidence } from "./explanation-artifacts.js";
+import { summarizeAlternativeEvidence, summarizeComparisonEvidence, summarizeLinePlanEvidence } from "./explanation-artifacts.js";
 import { createLessonPlanFromReview } from "./lesson.js";
 import { aggregatePracticeFocusFromReview } from "./practice.js";
 import { studyPositionWithBackend, studyPositionWithEngine } from "./study.js";
@@ -40,6 +40,9 @@ export function formatGameStudy(study) {
     lines.push("Key moments:");
     for (const moment of study.keyMoments.slice(0, 5)) {
       lines.push(`  ${moment.ply}. ${capitalize(moment.side)} ${moment.notation}: ${moment.classification}, ${moment.centipawnLoss} cp loss`);
+      if (moment.bestLinePlan?.summary) {
+        lines.push(`     Best plan: ${moment.bestLinePlan.summary}`);
+      }
     }
   }
 
@@ -171,6 +174,7 @@ function attachGameMoment(study, move) {
       bestWdl: move.review.bestAnalysis?.wdl ?? null,
       bestComparison: comparisonFor(move.review),
       bestAlternatives: alternativesFor(move.review),
+      bestLinePlan: bestLinePlanFor(move.review),
       book: move.book
     }
   };
@@ -270,6 +274,10 @@ function comparisonFor(review) {
 
 function alternativesFor(review) {
   return summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives);
+}
+
+function bestLinePlanFor(review) {
+  return summarizeLinePlanEvidence(review.bestExplanation?.linePlan ?? review.bestAnalysis?.explanation?.linePlan);
 }
 
 function formatCentipawns(value) {

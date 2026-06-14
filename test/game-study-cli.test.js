@@ -26,6 +26,7 @@ test("game study CLI prints a readable game learning report", async () => {
   assert.match(stdout, /Game study: 3 moves/);
   assert.match(stdout, /Lesson cards:/);
   assert.match(stdout, /Position studies:/);
+  assert.match(stdout, /Best plan: Start with/);
   assert.match(stdout, /Next steps:/);
 });
 

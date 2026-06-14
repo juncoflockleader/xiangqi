@@ -31,6 +31,29 @@ export function summarizeAlternativeEvidence(alternatives) {
   }));
 }
 
+export function summarizeLinePlanEvidence(linePlan) {
+  if (!linePlan) return null;
+
+  return {
+    summary: linePlan.summary ?? "",
+    perspective: linePlan.perspective ?? null,
+    firstMove: linePlan.firstMove ?? null,
+    expectedReply: linePlan.expectedReply ?? null,
+    continuation: [...(linePlan.continuation ?? [])],
+    moves: (linePlan.moves ?? []).map((move) => ({
+      ...move,
+      motifs: [...(move.motifs ?? [])]
+    })),
+    motifs: [...(linePlan.motifs ?? [])],
+    startingScore: numberOrNull(linePlan.startingScore),
+    endingScore: numberOrNull(linePlan.endingScore),
+    evaluationSwing: numberOrNull(linePlan.evaluationSwing),
+    startingScoreText: linePlan.startingScoreText ?? null,
+    endingScoreText: linePlan.endingScoreText ?? null,
+    evaluationSwingText: linePlan.evaluationSwingText ?? null
+  };
+}
+
 function scoreDetailFor(entry) {
   if (!entry) return null;
   return entry.scoreDetail ?? entry.native?.scoreDetail ?? entry.explanation?.search?.scoreDetail ?? null;
@@ -50,4 +73,8 @@ function scoreTextForAlternative(alternative) {
 function formatCentipawns(value) {
   const rounded = Math.round(value ?? 0);
   return `${rounded >= 0 ? "+" : ""}${rounded} cp`;
+}
+
+function numberOrNull(value) {
+  return Number.isFinite(value) ? value : null;
 }
