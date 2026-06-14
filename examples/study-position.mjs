@@ -15,6 +15,7 @@ import {
   parseNativeEngineOptions,
   splitEnvArgs
 } from "./native-cli-options.mjs";
+import { loadOpeningBook, resolveBookFormat } from "./opening-book-loader.mjs";
 
 let options;
 try {
@@ -31,9 +32,17 @@ if (options.help) {
   process.exit(0);
 }
 
+let openingBook;
+try {
+  openingBook = await loadOpeningBook(options);
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+
 let backend;
 try {
-  backend = createStudyBackend(options);
+  backend = createStudyBackend(options, openingBook);
 } catch (error) {
   console.error(error.message);
   process.exit(1);
@@ -70,13 +79,14 @@ try {
   await backend.close?.();
 }
 
-function createStudyBackend(options) {
+function createStudyBackend(options, openingBook) {
   applyNativePresets(options);
 
   const base = createLearningEngineBackend({
     profile: options.profile,
     depth: options.depth,
     timeLimitMs: options.timeLimitMs,
+    ...(openingBook ? { book: openingBook } : {}),
     command: options.engineCommand,
     args: options.engineArgs,
     protocol: options.engineProtocol,
@@ -159,6 +169,8 @@ function parseArgs(args) {
     depth: numberFromEnv(process.env.XIANGQI_STUDY_DEPTH, 3),
     timeLimitMs: numberFromEnv(process.env.XIANGQI_STUDY_TIME_MS, 1000),
     lines: numberFromEnv(process.env.XIANGQI_STUDY_LINES, 3),
+    bookPath: process.env.XIANGQI_OPENING_BOOK,
+    bookFormat: process.env.XIANGQI_OPENING_BOOK_FORMAT ?? "auto",
     fen: process.env.XIANGQI_STUDY_FEN,
     playedMove: process.env.XIANGQI_STUDY_MOVE,
     engineCommand: process.env.XIANGQI_ENGINE_COMMAND,
@@ -201,6 +213,16 @@ function parseArgs(args) {
     }
     if (arg === "--no-book") {
       parsed.useBook = false;
+      continue;
+    }
+    if (arg === "--book") {
+      parsed.bookPath = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--book-format") {
+      parsed.bookFormat = requireValue(args, index, arg);
+      index += 1;
       continue;
     }
     if (arg === "--profile") {
@@ -333,6 +355,7 @@ function parseArgs(args) {
 
   parsed.engineProtocol = parseProtocol(parsed.engineProtocol, "XIANGQI_ENGINE_PROTOCOL");
   parsed.oracleProtocol = parseProtocol(parsed.oracleProtocol, "XIANGQI_ORACLE_ENGINE_PROTOCOL");
+  resolveBookFormat(parsed.bookPath ?? "", parsed.bookFormat);
   parsed.depth = assertPositiveInteger(parsed.depth, "depth");
   parsed.timeLimitMs = assertPositiveInteger(parsed.timeLimitMs, "time");
   parsed.lines = assertPositiveInteger(parsed.lines, "lines");
@@ -392,6 +415,8 @@ function reportOptions(options) {
     timeLimitMs: options.timeLimitMs,
     lines: options.lines,
     useBook: options.useBook,
+    bookPath: options.bookPath ?? null,
+    bookFormat: options.bookPath ? resolveBookFormat(options.bookPath, options.bookFormat) : null,
     fen: options.fen ?? null,
     playedMove: options.playedMove ?? null,
     enginePreset: options.enginePreset ?? null,
@@ -417,6 +442,8 @@ Options:
   --depth n             Search depth. Default: 3.
   --time ms             Move time budget. Default: 1000.
   --lines n             Candidate lines to report. Default: 3.
+  --book file           Load opening book data from JSON, CSV/TSV, or text.
+  --book-format format  Book format: auto, json, csv, tsv, text, oracle, records.
   --fen fen             Study a FEN position. Default: initial position.
   --move move           Review a played move from the studied position.
   --played-move move    Alias for --move.

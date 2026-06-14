@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-import { readFile } from "node:fs/promises";
-import { extname } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import {
@@ -9,9 +7,6 @@ import {
   chooseGameMoveAsync,
   createLearningEngineBackend,
   createGame,
-  createOpeningBookFromCsv,
-  createOpeningBookFromOracleArtifact,
-  createOpeningBookFromText,
   createOracleReviewEngineBackend,
   createUcciEngineBackend,
   formatBoard,
@@ -27,6 +22,7 @@ import {
   parseNativeEngineOptions,
   splitEnvArgs
 } from "./native-cli-options.mjs";
+import { loadOpeningBook, parseBookFormat, resolveBookFormat } from "./opening-book-loader.mjs";
 
 let options;
 try {
@@ -756,45 +752,6 @@ function createPlayBackend(options, openingBook) {
       timeLimitMs: options.oracleTimeLimitMs
     }
   });
-}
-
-async function loadOpeningBook(options) {
-  if (!options.bookPath) return null;
-
-  const format = resolveBookFormat(options.bookPath, options.bookFormat);
-  let text;
-  try {
-    text = await readFile(options.bookPath, "utf8");
-  } catch (error) {
-    throw new Error(`Could not read opening book ${options.bookPath}: ${error.message}`);
-  }
-
-  try {
-    if (format === "json") return createOpeningBookFromOracleArtifact(text);
-    if (format === "csv") return createOpeningBookFromCsv(text);
-    if (format === "tsv") return createOpeningBookFromCsv(text, { delimiter: "\t" });
-    return createOpeningBookFromText(text);
-  } catch (error) {
-    throw new Error(`Could not load opening book ${options.bookPath}: ${error.message}`);
-  }
-}
-
-function resolveBookFormat(path, requested = "auto") {
-  const format = parseBookFormat(requested);
-  if (format !== "auto") return format;
-
-  const extension = extname(path).toLowerCase();
-  if (extension === ".json") return "json";
-  if (extension === ".csv") return "csv";
-  if (extension === ".tsv") return "tsv";
-  return "text";
-}
-
-function parseBookFormat(value = "auto") {
-  const normalized = String(value).toLowerCase();
-  if (normalized === "oracle" || normalized === "records") return "json";
-  if (["auto", "json", "csv", "tsv", "text"].includes(normalized)) return normalized;
-  throw new Error("--book-format must be auto, json, csv, tsv, or text.");
 }
 
 function findLastEngineDecision(currentGame) {

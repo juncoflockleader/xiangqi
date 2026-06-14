@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { INITIAL_FEN } from "../src/index.js";
 
 const execFileAsync = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -101,6 +102,33 @@ test("game study CLI can use a native UCI backend", async () => {
   assert.equal(report.study.lessonPlan.cards[0].bestMove, "h9-g7");
 });
 
+test("game study CLI can load an oracle opening artifact", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "xiangqi-game-study-book-"));
+  const bookPath = join(dir, "oracle-book.json");
+
+  try {
+    await writeFile(bookPath, `${JSON.stringify(oracleBookFixture(), null, 2)}\n`, "utf8");
+    const { stdout } = await runGameStudyCli([
+      "--book", bookPath,
+      "--depth", "1",
+      "--time", "100",
+      "--max-position-studies", "0",
+      "--moves", "h9-g7",
+      "--json"
+    ]);
+    const report = JSON.parse(stdout);
+
+    assert.equal(report.options.bookPath, bookPath);
+    assert.equal(report.options.bookFormat, "json");
+    assert.equal(report.study.review.moves[0].book.isBookMove, true);
+    assert.equal(report.study.review.moves[0].book.played.name, "Fixture Oracle Horse");
+    assert.equal(report.study.lessonPlan.cards[0].type, "opening");
+    assert.equal(report.study.lessonPlan.cards[0].answer.move, "h9-g7");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("game study CLI can use the Pikafish engine preset", async () => {
   const { stdout } = await runGameStudyCli([
     "--engine-preset", "pikafish",
@@ -154,9 +182,39 @@ function runGameStudyCli(args) {
       XIANGQI_ORACLE_ENGINE_PRESET: "",
       XIANGQI_ORACLE_ENGINE_EVAL_FILE: "",
       XIANGQI_ORACLE_ENGINE_OPTIONS: "",
+      XIANGQI_OPENING_BOOK: "",
+      XIANGQI_OPENING_BOOK_FORMAT: "",
       XIANGQI_PIKAFISH_AUTO_DISCOVER: "false",
       XIANGQI_GAME_STUDY_MOVES: "",
       XIANGQI_GAME_STUDY_FILE: ""
     }
   });
+}
+
+function oracleBookFixture() {
+  return {
+    schema: "xiangqi.oracle-opening-book",
+    version: 1,
+    source: "CLI Oracle Fixture",
+    generatedAt: "2026-06-14T00:00:00.000Z",
+    initialFen: INITIAL_FEN,
+    records: [
+      {
+        fen: INITIAL_FEN,
+        move: "h9-g7",
+        weight: 150,
+        name: "Fixture Oracle Horse",
+        idea: "Use a generated oracle book to develop the horse first.",
+        tags: ["oracle", "fixture"],
+        source: "CLI Oracle Fixture",
+        side: "red",
+        ply: 1,
+        rank: 1,
+        engineScore: 42,
+        centipawnLoss: 0,
+        depth: 2,
+        principalVariation: "h9-g7"
+      }
+    ]
+  };
 }

@@ -71,6 +71,7 @@ stronger analysis:
 npm run study -- \
   --engine-preset pikafish \
   --oracle-preset pikafish \
+  --book ./oracle-opening-book.json \
   --json
 ```
 
@@ -202,6 +203,7 @@ npm run study:game -- --moves "h7-e7 h0-g2 h9-g7" --json
 npm run study:game -- --moves "1.C2=5 n8+7 2.N2+3 p7+1"
 npm run study:game -- --file ./game.json --max-position-studies 3
 npm run study:game -- --engine-preset pikafish --file ./game.json --json
+npm run study:game -- --book ./oracle-opening-book.json --file ./game.json --json
 ```
 
 The game-study importer accepts coordinate notation and common western Xiangqi

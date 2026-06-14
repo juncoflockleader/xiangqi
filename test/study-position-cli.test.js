@@ -1,9 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { dirname, resolve } from "node:path";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { INITIAL_FEN } from "../src/index.js";
 
 const execFileAsync = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -64,6 +67,30 @@ test("study position CLI emits machine-readable native backend study", async () 
   assert.equal(report.study.decision.alternatives[1].verdict, "playable");
   assert.equal(report.study.candidateLines.length, 2);
   assert.equal(report.study.candidateLines[1].move, "h7-e7");
+});
+
+test("study position CLI can load an oracle opening artifact", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "xiangqi-study-book-"));
+  const bookPath = join(dir, "oracle-book.json");
+
+  try {
+    await writeFile(bookPath, `${JSON.stringify(oracleBookFixture(), null, 2)}\n`, "utf8");
+    const { stdout } = await runStudyCli([
+      "--book", bookPath,
+      "--depth", "1",
+      "--time", "100",
+      "--json"
+    ]);
+    const report = JSON.parse(stdout);
+
+    assert.equal(report.options.bookPath, bookPath);
+    assert.equal(report.options.bookFormat, "json");
+    assert.equal(report.study.bestMove, "h9-g7");
+    assert.equal(report.study.decision.source, "opening-book");
+    assert.match(report.study.decision.summary, /Fixture Oracle Horse/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("study position CLI can use the Pikafish engine preset", async () => {
@@ -165,9 +192,39 @@ function runStudyCli(args) {
       XIANGQI_ORACLE_ENGINE_PRESET: "",
       XIANGQI_ORACLE_ENGINE_EVAL_FILE: "",
       XIANGQI_ORACLE_ENGINE_OPTIONS: "",
+      XIANGQI_OPENING_BOOK: "",
+      XIANGQI_OPENING_BOOK_FORMAT: "",
       XIANGQI_PIKAFISH_AUTO_DISCOVER: "false",
       XIANGQI_STUDY_FEN: "",
       XIANGQI_STUDY_MOVE: ""
     }
   });
+}
+
+function oracleBookFixture() {
+  return {
+    schema: "xiangqi.oracle-opening-book",
+    version: 1,
+    source: "CLI Oracle Fixture",
+    generatedAt: "2026-06-14T00:00:00.000Z",
+    initialFen: INITIAL_FEN,
+    records: [
+      {
+        fen: INITIAL_FEN,
+        move: "h9-g7",
+        weight: 150,
+        name: "Fixture Oracle Horse",
+        idea: "Use a generated oracle book to develop the horse first.",
+        tags: ["oracle", "fixture"],
+        source: "CLI Oracle Fixture",
+        side: "red",
+        ply: 1,
+        rank: 1,
+        engineScore: 42,
+        centipawnLoss: 0,
+        depth: 2,
+        principalVariation: "h9-g7"
+      }
+    ]
+  };
 }

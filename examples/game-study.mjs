@@ -15,6 +15,7 @@ import {
   parseNativeEngineOptions,
   splitEnvArgs
 } from "./native-cli-options.mjs";
+import { loadOpeningBook, resolveBookFormat } from "./opening-book-loader.mjs";
 
 let options;
 try {
@@ -39,9 +40,17 @@ try {
   process.exit(1);
 }
 
+let openingBook;
+try {
+  openingBook = await loadOpeningBook(options);
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+
 let backend;
 try {
-  backend = createGameStudyBackend(options);
+  backend = createGameStudyBackend(options, openingBook);
 } catch (error) {
   console.error(error.message);
   process.exit(1);
@@ -98,13 +107,14 @@ try {
   await backend.close?.();
 }
 
-function createGameStudyBackend(options) {
+function createGameStudyBackend(options, openingBook) {
   applyNativePresets(options);
 
   const base = createLearningEngineBackend({
     profile: options.profile,
     depth: options.depth,
     timeLimitMs: options.timeLimitMs,
+    ...(openingBook ? { book: openingBook } : {}),
     command: options.engineCommand,
     args: options.engineArgs,
     protocol: options.engineProtocol,
@@ -195,6 +205,8 @@ function parseArgs(args) {
     maxCards: numberFromEnv(process.env.XIANGQI_GAME_STUDY_CARDS, 4),
     maxPositionStudies: numberFromEnv(process.env.XIANGQI_GAME_STUDY_POSITIONS, 3),
     positionStudyPlies: parsePlyList(process.env.XIANGQI_GAME_STUDY_PLIES),
+    bookPath: process.env.XIANGQI_OPENING_BOOK,
+    bookFormat: process.env.XIANGQI_OPENING_BOOK_FORMAT ?? "auto",
     movesText: process.env.XIANGQI_GAME_STUDY_MOVES,
     movesFile: process.env.XIANGQI_GAME_STUDY_FILE,
     positionalMoves: [],
@@ -240,6 +252,16 @@ function parseArgs(args) {
     }
     if (arg === "--no-book") {
       parsed.useBook = false;
+      continue;
+    }
+    if (arg === "--book") {
+      parsed.bookPath = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--book-format") {
+      parsed.bookFormat = requireValue(args, index, arg);
+      index += 1;
       continue;
     }
     if (arg === "--no-pressure") {
@@ -413,6 +435,7 @@ function parseArgs(args) {
 
   parsed.engineProtocol = parseProtocol(parsed.engineProtocol, "XIANGQI_ENGINE_PROTOCOL");
   parsed.oracleProtocol = parseProtocol(parsed.oracleProtocol, "XIANGQI_ORACLE_ENGINE_PROTOCOL");
+  resolveBookFormat(parsed.bookPath ?? "", parsed.bookFormat);
   parsed.depth = assertPositiveInteger(parsed.depth, "depth");
   parsed.timeLimitMs = assertPositiveInteger(parsed.timeLimitMs, "time");
   parsed.studyDepth ??= parsed.depth;
@@ -500,6 +523,8 @@ function reportOptions(options, importedGame) {
     studyTimeLimitMs: options.studyTimeLimitMs,
     lines: options.lines,
     useBook: options.useBook,
+    bookPath: options.bookPath ?? null,
+    bookFormat: options.bookPath ? resolveBookFormat(options.bookPath, options.bookFormat) : null,
     maxKeyMoments: options.maxKeyMoments,
     maxCards: options.maxCards,
     maxPositionStudies: options.maxPositionStudies,
@@ -553,6 +578,8 @@ Options:
   --study-depth n          Position-study depth. Default: depth.
   --study-time ms          Position-study move time. Default: time.
   --lines n                Candidate lines in position studies. Default: 3.
+  --book file              Load opening book data from JSON, CSV/TSV, or text.
+  --book-format format     Book format: auto, json, csv, tsv, text, oracle, records.
   --max-key-moments n      Key reviewed moments to keep. Default: 5.
   --max-cards n            Lesson cards to create. Default: 4.
   --max-position-studies n Key moments to expand into studies. Default: 3.
