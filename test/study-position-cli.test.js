@@ -58,6 +58,10 @@ test("study position CLI emits machine-readable native backend study", async () 
   assert.equal(report.options.useBook, false);
   assert.equal(report.study.bestMove, "h9-g7");
   assert.equal(report.study.decision.source, "native-uci");
+  assert.equal(report.study.decision.comparison.bestMove, "h9-g7");
+  assert.equal(report.study.decision.comparison.nextMove, "h7-e7");
+  assert.equal(report.study.decision.alternatives.length, 2);
+  assert.equal(report.study.decision.alternatives[1].verdict, "playable");
   assert.equal(report.study.candidateLines.length, 2);
   assert.equal(report.study.candidateLines[1].move, "h7-e7");
 });

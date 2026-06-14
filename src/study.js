@@ -9,6 +9,7 @@ export function studyPositionWithEngine(engine, position, options = {}) {
     ? null
     : engine.chooseMove(position, {
         ...shared,
+        lines,
         ...(options.decisionOptions ?? {})
       });
   const analysis = options.includeAnalysis === false
@@ -55,6 +56,7 @@ export async function studyPositionWithBackend(backend, position, options = {}) 
     ? null
     : await backend.chooseMove(position, {
         ...shared,
+        lines,
         ...(options.decisionOptions ?? {})
       });
   const analysis = options.includeAnalysis === false
@@ -123,6 +125,21 @@ export function formatPositionStudy(study) {
     }
   }
 
+  if (study.decision?.comparison?.reason) {
+    lines.push(`Comparison: ${study.decision.comparison.reason}`);
+  }
+
+  if (study.decision?.alternatives?.length > 0) {
+    lines.push("Decision alternatives:");
+    for (const alternative of study.decision.alternatives.slice(0, 5)) {
+      const verdict = alternative.verdict ?? "candidate";
+      const loss = Number.isFinite(alternative.centipawnLoss)
+        ? `, loss ${alternative.centipawnLoss} cp`
+        : "";
+      lines.push(`  ${alternative.rank}. ${alternative.move} (${alternative.scoreText}, ${verdict}${loss})`);
+    }
+  }
+
   return lines.join("\n");
 }
 
@@ -169,6 +186,8 @@ function summarizeDecision(decision) {
     reasons: [...(decision.explanation?.reasons ?? [])],
     confidence: decision.explanation?.confidence ?? null,
     linePlan: decision.explanation?.linePlan ?? null,
+    comparison: summarizeComparison(decision.explanation?.comparison),
+    alternatives: summarizeDecisionAlternatives(decision.explanation?.alternatives),
     principalVariation: (decision.principalVariation ?? []).map(notationFor).filter(Boolean),
     oracleReview: decision.oracleReview ?? decision.explanation?.oracleReview ?? null,
     backendFallback: decision.backendFallback ?? null
@@ -297,7 +316,57 @@ function nextStudySteps({ decision, coach, playedMoveReview, pressure }) {
       text: decision.linePlan.summary
     });
   }
+  if (decision?.comparison?.reason) {
+    steps.push({
+      kind: "comparison",
+      text: decision.comparison.reason
+    });
+  }
   return steps.slice(0, 4);
+}
+
+function summarizeComparison(comparison) {
+  if (!comparison) return null;
+
+  return {
+    ...comparison,
+    bestLine: [...(comparison.bestLine ?? [])],
+    nextLine: [...(comparison.nextLine ?? [])]
+  };
+}
+
+function summarizeDecisionAlternatives(alternatives) {
+  return (alternatives ?? []).map((alternative) => ({
+    rank: alternative.rank,
+    move: alternative.move,
+    score: Math.round(alternative.score ?? 0),
+    scoreDetail: scoreDetailFor(alternative),
+    scoreText: scoreTextForAlternative(alternative),
+    wdl: alternative.wdl ?? null,
+    centipawnLoss: Number.isFinite(alternative.centipawnLoss)
+      ? Math.round(alternative.centipawnLoss)
+      : null,
+    verdict: alternative.verdict ?? null,
+    summary: alternative.summary ?? "",
+    reasons: [...(alternative.reasons ?? [])],
+    expectedReply: alternative.expectedReply ?? null,
+    motifs: [...(alternative.motifs ?? [])],
+    linePlanSummary: alternative.linePlanSummary ?? "",
+    principalVariation: [...(alternative.principalVariation ?? [])],
+    principalVariationText: alternative.principalVariationText ?? "",
+    note: alternative.note ?? ""
+  }));
+}
+
+function scoreTextForAlternative(alternative) {
+  const detail = scoreDetailFor(alternative);
+  if (detail?.text) return detail.text;
+
+  if (Number.isFinite(alternative.centipawnLoss) || alternative.verdict) {
+    return formatCentipawns(alternative.score);
+  }
+
+  return `score ${Math.round(alternative.score ?? 0)}`;
 }
 
 function sharedStudyOptions(options) {

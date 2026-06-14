@@ -125,3 +125,41 @@ test("backend position study preserves native score details", async () => {
     await backend.close();
   }
 });
+
+test("backend position study preserves structured decision alternatives", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    depth: 2,
+    timeLimitMs: 100,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const study = await studyPositionWithBackend(backend, createInitialPosition(), {
+      useBook: false,
+      depth: 2,
+      timeLimitMs: 100,
+      lines: 2
+    });
+    const text = formatPositionStudy(study);
+
+    assert.equal(study.decision.comparison.bestMove, "h9-g7");
+    assert.equal(study.decision.comparison.nextMove, "h7-e7");
+    assert.equal(study.decision.comparison.scoreGap, 30);
+    assert.ok(study.decision.comparison.reason.includes("Native MultiPV rates h9-g7"));
+    assert.equal(study.decision.alternatives.length, 2);
+    assert.equal(study.decision.alternatives[0].move, "h9-g7");
+    assert.equal(study.decision.alternatives[0].verdict, "best");
+    assert.equal(study.decision.alternatives[0].scoreText, "+0.42");
+    assert.equal(study.decision.alternatives[1].move, "h7-e7");
+    assert.equal(study.decision.alternatives[1].verdict, "playable");
+    assert.ok(study.decision.alternatives[1].reasons[0].includes("top native line"));
+    assert.match(text, /Comparison: Native MultiPV rates h9-g7 30 centipawns/);
+    assert.match(text, /Decision alternatives:/);
+  } finally {
+    await backend.close();
+  }
+});
