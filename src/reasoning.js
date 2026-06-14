@@ -74,7 +74,7 @@ export function explainMove(position, searchResult) {
   return {
     summary,
     reasons: unique(reasons).slice(0, 7),
-    alternatives: explainAlternatives(searchResult.candidates ?? []),
+    alternatives: explainAlternatives(position, searchResult.candidates ?? []),
     principalVariation: bestLine.map((candidate) => candidate.notation ?? moveToNotation(candidate)),
     principalVariationText: formatPrincipalVariation(bestLine),
     linePlan: buildLinePlan(position, bestLine, { perspective: position.turn }),
@@ -443,7 +443,7 @@ function lineMoveNotation(move) {
     : move.notation ?? moveToNotation(move);
 }
 
-function explainAlternatives(candidates) {
+function explainAlternatives(position, candidates) {
   const bestScore = candidates[0]?.score ?? 0;
 
   return candidates.slice(0, 5).map((candidate, index) => {
@@ -454,6 +454,12 @@ function explainAlternatives(candidates) {
     const contrast = alternativeContrast(index, centipawnLoss);
     const principalVariation = (candidate.principalVariation ?? [])
       .map((lineMove) => lineMove.notation ?? moveToNotation(lineMove));
+    const moveStory = explainMoveFeatures(position, move);
+    const repetitionReason = explainRepetition(candidate.repetition);
+    const linePlan = buildLinePlan(position, candidate.principalVariation ?? [move], {
+      perspective: position.turn
+    });
+    const expectedReply = principalVariation[1] ?? null;
 
     if (candidate.repetition) {
       tactical.push("repeats a known position for a draw-assumed score");
@@ -471,6 +477,15 @@ function explainAlternatives(candidates) {
       score: Math.round(candidate.score),
       centipawnLoss,
       verdict,
+      summary: moveStory.summary,
+      reasons: unique([
+        contrast,
+        ...(repetitionReason ? [repetitionReason] : []),
+        ...moveStory.reasons
+      ]).slice(0, 5),
+      expectedReply,
+      motifs: linePlan.motifs,
+      linePlanSummary: linePlan.summary,
       principalVariation,
       principalVariationText: principalVariation.join(" "),
       note: `${contrast}; ${tactical.length > 0

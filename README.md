@@ -14,7 +14,7 @@ The current engine is dependency-free JavaScript and includes:
 - Static exchange analysis for distinguishing clean wins, tactically poisoned captures, and defended captures that remain sound after recaptures.
 - Immediate pressure/threat analysis for both sides.
 - Perft helpers for validating move generation while the engine grows.
-- Explainable move output for learning-app use cases, including structured confidence, depth-by-depth search trace, best-move stability, alternative-line verdicts, and draw-assumed repetition notes.
+- Explainable move output for learning-app use cases, including structured confidence, depth-by-depth search trace, best-move stability, alternative-line verdicts, expected replies, why-not reasons, and draw-assumed repetition notes.
 - Progressive coach hints that can reveal an idea, tactical clue, candidate focus, and full best-move reasoning.
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
 - Whole-game review with side summaries, opening-book matches, and key learning moments.
@@ -58,7 +58,7 @@ console.log(result.explanation.confidence.level);
 console.log(result.explanation.linePlan.summary);
 ```
 
-`chooseMove` returns the selected legal move, search score, principal variation, root candidates, selective-search stats, per-depth iteration trace, and a learning-friendly explanation. The explanation is based on engine-visible facts such as search score, tactical features, evaluation deltas, best-move stability across depths, and comparison against alternatives. `explanation.confidence` gives the UI a structured score, level, label, and factor list derived from depth, candidate gaps, stability, timeout status, or opening-database evidence. `explanation.linePlan` turns the principal variation into a teaching plan with the first move, expected reply, continuation moves, tactical motifs, and score-by-ply annotations from the root side's perspective.
+`chooseMove` returns the selected legal move, search score, principal variation, root candidates, selective-search stats, per-depth iteration trace, and a learning-friendly explanation. The explanation is based on engine-visible facts such as search score, tactical features, evaluation deltas, best-move stability across depths, and comparison against alternatives. `explanation.alternatives` includes verdicts, centipawn loss, expected replies, motifs, and concise reasons explaining why each candidate is better or worse than the top line. `explanation.confidence` gives the UI a structured score, level, label, and factor list derived from depth, candidate gaps, stability, timeout status, or opening-database evidence. `explanation.linePlan` turns the principal variation into a teaching plan with the first move, expected reply, continuation moves, tactical motifs, and score-by-ply annotations from the root side's perspective.
 
 Use named engine profiles when wiring the app:
 
