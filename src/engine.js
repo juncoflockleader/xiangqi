@@ -7,18 +7,20 @@ import { explainBookMove, explainCandidateMove, explainMove, explainReviewedMove
 import { reviewGameWithEngine } from "./review.js";
 import { coachMoveWithEngine } from "./coach.js";
 import { createLessonPlanWithEngine } from "./lesson.js";
+import { resolveEngineOptions } from "./profiles.js";
 import { searchBestMove } from "./search.js";
 import { createTranspositionTable } from "./transposition.js";
 
 export function createEngine(defaultOptions = {}) {
+  const engineOptions = resolveEngineOptions(defaultOptions);
   const transpositionTable = createTranspositionTable({
-    maxEntries: defaultOptions.maxTranspositionEntries ?? defaultOptions.ttSize,
-    replacementSample: defaultOptions.transpositionReplacementSample
+    maxEntries: engineOptions.maxTranspositionEntries ?? engineOptions.ttSize,
+    replacementSample: engineOptions.transpositionReplacementSample
   });
 
   return {
     chooseMove(position, options = {}) {
-      const mergedOptions = { ...defaultOptions, ...options };
+      const mergedOptions = { ...engineOptions, ...options };
       const bookResult = maybeBookResult(position, mergedOptions, transpositionTable.size);
       if (bookResult) return bookResult;
 
@@ -35,7 +37,7 @@ export function createEngine(defaultOptions = {}) {
 
     openingBook(position, options = {}) {
       return lookupOpeningBook(position, {
-        ...defaultOptions,
+        ...engineOptions,
         ...options
       });
     },
@@ -43,7 +45,7 @@ export function createEngine(defaultOptions = {}) {
     analyzePosition(position, options = {}) {
       const lineCount = normalizeLineCount(options.lines ?? options.multiPv ?? options.multipv ?? 5);
       const search = searchBestMove(position, {
-        ...defaultOptions,
+        ...engineOptions,
         ...options,
         candidateLimit: lineCount,
         transpositionTable
@@ -72,7 +74,7 @@ export function createEngine(defaultOptions = {}) {
     reviewMove(position, moveOrNotation, options = {}) {
       const move = resolveLegalMove(position, moveOrNotation);
       const search = searchBestMove(position, {
-        ...defaultOptions,
+        ...engineOptions,
         ...options,
         candidateLimit: Number.POSITIVE_INFINITY,
         priorityMoves: [move],
@@ -113,7 +115,7 @@ export function createEngine(defaultOptions = {}) {
       return reviewGameWithEngine(this, moves, {
         ...options,
         reviewOptions: {
-          ...defaultOptions,
+          ...engineOptions,
           ...(options.reviewOptions ?? {})
         }
       });
@@ -121,7 +123,7 @@ export function createEngine(defaultOptions = {}) {
 
     coachMove(position, options = {}) {
       return coachMoveWithEngine(this, position, {
-        ...defaultOptions,
+        ...engineOptions,
         ...options
       });
     },
@@ -130,7 +132,7 @@ export function createEngine(defaultOptions = {}) {
       return createLessonPlanWithEngine(this, moves, {
         ...options,
         reviewOptions: {
-          ...defaultOptions,
+          ...engineOptions,
           ...(options.reviewOptions ?? {})
         }
       });

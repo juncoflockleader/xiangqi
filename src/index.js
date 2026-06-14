@@ -14,6 +14,7 @@ export * from "./engine.js";
 export * from "./backend.js";
 export * from "./ucci-backend.js";
 export * from "./benchmark.js";
+export * from "./profiles.js";
 export * from "./review.js";
 export * from "./coach.js";
 export * from "./lesson.js";

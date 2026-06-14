@@ -87,7 +87,7 @@ test("native backend can use a UCI handshake for top-engine compatibility", asyn
   const backend = createUcciEngineBackend({
     command: process.execPath,
     args: [MOCK_UCCI_PATH.pathname],
-    protocol: "uci",
+    profile: "native-uci",
     depth: 2,
     timeLimitMs: 500,
     startupTimeoutMs: 1000,

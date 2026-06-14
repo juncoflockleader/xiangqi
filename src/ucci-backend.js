@@ -17,27 +17,29 @@ import { hasClockTimeControl, resolveSearchBudget } from "./time.js";
 import { reviewGameWithBackend } from "./review.js";
 import { coachMoveWithBackend } from "./coach.js";
 import { createLessonPlanWithBackend } from "./lesson.js";
+import { resolveEngineOptions } from "./profiles.js";
 
 const DEFAULT_UCCI_TIMEOUT_MS = 5000;
 const DEFAULT_SEARCH_TIMEOUT_MS = 30000;
 
 export function createUcciEngineBackend(options = {}) {
-  if (!options.command) {
+  const backendOptions = resolveEngineOptions(options);
+  if (!backendOptions.command) {
     throw new Error("Native engine backend requires a command.");
   }
 
-  const referenceEngine = options.referenceEngine ?? createEngine(options.referenceOptions ?? options);
-  const client = new UcciProcessClient(options);
-  const protocol = normalizeNativeProtocol(options.protocol);
+  const referenceEngine = backendOptions.referenceEngine ?? createEngine(backendOptions.referenceOptions ?? backendOptions);
+  const client = new UcciProcessClient(backendOptions);
+  const protocol = normalizeNativeProtocol(backendOptions.protocol);
   const source = nativeSource(protocol);
-  const name = options.name ?? (protocol === "uci" ? "Native UCI Engine" : "Native UCCI Engine");
+  const name = backendOptions.name ?? (protocol === "uci" ? "Native UCI Engine" : "Native UCCI Engine");
   let backend;
 
   backend = createEngineBackend({
-    id: options.id ?? source,
+    id: backendOptions.id ?? source,
     name,
     kind: source,
-    description: options.description ?? "External UCI/UCCI-compatible engine backend for stronger native or WASM search.",
+    description: backendOptions.description ?? "External UCI/UCCI-compatible engine backend for stronger native or WASM search.",
     features: [
       protocol === "uci" ? ENGINE_BACKEND_FEATURES.UCI_COMPATIBLE : ENGINE_BACKEND_FEATURES.UCCI_COMPATIBLE,
       ENGINE_BACKEND_FEATURES.NATIVE_READY,
@@ -48,7 +50,7 @@ export function createUcciEngineBackend(options = {}) {
       ENGINE_BACKEND_FEATURES.PRESSURE
     ],
     chooseMove: async (position, searchOptions = {}) => {
-      const mergedOptions = mergeNativeOptions(options, searchOptions, {
+      const mergedOptions = mergeNativeOptions(backendOptions, searchOptions, {
         lines: 1,
         backendName: name,
         protocol
@@ -58,8 +60,8 @@ export function createUcciEngineBackend(options = {}) {
       return nativeSearch(client, position, mergedOptions);
     },
     analyzePosition: async (position, searchOptions = {}) => {
-      const lineCount = normalizeLineCount(searchOptions.lines ?? searchOptions.multiPv ?? searchOptions.multipv ?? options.lines ?? 3);
-      const result = await nativeSearch(client, position, mergeNativeOptions(options, searchOptions, {
+      const lineCount = normalizeLineCount(searchOptions.lines ?? searchOptions.multiPv ?? searchOptions.multipv ?? backendOptions.lines ?? 3);
+      const result = await nativeSearch(client, position, mergeNativeOptions(backendOptions, searchOptions, {
         lines: lineCount,
         backendName: name,
         protocol
@@ -83,7 +85,7 @@ export function createUcciEngineBackend(options = {}) {
         }))
       };
     },
-    reviewMove: async (position, move, reviewOptions = {}) => nativeReviewMove(client, position, move, mergeNativeOptions(options, reviewOptions, {
+    reviewMove: async (position, move, reviewOptions = {}) => nativeReviewMove(client, position, move, mergeNativeOptions(backendOptions, reviewOptions, {
       backendName: name,
       lines: 1,
       protocol,
@@ -93,7 +95,7 @@ export function createUcciEngineBackend(options = {}) {
       const { reviewOptions = {}, ...gameReviewOptions } = gameOptions;
       return reviewGameWithBackend(backend, moves, {
         ...gameReviewOptions,
-        reviewOptions: mergeNativeOptions(options, reviewOptions, {
+        reviewOptions: mergeNativeOptions(backendOptions, reviewOptions, {
           backendName: name,
           lines: 1,
           protocol,
@@ -106,7 +108,7 @@ export function createUcciEngineBackend(options = {}) {
       const { reviewOptions = {}, ...planOptions } = lessonOptions;
       return createLessonPlanWithBackend(backend, moves, {
         ...planOptions,
-        reviewOptions: mergeNativeOptions(options, reviewOptions, {
+        reviewOptions: mergeNativeOptions(backendOptions, reviewOptions, {
           backendName: name,
           lines: 1,
           protocol,

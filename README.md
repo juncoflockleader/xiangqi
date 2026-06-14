@@ -21,6 +21,7 @@ The current engine is dependency-free JavaScript and includes:
 - Lesson-plan generation that turns reviewed games into prompt, hint, and answer cards.
 - Game-history helpers for play sessions, reviewed move logs, engine decision logs, position history, repeated-position detection, and async native-backend play.
 - A backend adapter contract and async UCI/UCCI process wrapper so the JS reference engine can sit beside a native C++/WASM engine without changing the learning-app API.
+- Named engine profiles for fast play, balanced play, deeper analysis, and native UCI/UCCI analysis setups.
 - Shared time-control budgeting for fixed movetime and clock-based `wtime`/`btime`/increment searches.
 - Starter benchmark positions for opening, tactical, and forcing-search regressions.
 - A minimal UCCI-style protocol adapter for GUI/app integration and engine smoke testing.
@@ -41,7 +42,7 @@ node --test
 import { createEngine, createInitialPosition } from "./src/index.js";
 
 const position = createInitialPosition();
-const engine = createEngine({ depth: 4, timeLimitMs: 1500 });
+const engine = createEngine({ profile: "balanced" });
 const result = engine.chooseMove(position);
 
 console.log(result.bestMove.notation);
@@ -49,6 +50,19 @@ console.log(result.explanation.summary);
 ```
 
 `chooseMove` returns the selected legal move, search score, principal variation, root candidates, selective-search stats, per-depth iteration trace, and a learning-friendly explanation. The explanation is based on engine-visible facts such as search score, tactical features, evaluation deltas, best-move stability across depths, and comparison against alternatives.
+
+Use named engine profiles when wiring the app:
+
+```js
+import { createEngine, listEngineProfiles } from "./src/index.js";
+
+console.log(listEngineProfiles().map((profile) => profile.id));
+
+const fastEngine = createEngine({ profile: "fast" });
+const analysisEngine = createEngine({ profile: "analysis", depth: 6 });
+```
+
+Profiles are presets only: explicit options such as `depth`, `timeLimitMs`, `lines`, or `maxTranspositionEntries` override the profile defaults.
 
 Use the opening book or opt into pure search:
 
@@ -99,9 +113,8 @@ console.log(backend.supports(ENGINE_BACKEND_FEATURES.EXPLANATION));
 
 const nativeBackend = createUcciEngineBackend({
   command: "/path/to/pikafish-or-other-native-engine",
-  protocol: "uci",
-  depth: 8,
-  timeLimitMs: 3000
+  profile: "native-uci",
+  depth: 8
 });
 
 const nativeResult = await nativeBackend.chooseMove(position);
@@ -182,8 +195,7 @@ import {
 const jsBackend = createJavaScriptEngineBackend({ depth: 3, timeLimitMs: 1000 });
 const nativeBackend = createUcciEngineBackend({
   command: "/path/to/pikafish-or-other-native-engine",
-  protocol: "uci",
-  depth: 8,
+  profile: "native-uci",
   timeLimitMs: 3000
 });
 

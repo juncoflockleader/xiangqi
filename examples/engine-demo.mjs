@@ -5,7 +5,7 @@ import {
 } from "../src/index.js";
 
 const position = createInitialPosition();
-const engine = createEngine({ depth: 2, timeLimitMs: 1000 });
+const engine = createEngine({ profile: "balanced", depth: 2, timeLimitMs: 1000 });
 const result = engine.chooseMove(position);
 
 console.log(formatBoard(position));
