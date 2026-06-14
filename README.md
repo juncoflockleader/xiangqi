@@ -89,6 +89,7 @@ Import or merge opening data:
 ```js
 import {
   createEngine,
+  createOpeningBookFromCsv,
   createOpeningBookFromRecords,
   createOpeningBookFromText,
   DEFAULT_OPENING_BOOK,
@@ -114,9 +115,14 @@ const databaseBook = createOpeningBookFromRecords([
     name: "Central Cannon Main Line"
   }
 ]);
+
+const csvBook = createOpeningBookFromCsv(`
+  moves,games,red_win_rate,draw_rate,black_win_rate,cp,source,name,tags
+  "h7-e7 h0-g2",1200,0.54,0.24,0.22,32,master-db,Central Cannon,csv
+`);
 ```
 
-The text importer accepts move lines plus optional `weight`, `count`, `frequency`, or `games` metadata. The structured-record importer also accepts common database priors such as `games`, `redWinRate`, `drawRate`, `blackWinRate`, `engineScore`, `source`, and `year`; it weights each continuation for the side to move and carries a database summary into the explanation. Repeated lines aggregate their weights, which makes it suitable for converting a larger opening database into engine heuristics.
+The text importer accepts move lines plus optional `weight`, `count`, `frequency`, or `games` metadata. The structured-record importer also accepts common database priors such as `games`, `redWinRate`, `drawRate`, `blackWinRate`, `engineScore`, `source`, and `year`; the CSV/TSV importer recognizes common headers such as `moves`, `red_win_rate`, `draw_rate`, `black_win_rate`, `cp`, `source`, `name`, and `tags`. Imported records weight each continuation for the side to move and carry a database summary into the explanation. Repeated lines aggregate their weights, which makes it suitable for converting a larger opening database into engine heuristics.
 
 Choose an engine backend:
 

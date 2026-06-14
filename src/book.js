@@ -213,11 +213,39 @@ export function createOpeningBookFromRecords(records, options = {}) {
   }, options);
 }
 
+export function createOpeningBookFromCsv(text, options = {}) {
+  return createOpeningBookFromRecords(parseOpeningBookCsv(text, options), options);
+}
+
 export function parseOpeningBookText(text) {
   return String(text)
     .split(/\r?\n/)
     .map((line, index) => parseOpeningBookLine(line, index + 1))
     .filter(Boolean);
+}
+
+export function parseOpeningBookCsv(text, options = {}) {
+  const delimiter = options.delimiter ?? detectCsvDelimiter(text);
+  const rows = parseDelimitedRows(String(text), delimiter);
+  if (rows.length === 0) return [];
+
+  const headers = rows[0].map(normalizeCsvHeader);
+  return rows.slice(1).map((row, index) => {
+    const record = {};
+
+    for (let column = 0; column < headers.length; column += 1) {
+      const key = headers[column];
+      const value = row[column]?.trim() ?? "";
+      if (!key || value === "") continue;
+      record[key] = value;
+    }
+
+    if (!record.moves && !record.line && !record.pv && !record.move) {
+      throw new Error(`Opening CSV row ${index + 2} requires a moves, line, pv, or move column.`);
+    }
+
+    return record;
+  });
 }
 
 export function mergeOpeningBooks(...books) {
@@ -651,6 +679,138 @@ function parseLineMetadata(parts) {
 
   return metadata;
 }
+
+function parseDelimitedRows(text, delimiter) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (quoted) {
+      if (char === "\"") {
+        if (text[index + 1] === "\"") {
+          field += "\"";
+          index += 1;
+        } else {
+          quoted = false;
+        }
+      } else {
+        field += char;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      quoted = true;
+    } else if (char === delimiter) {
+      row.push(field);
+      field = "";
+    } else if (char === "\n") {
+      row.push(field);
+      pushDelimitedRow(rows, row);
+      row = [];
+      field = "";
+    } else if (char === "\r") {
+      row.push(field);
+      pushDelimitedRow(rows, row);
+      row = [];
+      field = "";
+      if (text[index + 1] === "\n") index += 1;
+    } else {
+      field += char;
+    }
+  }
+
+  if (quoted) {
+    throw new Error("Opening CSV has an unterminated quoted field.");
+  }
+
+  if (field !== "" || row.length > 0) {
+    row.push(field);
+    pushDelimitedRow(rows, row);
+  }
+
+  return rows;
+}
+
+function pushDelimitedRow(rows, row) {
+  const trimmed = row.map((field) => field.trim());
+  if (trimmed.every((field) => field === "")) return;
+  const first = trimmed.find((field) => field !== "") ?? "";
+  if (first.startsWith("#") || first.startsWith("//")) return;
+  rows.push(trimmed);
+}
+
+function detectCsvDelimiter(text) {
+  const firstLine = String(text)
+    .split(/\r?\n/)
+    .find((line) => {
+      const trimmed = line.trim();
+      return trimmed && !trimmed.startsWith("#") && !trimmed.startsWith("//");
+    }) ?? "";
+
+  return firstLine.includes("\t") ? "\t" : ",";
+}
+
+function normalizeCsvHeader(header) {
+  const normalized = String(header)
+    .trim()
+    .replace(/^\uFEFF/, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+  return CSV_HEADER_ALIASES[normalized] ?? String(header).trim();
+}
+
+const CSV_HEADER_ALIASES = Object.freeze({
+  moves: "moves",
+  line: "moves",
+  pv: "moves",
+  variation: "moves",
+  sequence: "moves",
+  move: "move",
+  notation: "move",
+  bestmove: "move",
+  fen: "fen",
+  key: "key",
+  position: "fen",
+  initialfen: "initialFen",
+  startfen: "initialFen",
+  name: "name",
+  opening: "opening",
+  label: "label",
+  idea: "idea",
+  tags: "tags",
+  weight: "weight",
+  games: "games",
+  count: "count",
+  frequency: "frequency",
+  played: "played",
+  redwins: "redWins",
+  blackwins: "blackWins",
+  draws: "draws",
+  redwinrate: "redWinRate",
+  redrate: "redRate",
+  blackwinrate: "blackWinRate",
+  blackrate: "blackRate",
+  drawrate: "drawRate",
+  expectedscore: "expectedScore",
+  expected: "expectedScore",
+  sidewinrate: "sideWinRate",
+  winrate: "winRate",
+  sidelossrate: "sideLossRate",
+  lossrate: "lossRate",
+  enginescore: "engineScore",
+  cp: "engineScore",
+  centipawns: "engineScore",
+  source: "source",
+  db: "db",
+  database: "database",
+  year: "year"
+});
 
 function stripOpeningComment(line) {
   return line.replace(/\s*(#|\/\/).*$/, "");

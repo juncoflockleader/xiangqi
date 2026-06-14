@@ -3,11 +3,13 @@ import assert from "node:assert/strict";
 import {
   createEngine,
   createInitialPosition,
+  createOpeningBookFromCsv,
   createOpeningBookFromRecords,
   createOpeningBookFromText,
   DEFAULT_OPENING_BOOK,
   lookupOpeningBook,
   mergeOpeningBooks,
+  parseOpeningBookCsv,
   positionKey
 } from "../src/index.js";
 
@@ -214,4 +216,38 @@ test("structured opening records can target a specific FEN position", () => {
   assert.equal(reply.move.notation, "b0-c2");
   assert.equal(reply.entry.database.side, "black");
   assert.equal(reply.entry.database.source, "position-table");
+});
+
+test("opening database CSV imports weighted lines with column aliases", () => {
+  const imported = createOpeningBookFromCsv(`
+    moves,games,red_win_rate,draw_rate,black_win_rate,cp,source,name,tags
+    "h7-e7 h0-g2",120,0.62,0.2,0.18,24,master-csv,"CSV Central Cannon","database,csv,cannon"
+    "b9-c7 h0-g2",80,0.45,0.22,0.33,0,master-csv,"CSV Horse Opening","database,csv,horse"
+  `);
+  const engine = createEngine({ book: imported, openingHeuristics: false, depth: 1, timeLimitMs: 500 });
+  const result = engine.chooseMove(createInitialPosition());
+
+  assert.equal(result.source, "opening-book");
+  assert.equal(result.bestMove.notation, "h7-e7");
+  assert.equal(result.book.name, "CSV Central Cannon");
+  assert.equal(result.book.database.source, "master-csv");
+  assert.equal(Math.round(result.book.database.expectedScore * 100), 72);
+  assert.ok(result.book.tags.includes("csv"));
+
+  const reply = engine.openingBook(engine.play(createInitialPosition(), "h7-e7"));
+  assert.equal(reply.move.notation, "h0-g2");
+  assert.equal(reply.entry.database.side, "black");
+});
+
+test("opening database parser auto-detects TSV exports", () => {
+  const records = parseOpeningBookCsv([
+    "line\tgames\tblack_win_rate\tdraw_rate\tred_win_rate\tname",
+    "h7-e7 b0-c2\t90\t0.5\t0.2\t0.3\tTSV Screen Horse"
+  ].join("\n"));
+
+  assert.equal(records.length, 1);
+  assert.equal(records[0].moves, "h7-e7 b0-c2");
+  assert.equal(records[0].blackWinRate, "0.5");
+  assert.equal(records[0].drawRate, "0.2");
+  assert.equal(records[0].name, "TSV Screen Horse");
 });
