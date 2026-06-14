@@ -178,7 +178,7 @@ export class UcciSession {
     }
 
     outputs.push(
-      `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes} qnodes ${result.stats.qnodes} qchecks ${result.stats.qchecks} tthits ${result.stats.ttHits} ttstores ${result.stats.ttStores} ttevict ${result.stats.ttEvictions} asp ${result.stats.aspirationSearches} asphi ${result.stats.aspirationFailHigh} asplo ${result.stats.aspirationFailLow} ext ${result.stats.extensions} futil ${result.stats.futilityPrunes} delta ${result.stats.deltaPrunes} nmp ${result.stats.nullMovePrunes} cm ${result.stats.countermoveHits} rootord ${result.stats.rootScoreOrderHits} rootmoves ${result.stats.rootMovesSearched} pvs ${result.stats.pvsResearches} pv ${pv}`,
+      `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes} qnodes ${result.stats.qnodes} qchecks ${result.stats.qchecks} tthits ${result.stats.ttHits} ttstores ${result.stats.ttStores} ttevict ${result.stats.ttEvictions} asp ${result.stats.aspirationSearches} asphi ${result.stats.aspirationFailHigh} asplo ${result.stats.aspirationFailLow} ext ${result.stats.extensions} razor ${result.stats.razorPrunes} futil ${result.stats.futilityPrunes} delta ${result.stats.deltaPrunes} nmp ${result.stats.nullMovePrunes} cm ${result.stats.countermoveHits} rootord ${result.stats.rootScoreOrderHits} rootmoves ${result.stats.rootMovesSearched} pvs ${result.stats.pvsResearches} pv ${pv}`,
       `info string ${result.explanation.summary}`
     );
 

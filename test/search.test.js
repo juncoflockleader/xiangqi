@@ -261,6 +261,28 @@ test("search prunes shallow quiet moves with futility margins", () => {
   assert.ok(withPruning.nodes < withoutPruning.nodes);
 });
 
+test("search razors shallow quiet branches after quiescence verification", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const withRazoring = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false
+  });
+  const withoutRazoring = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useRazoring: false
+  });
+
+  assert.equal(withRazoring.depth, 3);
+  assert.equal(withRazoring.bestMove.notation, withoutRazoring.bestMove.notation);
+  assert.equal(withRazoring.score, withoutRazoring.score);
+  assert.ok(withRazoring.stats.razorPrunes > 0);
+  assert.equal(withoutRazoring.stats.razorPrunes, 0);
+  assert.ok(withRazoring.nodes < withoutRazoring.nodes);
+});
+
 test("search can order replies with the countermove heuristic", () => {
   const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
   const result = searchBestMove(position, {

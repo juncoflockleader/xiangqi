@@ -36,6 +36,8 @@ const DEFAULT_QCHECK_DEPTH = 1;
 const DEFAULT_DELTA_MARGIN = 160;
 const FUTILITY_BASE_MARGIN = 90;
 const FUTILITY_DEPTH_MARGIN = 70;
+const RAZOR_BASE_MARGIN = 180;
+const RAZOR_DEPTH_MARGIN = 120;
 const NULL_MOVE_MIN_DEPTH = 3;
 const TRANSPOSITION_MATE_BOUND = MATE_SCORE - 1000;
 
@@ -114,6 +116,7 @@ export function searchBestMove(position, options = {}) {
       usePvs: options.usePvs !== false,
       useCountermoves: options.useCountermoves !== false,
       useRootScoreOrdering: options.useRootScoreOrdering !== false,
+      useRazoring: options.useRazoring !== false,
       useFutilityPruning: options.useFutilityPruning !== false,
       useDeltaPruning: options.useDeltaPruning !== false,
       useQuiescenceChecks: options.useQuiescenceChecks !== false,
@@ -389,6 +392,20 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   let bestChildLine = [];
   const ordered = orderMoves(position, legalMoves, tt?.bestMove, context, ply, previousMove);
   const staticScore = inCheck ? null : evaluatePosition(position, position.turn).score;
+
+  if (shouldRazor({ depth, inCheck, alpha, beta, staticScore, context })) {
+    const razorScore = quiescence(position, alpha, beta, ply, context, context.qCheckDepth);
+    if (context.timedOut) {
+      leavePosition(context, repetitionKey);
+      return razorScore;
+    }
+    if (razorScore <= alpha) {
+      context.stats.razorPrunes += 1;
+      leavePosition(context, repetitionKey);
+      return razorScore;
+    }
+    context.stats.razorResearches += 1;
+  }
 
   for (let index = 0; index < ordered.length; index += 1) {
     const move = ordered[index];
@@ -701,6 +718,19 @@ function shouldPruneFutility({
   return staticScore + futilityMargin(depth) <= alpha;
 }
 
+function shouldRazor({ depth, inCheck, alpha, beta, staticScore, context }) {
+  if (!context.useRazoring) return false;
+  if (inCheck || staticScore === null) return false;
+  if (depth < 1 || depth > 2) return false;
+  if (alpha <= -MATE_SCORE + 1000 || beta >= MATE_SCORE - 1000) return false;
+
+  return staticScore + razorMargin(depth) <= alpha;
+}
+
+function razorMargin(depth) {
+  return RAZOR_BASE_MARGIN + RAZOR_DEPTH_MARGIN * depth;
+}
+
 function shouldPruneDelta({ position, move, standPat, alpha, context }) {
   if (!context.useDeltaPruning) return false;
   if (!move.captured) return false;
@@ -848,6 +878,8 @@ function createSearchStats() {
     aspirationFailHigh: 0,
     aspirationFailLow: 0,
     extensions: 0,
+    razorPrunes: 0,
+    razorResearches: 0,
     futilityPrunes: 0,
     deltaPrunes: 0,
     reductions: 0,
@@ -877,6 +909,8 @@ function mergeSearchStats(total, next) {
     aspirationFailHigh: total.aspirationFailHigh + next.aspirationFailHigh,
     aspirationFailLow: total.aspirationFailLow + next.aspirationFailLow,
     extensions: total.extensions + next.extensions,
+    razorPrunes: total.razorPrunes + next.razorPrunes,
+    razorResearches: total.razorResearches + next.razorResearches,
     futilityPrunes: total.futilityPrunes + next.futilityPrunes,
     deltaPrunes: total.deltaPrunes + next.deltaPrunes,
     reductions: total.reductions + next.reductions,
