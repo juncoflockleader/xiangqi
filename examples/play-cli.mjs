@@ -298,6 +298,9 @@ function printOracleReview(review) {
 function printReview(review) {
   if (!review) return;
   console.log(`Review: ${review.classification}, ${review.centipawnLoss} cp loss.`);
+  if (review.reviewBackend?.name) {
+    console.log(`Review source: ${review.reviewBackend.name}.`);
+  }
   console.log(review.explanation.summary);
   if (!review.isBestMove && review.bestMove) {
     console.log(`Engine preferred ${review.bestMove.notation}.`);

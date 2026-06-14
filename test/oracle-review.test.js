@@ -79,6 +79,67 @@ test("oracle-reviewed backend can keep playing when oracle review is unavailable
   assert.ok(result.explanation.reasons[0].includes("Offline Oracle review was unavailable"));
 });
 
+test("oracle-reviewed backend uses the oracle for move and game reviews", async () => {
+  const candidate = createJavaScriptEngineBackend({ depth: 1, timeLimitMs: 100 });
+  const oracle = createUcciEngineBackend({
+    name: "Mock Oracle",
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-ucci",
+    depth: 2,
+    timeLimitMs: 100,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+  const backend = createOracleReviewEngineBackend(candidate, oracle);
+
+  try {
+    const review = await backend.reviewMove(createInitialPosition(), "h7-e7", {
+      depth: 1,
+      timeLimitMs: 100
+    });
+    const gameReview = await backend.reviewGame(["h7-e7"], {
+      reviewOptions: {
+        depth: 1,
+        timeLimitMs: 100
+      }
+    });
+
+    assert.equal(review.reviewBackend.name, "Mock Oracle");
+    assert.equal(review.source, "native-ucci");
+    assert.equal(review.bestMove.notation, "h9-g7");
+    assert.equal(review.centipawnLoss, 59);
+    assert.equal(review.oracleReview.status, "reviewed");
+    assert.equal(review.oracleReview.bestMove, "h9-g7");
+    assert.equal(gameReview.moves[0].review.reviewBackend.name, "Mock Oracle");
+    assert.equal(gameReview.moves[0].review.oracleReview.bestMove, "h9-g7");
+  } finally {
+    await backend.close();
+  }
+});
+
+test("oracle-reviewed backend falls back to candidate move review when the oracle is unavailable", async () => {
+  const candidate = createJavaScriptEngineBackend({ depth: 1, timeLimitMs: 100 });
+  const oracle = {
+    id: "offline-oracle",
+    name: "Offline Oracle",
+    kind: "native-uci",
+    async reviewMove() {
+      throw new Error("review offline");
+    }
+  };
+  const backend = createOracleReviewEngineBackend(candidate, oracle);
+  const review = await backend.reviewMove(createInitialPosition(), "h7-e7", {
+    depth: 1,
+    timeLimitMs: 100
+  });
+
+  assert.equal(review.reviewBackend.name, "JavaScript Reference Engine");
+  assert.equal(review.oracleReview.status, "unavailable");
+  assert.equal(review.oracleReview.error, "review offline");
+  assert.ok(review.explanation.reasons[0].includes("Offline Oracle review was unavailable"));
+});
+
 test("oracle-reviewed backend forwards explicit oracle review options", async () => {
   const candidate = createJavaScriptEngineBackend({ depth: 1, timeLimitMs: 100 });
   let receivedOptions = null;

@@ -60,8 +60,8 @@ npm run play -- --side black \
   --engine-option EvalFile=/path/to/pikafish.nnue
 ```
 
-Or keep the fast local engine for the move choice while a stronger oracle grades
-each engine pick:
+Or keep the fast local engine for move choice while a stronger oracle grades
+engine picks and player move reviews:
 
 ```sh
 npm run play -- --side black \
@@ -325,9 +325,10 @@ console.log(decision.oracleReview.verdict);
 await reviewed.close();
 ```
 
-`oracleReview` is also copied into game-history decision summaries, so a future
-UI can show both why the candidate engine picked the move and how the stronger
-oracle graded it.
+`oracleReview` is also copied into game-history decision summaries, and
+`reviewMove`/`reviewGame` use the oracle by default with candidate fallback. A
+future UI can show both why the candidate engine picked the move and how the
+stronger oracle graded it, while also using the oracle for player feedback.
 
 Review a player's move:
 

@@ -98,6 +98,27 @@ test("play CLI can show an oracle review for the current engine pick", async () 
   assert.match(result.stdout, /Oracle review: good, 59 cp loss; oracle preferred h9-g7\./);
 });
 
+test("play CLI uses the oracle reviewer for player move feedback", async () => {
+  const result = await runPlayCli([
+    "--side", "red",
+    "--oracle-command", process.execPath,
+    "--oracle-arg", MOCK_UCCI_PATH,
+    "--oracle-protocol", "ucci",
+    "--oracle-depth", "2",
+    "--oracle-time", "100",
+    "--startup-timeout", "1000",
+    "--command-timeout", "1000",
+    "--depth", "1",
+    "--time", "100"
+  ], "h7e7\nquit\n");
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /You played h7-e7/);
+  assert.match(result.stdout, /Review source: Play Oracle\./);
+  assert.match(result.stdout, /Review: good, 59 cp loss\./);
+  assert.match(result.stdout, /Engine preferred h9-g7\./);
+});
+
 function runPlayCli(args, input) {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(process.execPath, ["examples/play-cli.mjs", ...args], {

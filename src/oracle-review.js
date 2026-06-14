@@ -1,5 +1,7 @@
 import { moveToNotation } from "./board.js";
 import { ENGINE_BACKEND_FEATURES, createEngineBackend } from "./backend.js";
+import { createLessonPlanWithBackend } from "./lesson.js";
+import { reviewGameWithBackend } from "./review.js";
 
 export function createOracleReviewEngineBackend(candidateBackend, oracleBackend, options = {}) {
   validateCandidateBackend(candidateBackend);
@@ -7,8 +9,9 @@ export function createOracleReviewEngineBackend(candidateBackend, oracleBackend,
 
   const id = options.id ?? `${candidateBackend.id ?? "candidate"}-with-${oracleBackend.id ?? "oracle"}-review`;
   const name = options.name ?? `${candidateBackend.name ?? "Candidate Engine"} with ${oracleBackend.name ?? "Oracle"} Review`;
+  let backend;
 
-  return createEngineBackend({
+  backend = createEngineBackend({
     id,
     name,
     kind: options.kind ?? "oracle-reviewed",
@@ -37,10 +40,18 @@ export function createOracleReviewEngineBackend(candidateBackend, oracleBackend,
       });
     },
     analyzePosition: (...args) => candidateBackend.analyzePosition(...args),
-    reviewMove: (...args) => candidateBackend.reviewMove(...args),
-    reviewGame: (...args) => candidateBackend.reviewGame?.(...args),
+    reviewMove: (position, move, reviewOptions = {}) => reviewMoveWithOracle(candidateBackend, oracleBackend, position, move, {
+      defaults: {
+        ...(options.oracleReviewOptions ?? {}),
+        ...(options.reviewOptions ?? {})
+      },
+      reviewOptions,
+      strict: reviewOptions.strictOracleReview ?? options.strictOracleReview ?? false,
+      reviewWithOracle: reviewOptions.reviewWithOracle ?? options.reviewWithOracle ?? true
+    }),
+    reviewGame: (moves, gameOptions = {}) => reviewGameWithBackend(backend, moves, gameOptions),
     coachMove: (...args) => candidateBackend.coachMove?.(...args),
-    lessonPlan: (...args) => candidateBackend.lessonPlan?.(...args),
+    lessonPlan: (moves, lessonOptions = {}) => createLessonPlanWithBackend(backend, moves, lessonOptions),
     openingBook: (...args) => candidateBackend.openingBook(...args),
     evaluate: (...args) => candidateBackend.evaluate?.(...args),
     pressure: (...args) => candidateBackend.pressure?.(...args),
@@ -68,6 +79,8 @@ export function createOracleReviewEngineBackend(candidateBackend, oracleBackend,
       return typeof candidateBackend.cacheCapacity === "number" ? candidateBackend.cacheCapacity : null;
     }
   });
+
+  return backend;
 }
 
 export async function annotateDecisionWithOracleReview(position, decision, oracleBackend, options = {}) {
@@ -101,6 +114,61 @@ function attachOracleReview(decision, oracleReview) {
     ...decision,
     oracleReview,
     explanation
+  };
+}
+
+async function reviewMoveWithOracle(candidateBackend, oracleBackend, position, move, options) {
+  const {
+    oracleReviewOptions,
+    strictOracleReview,
+    reviewWithOracle,
+    ...candidateReviewOptions
+  } = options.reviewOptions ?? {};
+  const strict = strictOracleReview ?? options.strict;
+
+  if (reviewWithOracle === false || options.reviewWithOracle === false) {
+    return candidateBackend.reviewMove(position, move, candidateReviewOptions);
+  }
+
+  const oracleOptions = {
+    ...(options.defaults ?? {}),
+    ...candidateReviewOptions,
+    useBook: false,
+    ...(oracleReviewOptions ?? {})
+  };
+
+  try {
+    const review = await oracleBackend.reviewMove(position, move, oracleOptions);
+    return annotateMoveReviewSource(review, oracleBackend);
+  } catch (error) {
+    if (strict) throw error;
+    const fallbackReview = await candidateBackend.reviewMove(position, move, candidateReviewOptions);
+    return annotateReviewFallback(fallbackReview, error, oracleBackend, candidateBackend);
+  }
+}
+
+function annotateMoveReviewSource(review, oracleBackend) {
+  const oracleReview = summarizeOracleReview(review, oracleBackend);
+  return {
+    ...review,
+    reviewBackend: summarizeBackend(oracleBackend),
+    oracleReview
+  };
+}
+
+function annotateReviewFallback(review, error, oracleBackend, candidateBackend) {
+  const oracleReview = unavailableOracleReview(error, oracleBackend);
+  const reason = `${oracleBackend.name ?? "Oracle"} review was unavailable (${oracleReview.error}), so ${candidateBackend.name ?? "the candidate engine"} reviewed this move.`;
+  return {
+    ...review,
+    reviewBackend: summarizeBackend(candidateBackend),
+    oracleReview,
+    explanation: review.explanation
+      ? {
+          ...review.explanation,
+          reasons: unique([reason, ...(review.explanation.reasons ?? [])]).slice(0, 8)
+        }
+      : review.explanation
   };
 }
 
