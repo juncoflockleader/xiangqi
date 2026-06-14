@@ -1,6 +1,7 @@
 import { INITIAL_FEN } from "./constants.js";
 import { createEngine } from "./engine.js";
 import { moveToNotation, parseFen } from "./board.js";
+import { describeEngineBackendStatus } from "./backend.js";
 
 export const ENGINE_BENCHMARKS = Object.freeze([
   Object.freeze({
@@ -88,10 +89,12 @@ export async function compareEngineBackends(backends, options = {}) {
       name: entry.name,
       kind: entry.kind,
       features: entry.features,
+      status: describeEngineBackendStatus(entry.engine),
       solved: report.solved,
       failed: report.failed,
       total: report.total,
       sourceMatched: report.sourceMatched,
+      fallbackCount: report.results.filter((result) => result.backendFallback).length,
       elapsedMs: report.elapsedMs,
       aggregate: report.aggregate,
       failures: report.results
@@ -142,7 +145,9 @@ export function formatEngineComparisonReport(comparison) {
 
   for (const backend of comparison.backends) {
     const label = backend.kind ? `${backend.name} (${backend.kind})` : backend.name;
-    lines.push(`${label}: ${backend.solved}/${backend.total} solved, ${backend.sourceMatched}/${backend.total} source matches, ${backend.elapsedMs}ms, ${formatNodes(backend.aggregate?.nodes)} nodes`);
+    const status = backend.status?.state ? `, status ${backend.status.state}` : "";
+    const fallback = backend.fallbackCount > 0 ? `, ${backend.fallbackCount} fallback` : "";
+    lines.push(`${label}: ${backend.solved}/${backend.total} solved, ${backend.sourceMatched}/${backend.total} source matches, ${backend.elapsedMs}ms, ${formatNodes(backend.aggregate?.nodes)} nodes${status}${fallback}`);
     if (backend.failures.length > 0) {
       const failed = backend.failures.map((failure) => `${failure.id}:${failure.actualMove ?? "none"}`).join(", ");
       lines.push(`  Failed: ${failed}`);
@@ -190,6 +195,7 @@ async function runBenchmark(engine, benchmark, options) {
     summary: result.explanation?.summary ?? "",
     reasons: result.explanation?.reasons ?? [],
     principalVariation: (result.principalVariation ?? []).map((move) => move.notation ?? moveToNotation(move)),
+    backendFallback: result.backendFallback ?? null,
     timeBudget: result.timeBudget ?? result.explanation?.search?.timeBudget ?? null
   };
 }

@@ -4,6 +4,7 @@ import {
   ENGINE_BENCHMARKS,
   compareEngineBackends,
   createJavaScriptEngineBackend,
+  createLearningEngineBackend,
   formatBenchmarkReport,
   formatEngineComparisonReport,
   runBenchmarkSuite
@@ -66,10 +67,44 @@ test("engine comparison reports multiple sync and async backends", async () => {
   assert.equal(comparison.backends[0].solved, 1);
   assert.equal(comparison.backends[1].solved, 1);
   assert.equal(comparison.backends[1].id, "async-reference");
+  assert.equal(comparison.backends[0].status.state, "primary");
+  assert.equal(comparison.backends[0].fallbackCount, 0);
   assert.ok(comparison.backends[0].aggregate.nodes >= 0);
   assert.ok(text.includes("JavaScript Reference Engine"));
   assert.ok(text.includes("Async Reference"));
+  assert.ok(text.includes("status primary"));
   assert.ok(text.includes("1/1 solved"));
+});
+
+test("engine comparison reports fallback backend usage", async () => {
+  const backend = createLearningEngineBackend({
+    command: "/path/that/should/not/start",
+    profile: "native-ucci",
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 50,
+    commandTimeoutMs: 50,
+    javascript: {
+      profile: "balanced",
+      depth: 2,
+      timeLimitMs: 1000
+    }
+  });
+
+  try {
+    const comparison = await compareEngineBackends([backend], { tag: "tactic" });
+    const text = formatEngineComparisonReport(comparison);
+    const report = comparison.backends[0];
+
+    assert.equal(report.kind, "hybrid");
+    assert.equal(report.status.state, "fallback");
+    assert.equal(report.fallbackCount, 1);
+    assert.equal(report.report.results[0].backendFallback.fallbackBackend, "javascript-reference");
+    assert.ok(text.includes("status fallback"));
+    assert.ok(text.includes("1 fallback"));
+  } finally {
+    await backend.close();
+  }
 });
 
 test("engine comparison rejects entries without chooseMove", async () => {
