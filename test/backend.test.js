@@ -20,6 +20,13 @@ test("javascript backend exposes the engine contract", () => {
   assert.equal(result.source, "opening-book");
   assert.equal(result.bestMove.notation, "h7-e7");
   assert.equal(description.cacheCapacity, backend.cacheCapacity);
+  assert.equal(typeof backend.reviewGame, "function");
+
+  const review = backend.reviewGame(["h7-e7"], {
+    reviewOptions: { depth: 1, timeLimitMs: 500 }
+  });
+  assert.equal(review.moves.length, 1);
+  assert.equal(review.summary.bookMoves, 1);
 });
 
 test("custom backend contract validates required methods", () => {

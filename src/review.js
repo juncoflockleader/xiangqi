@@ -69,6 +69,57 @@ export function reviewGameWithEngine(engine, moves, options = {}) {
   };
 }
 
+export async function reviewGameWithBackend(backend, moves, options = {}) {
+  const initialPosition = options.initialPosition ?? createInitialPosition();
+  const reviewOptions = options.reviewOptions ?? {};
+  const maxKeyMoments = options.maxKeyMoments ?? 5;
+  const reviewedMoves = [];
+  const positions = [initialPosition];
+  let position = initialPosition;
+
+  for (let index = 0; index < moves.length; index += 1) {
+    const rawMove = moves[index];
+    const legalMove = resolveReviewedMove(position, rawMove);
+    const notation = moveToNotation(legalMove);
+    const book = classifyBookMove(backend, position, legalMove, options.bookOptions ?? {});
+    const review = await backend.reviewMove(position, legalMove, {
+      ...reviewOptions,
+      history: positions.map((item) => positionKey(item))
+    });
+    const after = backend.play(position, notation);
+
+    reviewedMoves.push({
+      ply: index + 1,
+      moveNumber: Math.floor(index / 2) + 1,
+      side: position.turn,
+      notation,
+      move: legalMove,
+      positionBefore: toFen(position),
+      positionAfter: toFen(after),
+      review,
+      book
+    });
+
+    position = after;
+    positions.push(position);
+  }
+
+  const summary = summarizeReviewedMoves(reviewedMoves);
+
+  return {
+    initialPosition,
+    finalPosition: position,
+    moves: reviewedMoves,
+    summary,
+    keyMoments: selectKeyMoments(reviewedMoves, maxKeyMoments),
+    status: gameStatus({
+      position,
+      positions,
+      positionCounts: countPositions(positions)
+    })
+  };
+}
+
 function resolveReviewedMove(position, moveOrNotation) {
   const rawMove = typeof moveOrNotation === "string"
     ? parseMoveNotation(moveOrNotation)

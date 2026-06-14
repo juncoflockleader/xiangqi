@@ -139,3 +139,29 @@ test("UCCI backend reviews moves with native search scores", async () => {
     await backend.close();
   }
 });
+
+test("UCCI backend reviews games with native move reviews", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const review = await backend.reviewGame(["h7-e7"], {
+      reviewOptions: { depth: 2, timeLimitMs: 500 }
+    });
+
+    assert.equal(review.moves.length, 1);
+    assert.equal(review.summary.totalMoves, 1);
+    assert.equal(review.summary.bookMoves, 1);
+    assert.equal(review.moves[0].review.source, "native-ucci");
+    assert.equal(review.moves[0].review.bestMove.notation, "h9-g7");
+    assert.equal(review.keyMoments[0].notation, "h7-e7");
+    assert.equal(review.status.state, "playing");
+  } finally {
+    await backend.close();
+  }
+});

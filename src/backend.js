@@ -38,6 +38,7 @@ export function createJavaScriptEngineBackend(options = {}) {
     chooseMove: (position, searchOptions = {}) => engine.chooseMove(position, searchOptions),
     analyzePosition: (position, searchOptions = {}) => engine.analyzePosition(position, searchOptions),
     reviewMove: (position, move, reviewOptions = {}) => engine.reviewMove(position, move, reviewOptions),
+    reviewGame: (moves, reviewOptions = {}) => engine.reviewGame(moves, reviewOptions),
     openingBook: (position, bookOptions = {}) => engine.openingBook(position, bookOptions),
     evaluate: (position, evaluationOptions = {}) => engine.evaluate(position, evaluationOptions),
     pressure: (position, pressureOptions = {}) => engine.pressure(position, pressureOptions),

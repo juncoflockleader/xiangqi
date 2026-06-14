@@ -14,6 +14,7 @@ import { classifyMoveLoss, createEngine } from "./engine.js";
 import { explainBookMove, explainMoveFeatures, explainReviewedMove, formatScore } from "./reasoning.js";
 import { annotateMove, generateLegalMoves } from "./movegen.js";
 import { hasClockTimeControl, resolveSearchBudget } from "./time.js";
+import { reviewGameWithBackend } from "./review.js";
 
 const DEFAULT_UCCI_TIMEOUT_MS = 5000;
 const DEFAULT_SEARCH_TIMEOUT_MS = 30000;
@@ -26,8 +27,9 @@ export function createUcciEngineBackend(options = {}) {
   const referenceEngine = options.referenceEngine ?? createEngine(options.referenceOptions ?? options);
   const client = new UcciProcessClient(options);
   const name = options.name ?? "Native UCCI Engine";
+  let backend;
 
-  return createEngineBackend({
+  backend = createEngineBackend({
     id: options.id ?? "native-ucci",
     name,
     kind: "native-ucci",
@@ -80,6 +82,17 @@ export function createUcciEngineBackend(options = {}) {
       lines: 1,
       useBook: false
     })),
+    reviewGame: (moves, gameOptions = {}) => {
+      const { reviewOptions = {}, ...gameReviewOptions } = gameOptions;
+      return reviewGameWithBackend(backend, moves, {
+        ...gameReviewOptions,
+        reviewOptions: mergeNativeOptions(options, reviewOptions, {
+          backendName: name,
+          lines: 1,
+          useBook: false
+        })
+      });
+    },
     openingBook: (position, bookOptions = {}) => referenceEngine.openingBook(position, bookOptions),
     evaluate: (position, evaluationOptions = {}) => referenceEngine.evaluate(position, evaluationOptions),
     pressure: (position, pressureOptions = {}) => referenceEngine.pressure(position, pressureOptions),
@@ -88,6 +101,8 @@ export function createUcciEngineBackend(options = {}) {
     ready: () => client.ensureReady(),
     close: () => client.close()
   });
+
+  return backend;
 }
 
 class UcciProcessClient {
@@ -477,12 +492,12 @@ function buildNativeCandidates(position, infos, bestMove, primaryInfo) {
 }
 
 function resolveLegalMove(position, notation) {
-  const parsed = parseMoveNotation(notation);
+  const parsed = typeof notation === "string" ? parseMoveNotation(notation) : notation;
   const legalMove = generateLegalMoves(position, position.turn)
     .find((move) => sameMove(move, parsed));
 
   if (!legalMove) {
-    throw new Error(`UCCI engine returned illegal move: ${notation}`);
+    throw new Error(`UCCI engine returned illegal move: ${typeof notation === "string" ? notation : moveToNotation(parsed)}`);
   }
 
   return annotateMove(position, legalMove);
