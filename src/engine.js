@@ -5,6 +5,7 @@ import { evaluatePosition } from "./evaluate.js";
 import { analyzePressure } from "./pressure.js";
 import { explainBookMove, explainCandidateMove, explainMove, explainReviewedMove } from "./reasoning.js";
 import { reviewGameWithEngine } from "./review.js";
+import { coachMoveWithEngine } from "./coach.js";
 import { searchBestMove } from "./search.js";
 import { createTranspositionTable } from "./transposition.js";
 
@@ -113,6 +114,13 @@ export function createEngine(defaultOptions = {}) {
           ...defaultOptions,
           ...(options.reviewOptions ?? {})
         },
+        ...options
+      });
+    },
+
+    coachMove(position, options = {}) {
+      return coachMoveWithEngine(this, position, {
+        ...defaultOptions,
         ...options
       });
     },

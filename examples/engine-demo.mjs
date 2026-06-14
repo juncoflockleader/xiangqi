@@ -44,6 +44,13 @@ if (latestIteration) {
   console.log(`Depth trace: depth ${latestIteration.depth} best ${latestIteration.bestMove} (${stability})`);
 }
 
+const hint = engine.coachMove(position, { depth: 2, timeLimitMs: 1000 });
+console.log("");
+console.log("Coach hint ladder:");
+for (const level of hint.levels) {
+  console.log(`${level.level}. ${level.title}: ${level.text}`);
+}
+
 const pressure = engine.pressure(position, { limit: 2 });
 console.log("");
 console.log("Immediate pressure:");

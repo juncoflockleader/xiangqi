@@ -15,6 +15,7 @@ The current engine is dependency-free JavaScript and includes:
 - Immediate pressure/threat analysis for both sides.
 - Perft helpers for validating move generation while the engine grows.
 - Explainable move output for learning-app use cases, including depth-by-depth search trace and best-move stability.
+- Progressive coach hints that can reveal an idea, tactical clue, candidate focus, and full best-move reasoning.
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
 - Whole-game review with side summaries, opening-book matches, and key learning moments.
 - Game-history helpers for play sessions, reviewed move logs, position history, and repeated-position detection.
@@ -141,6 +142,19 @@ for (const line of analysis.lines) {
 ```
 
 `analyzePosition` returns ranked candidate lines with scores, centipawn loss against the best move, principal variations, and individual explanations.
+
+Ask for progressive coach hints:
+
+```js
+const hint = engine.coachMove(position, { depth: 3, timeLimitMs: 1000 });
+
+console.log(hint.levels[0].text); // idea
+console.log(hint.levels[1].text); // tactical clue
+console.log(hint.levels[2].text); // candidate focus
+console.log(hint.levels[3].text); // full reveal
+```
+
+`coachMove` is designed for lesson and hint flows: it preserves the engine's best move, alternatives, principal variation, and explanation, but packages them as progressive reveal levels so the UI can teach before showing the answer. The UCCI backend exposes the same method asynchronously, which lets a native engine provide the move while the JavaScript layer provides the teaching text.
 
 Run benchmark positions:
 

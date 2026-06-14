@@ -15,6 +15,7 @@ export * from "./backend.js";
 export * from "./ucci-backend.js";
 export * from "./benchmark.js";
 export * from "./review.js";
+export * from "./coach.js";
 export * from "./protocol/ucci.js";
 export * from "./game.js";
 export * from "./perft.js";

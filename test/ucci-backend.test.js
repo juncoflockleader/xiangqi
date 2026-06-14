@@ -83,6 +83,34 @@ test("UCCI backend parses MultiPV analysis lines", async () => {
   }
 });
 
+test("UCCI backend provides async native coach hints", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const hint = await backend.coachMove(createInitialPosition(), {
+      useBook: false,
+      lines: 2
+    });
+
+    assert.equal(hint.source, "native-ucci");
+    assert.equal(hint.bestMove.notation, "h9-g7");
+    assert.equal(hint.levels.length, 4);
+    assert.equal(hint.levels.at(-1).kind, "reveal");
+    assert.ok(hint.levels.at(-1).text.includes("h9-g7"));
+    assert.equal(hint.alternatives.length, 2);
+    assert.equal(hint.alternatives[1].notation, "h7-e7");
+  } finally {
+    await backend.close();
+  }
+});
+
 test("UCCI backend forwards clock controls to native engines", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,

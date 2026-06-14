@@ -21,6 +21,11 @@ test("javascript backend exposes the engine contract", () => {
   assert.equal(result.bestMove.notation, "h7-e7");
   assert.equal(description.cacheCapacity, backend.cacheCapacity);
   assert.equal(typeof backend.reviewGame, "function");
+  assert.equal(typeof backend.coachMove, "function");
+
+  const hint = backend.coachMove(position);
+  assert.equal(hint.bestMove.notation, "h7-e7");
+  assert.equal(hint.levels.at(-1).kind, "reveal");
 
   const review = backend.reviewGame(["h7-e7"], {
     reviewOptions: { depth: 1, timeLimitMs: 500 }
