@@ -7,7 +7,8 @@ import {
   createUcciEngineBackend,
   describeEngineBackend,
   formatGameStudy,
-  importGameMoveText
+  importGameMoveText,
+  resolveNativeEnginePreset
 } from "../src/index.js";
 import {
   parseNativeEngineOption,
@@ -38,7 +39,13 @@ try {
   process.exit(1);
 }
 
-const backend = createGameStudyBackend(options);
+let backend;
+try {
+  backend = createGameStudyBackend(options);
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
 
 try {
   const study = await createGameStudyWithBackend(backend, importedGame.moves, {
@@ -92,6 +99,8 @@ try {
 }
 
 function createGameStudyBackend(options) {
+  applyNativePresets(options);
+
   const base = createLearningEngineBackend({
     profile: options.profile,
     depth: options.depth,
@@ -100,16 +109,22 @@ function createGameStudyBackend(options) {
     args: options.engineArgs,
     protocol: options.engineProtocol,
     engineOptions: options.engineOptions,
+    native: options.engineName ? { name: options.engineName } : undefined,
     startupTimeoutMs: options.startupTimeoutMs,
     commandTimeoutMs: options.commandTimeoutMs,
     fallbackOnNativeError: !options.strictNative
   });
 
-  if (!options.oracleCommand) return base;
+  if (!options.oracleCommand) {
+    if (options.oraclePreset) {
+      throw new Error(`--oracle-preset ${options.oraclePreset} did not resolve a native command. Run npm run install:pikafish, or set --oracle-command, XIANGQI_ORACLE_ENGINE_COMMAND, PIKAFISH_COMMAND, or PIKAFISH_HOME.`);
+    }
+    return base;
+  }
 
   const oracle = createUcciEngineBackend({
     id: "game-study-oracle",
-    name: "Game Study Oracle",
+    name: options.oracleName,
     command: options.oracleCommand,
     args: options.oracleArgs,
     protocol: options.oracleProtocol,
@@ -186,13 +201,18 @@ function parseArgs(args) {
     engineCommand: process.env.XIANGQI_ENGINE_COMMAND,
     engineArgs: splitEnvArgs(process.env.XIANGQI_ENGINE_ARGS),
     engineProtocol: process.env.XIANGQI_ENGINE_PROTOCOL ?? "uci",
+    enginePreset: process.env.XIANGQI_ENGINE_PRESET,
+    engineEvalFile: process.env.XIANGQI_ENGINE_EVAL_FILE,
     engineOptions: parseNativeEngineOptions(process.env.XIANGQI_ENGINE_OPTIONS, "XIANGQI_ENGINE_OPTIONS"),
     startupTimeoutMs: numberFromEnv(process.env.XIANGQI_ENGINE_STARTUP_TIMEOUT_MS, 5000),
     commandTimeoutMs: numberFromEnv(process.env.XIANGQI_ENGINE_COMMAND_TIMEOUT_MS, 30000),
     strictNative: false,
+    oracleName: "Game Study Oracle",
     oracleCommand: process.env.XIANGQI_ORACLE_ENGINE_COMMAND,
     oracleArgs: splitEnvArgs(process.env.XIANGQI_ORACLE_ENGINE_ARGS),
     oracleProtocol: process.env.XIANGQI_ORACLE_ENGINE_PROTOCOL ?? process.env.XIANGQI_ENGINE_PROTOCOL ?? "uci",
+    oraclePreset: process.env.XIANGQI_ORACLE_ENGINE_PRESET,
+    oracleEvalFile: process.env.XIANGQI_ORACLE_ENGINE_EVAL_FILE,
     oracleEngineOptions: parseNativeEngineOptions(
       process.env.XIANGQI_ORACLE_ENGINE_OPTIONS,
       "XIANGQI_ORACLE_ENGINE_OPTIONS"
@@ -310,6 +330,16 @@ function parseArgs(args) {
       index += 1;
       continue;
     }
+    if (arg === "--engine-preset" || arg === "--native-preset") {
+      parsed.enginePreset = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--engine-eval-file" || arg === "--native-eval-file") {
+      parsed.engineEvalFile = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
     if (arg === "--engine-option" || arg === "--native-option") {
       parsed.engineOptions.push(parseNativeEngineOption(requireValue(args, index, arg), arg));
       index += 1;
@@ -346,6 +376,16 @@ function parseArgs(args) {
     }
     if (arg === "--oracle-protocol") {
       parsed.oracleProtocol = parseProtocol(requireValue(args, index, arg), arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--oracle-preset") {
+      parsed.oraclePreset = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--oracle-eval-file") {
+      parsed.oracleEvalFile = requireValue(args, index, arg);
       index += 1;
       continue;
     }
@@ -396,6 +436,42 @@ function parseArgs(args) {
   return parsed;
 }
 
+function applyNativePresets(options) {
+  if (options.enginePreset) {
+    const preset = resolveNativeEnginePreset(options.enginePreset, {
+      command: options.engineCommand,
+      args: options.engineArgs,
+      protocol: options.engineProtocol,
+      evalFile: options.engineEvalFile,
+      engineOptions: options.engineOptions,
+      env: process.env
+    });
+    options.enginePreset = preset.preset;
+    options.engineName = preset.name;
+    options.engineCommand = preset.command;
+    options.engineArgs = preset.args;
+    options.engineProtocol = preset.protocol;
+    options.engineOptions = preset.engineOptions;
+  }
+
+  if (options.oraclePreset) {
+    const preset = resolveNativeEnginePreset(options.oraclePreset, {
+      command: options.oracleCommand,
+      args: options.oracleArgs,
+      protocol: options.oracleProtocol,
+      evalFile: options.oracleEvalFile,
+      engineOptions: options.oracleEngineOptions,
+      env: process.env
+    });
+    options.oraclePreset = preset.preset;
+    options.oracleName = preset.name;
+    options.oracleCommand = preset.command;
+    options.oracleArgs = preset.args;
+    options.oracleProtocol = preset.protocol;
+    options.oracleEngineOptions = preset.engineOptions;
+  }
+}
+
 async function loadMoves(options) {
   const parts = [];
   if (options.movesText) parts.push(options.movesText);
@@ -433,8 +509,10 @@ function reportOptions(options, importedGame) {
     moveCount: importedGame.moves.length,
     moves: importedGame.moves,
     movesFile: options.movesFile ?? null,
+    enginePreset: options.enginePreset ?? null,
     engineCommand: options.engineCommand ?? null,
     engineProtocol: options.engineProtocol,
+    oraclePreset: options.oraclePreset ?? null,
     oracleCommand: options.oracleCommand ?? null,
     oracleProtocol: options.oracleProtocol
   };
@@ -463,7 +541,7 @@ Usage:
   npm run study:game -- --moves "1.C2=5 n8+7 2.N2+3 p7+1"
   npm run study:game -- --moves "h7-e7 h0-g2 h9-g7" --json
   npm run study:game -- --file ./game.json --max-position-studies 3
-  npm run study:game -- --engine-command /path/to/pikafish --engine-protocol uci --file ./game.txt
+  npm run study:game -- --engine-preset pikafish --file ./game.txt
 
 Options:
   --moves text             Coordinate or western Xiangqi moves.
@@ -486,12 +564,16 @@ Options:
   --engine-arg value       Append one native engine argument.
   --engine-args values     Append whitespace-separated native engine arguments.
   --engine-protocol p      Native play protocol: uci or ucci. Default: uci.
+  --engine-preset name     Apply a native play preset, e.g. pikafish.
+  --engine-eval-file f     NNUE/eval file for native play presets.
   --engine-option opt      Set native play option, name=value.
   --strict-native          Report native process errors instead of falling back.
   --oracle-command cmd     Ask a native oracle to review moves and candidate picks.
   --oracle-arg value       Append one oracle process argument.
   --oracle-args values     Append whitespace-separated oracle process arguments.
   --oracle-protocol p      Oracle protocol: uci or ucci. Default: uci.
+  --oracle-preset name     Apply a native oracle preset, e.g. pikafish.
+  --oracle-eval-file f     NNUE/eval file for native oracle presets.
   --oracle-option opt      Set native oracle option, name=value.
   --oracle-depth n         Oracle review depth. Default: max(depth, 2).
   --oracle-time ms         Oracle review time. Default: max(time, 1000).

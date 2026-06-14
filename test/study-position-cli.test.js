@@ -66,6 +66,31 @@ test("study position CLI emits machine-readable native backend study", async () 
   assert.equal(report.study.candidateLines[1].move, "h7-e7");
 });
 
+test("study position CLI can use the Pikafish engine preset", async () => {
+  const { stdout } = await runStudyCli([
+    "--engine-preset", "pikafish",
+    "--engine-command", process.execPath,
+    "--engine-arg", "fixtures/mock-ucci.mjs",
+    "--engine-eval-file", "pikafish.nnue",
+    "--startup-timeout", "1000",
+    "--command-timeout", "1000",
+    "--depth", "2",
+    "--time", "100",
+    "--lines", "2",
+    "--no-book",
+    "--json"
+  ]);
+  const report = JSON.parse(stdout);
+
+  assert.equal(report.options.enginePreset, "pikafish");
+  assert.equal(report.backend.status.primaryBackend.name, "Pikafish");
+  assert.equal(report.backend.status.primaryBackend.kind, "native-uci");
+  assert.equal(report.backend.nativeOptions[0].name, "UCI_ShowWDL");
+  assert.equal(report.backend.nativeOptions[1].name, "EvalFile");
+  assert.equal(report.study.decision.source, "native-uci");
+  assert.equal(report.study.bestMove, "h9-g7");
+});
+
 test("study position CLI can attach oracle review evidence", async () => {
   const { stdout } = await runStudyCli([
     "--oracle-command", process.execPath,
@@ -88,6 +113,42 @@ test("study position CLI can attach oracle review evidence", async () => {
   assert.equal(report.study.playedMoveReview.oracleReview.bestMove, "h9-g7");
 });
 
+test("study position CLI can attach oracle preset evidence", async () => {
+  const { stdout } = await runStudyCli([
+    "--oracle-preset", "pikafish",
+    "--oracle-command", process.execPath,
+    "--oracle-arg", "fixtures/mock-ucci.mjs",
+    "--oracle-eval-file", "pikafish.nnue",
+    "--startup-timeout", "1000",
+    "--command-timeout", "1000",
+    "--depth", "1",
+    "--time", "100",
+    "--move", "h7-e7",
+    "--json"
+  ]);
+  const report = JSON.parse(stdout);
+
+  assert.equal(report.options.oraclePreset, "pikafish");
+  assert.equal(report.backend.kind, "oracle-reviewed");
+  assert.equal(report.study.oracleReview.backend.name, "Pikafish");
+  assert.equal(report.study.playedMoveReview.reviewBackend.name, "Pikafish");
+  assert.equal(report.study.playedMoveReview.oracleReview.bestMove, "h9-g7");
+});
+
+test("study position CLI reports an unresolved oracle preset", async () => {
+  await assert.rejects(
+    () => runStudyCli([
+      "--oracle-preset", "pikafish",
+      "--json"
+    ]),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /--oracle-preset pikafish did not resolve a native command/);
+      return true;
+    }
+  );
+});
+
 function runStudyCli(args) {
   return execFileAsync(process.execPath, ["examples/study-position.mjs", ...args], {
     cwd: root,
@@ -96,10 +157,15 @@ function runStudyCli(args) {
       ...process.env,
       XIANGQI_ENGINE_COMMAND: "",
       XIANGQI_ENGINE_ARGS: "",
+      XIANGQI_ENGINE_PRESET: "",
+      XIANGQI_ENGINE_EVAL_FILE: "",
       XIANGQI_ENGINE_OPTIONS: "",
       XIANGQI_ORACLE_ENGINE_COMMAND: "",
       XIANGQI_ORACLE_ENGINE_ARGS: "",
+      XIANGQI_ORACLE_ENGINE_PRESET: "",
+      XIANGQI_ORACLE_ENGINE_EVAL_FILE: "",
       XIANGQI_ORACLE_ENGINE_OPTIONS: "",
+      XIANGQI_PIKAFISH_AUTO_DISCOVER: "false",
       XIANGQI_STUDY_FEN: "",
       XIANGQI_STUDY_MOVE: ""
     }

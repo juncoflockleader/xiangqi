@@ -101,6 +101,32 @@ test("game study CLI can use a native UCI backend", async () => {
   assert.equal(report.study.lessonPlan.cards[0].bestMove, "h9-g7");
 });
 
+test("game study CLI can use the Pikafish engine preset", async () => {
+  const { stdout } = await runGameStudyCli([
+    "--engine-preset", "pikafish",
+    "--engine-command", process.execPath,
+    "--engine-arg", "fixtures/mock-ucci.mjs",
+    "--engine-eval-file", "pikafish.nnue",
+    "--startup-timeout", "1000",
+    "--command-timeout", "1000",
+    "--depth", "2",
+    "--time", "100",
+    "--max-position-studies", "0",
+    "--no-book",
+    "--moves", "h7-e7",
+    "--json"
+  ]);
+  const report = JSON.parse(stdout);
+
+  assert.equal(report.options.enginePreset, "pikafish");
+  assert.equal(report.backend.status.primaryBackend.name, "Pikafish");
+  assert.equal(report.backend.status.primaryBackend.kind, "native-uci");
+  assert.equal(report.backend.nativeOptions[0].name, "UCI_ShowWDL");
+  assert.equal(report.backend.nativeOptions[1].name, "EvalFile");
+  assert.equal(report.study.review.moves[0].review.source, "native-uci");
+  assert.equal(report.study.lessonPlan.cards[0].bestMove, "h9-g7");
+});
+
 test("game study CLI explains missing moves", async () => {
   await assert.rejects(
     () => runGameStudyCli(["--json"]),
@@ -120,10 +146,15 @@ function runGameStudyCli(args) {
       ...process.env,
       XIANGQI_ENGINE_COMMAND: "",
       XIANGQI_ENGINE_ARGS: "",
+      XIANGQI_ENGINE_PRESET: "",
+      XIANGQI_ENGINE_EVAL_FILE: "",
       XIANGQI_ENGINE_OPTIONS: "",
       XIANGQI_ORACLE_ENGINE_COMMAND: "",
       XIANGQI_ORACLE_ENGINE_ARGS: "",
+      XIANGQI_ORACLE_ENGINE_PRESET: "",
+      XIANGQI_ORACLE_ENGINE_EVAL_FILE: "",
       XIANGQI_ORACLE_ENGINE_OPTIONS: "",
+      XIANGQI_PIKAFISH_AUTO_DISCOVER: "false",
       XIANGQI_GAME_STUDY_MOVES: "",
       XIANGQI_GAME_STUDY_FILE: ""
     }

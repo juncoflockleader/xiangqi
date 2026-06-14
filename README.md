@@ -69,11 +69,8 @@ stronger analysis:
 
 ```sh
 npm run study -- \
-  --engine-command /path/to/pikafish \
-  --engine-protocol uci \
-  --engine-option EvalFile=/path/to/pikafish.nnue \
-  --oracle-command /path/to/pikafish \
-  --oracle-protocol uci \
+  --engine-preset pikafish \
+  --oracle-preset pikafish \
   --json
 ```
 
@@ -202,6 +199,7 @@ after online sparring or imported game records:
 npm run study:game -- --moves "h7-e7 h0-g2 h9-g7" --json
 npm run study:game -- --moves "1.C2=5 n8+7 2.N2+3 p7+1"
 npm run study:game -- --file ./game.json --max-position-studies 3
+npm run study:game -- --engine-preset pikafish --file ./game.json --json
 ```
 
 The game-study importer accepts coordinate notation and common western Xiangqi
