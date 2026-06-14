@@ -48,3 +48,12 @@ console.log(review.explanation.summary);
 for (const reason of review.explanation.reasons.slice(0, 3)) {
   console.log(`- ${reason}`);
 }
+
+const gameReview = engine.reviewGame(["h7-e7", "h0-g2"], {
+  reviewOptions: { depth: 1, timeLimitMs: 500 }
+});
+console.log("");
+console.log(`Game review: ${gameReview.summary.totalMoves} moves, ${gameReview.summary.bookMoves} book moves`);
+for (const moment of gameReview.keyMoments.slice(0, 2)) {
+  console.log(`- ${moment.side} ${moment.notation}: ${moment.summary}`);
+}

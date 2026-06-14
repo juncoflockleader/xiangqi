@@ -16,6 +16,7 @@ The current engine is dependency-free JavaScript and includes:
 - Perft helpers for validating move generation while the engine grows.
 - Explainable move output for learning-app use cases.
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
+- Whole-game review with side summaries, opening-book matches, and key learning moments.
 - Game-history helpers for play sessions, reviewed move logs, position history, and repeated-position detection.
 - A minimal UCCI-style protocol adapter for GUI/app integration and engine smoke testing.
 
@@ -98,6 +99,17 @@ console.log(reply.explanation.summary);
 console.log(gameStatus(game));
 ```
 
+Review a completed or partial game:
+
+```js
+const gameReview = engine.reviewGame(["h7-e7", "h0-g2"], {
+  reviewOptions: { depth: 2, timeLimitMs: 1000 }
+});
+
+console.log(gameReview.summary);
+console.log(gameReview.keyMoments[0]?.summary);
+```
+
 ## Protocol
 
 The engine includes a small UCCI-style command adapter:
@@ -114,9 +126,10 @@ position fen 4k4/9/4r4/9/9/9/9/9/9/3KR4 r
 go depth 2 movetime 1000
 analyze depth 2 movetime 1000 lines 3
 book
+review depth 1 movetime 500
 ```
 
-The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, `setoption name MultiPV value N`, `setoption name UseBook value false`, `analyze`, `probe`, `pressure`, `explain`, and `quit`.
+The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, `setoption name MultiPV value N`, `setoption name UseBook value false`, `analyze`, `probe`, `pressure`, `review`, `explain`, and `quit`.
 
 ## Movegen Validation
 

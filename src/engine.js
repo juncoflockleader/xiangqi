@@ -4,6 +4,7 @@ import { bookMoveToCandidate, lookupOpeningBook } from "./book.js";
 import { evaluatePosition } from "./evaluate.js";
 import { analyzePressure } from "./pressure.js";
 import { explainBookMove, explainCandidateMove, explainMove, explainReviewedMove } from "./reasoning.js";
+import { reviewGameWithEngine } from "./review.js";
 import { searchBestMove } from "./search.js";
 
 export function createEngine(defaultOptions = {}) {
@@ -102,6 +103,16 @@ export function createEngine(defaultOptions = {}) {
         ...reviewed,
         explanation: explainReviewedMove(position, reviewed)
       };
+    },
+
+    reviewGame(moves, options = {}) {
+      return reviewGameWithEngine(this, moves, {
+        reviewOptions: {
+          ...defaultOptions,
+          ...(options.reviewOptions ?? {})
+        },
+        ...options
+      });
     },
 
     evaluate(position, options = {}) {

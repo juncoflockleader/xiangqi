@@ -18,7 +18,9 @@ export class UcciSession {
   constructor(options = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
     this.engine = createEngine(this.options);
+    this.initialPosition = createInitialPosition();
     this.position = createInitialPosition();
+    this.moveHistory = [];
     this.bannedMoves = [];
   }
 
@@ -50,6 +52,8 @@ export class UcciSession {
           return this.probe(trimmed);
         case "pressure":
           return this.pressure(trimmed);
+        case "review":
+          return this.review(trimmed);
         case "explain":
           return this.explain();
         case "quit":
@@ -103,15 +107,18 @@ export class UcciSession {
     const moveTokens = movesIndex === -1 ? [] : tokens.slice(movesIndex + 1);
 
     if (positionTokens[0]?.toLowerCase() === "startpos") {
-      this.position = createInitialPosition();
+      this.initialPosition = createInitialPosition();
     } else if (positionTokens[0]?.toLowerCase() === "fen") {
-      this.position = parseFen(positionTokens.slice(1).join(" "));
+      this.initialPosition = parseFen(positionTokens.slice(1).join(" "));
     } else {
       throw new Error("position requires startpos or fen");
     }
 
+    this.position = this.initialPosition;
+    this.moveHistory = [];
     for (const moveText of moveTokens) {
       this.position = this.engine.play(this.position, moveText);
+      this.moveHistory.push(moveText);
     }
 
     this.bannedMoves = [];
@@ -233,6 +240,28 @@ export class UcciSession {
 
     for (const threat of pressure.opponentThreats) {
       outputs.push(`info string opponent-threat ${threat.notation}: ${threat.summary}`);
+    }
+
+    return outputs;
+  }
+
+  review(line) {
+    if (this.moveHistory.length === 0) return ["info string review no moves"];
+
+    const options = parseGoOptions(line.replace(/^review/i, "go"), this.options);
+    const result = this.engine.reviewGame(this.moveHistory, {
+      initialPosition: this.initialPosition,
+      reviewOptions: {
+        ...options,
+        useBook: this.options.useBook
+      }
+    });
+    const outputs = [
+      `info string review moves ${result.summary.totalMoves} avgcp ${result.summary.averageCentipawnLoss} book ${result.summary.bookMoves} blunders ${result.summary.classifications.blunder}`
+    ];
+
+    for (const moment of result.keyMoments.slice(0, 3)) {
+      outputs.push(`info string moment ${moment.ply} ${moment.side} ${moment.notation} ${moment.classification} loss ${moment.centipawnLoss} best ${stripMoveSeparator(moment.bestMove)}: ${moment.summary}`);
     }
 
     return outputs;

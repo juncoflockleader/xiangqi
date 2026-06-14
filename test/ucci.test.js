@@ -106,3 +106,19 @@ test("UCCI pressure reports immediate threats", () => {
   assert.ok(output.some((line) => line.includes("threat e9e2") || line.includes("threat e9-e2")));
   assert.ok(output.some((line) => line.includes("opponent-threat")));
 });
+
+test("UCCI review summarizes loaded move history", () => {
+  const session = new UcciSession({ depth: 1, timeLimitMs: 500 });
+  session.handleLine("position startpos moves h7e7 h0g2");
+  const output = session.handleLine("review depth 1 movetime 500");
+
+  assert.ok(output.some((line) => line.includes("review moves 2")));
+  assert.ok(output.some((line) => line.includes("book 2")));
+});
+
+test("UCCI review reports no moves when history is empty", () => {
+  const session = new UcciSession();
+  session.handleLine("position startpos");
+
+  assert.deepEqual(session.handleLine("review"), ["info string review no moves"]);
+});
