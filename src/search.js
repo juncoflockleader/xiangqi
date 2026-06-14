@@ -184,6 +184,7 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
     }
 
     const next = makeMove(position, move);
+    const repetition = rootRepetitionInfo(context, positionKey(next));
     const line = [];
     const childAlpha = context.exactRootScores ? -INFINITY_SCORE : -beta;
     const childBeta = context.exactRootScores ? INFINITY_SCORE : -alpha;
@@ -193,6 +194,7 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
     candidates.push({
       move: annotated,
       score,
+      repetition,
       principalVariation: [annotated, ...line]
     });
 
@@ -685,6 +687,21 @@ function isRepetition(context, key) {
   const previous = context.repetitionCounts.get(key) ?? 0;
   const currentPath = context.pathCounts.get(key) ?? 0;
   return previous + currentPath >= 2;
+}
+
+function rootRepetitionInfo(context, key) {
+  const historyCount = context.repetitionCounts.get(key) ?? 0;
+  const pathCount = context.pathCounts.get(key) ?? 0;
+
+  if (historyCount + pathCount < 2) return null;
+
+  return {
+    kind: "repeated-position",
+    adjudication: "draw-assumed",
+    historyCount,
+    pathCount,
+    projectedCount: historyCount + pathCount + 1
+  };
 }
 
 function enterPosition(context, key) {

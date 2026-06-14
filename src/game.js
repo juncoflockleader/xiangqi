@@ -7,6 +7,7 @@ import {
   sameMove,
   toFen
 } from "./board.js";
+import { SIDES } from "./constants.js";
 import { generateLegalMoves, isInCheck } from "./movegen.js";
 
 export function createGame(initialPosition = createInitialPosition()) {
@@ -102,10 +103,10 @@ export async function chooseAndPlayGameMoveAsync(game, engine, options = {}) {
 export function gameStatus(game) {
   const legalMoves = generateLegalMoves(game.position, game.position.turn);
   const key = positionKey(game.position);
-  const repetitionCount = game.positionCounts.get(key) ?? 0;
+  const repetitionCount = positionRepetitionCount(game, key);
+  const inCheck = isInCheck(game.position, game.position.turn);
 
   if (legalMoves.length === 0) {
-    const inCheck = isInCheck(game.position, game.position.turn);
     return {
       state: inCheck ? "checkmate" : "stalemate",
       outcome: "loss",
@@ -125,7 +126,8 @@ export function gameStatus(game) {
       loser: null,
       legalMoves: legalMoves.length,
       repetitionCount,
-      inCheck: isInCheck(game.position, game.position.turn)
+      inCheck,
+      repetition: classifyRepetition(game, key)
     };
   }
 
@@ -136,12 +138,81 @@ export function gameStatus(game) {
     loser: null,
     legalMoves: legalMoves.length,
     repetitionCount,
-    inCheck: isInCheck(game.position, game.position.turn)
+    inCheck
   };
 }
 
 export function historyKeys(game) {
   return game.positions.map((position) => positionKey(position));
+}
+
+export function classifyRepetition(game, key = positionKey(game.position)) {
+  const positions = Array.isArray(game.positions) ? game.positions : [];
+  const moves = Array.isArray(game.moves) ? game.moves : [];
+  const currentIndex = findCurrentPositionIndex(positions, key, game.position);
+  const previousIndex = findPreviousPositionIndex(positions, key, currentIndex);
+
+  if (currentIndex < 1 || previousIndex < 0) {
+    return {
+      kind: "unknown",
+      adjudication: "draw-assumed",
+      reason: "position-history-unavailable",
+      cycleLength: null,
+      fromPly: null,
+      toPly: null,
+      checkingSides: [],
+      continuousCheckingSides: [],
+      possiblePerpetualCheckSide: null,
+      moves: []
+    };
+  }
+
+  const movesBySide = createSideCounts();
+  const checksBySide = createSideCounts();
+  const cycleMoves = [];
+
+  for (let index = previousIndex; index < currentIndex; index += 1) {
+    const before = positions[index];
+    const after = positions[index + 1];
+    const move = moves[index];
+    const side = move?.side ?? before?.turn ?? null;
+    const givesCheck = Boolean(after && isInCheck(after, after.turn));
+
+    if (side && Object.prototype.hasOwnProperty.call(movesBySide, side)) {
+      movesBySide[side] += 1;
+      if (givesCheck) checksBySide[side] += 1;
+    }
+
+    cycleMoves.push({
+      ply: index + 1,
+      side,
+      notation: move?.notation ?? null,
+      givesCheck
+    });
+  }
+
+  const sides = [SIDES.RED, SIDES.BLACK];
+  const checkingSides = sides.filter((side) => checksBySide[side] > 0);
+  const continuousCheckingSides = sides.filter(
+    (side) => movesBySide[side] > 0 && checksBySide[side] === movesBySide[side]
+  );
+  const kind = classifyRepetitionKind(checkingSides, continuousCheckingSides);
+
+  return {
+    kind,
+    adjudication: "draw-assumed",
+    cycleLength: currentIndex - previousIndex,
+    fromPly: previousIndex + 1,
+    toPly: currentIndex,
+    checkingSides,
+    continuousCheckingSides,
+    possiblePerpetualCheckSide: kind === "perpetual-check-candidate"
+      ? continuousCheckingSides[0]
+      : null,
+    movesBySide,
+    checksBySide,
+    moves: cycleMoves
+  };
 }
 
 function appendGameMove(game, engine, before, legalMove, details) {
@@ -217,4 +288,55 @@ function incrementCount(counts, key) {
   const next = new Map(counts);
   next.set(key, (next.get(key) ?? 0) + 1);
   return next;
+}
+
+function positionRepetitionCount(game, key) {
+  if (game.positionCounts?.get) {
+    return game.positionCounts.get(key) ?? 0;
+  }
+
+  if (Array.isArray(game.positions)) {
+    return game.positions.reduce(
+      (count, position) => count + (positionKey(position) === key ? 1 : 0),
+      0
+    );
+  }
+
+  return positionKey(game.position) === key ? 1 : 0;
+}
+
+function findCurrentPositionIndex(positions, key, currentPosition) {
+  for (let index = positions.length - 1; index >= 0; index -= 1) {
+    if (positionKey(positions[index]) === key) return index;
+  }
+
+  if (currentPosition && positionKey(currentPosition) === key) {
+    return positions.length;
+  }
+
+  return -1;
+}
+
+function findPreviousPositionIndex(positions, key, currentIndex) {
+  for (let index = currentIndex - 1; index >= 0; index -= 1) {
+    if (positionKey(positions[index]) === key) return index;
+  }
+
+  return -1;
+}
+
+function createSideCounts() {
+  return {
+    [SIDES.RED]: 0,
+    [SIDES.BLACK]: 0
+  };
+}
+
+function classifyRepetitionKind(checkingSides, continuousCheckingSides) {
+  if (continuousCheckingSides.length > 1) return "mutual-check-cycle";
+  if (continuousCheckingSides.length === 1 && checkingSides.length === 1) {
+    return "perpetual-check-candidate";
+  }
+  if (checkingSides.length > 0) return "checking-cycle";
+  return "cycle";
 }

@@ -128,4 +128,29 @@ test("game status detects a repeated position", () => {
   const status = gameStatus(game);
   assert.equal(status.state, "repetition");
   assert.equal(status.repetitionCount, 3);
+  assert.equal(status.repetition.kind, "cycle");
+  assert.equal(status.repetition.cycleLength, 4);
+  assert.equal(status.repetition.adjudication, "draw-assumed");
+  assert.deepEqual(status.repetition.moves.map((move) => move.notation), cycle);
+});
+
+test("game status classifies repeated checking cycles conservatively", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 100 });
+  let game = createGame(parseFen("3k5/R8/9/9/9/9/9/9/9/4K4 r"));
+  const cycle = ["a1-a0", "d0-d1", "a0-a1", "d1-d0"];
+
+  for (const move of [...cycle, ...cycle]) {
+    game = playGameMove(game, engine, move, { review: false });
+  }
+
+  const status = gameStatus(game);
+  assert.equal(status.state, "repetition");
+  assert.equal(status.outcome, "draw");
+  assert.equal(status.repetition.kind, "perpetual-check-candidate");
+  assert.equal(status.repetition.possiblePerpetualCheckSide, SIDES.RED);
+  assert.deepEqual(status.repetition.checkingSides, [SIDES.RED]);
+  assert.deepEqual(status.repetition.continuousCheckingSides, [SIDES.RED]);
+  assert.equal(status.repetition.checksBySide.red, 2);
+  assert.equal(status.repetition.checksBySide.black, 0);
+  assert.deepEqual(status.repetition.moves.map((move) => move.notation), cycle);
 });

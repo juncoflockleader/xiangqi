@@ -63,6 +63,7 @@ export function reviewGameWithEngine(engine, moves, options = {}) {
     keyMoments: selectKeyMoments(reviewedMoves, maxKeyMoments),
     status: gameStatus({
       position,
+      moves: reviewedMoves,
       positions,
       positionCounts: countPositions(positions)
     })
@@ -114,6 +115,7 @@ export async function reviewGameWithBackend(backend, moves, options = {}) {
     keyMoments: selectKeyMoments(reviewedMoves, maxKeyMoments),
     status: gameStatus({
       position,
+      moves: reviewedMoves,
       positions,
       positionCounts: countPositions(positions)
     })

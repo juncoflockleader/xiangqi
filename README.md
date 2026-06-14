@@ -8,7 +8,7 @@ The current engine is dependency-free JavaScript and includes:
 - Legal move generation for generals, advisors, elephants, horses, rooks, cannons, and pawns.
 - Check detection, flying-general rules, and make/unmake-style immutable position updates.
 - Iterative-deepening negamax search with alpha-beta and principal variation search.
-- Zobrist hashing, bounded depth-preferred transposition table, aspiration windows, quiescence search with bounded quiet-check search, capture/check/history-based move ordering, bounded check extensions, guarded null-move pruning, shallow futility pruning, late-move reductions, repetition hooks, and root candidate analysis.
+- Zobrist hashing, bounded depth-preferred transposition table, aspiration windows, quiescence search with bounded quiet-check search, capture/check/history-based move ordering, bounded check extensions, guarded null-move pruning, shallow futility pruning, late-move reductions, repetition diagnostics, and root candidate analysis.
 - Explainable opening-book support with a curated early repertoire, heuristic fallback for off-book opening positions, deterministic selection, and pure-search opt-out.
 - Evaluation terms for material, piece-square placement, mobility, threats, pawn progress, and king safety.
 - Static exchange analysis for distinguishing clean wins, tactically poisoned captures, and defended captures that remain sound after recaptures.
@@ -19,7 +19,7 @@ The current engine is dependency-free JavaScript and includes:
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
 - Whole-game review with side summaries, opening-book matches, and key learning moments.
 - Lesson-plan generation that turns reviewed games into prompt, hint, and answer cards.
-- Game-history helpers for play sessions, reviewed move logs, engine decision logs, position history, repeated-position detection, and async native-backend play.
+- Game-history helpers for play sessions, reviewed move logs, engine decision logs, position history, repeated-position detection with cycle/check diagnostics, and async native-backend play.
 - A backend adapter contract and async UCI/UCCI process wrapper so the JS reference engine can sit beside a native C++/WASM engine without changing the learning-app API.
 - Named engine profiles for fast play, balanced play, deeper analysis, and native UCI/UCCI analysis setups.
 - Shared time-control budgeting for fixed movetime and clock-based `wtime`/`btime`/increment searches, with phase-aware moves-to-go estimates, low-clock caps, and configurable move overhead.
@@ -258,7 +258,7 @@ game = await chooseAndPlayGameMoveAsync(game, nativeBackend, {
 });
 ```
 
-`gameStatus` reports `state`, `legalMoves`, repetition count, check status, and terminal `winner`/`loser` metadata. Xiangqi stalemate is treated as a loss for the side to move, so both checkmate and no-legal-move stalemate are scored as losing terminal positions.
+`gameStatus` reports `state`, `legalMoves`, repetition count, check status, and terminal `winner`/`loser` metadata. Repeated positions include a conservative `repetition` diagnostic with the repeated cycle, checking sides, and `draw-assumed` adjudication metadata so a learning UI can explain cycles without overclaiming the full official chase/perpetual-check rule set. Xiangqi stalemate is treated as a loss for the side to move, so both checkmate and no-legal-move stalemate are scored as losing terminal positions.
 
 Review a completed or partial game:
 

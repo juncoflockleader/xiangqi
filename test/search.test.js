@@ -33,6 +33,13 @@ test("search treats repeated child positions as draw candidates", () => {
 
   assert.ok(result.stats.repetitions >= 1);
   assert.equal(repeatedCandidate.score, 0);
+  assert.deepEqual(repeatedCandidate.repetition, {
+    kind: "repeated-position",
+    adjudication: "draw-assumed",
+    historyCount: 2,
+    pathCount: 0,
+    projectedCount: 3
+  });
 });
 
 test("search scores no-legal-move stalemate as a Xiangqi loss", () => {

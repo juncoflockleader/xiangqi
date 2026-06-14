@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  SIDES,
   createEngine,
   createInitialPosition,
   parseFen,
@@ -61,6 +62,21 @@ test("standalone game review helper accepts an engine", () => {
 
   assert.equal(review.moves.length, 1);
   assert.equal(review.moves[0].notation, "h7-e7");
+});
+
+test("game review carries repetition cycle diagnostics", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 100 });
+  const initialPosition = parseFen("3k5/R8/9/9/9/9/9/9/9/4K4 r");
+  const cycle = ["a1-a0", "d0-d1", "a0-a1", "d1-d0"];
+  const review = engine.reviewGame([...cycle, ...cycle], {
+    initialPosition,
+    reviewOptions: { depth: 1, timeLimitMs: 100 }
+  });
+
+  assert.equal(review.status.state, "repetition");
+  assert.equal(review.status.repetition.kind, "perpetual-check-candidate");
+  assert.equal(review.status.repetition.possiblePerpetualCheckSide, SIDES.RED);
+  assert.deepEqual(review.status.repetition.moves.map((move) => move.notation), cycle);
 });
 
 test("move review falls back when timeout prevents root candidate scoring", () => {
