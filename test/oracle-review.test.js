@@ -104,6 +104,16 @@ test("oracle-reviewed backend uses the oracle for move and game reviews", async 
         timeLimitMs: 100
       }
     });
+    const gameStudy = await backend.gameStudy(["h7-e7"], {
+      maxPositionStudies: 0,
+      reviewOptions: {
+        depth: 1,
+        timeLimitMs: 100
+      },
+      lessonOptions: {
+        maxCards: 1
+      }
+    });
 
     assert.equal(review.reviewBackend.name, "Mock Oracle");
     assert.equal(review.source, "native-ucci");
@@ -113,6 +123,9 @@ test("oracle-reviewed backend uses the oracle for move and game reviews", async 
     assert.equal(review.oracleReview.bestMove, "h9-g7");
     assert.equal(gameReview.moves[0].review.reviewBackend.name, "Mock Oracle");
     assert.equal(gameReview.moves[0].review.oracleReview.bestMove, "h9-g7");
+    assert.equal(gameStudy.type, "game-study");
+    assert.equal(gameStudy.review.moves[0].review.reviewBackend.name, "Mock Oracle");
+    assert.equal(gameStudy.lessonPlan.cards[0].bestMove, "h9-g7");
   } finally {
     await backend.close();
   }

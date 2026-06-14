@@ -158,6 +158,14 @@ console.log(gameStudy.positionStudies[0]?.summary);
 position-study bundles for selected plies, final FEN, and next-step prompts so a
 learning UI can move from game recap into focused practice.
 
+You can also generate the same artifact from the command line, which is handy
+after online sparring or imported game records:
+
+```sh
+npm run study:game -- --moves "h7-e7 h0-g2 h9-g7" --json
+npm run study:game -- --file ./game.json --max-position-studies 3
+```
+
 Use named engine profiles when wiring the app:
 
 ```js

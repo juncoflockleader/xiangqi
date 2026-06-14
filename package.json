@@ -13,6 +13,7 @@
     "spar": "node examples/sparring.mjs",
     "probe:native": "node examples/native-probe.mjs",
     "study": "node examples/study-position.mjs",
+    "study:game": "node examples/game-study.mjs",
     "perft": "node examples/perft.mjs",
     "ucci": "node bin/xiangqi-ucci.mjs",
     "test": "node --test --test-concurrency=1",
