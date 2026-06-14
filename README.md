@@ -31,6 +31,7 @@ The current engine is dependency-free JavaScript and includes:
 
 ```sh
 npm run play
+npm run study
 node examples/engine-demo.mjs
 node examples/benchmark.mjs
 node examples/oracle-benchmark.mjs --help
@@ -48,6 +49,31 @@ red against the fast JavaScript engine; use `npm run play -- --side black`,
 to experiment. Moves use coordinate notation such as `h9-g7` or `h9g7`, and the
 `hint`, `best`, and `why` commands show the learning-oriented explanation layer
 while you play.
+
+For a one-position learning report, run `npm run study`. It prints the best move,
+candidate lines, progressive hints, pressure, and an optional review of a move
+you are considering:
+
+```sh
+npm run study -- --fen "4k4/9/4r4/9/9/9/9/9/9/3KR4 r" \
+  --move e9-f9 \
+  --depth 2 \
+  --time 1000
+```
+
+Use `--json` to get the same study bundle as machine-readable data for a UI
+prototype, and pass the same native/oracle flags as the play demo when you want
+stronger analysis:
+
+```sh
+npm run study -- \
+  --engine-command /path/to/pikafish \
+  --engine-protocol uci \
+  --engine-option EvalFile=/path/to/pikafish.nnue \
+  --oracle-command /path/to/pikafish \
+  --oracle-protocol uci \
+  --json
+```
 
 The same demo can play through a native UCI/UCCI engine, with JavaScript fallback
 by default:

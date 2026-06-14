@@ -12,6 +12,7 @@
     "book:oracle": "node examples/oracle-opening.mjs",
     "spar": "node examples/sparring.mjs",
     "probe:native": "node examples/native-probe.mjs",
+    "study": "node examples/study-position.mjs",
     "perft": "node examples/perft.mjs",
     "ucci": "node bin/xiangqi-ucci.mjs",
     "test": "node --test --test-concurrency=1",
