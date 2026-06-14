@@ -202,6 +202,7 @@ function maybeBookResult(position, options, tableSize) {
     stats: {
       nodes: 0,
       qnodes: 0,
+      qchecks: 0,
       ttHits: 0,
       cutoffs: 0,
       aspirationSearches: 0,

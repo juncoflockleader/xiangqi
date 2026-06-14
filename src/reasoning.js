@@ -34,6 +34,10 @@ export function explainMove(position, searchResult) {
   const stability = searchStabilityReason(searchResult.iterations ?? []);
   if (stability) reasons.push(stability);
 
+  if ((searchResult.stats?.qchecks ?? 0) > 0) {
+    reasons.push(`Quiescence search tested ${searchResult.stats.qchecks} forcing quiet checks beyond capture-only tactics.`);
+  }
+
   if (reasons.length === 0) {
     reasons.push("It is the highest-scoring move after search and keeps the position coordinated.");
   }

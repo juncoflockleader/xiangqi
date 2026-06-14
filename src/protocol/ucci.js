@@ -163,7 +163,7 @@ export class UcciSession {
     }
 
     outputs.push(
-      `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes} qnodes ${result.stats.qnodes} tthits ${result.stats.ttHits} asp ${result.stats.aspirationSearches} asphi ${result.stats.aspirationFailHigh} asplo ${result.stats.aspirationFailLow} ext ${result.stats.extensions} nmp ${result.stats.nullMovePrunes} pvs ${result.stats.pvsResearches} pv ${pv}`,
+      `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes} qnodes ${result.stats.qnodes} qchecks ${result.stats.qchecks} tthits ${result.stats.ttHits} asp ${result.stats.aspirationSearches} asphi ${result.stats.aspirationFailHigh} asplo ${result.stats.aspirationFailLow} ext ${result.stats.extensions} nmp ${result.stats.nullMovePrunes} pvs ${result.stats.pvsResearches} pv ${pv}`,
       `info string ${result.explanation.summary}`
     );
 

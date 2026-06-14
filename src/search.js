@@ -29,6 +29,7 @@ const UPPER = "upper";
 const DEFAULT_MAX_EXTENSIONS = 4;
 const DEFAULT_MAX_PLY = 80;
 const DEFAULT_ASPIRATION_WINDOW = 45;
+const DEFAULT_QCHECK_DEPTH = 1;
 const NULL_MOVE_MIN_DEPTH = 3;
 
 export function searchBestMove(position, options = {}) {
@@ -87,9 +88,11 @@ export function searchBestMove(position, options = {}) {
       maxPly: options.maxPly ?? DEFAULT_MAX_PLY,
       exactRootScores,
       aspirationWindow: options.aspirationWindow ?? DEFAULT_ASPIRATION_WINDOW,
+      qCheckDepth: options.qCheckDepth ?? DEFAULT_QCHECK_DEPTH,
       useAspiration: options.useAspiration !== false && !exactRootScores,
       useNullMove: options.useNullMove !== false,
       usePvs: options.usePvs !== false,
+      useQuiescenceChecks: options.useQuiescenceChecks !== false,
       tacticalCache: new Map(),
       stats: createSearchStats(),
       nodes: 0,
@@ -267,7 +270,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       extensionsRemaining -= 1;
       context.stats.extensions += 1;
     } else {
-      const score = quiescence(position, alpha, beta, ply, context);
+      const score = quiescence(position, alpha, beta, ply, context, context.qCheckDepth);
       leavePosition(context, repetitionKey);
       return score;
     }
@@ -417,29 +420,50 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   return bestScore;
 }
 
-function quiescence(position, alpha, beta, ply, context) {
+function quiescence(position, alpha, beta, ply, context, qChecksRemaining) {
   context.nodes += 1;
   context.stats.nodes += 1;
   context.stats.qnodes += 1;
-  const standPat = evaluatePosition(position, position.turn).score;
 
-  if (standPat >= beta) {
-    context.stats.cutoffs += 1;
-    return beta;
+  if (isTimedOut(context)) {
+    context.timedOut = true;
+    return evaluatePosition(position, position.turn).score;
   }
-  if (standPat > alpha) alpha = standPat;
 
-  const captures = orderMoves(position, generateCaptures(position), null, context, ply)
-    .filter((move) => isGoodCapture(position, move, context));
+  if (ply >= context.maxPly) {
+    return evaluatePosition(position, position.turn).score;
+  }
 
-  for (const move of captures) {
+  const inCheck = isInCheck(position, position.turn);
+  let moves;
+
+  if (inCheck) {
+    moves = orderMoves(position, generateLegalMoves(position, position.turn), null, context, ply);
+    if (moves.length === 0) return -MATE_SCORE + ply;
+  } else {
+    const standPat = evaluatePosition(position, position.turn).score;
+
+    if (standPat >= beta) {
+      context.stats.cutoffs += 1;
+      return beta;
+    }
+    if (standPat > alpha) alpha = standPat;
+
+    const captures = orderMoves(position, generateCaptures(position), null, context, ply)
+      .filter((move) => isGoodCapture(position, move, context));
+    const checkingMoves = quietCheckingMoves(position, context, qChecksRemaining, ply);
+    moves = [...captures, ...checkingMoves];
+  }
+
+  for (const move of moves) {
     if (isTimedOut(context)) {
       context.timedOut = true;
       break;
     }
 
     const next = makeMove(position, move);
-    const score = normalizeScore(-quiescence(next, -beta, -alpha, ply + 1, context));
+    const nextQChecks = move.captured ? qChecksRemaining : Math.max(0, qChecksRemaining - 1);
+    const score = normalizeScore(-quiescence(next, -beta, -alpha, ply + 1, context, nextQChecks));
     if (score >= beta) {
       context.stats.cutoffs += 1;
       return beta;
@@ -448,6 +472,21 @@ function quiescence(position, alpha, beta, ply, context) {
   }
 
   return alpha;
+}
+
+function quietCheckingMoves(position, context, qChecksRemaining, ply) {
+  if (!context.useQuiescenceChecks || qChecksRemaining <= 0) return [];
+
+  const checks = orderMoves(position, generateLegalMoves(position, position.turn), null, context, ply)
+    .filter((move) => !move.captured && givesCheck(position, move));
+
+  context.stats.qchecks += checks.length;
+  return checks;
+}
+
+function givesCheck(position, move) {
+  const next = makeMove(position, move);
+  return isInCheck(next, next.turn);
 }
 
 function orderMoves(position, moves, principalMove, context, ply) {
@@ -587,6 +626,7 @@ function createSearchStats() {
   return {
     nodes: 0,
     qnodes: 0,
+    qchecks: 0,
     ttHits: 0,
     cutoffs: 0,
     aspirationSearches: 0,
@@ -605,6 +645,7 @@ function mergeSearchStats(total, next) {
   return {
     nodes: total.nodes + next.nodes,
     qnodes: total.qnodes + next.qnodes,
+    qchecks: total.qchecks + next.qchecks,
     ttHits: total.ttHits + next.ttHits,
     cutoffs: total.cutoffs + next.cutoffs,
     aspirationSearches: total.aspirationSearches + next.aspirationSearches,
