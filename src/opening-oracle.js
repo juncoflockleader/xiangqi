@@ -1,6 +1,9 @@
 import { createInitialPosition, moveToNotation, parseFen, toFen } from "./board.js";
 import { createOpeningBookFromRecords } from "./book.js";
 
+export const ORACLE_OPENING_BOOK_ARTIFACT_SCHEMA = "xiangqi.oracle-opening-book";
+export const ORACLE_OPENING_BOOK_ARTIFACT_VERSION = 1;
+
 export async function generateOracleOpeningBookRecords(oracle, options = {}) {
   validateOracleBackend(oracle);
 
@@ -60,6 +63,7 @@ export async function generateOracleOpeningBookRecords(oracle, options = {}) {
     finalFen: toFen(position),
     plies: primaryLine.length,
     requestedPlies: maxPlies,
+    candidateLines: lineCount,
     lines: lineCount,
     stopReason,
     primaryLine,
@@ -69,6 +73,67 @@ export async function generateOracleOpeningBookRecords(oracle, options = {}) {
       aggregateRecords: true
     })
   };
+}
+
+export function createOracleOpeningBookArtifact(report, options = {}) {
+  validateOracleOpeningReport(report);
+
+  return cloneJson({
+    schema: ORACLE_OPENING_BOOK_ARTIFACT_SCHEMA,
+    version: ORACLE_OPENING_BOOK_ARTIFACT_VERSION,
+    source: report.source ?? options.source ?? "oracle",
+    generatedAt: normalizeGeneratedAt(options.generatedAt),
+    initialFen: report.initialFen,
+    finalFen: report.finalFen,
+    plies: report.plies ?? report.primaryLine?.length ?? 0,
+    requestedPlies: report.requestedPlies,
+    candidateLines: report.candidateLines ?? report.lines,
+    stopReason: report.stopReason,
+    primaryLine: report.primaryLine ?? [],
+    positions: report.positions ?? [],
+    records: report.records,
+    parameters: {
+      ...(options.parameters ?? {}),
+      ...(options.searchOptions ? { searchOptions: options.searchOptions } : {})
+    }
+  });
+}
+
+export function createOpeningBookFromOracleArtifact(input, options = {}) {
+  const artifact = parseOracleOpeningBookArtifact(input);
+
+  return createOpeningBookFromRecords(artifact.records, {
+    initialFen: options.initialFen ?? artifact.initialFen,
+    aggregateRecords: true,
+    ...options
+  });
+}
+
+export function parseOracleOpeningBookArtifact(input) {
+  const artifact = typeof input === "string" ? JSON.parse(input) : input;
+
+  if (Array.isArray(artifact)) {
+    return {
+      schema: ORACLE_OPENING_BOOK_ARTIFACT_SCHEMA,
+      version: ORACLE_OPENING_BOOK_ARTIFACT_VERSION,
+      records: artifact
+    };
+  }
+
+  if (!artifact || typeof artifact !== "object") {
+    throw new Error("Oracle opening artifact must be an object or records array.");
+  }
+  if (artifact.schema && artifact.schema !== ORACLE_OPENING_BOOK_ARTIFACT_SCHEMA) {
+    throw new Error(`Unsupported oracle opening artifact schema: ${artifact.schema}`);
+  }
+  if (artifact.version && artifact.version !== ORACLE_OPENING_BOOK_ARTIFACT_VERSION) {
+    throw new Error(`Unsupported oracle opening artifact version: ${artifact.version}`);
+  }
+  if (!Array.isArray(artifact.records)) {
+    throw new Error("Oracle opening artifact requires a records array.");
+  }
+
+  return artifact;
 }
 
 export function formatOracleOpeningBookReport(report, options = {}) {
@@ -183,6 +248,25 @@ function resolveInitialPosition(options) {
 function validateOracleBackend(oracle) {
   if (!oracle?.analyzePosition) throw new Error("Oracle opening generation requires analyzePosition.");
   if (typeof oracle.play !== "function") throw new Error("Oracle opening generation requires play.");
+}
+
+function validateOracleOpeningReport(report) {
+  if (!report || typeof report !== "object") {
+    throw new Error("Oracle opening artifact requires a report object.");
+  }
+  if (!Array.isArray(report.records)) {
+    throw new Error("Oracle opening artifact requires report.records.");
+  }
+}
+
+function normalizeGeneratedAt(value) {
+  if (value === undefined) return new Date().toISOString();
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function normalizePositiveInteger(value, name) {

@@ -1,5 +1,8 @@
 #!/usr/bin/env node
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import {
+  createOracleOpeningBookArtifact,
   createUcciEngineBackend,
   formatOracleOpeningBookReport,
   generateOracleOpeningBookRecords
@@ -57,6 +60,20 @@ try {
     }
   });
 
+  if (options.outFile) {
+    const artifact = createOracleOpeningBookArtifact(report, {
+      parameters: {
+        protocol: options.protocol,
+        plies: options.plies,
+        lines: options.lines,
+        depth: options.depth,
+        timeLimitMs: options.timeLimitMs,
+        engineOptions: options.engineOptions
+      }
+    });
+    await writeJsonFile(options.outFile, artifact);
+  }
+
   if (options.recordsOnly) {
     console.log(JSON.stringify(report.records, null, 2));
   } else if (options.json) {
@@ -90,6 +107,7 @@ function parseArgs(args) {
     startupTimeoutMs: numberFromEnv(process.env.XIANGQI_ORACLE_STARTUP_TIMEOUT_MS, 5000),
     commandTimeoutMs: numberFromEnv(process.env.XIANGQI_ORACLE_COMMAND_TIMEOUT_MS, 30000),
     initialFen: process.env.XIANGQI_ORACLE_INITIAL_FEN,
+    outFile: process.env.XIANGQI_ORACLE_OPENING_OUT,
     maxRecords: 20,
     json: false,
     recordsOnly: false
@@ -154,6 +172,10 @@ function parseArgs(args) {
       options.initialFen = args[++index];
       continue;
     }
+    if (arg === "--out") {
+      options.outFile = args[++index];
+      continue;
+    }
     if (arg === "--max-records") {
       options.maxRecords = Number(args[++index]);
       continue;
@@ -177,6 +199,9 @@ function parseArgs(args) {
   assertPositiveInteger(options.maxRecords, "max-records");
   assertPositiveInteger(options.startupTimeoutMs, "startup-timeout");
   assertPositiveInteger(options.commandTimeoutMs, "command-timeout");
+  if (options.outFile === "") {
+    throw new Error("--out requires a file path.");
+  }
   return options;
 }
 
@@ -195,6 +220,12 @@ function assertPositiveInteger(value, name) {
   if (!Number.isInteger(value) || value <= 0) {
     throw new Error(`--${name} must be a positive integer.`);
   }
+}
+
+async function writeJsonFile(path, value) {
+  const file = resolve(path);
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
 function printUsage() {
@@ -216,6 +247,7 @@ Options:
   --depth N            Oracle search depth (default: 6)
   --time MS            Oracle movetime in ms (default: 2000)
   --fen FEN            Start from a custom FEN
+  --out FILE           Write a versioned reusable oracle-opening artifact
   --json               Print full machine-readable report
   --records-only       Print only the importable records array
 
@@ -223,6 +255,7 @@ Environment:
   XIANGQI_ORACLE_ENGINE_COMMAND, XIANGQI_ORACLE_ENGINE_ARGS,
   XIANGQI_ORACLE_ENGINE_PROTOCOL, XIANGQI_ORACLE_ENGINE_OPTIONS,
   XIANGQI_ORACLE_OPENING_PLIES, XIANGQI_ORACLE_LINES,
-  XIANGQI_ORACLE_DEPTH, XIANGQI_ORACLE_TIME_MS
+  XIANGQI_ORACLE_DEPTH, XIANGQI_ORACLE_TIME_MS,
+  XIANGQI_ORACLE_OPENING_OUT
 `);
 }

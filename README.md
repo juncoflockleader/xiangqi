@@ -141,14 +141,33 @@ npm run book:oracle -- --protocol uci \
   --lines 3 \
   --depth 8 \
   --time 3000 \
-  --records-only > oracle-opening-records.json
+  --out ./oracle-opening-book.json
 ```
 
 The command follows the oracle's best line for the requested opening plies and
-records the top MultiPV alternatives at each visited position. The JSON array is
-compatible with `createOpeningBookFromRecords`, so it can be inspected, merged,
-or turned into a small first-pass book without hard-coding native-engine choices
-into the default repertoire.
+records the top MultiPV alternatives at each visited position. The `--out`
+artifact is versioned and can be inspected, committed, or loaded later:
+
+```js
+import { readFile } from "node:fs/promises";
+import {
+  createEngine,
+  createOpeningBookFromOracleArtifact,
+  DEFAULT_OPENING_BOOK,
+  mergeOpeningBooks
+} from "./src/index.js";
+
+const artifact = JSON.parse(await readFile("./oracle-opening-book.json", "utf8"));
+const oracleBook = createOpeningBookFromOracleArtifact(artifact);
+const engine = createEngine({
+  book: mergeOpeningBooks(DEFAULT_OPENING_BOOK, oracleBook)
+});
+```
+
+Use `--records-only` when you only want the raw records array for
+`createOpeningBookFromRecords`. Keeping generated oracle books outside the
+default repertoire makes native-engine choices reviewable before they become
+learning-app heuristics.
 
 Choose an engine backend:
 
