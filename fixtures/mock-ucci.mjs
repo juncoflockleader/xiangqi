@@ -46,7 +46,10 @@ rl.on("line", (line) => {
       write(`info string position ${currentPosition}`);
     }
 
-    if (hasOption("MockRejectHeuristic") && /\sb(?:\s|$)/.test(currentPosition)) {
+    if (hasOption("MockMateWdl")) {
+      write(`info depth ${depth} score mate 2 wdl 980 20 0 nodes 456 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+      write(`bestmove ${nativeMove("h9g7")}`);
+    } else if (hasOption("MockRejectHeuristic") && /\sb(?:\s|$)/.test(currentPosition)) {
       write(`info depth ${depth} score cp 240 nodes 88 pv ${nativeMove("g2e3")}`);
       write(`bestmove ${nativeMove("g2e3")}`);
     } else if (hasOption("MockRejectHeuristic")) {

@@ -167,6 +167,8 @@ function buildProbeReport(backend, decision, review, options) {
     bestMove: notationFor(decision.bestMove),
     source: decision.source,
     score: Math.round(decision.score ?? 0),
+    scoreDetail: decision.scoreDetail ?? decision.explanation?.search?.scoreDetail ?? null,
+    wdl: decision.wdl ?? decision.explanation?.search?.wdl ?? null,
     depth: decision.depth ?? 0,
     nodes: decision.nodes ?? 0,
     principalVariation: (decision.principalVariation ?? []).map(notationFor),
@@ -177,6 +179,8 @@ function buildProbeReport(backend, decision, review, options) {
       rank: alternative.rank,
       move: alternative.move,
       score: alternative.score,
+      scoreDetail: alternative.scoreDetail ?? null,
+      wdl: alternative.wdl ?? null,
       centipawnLoss: alternative.centipawnLoss,
       verdict: alternative.verdict,
       summary: alternative.summary
@@ -188,6 +192,8 @@ function buildProbeReport(backend, decision, review, options) {
       centipawnLoss: review.centipawnLoss,
       playedScore: review.playedScore,
       bestScore: review.bestScore,
+      bestScoreDetail: review.bestAnalysis?.scoreDetail ?? null,
+      bestWdl: review.bestAnalysis?.wdl ?? null,
       summary: review.explanation?.summary ?? ""
     } : null
   };
@@ -198,10 +204,11 @@ function formatProbeReport(report) {
     `Native probe: ${report.backend.name} (${report.backend.kind})`,
     `Protocol: ${report.protocol}`,
     `Options: ${report.nativeOptions.length > 0 ? formatNativeOptions(report.nativeOptions) : "none"}`,
-    `Best move: ${report.bestMove} (${report.source}, d${report.depth}, ${formatNodes(report.nodes)} nodes, ${formatCentipawns(report.score)})`
+    `Best move: ${report.bestMove} (${report.source}, d${report.depth}, ${formatNodes(report.nodes)} nodes, ${formatScoreDetail(report)})`
   ];
 
   if (report.summary) lines.push(`Summary: ${report.summary}`);
+  if (report.wdl?.text) lines.push(`WDL: ${report.wdl.text}`);
   if (report.comparison?.reason) {
     lines.push(`Comparison: ${report.comparison.reason}`);
   }
@@ -215,12 +222,15 @@ function formatProbeReport(report) {
   if (report.alternatives.length > 0) {
     lines.push("Alternatives:");
     for (const alternative of report.alternatives.slice(0, 5)) {
-      lines.push(`  ${alternative.rank}. ${alternative.move}: ${alternative.verdict}, loss ${alternative.centipawnLoss} cp, ${formatCentipawns(alternative.score)}`);
+      const wdl = alternative.wdl?.text ? `, WDL ${alternative.wdl.text}` : "";
+      lines.push(`  ${alternative.rank}. ${alternative.move}: ${alternative.verdict}, loss ${alternative.centipawnLoss} cp, ${formatScoreDetail(alternative)}${wdl}`);
     }
   }
 
   if (report.review) {
     lines.push(`Review ${report.review.move}: ${report.review.classification}, loss ${report.review.centipawnLoss} cp, best ${report.review.bestMove}`);
+    if (report.review.bestScoreDetail?.text) lines.push(`Review best score: ${report.review.bestScoreDetail.text}`);
+    if (report.review.bestWdl?.text) lines.push(`Review WDL: ${report.review.bestWdl.text}`);
     if (report.review.summary) lines.push(`Review summary: ${report.review.summary}`);
   }
 
@@ -256,6 +266,10 @@ function formatNodes(value) {
 function formatCentipawns(value) {
   const rounded = Math.round(value ?? 0);
   return `${rounded >= 0 ? "+" : ""}${rounded} cp`;
+}
+
+function formatScoreDetail(entry) {
+  return entry.scoreDetail?.text ?? formatCentipawns(entry.score);
 }
 
 function printUsage() {

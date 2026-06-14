@@ -339,6 +339,47 @@ test("native backend can use a UCI handshake for top-engine compatibility", asyn
   }
 });
 
+test("native backend preserves mate and WDL score details", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    depth: 3,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockMateWdl: true
+    }
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), {
+      useBook: false,
+      lines: 2
+    });
+
+    assert.equal(result.bestMove.notation, "h9-g7");
+    assert.equal(result.scoreDetail.kind, "mate");
+    assert.equal(result.scoreDetail.value, 2);
+    assert.equal(result.scoreDetail.text, "mate in 2");
+    assert.equal(result.wdl.win, 980);
+    assert.equal(result.wdl.draw, 20);
+    assert.equal(result.wdl.loss, 0);
+    assert.equal(result.wdl.text, "98% win, 2% draw, 0% loss");
+    assert.equal(result.candidates[0].scoreDetail.text, "mate in 2");
+    assert.equal(result.candidates[0].wdl.text, "98% win, 2% draw, 0% loss");
+    assert.ok(result.explanation.summary.includes("mate in 2"));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("Native WDL expectation: 98% win")));
+    assert.equal(result.explanation.search.scoreDetail.text, "mate in 2");
+    assert.equal(result.explanation.search.wdl.text, "98% win, 2% draw, 0% loss");
+    assert.equal(result.explanation.alternatives[0].scoreDetail.text, "mate in 2");
+    assert.equal(result.explanation.alternatives[0].wdl.text, "98% win, 2% draw, 0% loss");
+  } finally {
+    await backend.close();
+  }
+});
+
 test("UCCI backend provides async native coach hints", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,

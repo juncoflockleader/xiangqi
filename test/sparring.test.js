@@ -7,6 +7,8 @@ import {
   runSparringMatch
 } from "../src/index.js";
 
+const MOCK_UCCI_PATH = new URL("../fixtures/mock-ucci.mjs", import.meta.url);
+
 test("sparring match runs bounded engine self-play with reasoning logs", async () => {
   const red = createJavaScriptEngineBackend({ id: "red-test", name: "Red Test", depth: 1, timeLimitMs: 100 });
   const black = createJavaScriptEngineBackend({ id: "black-test", name: "Black Test", depth: 1, timeLimitMs: 100 });
@@ -30,6 +32,38 @@ test("sparring match runs bounded engine self-play with reasoning logs", async (
   assert.ok(report.moves.every((move) => move.backendStatus.state === "primary"));
   assert.ok(text.includes("Sparring: Red Test (Red) vs Black Test (Black)"));
   assert.ok(text.includes("after 4 plies"));
+});
+
+test("sparring match records native score details for learning reports", async () => {
+  const red = createLearningEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    fallbackOnNativeError: false,
+    depth: 3,
+    timeLimitMs: 100,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockMateWdl: true
+    }
+  });
+  const black = createJavaScriptEngineBackend({ id: "black-test", name: "Black Test", depth: 1, timeLimitMs: 100 });
+
+  try {
+    const report = await runSparringMatch({ red, black }, {
+      maxPlies: 1,
+      searchOptions: { useBook: false, depth: 3, timeLimitMs: 100 }
+    });
+
+    assert.equal(report.totalPlies, 1);
+    assert.equal(report.moves[0].scoreDetail.kind, "mate");
+    assert.equal(report.moves[0].scoreDetail.text, "mate in 2");
+    assert.equal(report.moves[0].wdl.text, "98% win, 2% draw, 0% loss");
+    assert.ok(report.moves[0].summary.includes("mate in 2"));
+  } finally {
+    await red.close();
+  }
 });
 
 test("sparring match stops immediately on terminal initial positions", async () => {

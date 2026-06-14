@@ -106,6 +106,8 @@ export function createUcciEngineBackend(options = {}) {
           rank: index + 1,
           move: candidate.move,
           score: Math.round(candidate.score),
+          scoreDetail: candidate.scoreDetail ?? null,
+          wdl: candidate.wdl ?? null,
           centipawnLoss: Math.max(0, Math.round(bestScore - candidate.score)),
           principalVariation: candidate.principalVariation.map((move) => move.notation ?? moveToNotation(move)),
           explanation: explainNativeCandidate(position, candidate, {
@@ -393,6 +395,8 @@ async function nativeSearch(client, position, options) {
     protocol,
     bestMove: parsed.bestMove,
     score: parsed.score,
+    scoreDetail: parsed.scoreDetail,
+    wdl: parsed.wdl,
     depth: parsed.depth,
     nodes: parsed.nodes,
     principalVariation: parsed.principalVariation,
@@ -578,6 +582,8 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
   return {
     bestMove,
     score: primaryInfo.score ?? 0,
+    scoreDetail: nativeScoreDetail(primaryInfo),
+    wdl: nativeWdl(primaryInfo),
     depth: maxInfoValue(infos, "depth"),
     nodes: maxInfoValue(infos, "nodes"),
     principalVariation,
@@ -603,6 +609,10 @@ function parseInfoLine(line) {
     depth: 0,
     nodes: 0,
     multipv: 1,
+    scoreKind: null,
+    scoreValue: null,
+    mate: null,
+    wdl: null,
     score: null,
     pv: []
   };
@@ -621,9 +631,31 @@ function parseInfoLine(line) {
     } else if (token === "score") {
       const kind = tokens[index + 1]?.toLowerCase();
       const value = Number.parseInt(tokens[index + 2], 10);
-      if (kind === "cp") info.score = Number.isFinite(value) ? value : 0;
-      if (kind === "mate") info.score = Number.isFinite(value) ? Math.sign(value || 1) * (100000 - Math.abs(value)) : 0;
+      if (kind === "cp") {
+        info.scoreKind = "cp";
+        info.scoreValue = Number.isFinite(value) ? value : 0;
+        info.score = info.scoreValue;
+      }
+      if (kind === "mate") {
+        info.scoreKind = "mate";
+        info.scoreValue = Number.isFinite(value) ? value : 0;
+        info.mate = info.scoreValue;
+        info.score = Number.isFinite(value) ? Math.sign(value || 1) * (100000 - Math.abs(value)) : 0;
+      }
       index += 2;
+    } else if (token === "wdl") {
+      const win = Number.parseInt(tokens[index + 1], 10);
+      const draw = Number.parseInt(tokens[index + 2], 10);
+      const loss = Number.parseInt(tokens[index + 3], 10);
+      if ([win, draw, loss].every(Number.isFinite)) {
+        info.wdl = {
+          win,
+          draw,
+          loss,
+          total: win + draw + loss
+        };
+      }
+      index += 3;
     } else if (token === "pv") {
       info.pv = tokens.slice(index + 1);
       break;
@@ -669,8 +701,12 @@ function buildNativeCandidates(position, infos, bestMove, primaryInfo) {
         native: {
           depth: info.depth,
           nodes: info.nodes,
-          multipv: info.multipv
-        }
+          multipv: info.multipv,
+          scoreDetail: nativeScoreDetail(info),
+          wdl: nativeWdl(info)
+        },
+        scoreDetail: nativeScoreDetail(info),
+        wdl: nativeWdl(info)
       };
     })
     .filter(Boolean);
@@ -685,9 +721,75 @@ function buildNativeCandidates(position, infos, bestMove, primaryInfo) {
     native: {
       depth: primaryInfo.depth ?? 0,
       nodes: primaryInfo.nodes ?? 0,
-      multipv: 1
-    }
+      multipv: 1,
+      scoreDetail: nativeScoreDetail(primaryInfo),
+      wdl: nativeWdl(primaryInfo)
+    },
+    scoreDetail: nativeScoreDetail(primaryInfo),
+    wdl: nativeWdl(primaryInfo)
   }];
+}
+
+function nativeScoreDetail(info = {}) {
+  if (info.scoreKind === "mate") {
+    return {
+      kind: "mate",
+      value: info.mate ?? info.scoreValue ?? null,
+      normalizedScore: info.score ?? 0,
+      text: formatNativeScoreDetail(info)
+    };
+  }
+  if (info.scoreKind === "cp") {
+    return {
+      kind: "cp",
+      value: info.scoreValue ?? info.score ?? 0,
+      normalizedScore: info.score ?? 0,
+      text: formatNativeScoreDetail(info)
+    };
+  }
+
+  return {
+    kind: "unknown",
+    value: null,
+    normalizedScore: info.score ?? 0,
+    text: formatScore(info.score ?? 0)
+  };
+}
+
+function formatNativeScoreDetail(info = {}) {
+  if (info.scoreKind === "mate") {
+    const mate = info.mate ?? info.scoreValue ?? 0;
+    if (mate > 0) return `mate in ${mate}`;
+    if (mate < 0) return `getting mated in ${Math.abs(mate)}`;
+    return "forced mate";
+  }
+
+  return formatScore(info.score ?? 0);
+}
+
+function nativeWdl(info = {}) {
+  if (!info.wdl) return null;
+  const { win, draw, loss, total } = info.wdl;
+  const safeTotal = total > 0 ? total : win + draw + loss;
+
+  return {
+    win,
+    draw,
+    loss,
+    total: safeTotal,
+    expectation: safeTotal > 0 ? (win + draw / 2) / safeTotal : null,
+    text: formatNativeWdl(info.wdl)
+  };
+}
+
+function formatNativeWdl(wdl) {
+  const total = wdl.total > 0 ? wdl.total : wdl.win + wdl.draw + wdl.loss;
+  if (total <= 0) return `${wdl.win}/${wdl.draw}/${wdl.loss}`;
+
+  const win = Math.round((wdl.win / total) * 100);
+  const draw = Math.round((wdl.draw / total) * 100);
+  const loss = Math.round((wdl.loss / total) * 100);
+  return `${win}% win, ${draw}% draw, ${loss}% loss`;
 }
 
 function resolveLegalMove(position, notation) {
@@ -736,10 +838,12 @@ function explainNativeMove(position, result, backendName) {
   const moveStory = explainMoveFeatures(position, move);
   const comparison = buildNativeComparisonEvidence(result, position);
   const validation = result.openingHeuristicValidation;
+  const scoreText = result.scoreDetail?.text ?? formatScore(result.score);
   const reasons = [
     `${backendName} selected this move through ${protocolLabel} search.`,
     `The native search reported depth ${result.depth} and ${result.nodes} nodes.`,
-    `It reported a score of ${formatScore(result.score)} for the side to move.`,
+    `It reported a score of ${scoreText} for the side to move.`,
+    nativeWdlReason(result.wdl),
     comparison?.reason,
     validation?.status === "rejected"
       ? `Rejected opening heuristic ${validation.heuristicMove} because native search found it loses about ${validation.centipawnLoss} centipawns compared with ${validation.searchBestMove}.`
@@ -753,7 +857,7 @@ function explainNativeMove(position, result, backendName) {
   }
 
   return {
-    summary: `${pieceLabel(move.piece)} ${moveToNotation(move)} is selected by ${backendName} at depth ${result.depth}, with a reported score of ${formatScore(result.score)}.`,
+    summary: `${pieceLabel(move.piece)} ${moveToNotation(move)} is selected by ${backendName} at depth ${result.depth}, with a reported score of ${scoreText}.`,
     reasons: unique(reasons).slice(0, 7),
     alternatives: explainNativeAlternatives(position, result, backendName, protocolLabel),
     principalVariation,
@@ -769,7 +873,9 @@ function explainNativeMove(position, result, backendName) {
       tableSize: result.tableSize,
       stats: result.stats,
       iterations: result.iterations,
-      openingHeuristicValidation: result.openingHeuristicValidation ?? null
+      openingHeuristicValidation: result.openingHeuristicValidation ?? null,
+      scoreDetail: result.scoreDetail ?? null,
+      wdl: result.wdl ?? null
     }
   };
 }
@@ -783,6 +889,8 @@ function buildNativeComparisonEvidence(result, position) {
   const bestScore = Math.round(best.score);
   const nextScore = Math.round(next.score);
   const scoreGap = Math.max(0, bestScore - nextScore);
+  const bestScoreText = best.scoreDetail?.text ?? formatScore(bestScore);
+  const nextScoreText = next.scoreDetail?.text ?? formatScore(nextScore);
   const bestLine = (best.principalVariation ?? []).map((move) => move.notation ?? moveToNotation(move));
   const nextLine = (next.principalVariation ?? []).map((move) => move.notation ?? moveToNotation(move));
   const bestPlan = buildLinePlan(position, best.principalVariation ?? [best.move], {
@@ -803,8 +911,8 @@ function buildNativeComparisonEvidence(result, position) {
     scoreGapText: `${scoreGap} cp`,
     bestScore,
     nextScore,
-    bestScoreText: formatScore(bestScore),
-    nextScoreText: formatScore(nextScore),
+    bestScoreText,
+    nextScoreText,
     verdict: nearlyTied ? "near-tie" : nativeAlternativeVerdict(1, scoreGap),
     reason,
     bestLine,
@@ -834,6 +942,8 @@ function explainNativeAlternatives(position, result, backendName, protocolLabel)
       rank: index + 1,
       move: candidate.move.notation ?? moveToNotation(candidate.move),
       score: Math.round(candidate.score),
+      scoreDetail: candidate.scoreDetail ?? null,
+      wdl: candidate.wdl ?? null,
       centipawnLoss,
       verdict: nativeAlternativeVerdict(index, centipawnLoss),
       summary: explanation.summary,
@@ -854,17 +964,19 @@ function explainNativeAlternatives(position, result, backendName, protocolLabel)
 function explainNativeCandidate(position, candidate, context) {
   const moveStory = explainMoveFeatures(position, candidate.move);
   const centipawnLoss = Math.max(0, Math.round((context.bestScore ?? candidate.score) - candidate.score));
+  const scoreText = candidate.scoreDetail?.text ?? formatScore(candidate.score);
   const principalVariation = (candidate.principalVariation ?? [])
     .map((move) => move.notation ?? moveToNotation(move));
   const reasons = [
     context.rank === 1
       ? `This is ${context.backendName}'s top native candidate.`
       : `This native line trails the top line by about ${centipawnLoss} centipawns.`,
+    nativeWdlReason(candidate.wdl),
     ...moveStory.reasons
-  ];
+  ].filter(Boolean);
 
   return {
-    summary: `Native candidate ${context.rank}: ${pieceLabel(candidate.move.piece)} ${candidate.move.notation} scores ${formatScore(candidate.score)} at depth ${context.depth}.`,
+    summary: `Native candidate ${context.rank}: ${pieceLabel(candidate.move.piece)} ${candidate.move.notation} scores ${scoreText} at depth ${context.depth}.`,
     reasons: unique(reasons).slice(0, 7),
     principalVariation,
     principalVariationText: principalVariation.join(" "),
@@ -888,6 +1000,11 @@ function nativeAlternativeContrast(index, centipawnLoss) {
   if (index === 0) return "top native line";
   if (centipawnLoss <= 15) return `roughly tied with the top native line, trailing by ${centipawnLoss} centipawns`;
   return `trails the top native line by ${centipawnLoss} centipawns`;
+}
+
+function nativeWdlReason(wdl) {
+  if (!wdl) return null;
+  return `Native WDL expectation: ${wdl.text}.`;
 }
 
 function formatGoCommand(options) {
