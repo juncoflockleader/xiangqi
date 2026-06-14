@@ -601,7 +601,7 @@ console.log(sparring.moves[0].refereeReview?.classification);
 console.log(sparring.aggregate.fallbackCount);
 ```
 
-The sparring harness uses the same game-history layer as a play session, so every move keeps the chosen notation, position FENs, search source, score, depth, nodes, principal variation, explanation summary/reasons, backend status, and native-fallback provenance. When a `referee` backend is supplied, the match also gets reviewed for centipawn loss, classifications, best-move corrections, and learning moments. It is meant for repeatable engine-vs-engine smoke tests before trying brittle online boards. Run `npm run spar -- --plies 20 --depth 2 --time 1000`, add `--referee --referee-depth 4 --referee-time 2000` for a JS review pass, or set `XIANGQI_REFEREE_ENGINE_COMMAND`/`--referee-command` to grade the match with a native UCI/UCCI engine. Set `XIANGQI_ENGINE_COMMAND` to put a native UCI/UCCI engine on both playing sides through the learning backend.
+The sparring harness uses the same game-history layer as a play session, so every move keeps the chosen notation, position FENs, search source, score, depth, nodes, principal variation, explanation summary/reasons, best-vs-next comparison, candidate alternatives, backend status, and native-fallback provenance. When a `referee` backend is supplied, the match also gets reviewed for centipawn loss, classifications, best-move corrections, and learning moments. It is meant for repeatable engine-vs-engine smoke tests before trying brittle online boards. Run `npm run spar -- --plies 20 --depth 2 --time 1000 --lines 3`, add `--referee --referee-depth 4 --referee-time 2000 --referee-lines 3` for a JS review pass, or set `XIANGQI_REFEREE_ENGINE_COMMAND`/`--referee-command` to grade the match with a native UCI/UCCI engine. Set `XIANGQI_ENGINE_COMMAND` to put a native UCI/UCCI engine on both playing sides through the learning backend.
 
 To spar against a strong UCI engine such as Pikafish without checking binaries
 into this repo, point one side and the referee at a local executable:
@@ -615,14 +615,15 @@ npm run probe:native -- --protocol uci \
 
 XIANGQI_BLACK_ENGINE_COMMAND=/path/to/pikafish \
 XIANGQI_REFEREE_ENGINE_COMMAND=/path/to/pikafish \
-npm run spar -- --black-protocol uci --referee-protocol uci --plies 20 --no-book \
+npm run spar -- --black-protocol uci --referee-protocol uci --plies 20 --lines 3 --no-book \
   --native-option Threads=4 \
   --native-option Hash=512 \
   --native-option EvalFile=/path/to/pikafish.nnue \
   --black-depth 6 \
   --black-time 1500 \
   --referee-depth 8 \
-  --referee-time 3000
+  --referee-time 3000 \
+  --referee-lines 3
 ```
 
 Use `--red-depth`/`--black-depth`, `--red-time`/`--black-time`, and
@@ -633,8 +634,8 @@ native-vs-native matches. Use `--red-option`, `--black-option`, or
 comma-separated environment values such as
 `XIANGQI_ENGINE_OPTIONS="Threads=4,Hash=512"` or JSON values such as
 `XIANGQI_REFEREE_ENGINE_OPTIONS='{"Threads":4,"Hash":1024}'`. The sparring
-report prints the normalized native options so engine-vs-engine results carry
-their configuration with them.
+report prints the normalized native options and the top candidate comparisons so
+engine-vs-engine results carry both configuration and reasoning with them.
 
 Inspect threats without running a full search:
 

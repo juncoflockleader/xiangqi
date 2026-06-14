@@ -40,22 +40,26 @@ try {
       ? {
           reviewOptions: {
             depth: options.refereeDepth,
-            timeLimitMs: options.refereeTimeLimitMs
+            timeLimitMs: options.refereeTimeLimitMs,
+            lines: options.refereeLines
           }
         }
       : undefined,
     searchOptions: {
       depth: options.depth,
       timeLimitMs: options.timeLimitMs,
+      lines: options.lines,
       useBook: options.useBook
     },
     redSearchOptions: {
       depth: searchDepthFor("red", options, hasNativeCommand("red", options)),
-      timeLimitMs: searchTimeFor("red", options, hasNativeCommand("red", options))
+      timeLimitMs: searchTimeFor("red", options, hasNativeCommand("red", options)),
+      lines: options.lines
     },
     blackSearchOptions: {
       depth: searchDepthFor("black", options, hasNativeCommand("black", options)),
-      timeLimitMs: searchTimeFor("black", options, hasNativeCommand("black", options))
+      timeLimitMs: searchTimeFor("black", options, hasNativeCommand("black", options)),
+      lines: options.lines
     }
   });
 
@@ -158,6 +162,7 @@ function parseArgs(args) {
   const options = {
     depth: 1,
     timeLimitMs: 500,
+    lines: numberFromEnv(process.env.XIANGQI_ENGINE_LINES, 3),
     maxPlies: 20,
     maxMoves: 40,
     useBook: true,
@@ -188,7 +193,8 @@ function parseArgs(args) {
     redDepth: numberFromEnv(process.env.XIANGQI_RED_DEPTH, undefined),
     blackDepth: numberFromEnv(process.env.XIANGQI_BLACK_DEPTH, undefined),
     redTimeLimitMs: numberFromEnv(process.env.XIANGQI_RED_TIME_MS, undefined),
-    blackTimeLimitMs: numberFromEnv(process.env.XIANGQI_BLACK_TIME_MS, undefined)
+    blackTimeLimitMs: numberFromEnv(process.env.XIANGQI_BLACK_TIME_MS, undefined),
+    refereeLines: numberFromEnv(process.env.XIANGQI_REFEREE_LINES, undefined)
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -281,6 +287,10 @@ function parseArgs(args) {
       options.timeLimitMs = Number(args[++index]);
       continue;
     }
+    if (arg === "--lines") {
+      options.lines = Number(args[++index]);
+      continue;
+    }
     if (arg === "--native-time") {
       options.nativeTimeLimitMs = Number(args[++index]);
       continue;
@@ -295,6 +305,11 @@ function parseArgs(args) {
     }
     if (arg === "--referee-time") {
       options.refereeTimeLimitMs = Number(args[++index]);
+      options.referee = true;
+      continue;
+    }
+    if (arg === "--referee-lines") {
+      options.refereeLines = Number(args[++index]);
       options.referee = true;
       continue;
     }
@@ -349,9 +364,11 @@ function parseArgs(args) {
 
   options.refereeDepth ??= options.nativeDepth ?? Math.max(options.depth, 2);
   options.refereeTimeLimitMs ??= options.nativeTimeLimitMs ?? Math.max(options.timeLimitMs, 1000);
+  options.refereeLines ??= options.lines;
 
   assertPositiveInteger(options.depth, "depth");
   assertPositiveInteger(options.timeLimitMs, "time");
+  assertPositiveInteger(options.lines, "lines");
   assertOptionalPositiveInteger(options.nativeDepth, "native-depth");
   assertOptionalPositiveInteger(options.nativeTimeLimitMs, "native-time");
   assertOptionalPositiveInteger(options.redDepth, "red-depth");
@@ -360,6 +377,7 @@ function parseArgs(args) {
   assertOptionalPositiveInteger(options.blackTimeLimitMs, "black-time");
   assertPositiveInteger(options.refereeDepth, "referee-depth");
   assertPositiveInteger(options.refereeTimeLimitMs, "referee-time");
+  assertPositiveInteger(options.refereeLines, "referee-lines");
   assertNonNegativeInteger(options.maxPlies, "plies");
   assertNonNegativeInteger(options.maxMoves, "moves");
   assertProtocol(options.protocol ?? "ucci", "protocol");
@@ -457,6 +475,7 @@ Options:
   --plies N              Maximum plies to play (default: 20)
   --depth N              JavaScript search depth (default: 1)
   --time MS              JavaScript movetime in ms (default: 500)
+  --lines N              Candidate lines to compare (default: 3)
   --red-depth N          Override Red search depth
   --black-depth N        Override Black search depth
   --red-time MS          Override Red movetime
@@ -465,6 +484,7 @@ Options:
   --referee              Review moves with a JS referee after the match
   --referee-depth N      Referee review depth (default: max(depth, 2))
   --referee-time MS      Referee review movetime (default: max(time, 1000))
+  --referee-lines N      Referee candidate lines to compare (default: --lines)
   --fen FEN              Start from a custom FEN
   --native-command CMD   Use the same native UCI/UCCI command for both sides
   --red-command CMD      Use a native command only for Red
@@ -496,7 +516,7 @@ Environment:
   XIANGQI_RED_ENGINE_OPTIONS, XIANGQI_BLACK_ENGINE_OPTIONS,
   XIANGQI_RED_ENGINE_PROTOCOL, XIANGQI_BLACK_ENGINE_PROTOCOL,
   XIANGQI_RED_DEPTH, XIANGQI_BLACK_DEPTH, XIANGQI_RED_TIME_MS, XIANGQI_BLACK_TIME_MS,
-  XIANGQI_REFEREE_ENGINE_OPTIONS
+  XIANGQI_ENGINE_LINES, XIANGQI_REFEREE_LINES, XIANGQI_REFEREE_ENGINE_OPTIONS
 `);
 }
 

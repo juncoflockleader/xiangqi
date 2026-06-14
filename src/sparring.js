@@ -1,6 +1,7 @@
 import { createJavaScriptEngineBackend, describeEngineBackend } from "./backend.js";
 import { createGame, gameStatus, chooseAndPlayGameMoveAsync } from "./game.js";
 import { createInitialPosition, moveToNotation, parseFen, toFen } from "./board.js";
+import { summarizeAlternativeEvidence, summarizeComparisonEvidence } from "./explanation-artifacts.js";
 import { reviewGameWithBackend } from "./review.js";
 
 const SIDES = Object.freeze(["red", "black"]);
@@ -105,6 +106,10 @@ export function formatSparringReport(report, options = {}) {
     const fallback = move.backendFallback ? ", fallback" : "";
     lines.push(`${move.ply}. ${capitalize(move.side)} ${move.notation} (${move.player.name}, ${depth}${source}${fallback})`);
     if (move.summary) lines.push(`  ${move.summary}`);
+    if (move.comparison?.reason) lines.push(`  Compare: ${move.comparison.reason}`);
+    for (const alternative of move.alternatives.slice(0, options.maxAlternatives ?? 2)) {
+      lines.push(`  Alt ${alternative.rank}: ${formatAlternative(alternative)}`);
+    }
   }
 
   const maxLearningMoments = options.maxLearningMoments ?? Math.min(3, report.learningMoments.length);
@@ -259,6 +264,8 @@ function summarizeSparringMove(move, entries, reviewedMove = null) {
     principalVariation: [...(decision.principalVariation ?? [])],
     summary: decision.explanation?.summary ?? "",
     reasons: [...(decision.explanation?.reasons ?? [])],
+    comparison: summarizeComparisonEvidence(decision.explanation?.comparison),
+    alternatives: summarizeAlternativeEvidence(decision.explanation?.alternatives),
     confidence: decision.explanation?.confidence ?? null,
     backendStatus: decision.backendStatus ?? null,
     backendFallback: decision.backendFallback ?? null,
@@ -299,6 +306,8 @@ function summarizeRefereeMove(move) {
     mistakes: review.mistakes,
     summary: review.explanation?.summary ?? "",
     reasons: [...(review.explanation?.reasons ?? [])],
+    bestComparison: summarizeComparisonEvidence(review.bestComparison ?? review.bestAnalysis?.explanation?.comparison),
+    bestAlternatives: summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives),
     book: move.book
   };
 }
@@ -385,6 +394,22 @@ function formatNativeOptions(options) {
     if (option.value === null) return option.name;
     return `${option.name}=${formatNativeOptionValue(option.value)}`;
   }).join(", ");
+}
+
+function formatAlternative(alternative) {
+  const verdict = alternative.verdict ? `${alternative.verdict}, ` : "";
+  const score = alternative.scoreText ?? formatCentipawns(alternative.score);
+  const loss = Number.isFinite(alternative.centipawnLoss)
+    ? `, loss ${alternative.centipawnLoss} cp`
+    : "";
+  const reply = alternative.expectedReply ? `, expects ${alternative.expectedReply}` : "";
+  const wdl = alternative.wdl?.text ? `, WDL ${alternative.wdl.text}` : "";
+  return `${alternative.move}: ${verdict}${score}${loss}${reply}${wdl}`;
+}
+
+function formatCentipawns(value) {
+  const rounded = Math.round(value ?? 0);
+  return `${rounded >= 0 ? "+" : ""}${rounded} cp`;
 }
 
 function formatNativeOptionValue(value) {

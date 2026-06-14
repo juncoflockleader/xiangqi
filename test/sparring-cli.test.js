@@ -89,6 +89,29 @@ test("sparring CLI supports asymmetric native opponent settings", async () => {
   assert.ok(stdout.includes("Native options: Black MockDepthFromGo=true"));
 });
 
+test("sparring CLI prints native candidate comparisons when lines are requested", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "examples/sparring.mjs",
+    "--plies", "1",
+    "--depth", "1",
+    "--time", "100",
+    "--lines", "2",
+    "--no-book",
+    "--red-protocol", "uci"
+  ], {
+    cwd: root,
+    timeout: 5000,
+    env: {
+      ...process.env,
+      XIANGQI_RED_ENGINE_COMMAND: process.execPath,
+      XIANGQI_RED_ENGINE_ARGS: "fixtures/mock-ucci.mjs"
+    }
+  });
+
+  assert.ok(stdout.includes("Compare: Native MultiPV rates h9-g7 30 centipawns above the next candidate h7-e7."));
+  assert.ok(stdout.includes("Alt 2: h7-e7: playable, +0.12"));
+});
+
 test("sparring CLI applies Pikafish preset to a native player", async () => {
   const { stdout } = await execFileAsync(process.execPath, [
     "examples/sparring.mjs",

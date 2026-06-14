@@ -66,6 +66,39 @@ test("sparring match records native score details for learning reports", async (
   }
 });
 
+test("sparring match preserves native candidate comparisons", async () => {
+  const red = createLearningEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    fallbackOnNativeError: false,
+    depth: 3,
+    timeLimitMs: 100,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+  const black = createJavaScriptEngineBackend({ id: "black-test", name: "Black Test", depth: 1, timeLimitMs: 100 });
+
+  try {
+    const report = await runSparringMatch({ red, black }, {
+      maxPlies: 1,
+      searchOptions: { useBook: false, depth: 3, timeLimitMs: 100, lines: 2 }
+    });
+    const text = formatSparringReport(report);
+
+    assert.equal(report.totalPlies, 1);
+    assert.equal(report.moves[0].comparison.bestMove, "h9-g7");
+    assert.equal(report.moves[0].comparison.nextMove, "h7-e7");
+    assert.equal(report.moves[0].alternatives.length, 2);
+    assert.equal(report.moves[0].alternatives[1].move, "h7-e7");
+    assert.equal(report.moves[0].alternatives[1].verdict, "playable");
+    assert.ok(text.includes("Compare: Native MultiPV rates h9-g7 30 centipawns above the next candidate h7-e7."));
+    assert.ok(text.includes("Alt 2: h7-e7: playable, +0.12"));
+  } finally {
+    await red.close();
+  }
+});
+
 test("sparring match stops immediately on terminal initial positions", async () => {
   const report = await runSparringMatch(null, {
     initialFen: "3rkr3/9/9/9/9/9/9/9/9/4K4 r",
