@@ -370,9 +370,7 @@ available or when the native process cannot start during a turn:
 
 ```js
 const backend = createLearningEngineBackend({
-  command: process.env.XIANGQI_ENGINE_COMMAND,
-  args: process.env.XIANGQI_ENGINE_ARGS?.split(" ") ?? [],
-  profile: "native-uci",
+  nativePreset: "pikafish",
   depth: 10,
   timeLimitMs: 5000,
   javascript: {
@@ -387,6 +385,11 @@ console.log(result.explanation.alternatives);
 console.log(result.backendFallback?.message);
 await backend.close?.();
 ```
+
+`nativePreset: "pikafish"` resolves explicit command/env settings first, then
+auto-discovers the newest default `npm run install:pikafish` bundle under
+`.engines/pikafish`. If no native command resolves, the factory returns the
+JavaScript learning engine instead of failing app startup.
 
 `engineOptions` are sent to the native process as `setoption` commands before
 the first `isready` check after handshake. Use an object for ordinary options

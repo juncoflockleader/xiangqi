@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   createEngineBackend,
   createInitialPosition,
@@ -122,6 +125,28 @@ test("learning backend factory can prefer a native profile without requiring it"
   assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.LOCAL_SEARCH), true);
 });
 
+test("learning backend factory can prefer an unresolved native preset without requiring it", () => {
+  const config = resolveLearningEngineBackendConfig({
+    nativePreset: "pikafish",
+    autoDiscover: false,
+    env: {},
+    depth: 1,
+    timeLimitMs: 100
+  });
+  const backend = createLearningEngineBackend({
+    nativePreset: "pikafish",
+    autoDiscover: false,
+    env: {},
+    depth: 1,
+    timeLimitMs: 100
+  });
+
+  assert.equal(config.kind, "javascript");
+  assert.equal(config.reason, "javascript-fallback");
+  assert.equal(backend.kind, "javascript");
+  assert.equal(isNativeEngineBackend(backend), false);
+});
+
 test("learning backend factory can disable native selection despite a command", () => {
   const backend = createLearningEngineBackend({
     command: process.execPath,
@@ -174,6 +199,82 @@ test("learning backend factory selects a native engine when configured", async (
     assert.equal(result.backendFallback, undefined);
   } finally {
     await backend.close();
+  }
+});
+
+test("learning backend factory selects a native preset when configured", async () => {
+  const config = resolveLearningEngineBackendConfig({
+    nativePreset: "pikafish",
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockTie: true
+    },
+    env: {}
+  });
+  const backend = createLearningEngineBackend({
+    nativePreset: "pikafish",
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockTie: true
+    },
+    env: {}
+  });
+
+  try {
+    const description = describeEngineBackend(backend);
+    const result = await backend.chooseMove(createInitialPosition(), {
+      useBook: false,
+      lines: 2
+    });
+
+    assert.equal(config.kind, "native");
+    assert.equal(config.reason, "native-preset");
+    assert.equal(config.options.protocol, "uci");
+    assert.equal(description.status.primaryBackend.name, "Pikafish");
+    assert.equal(description.status.primaryBackend.kind, "native-uci");
+    assert.deepEqual(description.nativeOptions, [
+      { name: "UCI_ShowWDL", value: true },
+      { name: "MockTie", value: true }
+    ]);
+    assert.equal(result.source, "native-uci");
+    assert.equal(result.bestMove.notation, "h9-g7");
+    assert.equal(result.explanation.comparison.verdict, "near-tie");
+  } finally {
+    await backend.close();
+  }
+});
+
+test("learning backend factory resolves a discoverable native preset command", () => {
+  const root = mkdtempSync(join(tmpdir(), "xiangqi-backend-preset-"));
+
+  try {
+    const bundle = createPikafishBundle(root, "Pikafish-2026-01-02");
+    const config = resolveLearningEngineBackendConfig({
+      nativePreset: "pikafish",
+      installRoot: root,
+      platform: "darwin",
+      arch: "arm64",
+      env: {}
+    });
+
+    assert.equal(config.kind, "native");
+    assert.equal(config.reason, "native-preset");
+    assert.equal(config.options.command, bundle.command);
+    assert.equal(config.options.cwd, bundle.home);
+    assert.equal(config.options.protocol, "uci");
+    assert.equal(config.options.profile, "native-uci");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
@@ -237,3 +338,13 @@ test("learning backend factory reports explicit native misconfiguration", () => 
     /native backend requires a command/
   );
 });
+
+function createPikafishBundle(root, tag) {
+  const home = join(root, tag);
+  const command = join(home, "MacOS", "pikafish-apple-silicon");
+  mkdirSync(join(home, "MacOS"), { recursive: true });
+  writeFileSync(command, "#!/bin/sh\n", "utf8");
+  chmodSync(command, 0o755);
+  writeFileSync(join(home, "pikafish.nnue"), "nnue", "utf8");
+  return { home, command };
+}

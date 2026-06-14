@@ -1,4 +1,5 @@
 import { ENGINE_BACKEND_FEATURES, createEngineBackend, createJavaScriptEngineBackend } from "./backend.js";
+import { mergeNativeEngineOptions, resolveNativeEnginePreset } from "./native-presets.js";
 import { createUcciEngineBackend } from "./ucci-backend.js";
 
 const NATIVE_BACKEND_KINDS = new Set(["native", "native-ucci", "native-uci", "ucci", "uci"]);
@@ -15,17 +16,29 @@ const ROUTING_KEYS = new Set([
   "kind",
   "native",
   "nativeProfile",
+  "nativePreset",
   "preferNative"
 ]);
 
 const NATIVE_ONLY_KEYS = new Set([
   "args",
+  "arch",
+  "autoDiscover",
   "closeTimeoutMs",
   "command",
   "commandTimeoutMs",
   "cwd",
+  "discover",
   "engineOptions",
+  "engineHome",
   "env",
+  "evalFile",
+  "home",
+  "installRoot",
+  "nativePreset",
+  "nnue",
+  "pikafishInstallRoot",
+  "platform",
   "protocol",
   "referenceEngine",
   "referenceOptions",
@@ -63,7 +76,7 @@ export function resolveLearningEngineBackendConfig(options = {}) {
   if (hasNativeCommand) {
     return {
       kind: "native",
-      reason: "native-command",
+      reason: nativeOptions.preset ? "native-preset" : "native-command",
       options: nativeOptions,
       fallbackOptions: normalizeJavaScriptOptions(options),
       fallbackOnNativeError: options.fallbackOnNativeError ?? true
@@ -203,21 +216,68 @@ function normalizeNativeOptions(options, backendKind) {
   const native = typeof options.native === "object" && options.native !== null
     ? options.native
     : {};
+  const nativePreset = firstText(
+    options.nativePreset,
+    native.nativePreset,
+    native.preset
+  );
   const shared = stripRoutingOptions(options, { omitNativeOnly: false });
+  const directNative = stripNativePresetOptions(native);
+  const userEngineOptions = mergeNativeEngineOptions(options.engineOptions, native.engineOptions);
+  const preset = nativePreset
+    ? resolveNativeEnginePreset(nativePreset, {
+        command: native.command ?? options.command,
+        args: native.args ?? options.args,
+        protocol: native.protocol ?? options.protocol,
+        evalFile: native.evalFile ?? native.nnue ?? options.evalFile ?? options.nnue,
+        home: native.home ?? native.engineHome ?? options.home ?? options.engineHome,
+        installRoot: native.installRoot ?? native.pikafishInstallRoot ?? options.installRoot ?? options.pikafishInstallRoot,
+        autoDiscover: native.autoDiscover ?? options.autoDiscover,
+        discover: native.discover ?? options.discover,
+        platform: native.platform ?? options.platform,
+        arch: native.arch ?? options.arch,
+        cwd: native.cwd ?? options.cwd,
+        env: native.env ?? options.env,
+        engineOptions: userEngineOptions
+      })
+    : null;
   const directNativeProfile = isNativeProfile(options.profile) ? options.profile : undefined;
   const nativeProfile = options.nativeProfile
     ?? native.profile
+    ?? (preset?.protocol ? inferNativeProfile(preset.protocol, backendKind) : undefined)
     ?? directNativeProfile
     ?? inferNativeProfile(options.protocol ?? native.protocol, backendKind);
+  const merged = {
+    ...shared,
+    ...directNative,
+    ...(preset ?? {})
+  };
 
   return {
-    ...shared,
-    ...native,
+    ...merged,
     profile: nativeProfile,
-    protocol: native.protocol ?? options.protocol ?? inferNativeProtocol(nativeProfile, backendKind),
-    command: native.command ?? options.command,
-    args: native.args ?? options.args
+    protocol: native.protocol ?? options.protocol ?? preset?.protocol ?? inferNativeProtocol(nativeProfile, backendKind),
+    command: native.command ?? options.command ?? preset?.command,
+    args: native.args ?? options.args ?? preset?.args ?? [],
+    engineOptions: preset?.engineOptions ?? userEngineOptions
   };
+}
+
+function stripNativePresetOptions(native) {
+  const {
+    autoDiscover,
+    discover,
+    engineHome,
+    evalFile,
+    home,
+    installRoot,
+    nativePreset,
+    nnue,
+    pikafishInstallRoot,
+    preset,
+    ...direct
+  } = native;
+  return direct;
 }
 
 function normalizeJavaScriptOptions(options) {
@@ -277,6 +337,13 @@ function isNativeKind(kind) {
 
 function isNativeProfile(profile) {
   return NATIVE_PROFILES.has(String(profile ?? "").toLowerCase());
+}
+
+function firstText(...values) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return undefined;
 }
 
 function annotateFallbackResult(result, method, error, primaryBackend, fallbackBackend) {
