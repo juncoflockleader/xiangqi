@@ -196,6 +196,7 @@ class UcciProcessClient {
     this.child = null;
     this.lines = [];
     this.waiters = new Set();
+    this.searchQueue = Promise.resolve();
     this.ready = false;
     this.stderr = "";
   }
@@ -247,6 +248,16 @@ class UcciProcessClient {
   }
 
   async search(position, options = {}) {
+    return this.enqueueSearch(() => this.searchWithRestart(position, options));
+  }
+
+  enqueueSearch(task) {
+    const run = this.searchQueue.catch(() => null).then(task);
+    this.searchQueue = run.catch(() => null);
+    return run;
+  }
+
+  async searchWithRestart(position, options = {}) {
     try {
       return await this.searchOnce(position, options);
     } catch (error) {

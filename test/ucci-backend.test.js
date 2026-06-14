@@ -148,6 +148,33 @@ test("UCCI backend restarts native process after it exits between searches", asy
   }
 });
 
+test("UCCI backend serializes concurrent searches on one native process", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+  const redPosition = createInitialPosition();
+  const blackPosition = backend.play(redPosition, "h7-e7");
+
+  try {
+    const [redResult, blackResult] = await Promise.all([
+      backend.chooseMove(redPosition, { useBook: false }),
+      backend.chooseMove(blackPosition, { useBook: false })
+    ]);
+
+    assert.equal(redResult.bestMove.notation, "h9-g7");
+    assert.equal(blackResult.bestMove.notation, "h0-g2");
+    assert.equal(redResult.source, "native-ucci");
+    assert.equal(blackResult.source, "native-ucci");
+  } finally {
+    await backend.close();
+  }
+});
+
 test("UCCI backend close terminates native process that ignores quit", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,
