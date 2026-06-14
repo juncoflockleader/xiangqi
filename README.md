@@ -162,11 +162,13 @@ console.log(study.bestMove);
 console.log(study.hints.map((hint) => hint.text));
 console.log(study.candidateLines.map((line) => [line.move, line.scoreText]));
 console.log(study.playedMoveReview?.classification);
+console.log(study.practiceFocus?.title);
 ```
 
 `studyPosition` returns one UI-ready bundle with the selected move, explanation,
 candidate lines, progressive hints, pressure/threat summary, optional played-move
-review, and any oracle-review evidence attached by the active backend.
+review, practice focus for detected mistake patterns, and any oracle-review
+evidence attached by the active backend.
 
 For a full played game, ask for a game study. It reuses the review pipeline,
 turns key moments into lesson cards, and attaches deeper position studies for
@@ -183,11 +185,13 @@ const gameStudy = engine.gameStudy(["h7-e7", "h0-g2", "h9-g7"], {
 console.log(gameStudy.summary);
 console.log(gameStudy.lessonPlan.cards[0]?.prompt);
 console.log(gameStudy.positionStudies[0]?.summary);
+console.log(gameStudy.practiceFocus[0]?.title);
 ```
 
 `gameStudy` returns the full move review, compact key moments, lesson cards,
-position-study bundles for selected plies, final FEN, and next-step prompts so a
-learning UI can move from game recap into focused practice.
+position-study bundles for selected plies, aggregated practice focus, final FEN,
+and next-step prompts so a learning UI can move from game recap into focused
+practice.
 
 You can also generate the same artifact from the command line, which is handy
 after online sparring or imported game records:

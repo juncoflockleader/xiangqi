@@ -26,6 +26,7 @@ test("game study bundles review, lesson cards, and position studies", () => {
       includePressure: false
     }
   });
+  const formatted = formatGameStudy(study);
 
   assert.equal(study.type, "game-study");
   assert.equal(study.review.moves.length, SAMPLE_MOVES.length);
@@ -34,6 +35,12 @@ test("game study bundles review, lesson cards, and position studies", () => {
   assert.equal(study.summary.lessonCards, study.lessonPlan.cards.length);
   assert.equal(study.positionStudies.length, 2);
   assert.equal(study.summary.positionStudies, 2);
+  assert.equal(study.summary.practiceFocus, study.practiceFocus.length);
+  assert.equal(study.practiceFocus[0].category, "positional-drift");
+  assert.equal(study.practiceFocus[0].title, "Piece coordination");
+  assert.equal(study.practiceFocus[0].examples.length, 2);
+  assert.ok(study.nextSteps.some((step) => step.kind === "practice"));
+  assert.match(formatted, /Practice focus:/);
   assert.equal(study.positionStudies[0].type, "position-study");
   assert.equal(study.positionStudies[0].gameMoment.ply, study.keyMoments[0].ply);
   assert.ok(study.positionStudies[0].playedMoveReview);

@@ -44,6 +44,7 @@ test("position study can include a played move review", () => {
     lines: 2,
     playedMove: "e9-f9"
   });
+  const text = formatPositionStudy(study);
 
   assert.equal(study.bestMove, "e9-e2");
   assert.equal(study.playedMoveReview.move, "e9-f9");
@@ -51,6 +52,13 @@ test("position study can include a played move review", () => {
   assert.equal(study.playedMoveReview.classification, "blunder");
   assert.ok(study.playedMoveReview.centipawnLoss > 1000);
   assert.equal(study.nextSteps[0].kind, "correction");
+  assert.equal(study.nextSteps[1].kind, "practice");
+  assert.equal(study.practiceFocus.category, "missed-material");
+  assert.equal(study.practiceFocus.title, "Material tactics");
+  assert.equal(study.practiceFocus.drill, "candidate-captures");
+  assert.equal(study.practiceFocus.move, "e9-f9");
+  assert.equal(study.practiceFocus.bestMove, "e9-e2");
+  assert.match(text, /Practice: Material tactics/);
   assert.ok(study.summary.includes("e9-f9 is blunder"));
 });
 

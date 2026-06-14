@@ -1,6 +1,7 @@
 import { parseFen, toFen } from "./board.js";
 import { summarizeAlternativeEvidence, summarizeComparisonEvidence } from "./explanation-artifacts.js";
 import { createLessonPlanFromReview } from "./lesson.js";
+import { aggregatePracticeFocusFromReview } from "./practice.js";
 import { studyPositionWithBackend, studyPositionWithEngine } from "./study.js";
 
 const DEFAULT_MAX_POSITION_STUDIES = 3;
@@ -49,6 +50,13 @@ export function formatGameStudy(study) {
     }
   }
 
+  if (study.practiceFocus.length > 0) {
+    lines.push("Practice focus:");
+    for (const focus of study.practiceFocus.slice(0, 3)) {
+      lines.push(`  ${focus.title}: ${focus.text}`);
+    }
+  }
+
   if (study.positionStudies.length > 0) {
     lines.push("Position studies:");
     for (const item of study.positionStudies.slice(0, 3)) {
@@ -79,6 +87,7 @@ async function createPositionStudiesWithBackend(backend, review, options) {
 
 function buildGameStudy(review, lessonPlan, positionStudies, options) {
   const finalFen = review.finalPosition ? toFen(review.finalPosition) : null;
+  const practiceFocus = aggregatePracticeFocusFromReview(review, options.practiceOptions ?? {});
   return {
     type: "game-study",
     title: options.title ?? "Xiangqi Game Study",
@@ -86,7 +95,8 @@ function buildGameStudy(review, lessonPlan, positionStudies, options) {
       ...review.summary,
       keyMoments: review.keyMoments.length,
       lessonCards: lessonPlan.cards.length,
-      positionStudies: positionStudies.length
+      positionStudies: positionStudies.length,
+      practiceFocus: practiceFocus.length
     },
     status: review.status,
     finalFen,
@@ -94,7 +104,8 @@ function buildGameStudy(review, lessonPlan, positionStudies, options) {
     keyMoments: review.keyMoments,
     lessonPlan,
     positionStudies,
-    nextSteps: nextGameStudySteps(lessonPlan, positionStudies, review)
+    practiceFocus,
+    nextSteps: nextGameStudySteps(lessonPlan, positionStudies, review, practiceFocus)
   };
 }
 
@@ -165,7 +176,7 @@ function attachGameMoment(study, move) {
   };
 }
 
-function nextGameStudySteps(lessonPlan, positionStudies, review) {
+function nextGameStudySteps(lessonPlan, positionStudies, review, practiceFocus) {
   const steps = [];
   const firstCard = lessonPlan.cards[0];
   if (firstCard) {
@@ -182,6 +193,13 @@ function nextGameStudySteps(lessonPlan, positionStudies, review) {
       kind: "position-study",
       text: firstStudy.nextSteps[0].text,
       ref: `ply-${firstStudy.gameMoment.ply}`
+    });
+  }
+  if (practiceFocus?.[0]) {
+    steps.push({
+      kind: "practice",
+      text: practiceFocus[0].text,
+      focus: practiceFocus[0]
     });
   }
 

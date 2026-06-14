@@ -1,5 +1,6 @@
 import { moveToNotation, toFen } from "./board.js";
 import { summarizeAlternativeEvidence, summarizeComparisonEvidence } from "./explanation-artifacts.js";
+import { practiceFocusFromReview } from "./practice.js";
 
 const DEFAULT_STUDY_LINES = 3;
 
@@ -108,6 +109,10 @@ export function formatPositionStudy(study) {
     lines.push(`Review: ${review.move} is ${review.classification}, ${review.centipawnLoss} cp loss; best ${review.bestMove}.`);
   }
 
+  if (study.practiceFocus) {
+    lines.push(`Practice: ${study.practiceFocus.title} - ${study.practiceFocus.text}`);
+  }
+
   if (study.oracleReview) {
     lines.push(`Oracle: ${study.oracleReview.verdict}`);
   }
@@ -150,6 +155,7 @@ function buildPositionStudy(position, parts) {
   const coach = summarizeCoach(parts.coach);
   const playedMoveReview = parts.review ? summarizeReview(parts.review) : null;
   const pressure = parts.pressure ? summarizePressure(parts.pressure) : null;
+  const practiceFocus = playedMoveReview ? practiceFocusFromReview(playedMoveReview) : null;
   const bestMove = decision?.bestMove
     ?? candidateLines[0]?.move
     ?? coach?.bestMove
@@ -168,8 +174,9 @@ function buildPositionStudy(position, parts) {
     coach,
     playedMoveReview,
     pressure,
+    practiceFocus,
     oracleReview,
-    nextSteps: nextStudySteps({ decision, coach, playedMoveReview, pressure })
+    nextSteps: nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceFocus })
   };
 }
 
@@ -293,12 +300,19 @@ function summarizeStudy({ side, bestMove, decision, playedMoveReview, oracleRevi
   return decision?.summary ?? `${bestMove} is the recommended move for ${side}.`;
 }
 
-function nextStudySteps({ decision, coach, playedMoveReview, pressure }) {
+function nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceFocus }) {
   const steps = [];
   if (playedMoveReview && !playedMoveReview.isBestMove) {
     steps.push({
       kind: "correction",
       text: `Compare ${playedMoveReview.move} with ${playedMoveReview.bestMove}.`
+    });
+  }
+  if (practiceFocus) {
+    steps.push({
+      kind: "practice",
+      text: practiceFocus.text,
+      focus: practiceFocus
     });
   }
   if (coach?.levels?.[0]) {
