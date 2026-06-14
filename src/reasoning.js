@@ -7,7 +7,12 @@ import {
   pieceLabel,
   sameMove
 } from "./board.js";
-import { evaluateMoveDelta, describeCapture, describeEvaluationTerms } from "./evaluate.js";
+import {
+  evaluateMoveDelta,
+  evaluatePosition,
+  describeCapture,
+  describeEvaluationTerms
+} from "./evaluate.js";
 import { generateLegalMoves, isInCheck } from "./movegen.js";
 import { analyzeThreats, topThreat } from "./pressure.js";
 import { formatPrincipalVariation } from "./search.js";
@@ -66,7 +71,7 @@ export function explainMove(position, searchResult) {
     alternatives: explainAlternatives(searchResult.candidates ?? []),
     principalVariation: bestLine.map((candidate) => candidate.notation ?? moveToNotation(candidate)),
     principalVariationText: formatPrincipalVariation(bestLine),
-    linePlan: buildLinePlan(position, bestLine),
+    linePlan: buildLinePlan(position, bestLine, { perspective: position.turn }),
     evaluationDelta: moveStory.evaluationDelta,
     confidence,
     search: {
@@ -105,7 +110,10 @@ export function explainBookMove(position, bookResult) {
     })),
     principalVariation: [moveToNotation(move)],
     principalVariationText: moveToNotation(move),
-    linePlan: buildLinePlan(position, [move], { source: bookResult.source ?? "opening-book" }),
+    linePlan: buildLinePlan(position, [move], {
+      source: bookResult.source ?? "opening-book",
+      perspective: position.turn
+    }),
     evaluationDelta: moveStory.evaluationDelta,
     confidence,
     search: {
@@ -231,7 +239,9 @@ export function explainCandidateMove(position, candidate, context = {}) {
     reasons: unique(reasons).slice(0, 7),
     principalVariation,
     principalVariationText: principalVariation.join(" "),
-    linePlan: buildLinePlan(position, candidate.principalVariation ?? [candidate.move]),
+    linePlan: buildLinePlan(position, candidate.principalVariation ?? [candidate.move], {
+      perspective: position.turn
+    }),
     evaluationDelta: moveStory.evaluationDelta,
     centipawnLoss
   };
@@ -340,6 +350,7 @@ export function buildLinePlan(position, line = [], options = {}) {
   if (!line || line.length === 0) return emptyLinePlan();
 
   let current = position;
+  const perspective = options.perspective ?? position.turn;
   const moves = [];
   const motifs = [];
 
@@ -357,6 +368,10 @@ export function buildLinePlan(position, line = [], options = {}) {
     };
     const role = lineMoveRole(index, options.source);
     const stepMotifs = lineMoveMotifs(current, annotated);
+    const next = makeMove(current, legalMove);
+    const scoreBefore = evaluatePosition(current, perspective).score;
+    const scoreAfter = evaluatePosition(next, perspective).score;
+    const scoreDelta = scoreAfter - scoreBefore;
     motifs.push(...stepMotifs);
     moves.push({
       ply: index + 1,
@@ -365,10 +380,16 @@ export function buildLinePlan(position, line = [], options = {}) {
       move: notation,
       piece: PIECE_NAMES[annotated.piece.type],
       summary: `${capitalize(role.replace("-", " "))}: ${pieceLabel(annotated.piece)} ${notation}`,
+      scoreBefore: Math.round(scoreBefore),
+      scoreAfter: Math.round(scoreAfter),
+      scoreDelta: Math.round(scoreDelta),
+      scoreBeforeText: formatScore(scoreBefore),
+      scoreAfterText: formatScore(scoreAfter),
+      scoreDeltaText: formatSignedCentipawns(scoreDelta),
       motifs: stepMotifs
     });
 
-    current = makeMove(current, legalMove);
+    current = next;
   }
 
   if (moves.length === 0) return emptyLinePlan();
@@ -377,14 +398,24 @@ export function buildLinePlan(position, line = [], options = {}) {
   const reply = moves[1] ?? null;
   const continuation = moves.slice(2).map((move) => move.move);
   const uniqueMotifs = unique(motifs);
+  const startingScore = first.scoreBefore;
+  const endingScore = moves.at(-1).scoreAfter;
+  const evaluationSwing = endingScore - startingScore;
 
   return {
     summary: summarizeLinePlan(first, reply, continuation, uniqueMotifs),
+    perspective,
     firstMove: first.move,
     expectedReply: reply?.move ?? null,
     continuation,
     moves,
-    motifs: uniqueMotifs
+    motifs: uniqueMotifs,
+    startingScore,
+    endingScore,
+    evaluationSwing,
+    startingScoreText: formatScore(startingScore),
+    endingScoreText: formatScore(endingScore),
+    evaluationSwingText: formatSignedCentipawns(evaluationSwing)
   };
 }
 
@@ -460,11 +491,18 @@ function findCandidate(candidates, move) {
 function emptyLinePlan() {
   return {
     summary: "No principal variation is available.",
+    perspective: null,
     firstMove: null,
     expectedReply: null,
     continuation: [],
     moves: [],
-    motifs: []
+    motifs: [],
+    startingScore: null,
+    endingScore: null,
+    evaluationSwing: null,
+    startingScoreText: null,
+    endingScoreText: null,
+    evaluationSwingText: null
   };
 }
 

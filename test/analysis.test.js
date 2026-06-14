@@ -21,6 +21,8 @@ test("engine analyzes multiple candidate lines with explanations", () => {
   assert.ok(analysis.lines[0].explanation.summary.includes("Candidate 1"));
   assert.equal(analysis.lines[0].explanation.linePlan.firstMove, analysis.lines[0].move.notation);
   assert.ok(analysis.lines[0].explanation.linePlan.moves.length > 0);
+  assert.equal(typeof analysis.lines[0].explanation.linePlan.moves[0].scoreAfter, "number");
+  assert.match(analysis.lines[0].explanation.linePlan.moves[0].scoreAfterText, /^([+-]\d+\.\d\d|winning by force|losing by force)$/);
   assert.ok(analysis.lines.every((line) => line.principalVariation.length > 0));
 });
 
@@ -85,8 +87,14 @@ test("analysis line count is clamped to a useful range", () => {
 test("line plans can be built from move notation strings", () => {
   const plan = buildLinePlan(createInitialPosition(), ["h7e7", "h0g2"]);
 
+  assert.equal(plan.perspective, "red");
   assert.equal(plan.firstMove, "h7-e7");
   assert.equal(plan.expectedReply, "h0-g2");
   assert.equal(plan.moves[0].role, "engine-choice");
+  assert.equal(plan.startingScore, plan.moves[0].scoreBefore);
+  assert.equal(plan.endingScore, plan.moves.at(-1).scoreAfter);
+  assert.equal(plan.evaluationSwing, plan.endingScore - plan.startingScore);
+  assert.equal(plan.moves[0].scoreDelta, plan.moves[0].scoreAfter - plan.moves[0].scoreBefore);
+  assert.match(plan.moves[0].scoreDeltaText, /^[+-]\d+ centipawns$/);
   assert.ok(plan.summary.includes("h7-e7"));
 });
