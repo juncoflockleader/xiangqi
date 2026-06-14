@@ -8,6 +8,7 @@ test("UCCI session identifies itself", () => {
 
   assert.ok(output.some((line) => line.startsWith("id name")));
   assert.ok(output.some((line) => line.includes("MultiPV")));
+  assert.ok(output.some((line) => line.includes("UseBook")));
   assert.ok(output.includes("ucciok"));
 });
 
@@ -20,6 +21,33 @@ test("UCCI session searches a FEN position", () => {
   assert.ok(output.some((line) => line.includes("nodes")));
   assert.ok(output.includes("bestmove e9e2"));
   assert.ok(output.some((line) => line.includes("reason: Wins a rook")));
+});
+
+test("UCCI go uses the opening book from startpos by default", () => {
+  const session = new UcciSession({ depth: 2, timeLimitMs: 1000 });
+  session.handleLine("position startpos");
+  const output = session.handleLine("go depth 2 movetime 1000");
+
+  assert.ok(output.some((line) => line.includes("book Central Cannon")));
+  assert.ok(output.includes("bestmove h7e7"));
+});
+
+test("UCCI UseBook option disables book selection", () => {
+  const session = new UcciSession({ depth: 1, timeLimitMs: 500 });
+  session.handleLine("setoption name UseBook value false");
+  session.handleLine("position startpos");
+  const output = session.handleLine("go depth 1 movetime 500");
+
+  assert.equal(output.some((line) => line.includes("book Central Cannon")), false);
+  assert.ok(output.some((line) => line.startsWith("info depth 1")));
+});
+
+test("UCCI book command lists available opening entries", () => {
+  const session = new UcciSession();
+  session.handleLine("position startpos");
+  const output = session.handleLine("book");
+
+  assert.ok(output.some((line) => line.includes("h7-e7 Central Cannon")));
 });
 
 test("UCCI analyze returns multiple principal variations", () => {

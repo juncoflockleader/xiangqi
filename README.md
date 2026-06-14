@@ -9,6 +9,7 @@ The current engine is dependency-free JavaScript and includes:
 - Check detection, flying-general rules, and make/unmake-style immutable position updates.
 - Iterative-deepening negamax search with alpha-beta pruning.
 - Zobrist hashing, transposition table, quiescence search, capture/check/history-based move ordering, bounded check extensions, late-move reductions, repetition hooks, and root candidate analysis.
+- Explainable opening-book support with deterministic book move selection and pure-search opt-out.
 - Evaluation terms for material, piece-square placement, mobility, threats, pawn progress, and king safety.
 - Capture safety analysis for distinguishing clean wins from tactically poisoned captures.
 - Immediate pressure/threat analysis for both sides.
@@ -41,6 +42,14 @@ console.log(result.explanation.summary);
 ```
 
 `chooseMove` returns the selected legal move, search score, principal variation, root candidates, and a learning-friendly explanation. The explanation is based on engine-visible facts such as search score, tactical features, evaluation deltas, and comparison against alternatives.
+
+Use the opening book or opt into pure search:
+
+```js
+const bookMove = engine.chooseMove(position);
+const searchMove = engine.chooseMove(position, { useBook: false });
+const book = engine.openingBook(position);
+```
 
 Review a player's move:
 
@@ -104,9 +113,10 @@ ucci
 position fen 4k4/9/4r4/9/9/9/9/9/9/3KR4 r
 go depth 2 movetime 1000
 analyze depth 2 movetime 1000 lines 3
+book
 ```
 
-The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `go`, `go ... multipv N`, `setoption name MultiPV value N`, `analyze`, `probe`, `pressure`, `explain`, and `quit`.
+The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, `setoption name MultiPV value N`, `setoption name UseBook value false`, `analyze`, `probe`, `pressure`, `explain`, and `quit`.
 
 ## Movegen Validation
 
@@ -126,7 +136,7 @@ Coordinates use file letters `a` through `i` and ranks `0` through `9`, with ran
 
 ## Roadmap
 
-- Add opening-book support and repetition rule handling.
+- Expand the opening book and repetition rule handling.
 - Add stronger time management and deeper late-game search extensions.
 - Add engine-vs-engine benchmark positions.
 - Connect the engine to a playable learning UI with move review, hints, and lesson generation.

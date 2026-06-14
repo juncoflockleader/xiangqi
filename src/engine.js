@@ -1,8 +1,9 @@
 import { applyLegalMove, annotateMove, generateLegalMoves, legalMovesWithNotation } from "./movegen.js";
 import { moveToNotation, parseMoveNotation, sameMove } from "./board.js";
+import { bookMoveToCandidate, lookupOpeningBook } from "./book.js";
 import { evaluatePosition } from "./evaluate.js";
 import { analyzePressure } from "./pressure.js";
-import { explainCandidateMove, explainMove, explainReviewedMove } from "./reasoning.js";
+import { explainBookMove, explainCandidateMove, explainMove, explainReviewedMove } from "./reasoning.js";
 import { searchBestMove } from "./search.js";
 
 export function createEngine(defaultOptions = {}) {
@@ -10,9 +11,12 @@ export function createEngine(defaultOptions = {}) {
 
   return {
     chooseMove(position, options = {}) {
+      const mergedOptions = { ...defaultOptions, ...options };
+      const bookResult = maybeBookResult(position, mergedOptions, transpositionTable.size);
+      if (bookResult) return bookResult;
+
       const search = searchBestMove(position, {
-        ...defaultOptions,
-        ...options,
+        ...mergedOptions,
         transpositionTable
       });
 
@@ -20,6 +24,13 @@ export function createEngine(defaultOptions = {}) {
         ...search,
         explanation: explainMove(position, search)
       };
+    },
+
+    openingBook(position, options = {}) {
+      return lookupOpeningBook(position, {
+        ...defaultOptions,
+        ...options
+      });
     },
 
     analyzePosition(position, options = {}) {
@@ -157,4 +168,45 @@ function normalizeLineCount(value) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed)) return 5;
   return Math.max(1, Math.min(12, parsed));
+}
+
+function maybeBookResult(position, options, tableSize) {
+  if (options.useBook === false) return null;
+
+  const bookHit = lookupOpeningBook(position, options);
+  if (!bookHit) return null;
+
+  const candidates = bookHit.entries.map(bookMoveToCandidate);
+  const result = {
+    source: "opening-book",
+    bestMove: bookHit.move,
+    score: bookHit.entry.weight,
+    depth: 0,
+    nodes: 0,
+    principalVariation: [bookHit.move],
+    candidates,
+    timedOut: false,
+    tableSize,
+    stats: {
+      nodes: 0,
+      qnodes: 0,
+      ttHits: 0,
+      cutoffs: 0,
+      extensions: 0,
+      reductions: 0,
+      repetitions: 0
+    },
+    book: {
+      name: bookHit.entry.name,
+      idea: bookHit.entry.idea,
+      tags: bookHit.entry.tags,
+      weight: bookHit.entry.weight
+    },
+    bookAlternatives: bookHit.entries
+  };
+
+  return {
+    ...result,
+    explanation: explainBookMove(position, result)
+  };
 }

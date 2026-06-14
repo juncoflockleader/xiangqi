@@ -74,7 +74,7 @@ test("applying a legal move updates the board and turn", () => {
 test("engine returns a legal move and explanation", () => {
   const position = createInitialPosition();
   const engine = createEngine({ depth: 2, timeLimitMs: 1000 });
-  const result = engine.chooseMove(position);
+  const result = engine.chooseMove(position, { useBook: false });
   const legalKeys = new Set(generateLegalMoves(position).map((move) => `${move.from}:${move.to}`));
 
   assert.ok(result.bestMove);

@@ -55,6 +55,39 @@ export function explainMove(position, searchResult) {
   };
 }
 
+export function explainBookMove(position, bookResult) {
+  const move = bookResult.bestMove;
+  const moveStory = explainMoveFeatures(position, move);
+  const entry = bookResult.book;
+  const reasons = [
+    `Opening book: ${entry.name}.`,
+    entry.idea,
+    ...moveStory.reasons
+  ];
+
+  return {
+    summary: `${pieceLabel(move.piece)} ${moveToNotation(move)} is the book move: ${entry.name}.`,
+    reasons: unique(reasons).slice(0, 7),
+    alternatives: bookResult.bookAlternatives.map((alternative, index) => ({
+      rank: index + 1,
+      move: alternative.notation,
+      score: alternative.weight,
+      note: `${alternative.name}: ${alternative.idea}`
+    })),
+    principalVariation: [moveToNotation(move)],
+    principalVariationText: moveToNotation(move),
+    evaluationDelta: moveStory.evaluationDelta,
+    search: {
+      depth: 0,
+      nodes: 0,
+      timedOut: false,
+      tableSize: bookResult.tableSize,
+      stats: bookResult.stats,
+      source: "opening-book"
+    }
+  };
+}
+
 export function explainMoveFeatures(position, move) {
   const next = makeMove(position, move);
   const delta = evaluateMoveDelta(position, next, position.turn);

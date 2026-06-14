@@ -10,7 +10,8 @@ import { formatScore } from "../reasoning.js";
 const DEFAULT_OPTIONS = Object.freeze({
   depth: 4,
   timeLimitMs: 2000,
-  multiPv: 1
+  multiPv: 1,
+  useBook: true
 });
 
 export class UcciSession {
@@ -39,6 +40,8 @@ export class UcciSession {
           return this.setPosition(trimmed);
         case "banmoves":
           return this.setBannedMoves(trimmed);
+        case "book":
+          return this.book();
         case "go":
           return this.go(trimmed);
         case "analyze":
@@ -66,6 +69,7 @@ export class UcciSession {
       "option name Depth type spin default 4 min 1 max 8",
       "option name MoveTime type spin default 2000 min 50 max 60000",
       "option name MultiPV type spin default 1 min 1 max 12",
+      "option name UseBook type check default true",
       "option name Explain type check default true",
       "ucciok"
     ];
@@ -84,6 +88,8 @@ export class UcciSession {
       this.options.timeLimitMs = clampInteger(value, 50, 120000, this.options.timeLimitMs);
     } else if (normalized === "multipv") {
       this.options.multiPv = clampInteger(value, 1, 12, this.options.multiPv);
+    } else if (normalized === "usebook") {
+      this.options.useBook = parseBoolean(value, this.options.useBook);
     }
 
     this.engine = createEngine(this.options);
@@ -127,7 +133,8 @@ export class UcciSession {
 
     const result = this.engine.chooseMove(this.position, {
       ...options,
-      bannedMoves: this.bannedMoves
+      bannedMoves: this.bannedMoves,
+      useBook: this.options.useBook
     });
 
     if (!result.bestMove) {
@@ -142,6 +149,10 @@ export class UcciSession {
       `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes} qnodes ${result.stats.qnodes} tthits ${result.stats.ttHits} ext ${result.stats.extensions} pv ${pv}`,
       `info string ${result.explanation.summary}`
     ];
+
+    if (result.source === "opening-book") {
+      outputs.unshift(`info string book ${result.book.name}: ${result.book.idea}`);
+    }
 
     for (const reason of result.explanation.reasons.slice(0, 3)) {
       outputs.push(`info string reason: ${reason}`);
@@ -176,6 +187,21 @@ export class UcciSession {
 
     outputs.push(`bestmove ${protocolMove(result.bestMove)}`);
     return outputs;
+  }
+
+  book() {
+    if (!this.options.useBook) return ["info string book disabled"];
+
+    const hit = this.engine.openingBook(this.position, {
+      bannedMoves: this.bannedMoves,
+      useBook: this.options.useBook
+    });
+
+    if (!hit) return ["info string book none"];
+
+    return hit.entries.map((entry, index) => (
+      `info string book ${index + 1} ${entry.notation} ${entry.name}: ${entry.idea}`
+    ));
   }
 
   probe(line) {
@@ -272,4 +298,12 @@ function clampInteger(value, min, max, fallback) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, parsed));
+}
+
+function parseBoolean(value, fallback) {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.toLowerCase();
+  if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  if (["false", "0", "no", "off"].includes(normalized)) return false;
+  return fallback;
 }
