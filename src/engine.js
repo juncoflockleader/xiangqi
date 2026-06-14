@@ -4,6 +4,7 @@ import { bookMoveToCandidate, lookupOpeningBook } from "./book.js";
 import { evaluatePosition } from "./evaluate.js";
 import { analyzePressure } from "./pressure.js";
 import { explainBookMove, explainCandidateMove, explainMove, explainReviewedMove } from "./reasoning.js";
+import { analyzeReviewMistakes } from "./mistakes.js";
 import { reviewGameWithEngine } from "./review.js";
 import { coachMoveWithEngine } from "./coach.js";
 import { createLessonPlanWithEngine } from "./lesson.js";
@@ -104,6 +105,7 @@ export function createEngine(defaultOptions = {}) {
         depth: search.depth,
         nodes: search.nodes
       };
+      reviewed.mistakes = analyzeReviewMistakes(position, reviewed);
 
       return {
         ...reviewed,

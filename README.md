@@ -156,10 +156,11 @@ const review = engine.reviewMove(position, "e9-f9");
 
 console.log(review.classification);
 console.log(review.centipawnLoss);
+console.log(review.mistakes.primary);
 console.log(review.explanation.summary);
 ```
 
-`reviewMove` compares the played move against the searched best line and returns a practical grade: `best`, `excellent`, `good`, `inaccuracy`, `mistake`, or `blunder`.
+`reviewMove` compares the played move against the searched best line and returns a practical grade: `best`, `excellent`, `good`, `inaccuracy`, `mistake`, or `blunder`. It also returns `mistakes`, a structured pattern summary for learning flows, such as missed material, unsafe capture, missed check, missed threat, allowed threat, or positional drift.
 
 Analyze several candidate lines:
 
@@ -283,7 +284,7 @@ console.log(lesson.cards[0].hints.at(-1).text);
 console.log(lesson.cards[0].answer.move);
 ```
 
-Lesson cards include the position FEN, side to move, played move, engine-preferred move, classification, centipawn loss, prompt text, progressive hints, answer explanation, and tags such as `opening`, `correction`, `book`, and `high-impact`.
+Lesson cards include the position FEN, side to move, played move, engine-preferred move, classification, centipawn loss, mistake pattern, prompt text, progressive hints, answer explanation, and tags such as `opening`, `correction`, `book`, and `high-impact`.
 
 ## Protocol
 

@@ -5,6 +5,7 @@ export * from "./transposition.js";
 export * from "./time.js";
 export * from "./tactics.js";
 export * from "./pressure.js";
+export * from "./mistakes.js";
 export * from "./book.js";
 export * from "./movegen.js";
 export * from "./evaluate.js";

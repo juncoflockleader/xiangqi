@@ -34,7 +34,22 @@ test("game review highlights large mistakes as key moments", () => {
   assert.equal(review.summary.classifications.blunder, 1);
   assert.equal(review.keyMoments[0].notation, "e9-f9");
   assert.equal(review.keyMoments[0].bestMove, "e9-e2");
+  assert.equal(review.keyMoments[0].mistakes.primary, "missed-material");
   assert.ok(review.keyMoments[0].centipawnLoss > 1000);
+});
+
+test("move review classifies tactical mistake patterns", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  const position = parseFen("4k4/9/4r4/9/9/4p4/4R4/9/9/3K5 r");
+  const review = engine.reviewMove(position, "e6-e5", {
+    depth: 1,
+    timeLimitMs: 500
+  });
+
+  assert.equal(review.mistakes.primary, "unsafe-capture");
+  assert.ok(review.mistakes.tags.includes("tactics"));
+  assert.ok(review.explanation.reasons.some((reason) => reason.includes("Mistake pattern")));
+  assert.equal(review.explanation.mistakes.primary, "unsafe-capture");
 });
 
 test("standalone game review helper accepts an engine", () => {

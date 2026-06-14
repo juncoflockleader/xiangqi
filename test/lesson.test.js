@@ -24,6 +24,9 @@ test("lesson plan turns reviewed mistakes into correction cards", () => {
   assert.ok(plan.cards[0].centipawnLoss > 0);
   assert.ok(plan.cards[0].prompt.includes("stronger move"));
   assert.ok(plan.cards[0].hints.at(-1).text.includes("e9-e2"));
+  assert.equal(plan.cards[0].mistakes.primary, "missed-material");
+  assert.ok(plan.cards[0].tags.includes("missed-material"));
+  assert.ok(plan.cards[0].hints.some((hint) => hint.kind === "pattern"));
   assert.equal(plan.summary.byType.correction, 1);
 });
 

@@ -80,6 +80,7 @@ function createLessonCard(move, rank) {
     bestMove,
     classification: move.review.classification,
     centipawnLoss: move.review.centipawnLoss,
+    mistakes: move.review.mistakes,
     tags,
     hints: lessonHints(move, type, bestMove),
     answer: {
@@ -146,6 +147,14 @@ function lessonHints(move, type, bestMove) {
     });
   }
 
+  if (type === "correction" && move.review.mistakes?.primary && move.review.mistakes.primary !== "none") {
+    hints.push({
+      level: hints.length + 1,
+      kind: "pattern",
+      text: move.review.mistakes.summary
+    });
+  }
+
   hints.push(revealHint(move, type, bestMove, hints.length + 1));
 
   return hints.slice(0, 4).map((hint, index) => ({
@@ -178,6 +187,10 @@ function lessonTags(move, type) {
   }
   if (move.review.centipawnLoss >= 300) tags.add("high-impact");
   if (move.review.centipawnLoss >= 90) tags.add("accuracy");
+  for (const tag of move.review.mistakes?.tags ?? []) tags.add(tag);
+  if (move.review.mistakes?.primary && move.review.mistakes.primary !== "none") {
+    tags.add(move.review.mistakes.primary);
+  }
   return [...tags];
 }
 

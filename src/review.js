@@ -212,6 +212,7 @@ function selectKeyMoments(moves, limit) {
       classification: item.review.classification,
       centipawnLoss: item.review.centipawnLoss,
       bestMove: item.review.bestMove.notation,
+      mistakes: item.review.mistakes,
       book: item.book,
       summary: item.review.explanation.summary,
       reasons: item.review.explanation.reasons

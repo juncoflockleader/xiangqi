@@ -11,6 +11,7 @@ import {
 import { ENGINE_BACKEND_FEATURES, createEngineBackend } from "./backend.js";
 import { bookMoveToCandidate } from "./book.js";
 import { classifyMoveLoss, createEngine } from "./engine.js";
+import { analyzeReviewMistakes } from "./mistakes.js";
 import { assessSearchConfidence, buildLinePlan, explainBookMove, explainMoveFeatures, explainReviewedMove, formatScore } from "./reasoning.js";
 import { annotateMove, generateLegalMoves } from "./movegen.js";
 import { hasClockTimeControl, resolveSearchBudget } from "./time.js";
@@ -356,6 +357,7 @@ async function nativeReviewMove(client, position, moveOrNotation, options) {
     depth: bestAnalysis.depth,
     nodes: bestAnalysis.nodes + (playedCandidate.nodes ?? 0)
   };
+  reviewed.mistakes = analyzeReviewMistakes(position, reviewed);
 
   return {
     ...reviewed,

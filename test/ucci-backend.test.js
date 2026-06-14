@@ -198,6 +198,7 @@ test("UCCI backend reviews moves with native search scores", async () => {
     assert.equal(review.playedScore, -17);
     assert.equal(review.centipawnLoss, 59);
     assert.equal(review.classification, "good");
+    assert.equal(review.mistakes.primary, "none");
     assert.deepEqual(review.principalVariation, ["h7-e7", "h0-g2"]);
     assert.ok(review.bestExplanation.summary.includes("Native UCCI Engine"));
     assert.ok(review.explanation.reasons.some((reason) => reason.includes("h9-g7")));

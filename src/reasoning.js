@@ -177,6 +177,9 @@ export function explainReviewedMove(position, review) {
     reasons.push(`It gives up about ${loss} centipawns compared with ${bestMove.notation}.`);
     reasons.push(`The preferred line starts with ${bestMove.notation}: ${review.bestExplanation.summary}`);
   }
+  if (review.mistakes?.primary && review.mistakes.primary !== "none") {
+    reasons.push(`Mistake pattern: ${review.mistakes.summary}`);
+  }
 
   reasons.push(...moveStory.reasons);
 
@@ -184,7 +187,8 @@ export function explainReviewedMove(position, review) {
     summary: `${moveToNotation(review.move)} is ${classificationPhrase(review.classification)} with ${loss} centipawns of loss.`,
     reasons: unique(reasons).slice(0, 7),
     move: moveStory,
-    bestMove: review.bestExplanation
+    bestMove: review.bestExplanation,
+    mistakes: review.mistakes ?? null
   };
 }
 
