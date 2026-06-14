@@ -59,7 +59,7 @@ for (const threat of pressure.threats) {
 }
 
 const reviewPosition = engine.play(position, "a9-a8");
-const review = engine.reviewMove(reviewPosition, "a0-a1", { depth: 2, timeLimitMs: 500 });
+const review = engine.reviewMove(reviewPosition, "a0-a1", { depth: 2, timeLimitMs: 1000 });
 
 console.log("");
 console.log(`Review sample: ${review.move.notation}`);

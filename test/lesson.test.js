@@ -45,6 +45,51 @@ test("lesson plan can be built from an existing game review", () => {
   assert.equal(plan.cards[0].answer.move, plan.cards[0].playedMove);
 });
 
+test("book moves remain opening cards when shallow review scores are noisy", () => {
+  const review = {
+    summary: {
+      totalMoves: 1,
+      averageCentipawnLoss: 400
+    },
+    status: { state: "playing" },
+    moves: [
+      {
+        ply: 1,
+        moveNumber: 1,
+        side: "red",
+        notation: "h7-e7",
+        positionBefore: "rheakaehr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RHEAKAEHR r",
+        review: {
+          classification: "blunder",
+          centipawnLoss: 400,
+          bestMove: { notation: "a9-a8" },
+          explanation: {
+            summary: "Shallow fallback preferred another move.",
+            reasons: ["Search reached the time limit before completing depth 1."]
+          },
+          mistakes: {
+            primary: "none",
+            tags: []
+          },
+          principalVariation: ["h7-e7"]
+        },
+        book: {
+          isBookMove: true,
+          played: {
+            idea: "Occupies the central file early.",
+            tags: ["central-cannon"]
+          }
+        }
+      }
+    ]
+  };
+  const plan = createLessonPlanFromReview(review, { maxCards: 1 });
+
+  assert.equal(plan.cards[0].type, "opening");
+  assert.equal(plan.cards[0].answer.move, "h7-e7");
+  assert.ok(plan.cards[0].tags.includes("book"));
+});
+
 test("standalone lesson helper mirrors engine lesson plans", () => {
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });
   const plan = createLessonPlanWithEngine(engine, ["h7-e7"], {

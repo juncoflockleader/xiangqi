@@ -132,6 +132,17 @@ export function searchBestMove(position, options = {}) {
     previousScore = bestScore;
   }
 
+  let fallback = null;
+  if (completedDepth === 0) {
+    fallback = staticRootFallback(position, rootMoves, candidateLimit);
+    bestMove = fallback.bestMove;
+    bestScore = fallback.score;
+    bestLine = fallback.principalVariation;
+    candidates = fallback.candidates;
+    nodes += fallback.nodes;
+    stats = mergeSearchStats(stats, fallback.stats);
+  }
+
   return {
     bestMove: bestMove ? annotateMove(position, bestMove) : null,
     score: bestScore,
@@ -143,7 +154,8 @@ export function searchBestMove(position, options = {}) {
     timedOut,
     tableSize: table.size,
     stats,
-    timeBudget
+    timeBudget,
+    fallback: fallback?.kind ?? null
   };
 }
 
@@ -238,6 +250,36 @@ function createIterationRecord(position, depth, root, context, previousBest) {
     candidates: root.candidates,
     stableBestMove: previousBest ? sameMove(root.bestMove, previousBest) : null,
     stats: { ...context.stats }
+  };
+}
+
+function staticRootFallback(position, rootMoves, candidateLimit) {
+  const candidates = rootMoves.map((move) => {
+    const annotated = annotateMove(position, move);
+    const next = makeMove(position, move);
+    const score = evaluatePosition(next, position.turn, { detailed: false }).score;
+
+    return {
+      move: annotated,
+      score,
+      fallback: "static-root",
+      principalVariation: [annotated]
+    };
+  }).sort((a, b) => b.score - a.score);
+  const best = candidates[0] ?? null;
+  const limitedCandidates = candidates.slice(0, candidateLimit);
+
+  return {
+    kind: "static-root",
+    bestMove: best?.move ?? null,
+    score: best?.score ?? evaluatePosition(position, position.turn).score,
+    principalVariation: best?.principalVariation ?? [],
+    candidates: limitedCandidates,
+    nodes: rootMoves.length,
+    stats: {
+      ...createSearchStats(),
+      nodes: rootMoves.length
+    }
   };
 }
 

@@ -33,7 +33,7 @@ node examples/engine-demo.mjs
 node examples/benchmark.mjs
 node examples/perft.mjs 2
 node bin/xiangqi-ucci.mjs
-node --test
+npm test
 ```
 
 ## API Sketch

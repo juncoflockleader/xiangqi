@@ -37,6 +37,12 @@ export function explainMove(position, searchResult) {
   const stability = searchStabilityReason(searchResult.iterations ?? []);
   if (stability) reasons.push(stability);
 
+  if (searchResult.fallback === "static-root") {
+    reasons.push(searchResult.timedOut
+      ? "Search reached the time limit before completing depth 1, so this move comes from a static one-ply fallback."
+      : "No full search depth was completed, so this move comes from a static one-ply fallback.");
+  }
+
   if ((searchResult.stats?.qchecks ?? 0) > 0) {
     reasons.push(`Quiescence search tested ${searchResult.stats.qchecks} forcing quiet checks beyond capture-only tactics.`);
   }

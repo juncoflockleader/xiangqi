@@ -50,10 +50,10 @@ function compareLessonMoves(a, b) {
 }
 
 function lessonPriority(move) {
+  if (move.book?.isBookMove) return 95;
   if (move.review.classification === "blunder") return 90;
   if (move.review.classification === "mistake") return 80;
   if (move.review.classification === "inaccuracy") return 70;
-  if (move.book?.isBookMove) return 50;
   if (move.review.classification === "best") return 30;
   if (move.review.classification === "excellent") return 20;
   return 10;
@@ -100,8 +100,8 @@ function lessonAnswerMove(move, type, moves) {
 }
 
 function lessonType(move) {
-  if (SEVERE_CLASSIFICATIONS.includes(move.review.classification)) return "correction";
   if (move.book?.isBookMove) return "opening";
+  if (SEVERE_CLASSIFICATIONS.includes(move.review.classification)) return "correction";
   return "model";
 }
 

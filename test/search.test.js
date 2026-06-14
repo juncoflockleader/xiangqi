@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   MATE_SCORE,
   createEngine,
+  createInitialPosition,
   generateLegalMoves,
   makeMove,
   parseFen,
@@ -40,6 +41,41 @@ test("search treats repeated child positions as draw candidates", () => {
     pathCount: 0,
     projectedCount: 3
   });
+});
+
+test("search keeps static root candidates when the deadline expires before depth one", () => {
+  const result = searchBestMove(createInitialPosition(), {
+    depth: 8,
+    timeLimitMs: 1,
+    minTimeMs: 1,
+    candidateLimit: 4
+  });
+
+  assert.equal(result.depth, 0);
+  assert.equal(result.timedOut, true);
+  assert.equal(result.fallback, "static-root");
+  assert.ok(result.bestMove);
+  assert.ok(result.nodes > 0);
+  assert.ok(result.stats.nodes > 0);
+  assert.equal(result.candidates.length, 4);
+  assert.ok(result.candidates.every((candidate) => candidate.fallback === "static-root"));
+  assert.deepEqual(
+    result.principalVariation.map((move) => move.notation),
+    [result.bestMove.notation]
+  );
+});
+
+test("engine explains static root fallback choices", () => {
+  const engine = createEngine({ depth: 8, timeLimitMs: 1, minTimeMs: 1 });
+  const result = engine.chooseMove(createInitialPosition(), {
+    useBook: false,
+    depth: 8,
+    timeLimitMs: 1,
+    minTimeMs: 1
+  });
+
+  assert.equal(result.fallback, "static-root");
+  assert.ok(result.explanation.reasons.some((reason) => reason.includes("static one-ply fallback")));
 });
 
 test("search scores no-legal-move stalemate as a Xiangqi loss", () => {
