@@ -84,6 +84,8 @@ export function explainMove(position, searchResult) {
       depth: searchResult.depth,
       nodes: searchResult.nodes,
       timedOut: searchResult.timedOut,
+      stopReason: searchResult.stopReason ?? null,
+      softTimeLimitMs: searchResult.softTimeLimitMs ?? null,
       tableSize: searchResult.tableSize,
       stats: searchResult.stats,
       iterations: summarizeIterations(searchResult.iterations ?? []),
@@ -318,7 +320,14 @@ export function assessSearchConfidence(result, context = {}) {
     });
   }
 
-  if (result.timedOut) {
+  if ((result.stopReason ?? "").startsWith("soft-time")) {
+    score += 3;
+    factors.push({
+      kind: "time",
+      impact: 3,
+      text: `Soft time management stopped after a completed depth (${result.stopReason}).`
+    });
+  } else if (result.timedOut) {
     score -= 20;
     factors.push({
       kind: "time",

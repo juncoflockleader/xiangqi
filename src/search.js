@@ -40,13 +40,19 @@ const RAZOR_BASE_MARGIN = 180;
 const RAZOR_DEPTH_MARGIN = 120;
 const NULL_MOVE_MIN_DEPTH = 3;
 const TRANSPOSITION_MATE_BOUND = MATE_SCORE - 1000;
+const DEFAULT_SOFT_TIME_FRACTION = 0.55;
+const DEFAULT_SOFT_MIN_DEPTH = 2;
+const DEFAULT_SOFT_STABLE_DEPTHS = 1;
+const DEFAULT_SOFT_SCORE_GAP = 80;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
   const timeBudget = resolveSearchBudget(options, position.turn, {}, { position });
   const timeLimitMs = timeBudget.timeLimitMs;
+  const softTimeLimitMs = resolveSoftTimeLimit(options, timeLimitMs);
   const startedAt = performanceNow();
   const deadline = startedAt + timeLimitMs;
+  const softDeadline = startedAt + softTimeLimitMs;
   const table = options.transpositionTable ?? createTranspositionTable({
     maxEntries: options.maxTranspositionEntries ?? options.ttSize,
     replacementSample: options.transpositionReplacementSample
@@ -90,6 +96,7 @@ export function searchBestMove(position, options = {}) {
   let previousBest = null;
   let previousScore = null;
   let previousRootScores = new Map();
+  let stopReason = null;
   const iterations = [];
 
   for (let depth = 1; depth <= depthLimit; depth += 1) {
@@ -122,6 +129,11 @@ export function searchBestMove(position, options = {}) {
       useDeltaPruning: options.useDeltaPruning !== false,
       useQuiescenceChecks: options.useQuiescenceChecks !== false,
       useRecaptureExtensions: options.useRecaptureExtensions !== false,
+      useSoftTimeManagement: options.useSoftTimeManagement !== false && !exactRootScores,
+      softDeadline,
+      softMinDepth: Math.max(1, Math.floor(numberOption(options.softMinDepth, DEFAULT_SOFT_MIN_DEPTH))),
+      softStableDepths: Math.max(1, Math.floor(numberOption(options.softStableDepths, DEFAULT_SOFT_STABLE_DEPTHS))),
+      softScoreGap: Math.max(0, numberOption(options.softScoreGap, DEFAULT_SOFT_SCORE_GAP)),
       tacticalCache: new Map(),
       stats: createSearchStats(),
       nodes: 0,
@@ -129,11 +141,12 @@ export function searchBestMove(position, options = {}) {
     };
 
     const root = searchDepthRoot(position, depth, previousBest, previousScore, context, rootMoves);
-    nodes += context.nodes;
-    stats = mergeSearchStats(stats, context.stats);
 
     if (context.timedOut) {
+      nodes += context.nodes;
+      stats = mergeSearchStats(stats, context.stats);
       timedOut = true;
+      stopReason = "timeout";
       break;
     }
 
@@ -142,10 +155,27 @@ export function searchBestMove(position, options = {}) {
     bestLine = root.principalVariation;
     candidates = root.candidates;
     completedDepth = depth;
-    iterations.push(createIterationRecord(position, depth, root, context, previousBest));
+    const stableBestMove = previousBest ? sameMove(root.bestMove, previousBest) : null;
+    const softStopReason = softStopReasonFor({
+      depth,
+      depthLimit,
+      root,
+      stableBestMove,
+      previousIterations: iterations,
+      context
+    });
+    if (softStopReason) {
+      context.stats.softStops += 1;
+      stopReason = softStopReason;
+    }
+    const iteration = createIterationRecord(position, depth, root, context, previousBest);
+    iterations.push(iteration);
     previousBest = bestMove;
     previousScore = bestScore;
     previousRootScores = root.rootMoveScores;
+    nodes += context.nodes;
+    stats = mergeSearchStats(stats, context.stats);
+    if (stopReason) break;
   }
 
   let fallback = null;
@@ -171,6 +201,8 @@ export function searchBestMove(position, options = {}) {
     tableSize: table.size,
     stats,
     timeBudget,
+    stopReason,
+    softTimeLimitMs: Number.isFinite(softTimeLimitMs) ? softTimeLimitMs : null,
     fallback: fallback?.kind ?? null
   };
 }
@@ -256,6 +288,47 @@ function shouldUseAspiration(depth, previousScore, context) {
   if (depth <= 1 || previousScore === null) return false;
   if (Math.abs(previousScore) >= MATE_SCORE - 1000) return false;
   return context.aspirationWindow > 0 && context.aspirationWindow < INFINITY_SCORE;
+}
+
+function resolveSoftTimeLimit(options, timeLimitMs) {
+  if (options.useSoftTimeManagement === false) return Number.POSITIVE_INFINITY;
+
+  const explicit = numberOption(options.softTimeLimitMs, options.softTimeMs);
+  if (explicit !== null) return Math.max(0, Math.floor(explicit));
+
+  const fraction = Math.max(0, numberOption(options.softTimeFraction, DEFAULT_SOFT_TIME_FRACTION));
+  return Math.max(0, Math.floor(timeLimitMs * Math.min(1, fraction)));
+}
+
+function softStopReasonFor({ depth, depthLimit, root, stableBestMove, previousIterations, context }) {
+  if (!context.useSoftTimeManagement) return null;
+  if (depth >= depthLimit) return null;
+  if (depth < context.softMinDepth) return null;
+  if (performanceNow() < context.softDeadline) return null;
+
+  if (Math.abs(root.score) >= MATE_SCORE - 1000) return "soft-time-forced-score";
+
+  const gap = rootCandidateGap(root.candidates);
+  if (gap !== null && gap >= context.softScoreGap) return "soft-time-candidate-gap";
+
+  const stableDepths = stableBestMove ? 1 + trailingStableDepths(previousIterations) : 0;
+  if (stableDepths >= context.softStableDepths) return "soft-time-stable-best";
+
+  return null;
+}
+
+function trailingStableDepths(iterations) {
+  let count = 0;
+  for (let index = iterations.length - 1; index >= 0; index -= 1) {
+    if (iterations[index].stableBestMove !== true) break;
+    count += 1;
+  }
+  return count;
+}
+
+function rootCandidateGap(candidates) {
+  if ((candidates?.length ?? 0) < 2) return null;
+  return candidates[0].score - candidates[1].score;
 }
 
 function createIterationRecord(position, depth, root, context, previousBest) {
@@ -951,6 +1024,7 @@ function createSearchStats() {
     aspirationFailLow: 0,
     extensions: 0,
     recaptureExtensions: 0,
+    softStops: 0,
     mateDistancePrunes: 0,
     mateDistanceWindows: 0,
     razorPrunes: 0,
@@ -985,6 +1059,7 @@ function mergeSearchStats(total, next) {
     aspirationFailLow: total.aspirationFailLow + next.aspirationFailLow,
     extensions: total.extensions + next.extensions,
     recaptureExtensions: total.recaptureExtensions + next.recaptureExtensions,
+    softStops: total.softStops + next.softStops,
     mateDistancePrunes: total.mateDistancePrunes + next.mateDistancePrunes,
     mateDistanceWindows: total.mateDistanceWindows + next.mateDistanceWindows,
     razorPrunes: total.razorPrunes + next.razorPrunes,
@@ -1001,6 +1076,15 @@ function mergeSearchStats(total, next) {
     rootMovesSearched: total.rootMovesSearched + next.rootMovesSearched,
     repetitions: total.repetitions + next.repetitions
   };
+}
+
+function numberOption(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined || value === "") continue;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
 }
 
 function performanceNow() {

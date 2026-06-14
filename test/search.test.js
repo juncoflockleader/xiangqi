@@ -206,6 +206,59 @@ test("search records a per-depth iterative deepening trace", () => {
   assert.ok(result.iterations.every((iteration) => iteration.principalVariation.length > 0));
 });
 
+test("search can soft-stop after a stable completed depth", () => {
+  const position = parseFen("4k4/9/4r4/9/9/9/9/9/9/3KR4 r");
+  const result = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 1000,
+    softTimeMs: 0,
+    softMinDepth: 2,
+    softScoreGap: 0,
+    useAspiration: false
+  });
+  const disabled = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 1000,
+    softTimeMs: 0,
+    softMinDepth: 2,
+    softScoreGap: 0,
+    useSoftTimeManagement: false,
+    useAspiration: false
+  });
+  const exactRoot = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 1000,
+    softTimeMs: 0,
+    softMinDepth: 2,
+    softScoreGap: 0,
+    candidateLimit: Number.POSITIVE_INFINITY,
+    useAspiration: false
+  });
+
+  assert.equal(result.depth, 2);
+  assert.equal(result.stopReason, "soft-time-candidate-gap");
+  assert.equal(result.stats.softStops, 1);
+  assert.equal(result.softTimeLimitMs, 0);
+  assert.equal(disabled.depth, 4);
+  assert.equal(disabled.stopReason, null);
+  assert.equal(disabled.stats.softStops, 0);
+  assert.equal(disabled.softTimeLimitMs, null);
+  assert.equal(exactRoot.depth, 4);
+  assert.equal(exactRoot.stats.softStops, 0);
+
+  const engine = createEngine({ depth: 4, timeLimitMs: 1000 });
+  const explained = engine.chooseMove(position, {
+    useBook: false,
+    softTimeMs: 0,
+    softMinDepth: 2,
+    softScoreGap: 0,
+    useAspiration: false
+  });
+
+  assert.equal(explained.explanation.search.stopReason, "soft-time-candidate-gap");
+  assert.ok(explained.explanation.confidence.factors.some((factor) => factor.text.includes("Soft time management")));
+});
+
 test("search reuses previous root scores for iterative move ordering", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const result = searchBestMove(position, {

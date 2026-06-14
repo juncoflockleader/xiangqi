@@ -279,6 +279,7 @@ function maybeBookResult(position, options, tableSize) {
       aspirationFailLow: 0,
       extensions: 0,
       recaptureExtensions: 0,
+      softStops: 0,
       mateDistancePrunes: 0,
       mateDistanceWindows: 0,
       razorPrunes: 0,
