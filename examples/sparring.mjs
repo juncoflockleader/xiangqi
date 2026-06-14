@@ -5,6 +5,11 @@ import {
   formatSparringReport,
   runSparringMatch
 } from "../src/index.js";
+import {
+  parseNativeEngineOption,
+  parseNativeEngineOptions,
+  splitEnvArgs
+} from "./native-cli-options.mjs";
 
 let options;
 try {
@@ -144,10 +149,10 @@ function parseArgs(args) {
     redArgs: splitEnvArgs(process.env.XIANGQI_RED_ENGINE_ARGS ?? process.env.XIANGQI_ENGINE_ARGS),
     blackArgs: splitEnvArgs(process.env.XIANGQI_BLACK_ENGINE_ARGS ?? process.env.XIANGQI_ENGINE_ARGS),
     refereeArgs: splitEnvArgs(process.env.XIANGQI_REFEREE_ENGINE_ARGS),
-    nativeOptions: parseEngineOptions(process.env.XIANGQI_ENGINE_OPTIONS, "XIANGQI_ENGINE_OPTIONS"),
-    redOptions: parseEngineOptions(process.env.XIANGQI_RED_ENGINE_OPTIONS, "XIANGQI_RED_ENGINE_OPTIONS"),
-    blackOptions: parseEngineOptions(process.env.XIANGQI_BLACK_ENGINE_OPTIONS, "XIANGQI_BLACK_ENGINE_OPTIONS"),
-    refereeOptions: parseEngineOptions(process.env.XIANGQI_REFEREE_ENGINE_OPTIONS, "XIANGQI_REFEREE_ENGINE_OPTIONS")
+    nativeOptions: parseNativeEngineOptions(process.env.XIANGQI_ENGINE_OPTIONS, "XIANGQI_ENGINE_OPTIONS"),
+    redOptions: parseNativeEngineOptions(process.env.XIANGQI_RED_ENGINE_OPTIONS, "XIANGQI_RED_ENGINE_OPTIONS"),
+    blackOptions: parseNativeEngineOptions(process.env.XIANGQI_BLACK_ENGINE_OPTIONS, "XIANGQI_BLACK_ENGINE_OPTIONS"),
+    refereeOptions: parseNativeEngineOptions(process.env.XIANGQI_REFEREE_ENGINE_OPTIONS, "XIANGQI_REFEREE_ENGINE_OPTIONS")
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -165,19 +170,19 @@ function parseArgs(args) {
       continue;
     }
     if (arg === "--native-option") {
-      options.nativeOptions.push(parseEngineOption(args[++index], "--native-option"));
+      options.nativeOptions.push(parseNativeEngineOption(args[++index], "--native-option"));
       continue;
     }
     if (arg === "--red-option") {
-      options.redOptions.push(parseEngineOption(args[++index], "--red-option"));
+      options.redOptions.push(parseNativeEngineOption(args[++index], "--red-option"));
       continue;
     }
     if (arg === "--black-option") {
-      options.blackOptions.push(parseEngineOption(args[++index], "--black-option"));
+      options.blackOptions.push(parseNativeEngineOption(args[++index], "--black-option"));
       continue;
     }
     if (arg === "--referee-option") {
-      options.refereeOptions.push(parseEngineOption(args[++index], "--referee-option"));
+      options.refereeOptions.push(parseNativeEngineOption(args[++index], "--referee-option"));
       options.referee = true;
       continue;
     }
@@ -279,10 +284,6 @@ function assertNonNegativeInteger(value, name) {
   }
 }
 
-function splitEnvArgs(value) {
-  return value?.trim() ? value.trim().split(/\s+/) : [];
-}
-
 function engineOptionsFor(side, options) {
   const sideOptions = side === "red"
     ? options.redOptions
@@ -290,81 +291,6 @@ function engineOptionsFor(side, options) {
       ? options.blackOptions
       : options.refereeOptions;
   return [...options.nativeOptions, ...sideOptions];
-}
-
-function parseEngineOptions(value, source) {
-  if (!value?.trim()) return [];
-  const text = value.trim();
-
-  if (text.startsWith("{") || text.startsWith("[")) {
-    try {
-      return jsonEngineOptions(JSON.parse(text), source);
-    } catch (error) {
-      throw new Error(`${source} must be JSON engine options or comma-separated name=value entries: ${error.message}`);
-    }
-  }
-
-  return text
-    .split(/[,\n;]/)
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => parseEngineOption(entry, source));
-}
-
-function jsonEngineOptions(value, source) {
-  if (Array.isArray(value)) {
-    return value.map((entry, index) => normalizeJsonEngineOption(entry, `${source}[${index}]`));
-  }
-
-  if (value && typeof value === "object") {
-    return Object.entries(value).map(([name, optionValue]) => ({ name, value: optionValue }));
-  }
-
-  throw new Error(`${source} must be an object or array.`);
-}
-
-function normalizeJsonEngineOption(entry, source) {
-  if (typeof entry === "string") return { name: entry, value: null };
-  if (Array.isArray(entry)) {
-    const [name, value = null] = entry;
-    return { name: assertEngineOptionName(name, source), value };
-  }
-  if (entry && typeof entry === "object") {
-    return {
-      name: assertEngineOptionName(entry.name ?? entry.key ?? entry.option, source),
-      value: Object.prototype.hasOwnProperty.call(entry, "value") ? entry.value : null
-    };
-  }
-
-  throw new Error(`${source} must be a string, [name, value], or { name, value } entry.`);
-}
-
-function parseEngineOption(text, source) {
-  if (!text) throw new Error(`${source} requires an option name.`);
-  const separatorIndex = text.indexOf("=");
-  const name = separatorIndex === -1 ? text : text.slice(0, separatorIndex);
-  const value = separatorIndex === -1 ? null : parseEngineOptionValue(text.slice(separatorIndex + 1));
-  return { name: assertEngineOptionName(name, source), value };
-}
-
-function assertEngineOptionName(name, source) {
-  if (typeof name !== "string" && typeof name !== "number") {
-    throw new Error(`${source} requires an option name.`);
-  }
-
-  const normalized = String(name).trim();
-  if (!normalized) throw new Error(`${source} requires an option name.`);
-  return normalized;
-}
-
-function parseEngineOptionValue(value) {
-  const trimmed = value.trim();
-  if ((trimmed.startsWith("\"") && trimmed.endsWith("\"")) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
-    return trimmed.slice(1, -1);
-  }
-  if (/^(true|false)$/i.test(trimmed)) return trimmed.toLowerCase() === "true";
-  if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) return Number(trimmed);
-  return trimmed;
 }
 
 function printUsage() {

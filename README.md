@@ -33,6 +33,7 @@ npm run play
 node examples/engine-demo.mjs
 node examples/benchmark.mjs
 node examples/sparring.mjs --plies 12
+node examples/native-probe.mjs --help
 node examples/perft.mjs 2
 node bin/xiangqi-ucci.mjs
 npm test
@@ -198,6 +199,24 @@ as `[{ name: "Clear Hash" }]`. `describeEngineBackend(nativeBackend)` includes
 the normalized `nativeOptions` list so the app can show exactly how a strong
 engine was configured.
 
+Probe a native engine before wiring it into sparring or the app:
+
+```sh
+XIANGQI_ENGINE_COMMAND=/path/to/pikafish \
+npm run probe:native -- --protocol uci \
+  --option Threads=4 \
+  --option Hash=512 \
+  --option EvalFile=/path/to/pikafish.nnue \
+  --depth 6 \
+  --time 1500 \
+  --lines 3
+```
+
+The probe prints the native backend description, normalized options, selected
+move, top alternatives, principal reasoning summary, and optional move review
+via `--review h7-e7`. Add `--json` when a script or CI job should parse the
+result.
+
 Set `native: false` or `preferNative: false` to force the JS learning engine, or
 pass a nested `native: { command, args, protocol }` object when the app keeps
 native-engine configuration separate from shared search options. Set
@@ -316,6 +335,12 @@ To spar against a strong UCI engine such as Pikafish without checking binaries
 into this repo, point one side and the referee at a local executable:
 
 ```sh
+XIANGQI_ENGINE_COMMAND=/path/to/pikafish \
+npm run probe:native -- --protocol uci \
+  --option Threads=4 \
+  --option Hash=512 \
+  --option EvalFile=/path/to/pikafish.nnue
+
 XIANGQI_BLACK_ENGINE_COMMAND=/path/to/pikafish \
 XIANGQI_REFEREE_ENGINE_COMMAND=/path/to/pikafish \
 npm run spar -- --protocol uci --referee-protocol uci --plies 20 --no-book \
