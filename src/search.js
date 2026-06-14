@@ -23,6 +23,8 @@ import { evaluatePosition } from "./evaluate.js";
 const EXACT = "exact";
 const LOWER = "lower";
 const UPPER = "upper";
+const DEFAULT_MAX_EXTENSIONS = 4;
+const DEFAULT_MAX_PLY = 80;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -34,6 +36,7 @@ export function searchBestMove(position, options = {}) {
   const killers = new Map();
   const candidateLimit = options.candidateLimit ?? 8;
   const bannedMoveKeys = new Set((options.bannedMoves ?? []).map(moveKey));
+  const repetitionCounts = buildRepetitionCounts(options.history ?? options.positionHistory ?? []);
   const rootMoves = generateLegalMoves(position, position.turn)
     .filter((move) => !bannedMoveKeys.has(moveKey(move)));
 
@@ -46,7 +49,8 @@ export function searchBestMove(position, options = {}) {
       principalVariation: [],
       candidates: [],
       timedOut: false,
-      tableSize: table.size
+      tableSize: table.size,
+      stats: createSearchStats()
     };
   }
 
@@ -56,6 +60,7 @@ export function searchBestMove(position, options = {}) {
   let completedDepth = 0;
   let timedOut = false;
   let nodes = 0;
+  let stats = createSearchStats();
   let candidates = [];
   let previousBest = null;
 
@@ -67,12 +72,18 @@ export function searchBestMove(position, options = {}) {
       history,
       killers,
       candidateLimit,
+      repetitionCounts: new Map(repetitionCounts),
+      pathCounts: new Map(),
+      maxExtensions: options.maxExtensions ?? DEFAULT_MAX_EXTENSIONS,
+      maxPly: options.maxPly ?? DEFAULT_MAX_PLY,
+      stats: createSearchStats(),
       nodes: 0,
       timedOut: false
     };
 
     const root = searchRoot(position, depth, previousBest, context, rootMoves);
     nodes += context.nodes;
+    stats = mergeSearchStats(stats, context.stats);
 
     if (context.timedOut) {
       timedOut = true;
@@ -95,7 +106,8 @@ export function searchBestMove(position, options = {}) {
     principalVariation: bestLine,
     candidates,
     timedOut,
-    tableSize: table.size
+    tableSize: table.size,
+    stats
   };
 }
 
@@ -116,7 +128,7 @@ function searchRoot(position, depth, previousBest, context, rootMoves) {
 
     const next = makeMove(position, move);
     const line = [];
-    const score = -negamax(next, depth - 1, -INFINITY_SCORE, INFINITY_SCORE, 1, context, line);
+    const score = normalizeScore(-negamax(next, depth - 1, -INFINITY_SCORE, INFINITY_SCORE, 1, context, line, context.maxExtensions));
     const annotated = annotateMove(position, move);
 
     candidates.push({
@@ -144,35 +156,61 @@ function searchRoot(position, depth, previousBest, context, rootMoves) {
   };
 }
 
-function negamax(position, depth, alpha, beta, ply, context, lineOut) {
+function negamax(position, depth, alpha, beta, ply, context, lineOut, extensionsRemaining) {
   context.nodes += 1;
+  context.stats.nodes += 1;
   if (isTimedOut(context)) {
     context.timedOut = true;
     return evaluatePosition(position, position.turn).score;
   }
 
-  const alphaOriginal = alpha;
+  if (ply >= context.maxPly) {
+    return evaluatePosition(position, position.turn).score;
+  }
+
   const key = positionKey(position);
+  if (isRepetition(context, key)) {
+    context.stats.repetitions += 1;
+    return DRAW_SCORE;
+  }
+
+  enterPosition(context, key);
+
+  const alphaOriginal = alpha;
   const tt = context.table.get(key);
 
   if (tt && tt.depth >= depth) {
+    context.stats.ttHits += 1;
     if (tt.flag === EXACT) {
       if (lineOut && tt.bestMove) lineOut.splice(0, lineOut.length, annotateMove(position, tt.bestMove));
+      leavePosition(context, key);
       return tt.score;
     }
     if (tt.flag === LOWER) alpha = Math.max(alpha, tt.score);
     if (tt.flag === UPPER) beta = Math.min(beta, tt.score);
-    if (alpha >= beta) return tt.score;
+    if (alpha >= beta) {
+      leavePosition(context, key);
+      return tt.score;
+    }
   }
 
   const inCheck = isInCheck(position, position.turn);
   if (depth <= 0) {
-    return quiescence(position, alpha, beta, ply, context);
+    if (inCheck && extensionsRemaining > 0) {
+      depth = 1;
+      extensionsRemaining -= 1;
+      context.stats.extensions += 1;
+    } else {
+      const score = quiescence(position, alpha, beta, ply, context);
+      leavePosition(context, key);
+      return score;
+    }
   }
 
   const legalMoves = generateLegalMoves(position, position.turn);
 
   if (legalMoves.length === 0) {
+    leavePosition(context, key);
     return inCheck ? -MATE_SCORE + ply : -MATE_SCORE + ply;
   }
 
@@ -181,13 +219,46 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut) {
   let bestChildLine = [];
   const ordered = orderMoves(position, legalMoves, tt?.bestMove, context, ply);
 
-  for (const move of ordered) {
+  for (let index = 0; index < ordered.length; index += 1) {
+    const move = ordered[index];
     const next = makeMove(position, move);
     const childLine = [];
-    const extension = move.captured || inCheck ? 0 : 0;
-    const score = -negamax(next, depth - 1 + extension, -beta, -alpha, ply + 1, context, childLine);
+    const givesCheck = isInCheck(next, next.turn);
+    const extension = shouldExtend({ inCheck, givesCheck, move, extensionsRemaining }) ? 1 : 0;
+    const childExtensions = extensionsRemaining - extension;
+    if (extension > 0) context.stats.extensions += 1;
 
-    if (context.timedOut) return score;
+    let reduction = shouldReduce({ depth, index, move, inCheck, givesCheck }) ? 1 : 0;
+    if (reduction > 0) context.stats.reductions += 1;
+
+    let score = normalizeScore(-negamax(
+      next,
+      depth - 1 + extension - reduction,
+      -beta,
+      -alpha,
+      ply + 1,
+      context,
+      childLine,
+      childExtensions
+    ));
+
+    if (reduction > 0 && score > alpha) {
+      score = normalizeScore(-negamax(
+        next,
+        depth - 1 + extension,
+        -beta,
+        -alpha,
+        ply + 1,
+        context,
+        childLine,
+        childExtensions
+      ));
+    }
+
+    if (context.timedOut) {
+      leavePosition(context, key);
+      return score;
+    }
 
     if (score > bestScore) {
       bestScore = score;
@@ -198,6 +269,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut) {
     alpha = Math.max(alpha, score);
 
     if (alpha >= beta) {
+      context.stats.cutoffs += 1;
       if (!move.captured) {
         rememberKiller(context.killers, ply, move);
         bumpHistory(context.history, move, depth * depth);
@@ -210,14 +282,20 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut) {
   context.table.set(key, { depth, score: bestScore, flag, bestMove });
 
   if (lineOut) lineOut.splice(0, lineOut.length, ...bestChildLine);
+  leavePosition(context, key);
   return bestScore;
 }
 
 function quiescence(position, alpha, beta, ply, context) {
   context.nodes += 1;
+  context.stats.nodes += 1;
+  context.stats.qnodes += 1;
   const standPat = evaluatePosition(position, position.turn).score;
 
-  if (standPat >= beta) return beta;
+  if (standPat >= beta) {
+    context.stats.cutoffs += 1;
+    return beta;
+  }
   if (standPat > alpha) alpha = standPat;
 
   const captures = orderMoves(position, generateCaptures(position), null, context, ply)
@@ -230,8 +308,11 @@ function quiescence(position, alpha, beta, ply, context) {
     }
 
     const next = makeMove(position, move);
-    const score = -quiescence(next, -beta, -alpha, ply + 1, context);
-    if (score >= beta) return beta;
+    const score = normalizeScore(-quiescence(next, -beta, -alpha, ply + 1, context));
+    if (score >= beta) {
+      context.stats.cutoffs += 1;
+      return beta;
+    }
     if (score > alpha) alpha = score;
   }
 
@@ -264,6 +345,21 @@ function isGoodCapture(move) {
   return PIECE_VALUES[move.captured.type] >= PIECE_VALUES[move.piece.type] * 0.55;
 }
 
+function shouldExtend({ inCheck, givesCheck, move, extensionsRemaining }) {
+  if (extensionsRemaining <= 0) return false;
+  if (inCheck) return true;
+  if (givesCheck) return true;
+  return Boolean(move.captured && PIECE_VALUES[move.captured.type] >= PIECE_VALUES[move.piece.type] * 2);
+}
+
+function shouldReduce({ depth, index, move, inCheck, givesCheck }) {
+  if (depth < 3) return false;
+  if (index < 4) return false;
+  if (inCheck || givesCheck) return false;
+  if (move.captured) return false;
+  return true;
+}
+
 function rememberKiller(killers, ply, move) {
   const existing = killers.get(ply) ?? [];
   if (existing.some((candidate) => sameMove(candidate, move))) return;
@@ -283,9 +379,67 @@ function isTimedOut(context) {
   return performanceNow() >= context.deadline;
 }
 
+function buildRepetitionCounts(history) {
+  const counts = new Map();
+
+  for (const item of history) {
+    const key = typeof item === "string" ? item : positionKey(item);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+function isRepetition(context, key) {
+  const previous = context.repetitionCounts.get(key) ?? 0;
+  const currentPath = context.pathCounts.get(key) ?? 0;
+  return previous + currentPath >= 2;
+}
+
+function enterPosition(context, key) {
+  context.pathCounts.set(key, (context.pathCounts.get(key) ?? 0) + 1);
+}
+
+function leavePosition(context, key) {
+  const count = context.pathCounts.get(key) ?? 0;
+  if (count <= 1) {
+    context.pathCounts.delete(key);
+  } else {
+    context.pathCounts.set(key, count - 1);
+  }
+}
+
+function createSearchStats() {
+  return {
+    nodes: 0,
+    qnodes: 0,
+    ttHits: 0,
+    cutoffs: 0,
+    extensions: 0,
+    reductions: 0,
+    repetitions: 0
+  };
+}
+
+function mergeSearchStats(total, next) {
+  return {
+    nodes: total.nodes + next.nodes,
+    qnodes: total.qnodes + next.qnodes,
+    ttHits: total.ttHits + next.ttHits,
+    cutoffs: total.cutoffs + next.cutoffs,
+    extensions: total.extensions + next.extensions,
+    reductions: total.reductions + next.reductions,
+    repetitions: total.repetitions + next.repetitions
+  };
+}
+
 function performanceNow() {
   if (globalThis.performance?.now) return globalThis.performance.now();
   return Date.now();
+}
+
+function normalizeScore(score) {
+  return Object.is(score, -0) ? 0 : score;
 }
 
 export function formatPrincipalVariation(line) {

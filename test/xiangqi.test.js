@@ -82,6 +82,7 @@ test("engine returns a legal move and explanation", () => {
   assert.ok(result.explanation.summary.includes(result.bestMove.notation));
   assert.ok(result.explanation.reasons.length > 0);
   assert.ok(result.depth >= 1);
+  assert.ok(result.explanation.search.stats.nodes > 0);
 });
 
 test("engine sees a simple winning capture", () => {

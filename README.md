@@ -8,10 +8,11 @@ The current engine is dependency-free JavaScript and includes:
 - Legal move generation for generals, advisors, elephants, horses, rooks, cannons, and pawns.
 - Check detection, flying-general rules, and make/unmake-style immutable position updates.
 - Iterative-deepening negamax search with alpha-beta pruning.
-- Transposition table, quiescence search, capture/check/history-based move ordering, and root candidate analysis.
+- Transposition table, quiescence search, capture/check/history-based move ordering, bounded check extensions, late-move reductions, repetition hooks, and root candidate analysis.
 - Evaluation terms for material, piece-square placement, mobility, threats, pawn progress, and king safety.
 - Explainable move output for learning-app use cases.
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
+- Game-history helpers for play sessions, reviewed move logs, position history, and repeated-position detection.
 - A minimal UCCI-style protocol adapter for GUI/app integration and engine smoke testing.
 
 ## Quick Start
@@ -48,6 +49,20 @@ console.log(review.explanation.summary);
 ```
 
 `reviewMove` compares the played move against the searched best line and returns a practical grade: `best`, `excellent`, `good`, `inaccuracy`, `mistake`, or `blunder`.
+
+Track a play session:
+
+```js
+import { chooseGameMove, createGame, playGameMove, gameStatus } from "./src/index.js";
+
+let game = createGame();
+game = playGameMove(game, engine, "a9-a8");
+const reply = chooseGameMove(game, engine);
+
+console.log(game.moves.at(-1).review.explanation.summary);
+console.log(reply.explanation.summary);
+console.log(gameStatus(game));
+```
 
 ## Protocol
 

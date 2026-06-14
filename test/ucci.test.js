@@ -16,6 +16,7 @@ test("UCCI session searches a FEN position", () => {
   const output = session.handleLine("go depth 2 movetime 1000");
 
   assert.ok(output.some((line) => line.startsWith("info depth 2 score cp")));
+  assert.ok(output.some((line) => line.includes("nodes")));
   assert.ok(output.includes("bestmove e9e2"));
   assert.ok(output.some((line) => line.includes("reason: Wins a rook")));
 });

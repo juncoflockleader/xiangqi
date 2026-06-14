@@ -47,7 +47,8 @@ export function explainMove(position, searchResult) {
       depth: searchResult.depth,
       nodes: searchResult.nodes,
       timedOut: searchResult.timedOut,
-      tableSize: searchResult.tableSize
+      tableSize: searchResult.tableSize,
+      stats: searchResult.stats
     }
   };
 }

@@ -126,7 +126,7 @@ export class UcciSession {
 
     const pv = result.principalVariation.map(protocolMove).join(" ");
     const outputs = [
-      `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes} pv ${pv}`,
+      `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes} qnodes ${result.stats.qnodes} tthits ${result.stats.ttHits} ext ${result.stats.extensions} pv ${pv}`,
       `info string ${result.explanation.summary}`
     ];
 
