@@ -37,6 +37,7 @@ const DEFAULT_DELTA_MARGIN = 160;
 const FUTILITY_BASE_MARGIN = 90;
 const FUTILITY_DEPTH_MARGIN = 70;
 const NULL_MOVE_MIN_DEPTH = 3;
+const TRANSPOSITION_MATE_BOUND = MATE_SCORE - 1000;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -315,16 +316,17 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
 
   if (tt && tt.depth >= depth) {
     context.stats.ttHits += 1;
+    const ttScore = scoreFromTransposition(tt.score, ply);
     if (tt.flag === EXACT) {
       if (lineOut && tt.bestMove) lineOut.splice(0, lineOut.length, annotateMove(position, tt.bestMove));
       leavePosition(context, repetitionKey);
-      return tt.score;
+      return ttScore;
     }
-    if (tt.flag === LOWER) alpha = Math.max(alpha, tt.score);
-    if (tt.flag === UPPER) beta = Math.min(beta, tt.score);
+    if (tt.flag === LOWER) alpha = Math.max(alpha, ttScore);
+    if (tt.flag === UPPER) beta = Math.min(beta, ttScore);
     if (alpha >= beta) {
       leavePosition(context, repetitionKey);
-      return tt.score;
+      return ttScore;
     }
   }
 
@@ -501,7 +503,12 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   }
 
   const flag = bestScore <= alphaOriginal ? UPPER : bestScore >= beta ? LOWER : EXACT;
-  storeTransposition(context, transpositionKey, { depth, score: bestScore, flag, bestMove });
+  storeTransposition(context, transpositionKey, {
+    depth,
+    score: scoreToTransposition(bestScore, ply),
+    flag,
+    bestMove
+  });
 
   if (lineOut) lineOut.splice(0, lineOut.length, ...bestChildLine);
   leavePosition(context, repetitionKey);
@@ -869,6 +876,18 @@ function performanceNow() {
 
 function normalizeScore(score) {
   return Object.is(score, -0) ? 0 : score;
+}
+
+function scoreToTransposition(score, ply) {
+  if (score >= TRANSPOSITION_MATE_BOUND) return score + ply;
+  if (score <= -TRANSPOSITION_MATE_BOUND) return score - ply;
+  return score;
+}
+
+function scoreFromTransposition(score, ply) {
+  if (score >= TRANSPOSITION_MATE_BOUND) return score - ply;
+  if (score <= -TRANSPOSITION_MATE_BOUND) return score + ply;
+  return score;
 }
 
 export function formatPrincipalVariation(line) {

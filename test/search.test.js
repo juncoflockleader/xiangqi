@@ -5,6 +5,7 @@ import {
   createEngine,
   createInitialPosition,
   generateLegalMoves,
+  hashPosition,
   makeMove,
   parseFen,
   searchBestMove
@@ -113,6 +114,27 @@ test("search scores no-legal-move stalemate as a Xiangqi loss", () => {
   assert.equal(generateLegalMoves(position).length, 0);
   assert.equal(result.bestMove, null);
   assert.equal(result.score, -MATE_SCORE);
+});
+
+test("search restores mate distance when probing the transposition table", () => {
+  const position = parseFen("4k4/9/9/9/9/9/9/9/9/3K5 r");
+  const move = generateLegalMoves(position)[0];
+  const child = makeMove(position, move);
+  const table = new Map([
+    [hashPosition(child), { depth: 0, flag: "exact", score: MATE_SCORE }]
+  ]);
+
+  const result = searchBestMove(position, {
+    depth: 1,
+    timeLimitMs: 1000,
+    candidateLimit: Number.POSITIVE_INFINITY,
+    transpositionTable: table
+  });
+  const candidate = result.candidates.find((entry) => entry.move.notation === move.notation);
+
+  assert.ok(candidate);
+  assert.equal(candidate.score, -MATE_SCORE + 1);
+  assert.ok(result.stats.ttHits >= 1);
 });
 
 test("search uses selective pruning and PVS in quiet tactical trees", () => {
