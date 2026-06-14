@@ -20,6 +20,7 @@ const ROUTING_KEYS = new Set([
 
 const NATIVE_ONLY_KEYS = new Set([
   "args",
+  "closeTimeoutMs",
   "command",
   "commandTimeoutMs",
   "cwd",

@@ -72,7 +72,11 @@ rl.on("line", (line) => {
       write(`info depth 2 score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
       write(`bestmove ${nativeMove("h9g7")}`);
     }
+    if (hasOption("MockExitAfterBestmove")) {
+      setImmediate(() => process.exit(0));
+    }
   } else if (command === "quit") {
+    if (hasOption("MockIgnoreQuit")) return;
     write("bye");
     process.exit(0);
   }

@@ -173,6 +173,7 @@ class UcciProcessClient {
     this.protocol = normalizeNativeProtocol(options.protocol);
     this.engineOptions = normalizeNativeEngineOptions(options.engineOptions);
     this.startupTimeoutMs = options.startupTimeoutMs ?? DEFAULT_UCCI_TIMEOUT_MS;
+    this.closeTimeoutMs = options.closeTimeoutMs ?? 250;
     this.child = null;
     this.lines = [];
     this.waiters = new Set();
@@ -314,26 +315,54 @@ class UcciProcessClient {
     const child = this.child;
     this.child = null;
     this.ready = false;
+    this.rejectWaiters(new Error("UCCI engine backend closed."));
+
+    if (isChildExited(child)) return;
 
     await new Promise((resolve) => {
       let settled = false;
+      let timer = null;
       const finish = () => {
         if (settled) return;
         settled = true;
+        if (timer) clearTimeout(timer);
         resolve();
       };
 
       child.once("exit", finish);
-      if (!child.killed && child.stdin.writable) {
-        child.stdin.write("quit\n");
+      if (isChildExited(child)) {
+        finish();
+        return;
       }
 
-      const timer = setTimeout(() => {
-        if (!child.killed) child.kill();
+      if (!child.killed && child.stdin.writable) {
+        try {
+          child.stdin.write("quit\n");
+        } catch {
+          terminateChild(child);
+        }
+      } else {
+        terminateChild(child);
+      }
+
+      timer = setTimeout(() => {
+        terminateChild(child);
         finish();
-      }, 250);
-      timer.unref?.();
+      }, this.closeTimeoutMs);
     });
+  }
+}
+
+function isChildExited(child) {
+  return child.exitCode !== null || child.signalCode !== null;
+}
+
+function terminateChild(child) {
+  if (child.killed || isChildExited(child)) return;
+  try {
+    child.kill();
+  } catch {
+    // The process may exit between the state check and kill call.
   }
 }
 
