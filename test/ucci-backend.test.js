@@ -83,6 +83,40 @@ test("UCCI backend parses MultiPV analysis lines", async () => {
   }
 });
 
+test("native backend can use a UCI handshake for top-engine compatibility", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    protocol: "uci",
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), { useBook: false });
+    const description = describeEngineBackend(backend);
+
+    assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.UCI_COMPATIBLE), true);
+    assert.equal(description.kind, "native-uci");
+    assert.equal(result.source, "native-uci");
+    assert.equal(result.bestMove.notation, "h9-g7");
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("UCI search")));
+
+    const analysis = await backend.analyzePosition(createInitialPosition(), {
+      useBook: false,
+      lines: 2
+    });
+
+    assert.equal(analysis.lines.length, 2);
+    assert.equal(analysis.lines[0].move.notation, "h9-g7");
+    assert.equal(analysis.lines[1].move.notation, "h7-e7");
+  } finally {
+    await backend.close();
+  }
+});
+
 test("UCCI backend provides async native coach hints", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,

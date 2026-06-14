@@ -7,6 +7,7 @@ const rl = readline.createInterface({
 });
 
 let currentPosition = "";
+let currentMultiPv = 1;
 
 function write(line) {
   process.stdout.write(`${line}\n`);
@@ -20,8 +21,15 @@ rl.on("line", (line) => {
     write("id name Mock Native UCCI");
     write("id author test");
     write("ucciok");
+  } else if (command === "uci") {
+    write("id name Mock Native UCI");
+    write("id author test");
+    write("uciok");
   } else if (command === "isready") {
     write("readyok");
+  } else if (command === "setoption") {
+    const match = trimmed.match(/\bname\s+MultiPV\s+value\s+(\d+)/i);
+    if (match) currentMultiPv = Number.parseInt(match[1], 10) || 1;
   } else if (command === "position") {
     currentPosition = trimmed;
   } else if (command === "go") {
@@ -32,7 +40,7 @@ rl.on("line", (line) => {
       write(`info string command ${trimmed}`);
       write("info depth 2 score cp 55 nodes 321 pv h9g7 h0g2");
       write("bestmove h9g7");
-    } else if (/\bmultipv\s+2\b/i.test(trimmed)) {
+    } else if (/\bmultipv\s+2\b/i.test(trimmed) || currentMultiPv === 2) {
       write("info multipv 1 depth 2 score cp 42 nodes 123 pv h9g7 h0g2");
       write("info multipv 2 depth 2 score cp 12 nodes 123 pv h7e7 h0g2");
       write("bestmove h9g7");

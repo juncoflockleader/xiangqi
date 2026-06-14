@@ -20,7 +20,7 @@ The current engine is dependency-free JavaScript and includes:
 - Whole-game review with side summaries, opening-book matches, and key learning moments.
 - Lesson-plan generation that turns reviewed games into prompt, hint, and answer cards.
 - Game-history helpers for play sessions, reviewed move logs, engine decision logs, position history, repeated-position detection, and async native-backend play.
-- A backend adapter contract and async UCCI process wrapper so the JS reference engine can sit beside a native C++/WASM engine without changing the learning-app API.
+- A backend adapter contract and async UCI/UCCI process wrapper so the JS reference engine can sit beside a native C++/WASM engine without changing the learning-app API.
 - Shared time-control budgeting for fixed movetime and clock-based `wtime`/`btime`/increment searches.
 - Starter benchmark positions for opening, tactical, and forcing-search regressions.
 - A minimal UCCI-style protocol adapter for GUI/app integration and engine smoke testing.
@@ -98,7 +98,8 @@ console.log(describeEngineBackend(backend));
 console.log(backend.supports(ENGINE_BACKEND_FEATURES.EXPLANATION));
 
 const nativeBackend = createUcciEngineBackend({
-  command: "/path/to/pikafish-or-other-ucci-engine",
+  command: "/path/to/pikafish-or-other-native-engine",
+  protocol: "uci",
   depth: 8,
   timeLimitMs: 3000
 });
@@ -118,7 +119,7 @@ console.log(nativeGameReview.summary);
 await nativeBackend.close();
 ```
 
-The JavaScript backend is the reference learning engine. The UCCI backend is async because it talks to an external process. By default it checks the JS/imported opening book before starting native search, and `useBook: false` forces a pure native search. Native `reviewMove` and `reviewGame` compare played moves against the UCCI engine's preferred moves, then use the JS explanation layer to turn score gaps into learning feedback. The built-in backends expose `chooseMove`, `analyzePosition`, `reviewMove`, `reviewGame`, `coachMove`, `lessonPlan`, `openingBook`, `play`, and `legalMoves`, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
+The JavaScript backend is the reference learning engine. The native backend is async because it talks to an external UCI/UCCI process; UCCI is the default, and `protocol: "uci"` supports UCI-style engines such as Pikafish. By default it checks the JS/imported opening book before starting native search, and `useBook: false` forces a pure native search. Native `reviewMove` and `reviewGame` compare played moves against the external engine's preferred moves, then use the JS explanation layer to turn score gaps into learning feedback. The built-in backends expose `chooseMove`, `analyzePosition`, `reviewMove`, `reviewGame`, `coachMove`, `lessonPlan`, `openingBook`, `play`, and `legalMoves`, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
 
 Review a player's move:
 
@@ -155,7 +156,7 @@ console.log(hint.levels[2].text); // candidate focus
 console.log(hint.levels[3].text); // full reveal
 ```
 
-`coachMove` is designed for lesson and hint flows: it preserves the engine's best move, alternatives, principal variation, and explanation, but packages them as progressive reveal levels so the UI can teach before showing the answer. The UCCI backend exposes the same method asynchronously, which lets a native engine provide the move while the JavaScript layer provides the teaching text.
+`coachMove` is designed for lesson and hint flows: it preserves the engine's best move, alternatives, principal variation, and explanation, but packages them as progressive reveal levels so the UI can teach before showing the answer. The native backend exposes the same method asynchronously, which lets a UCI/UCCI engine provide the move while the JavaScript layer provides the teaching text.
 
 Run benchmark positions:
 
@@ -180,7 +181,8 @@ import {
 
 const jsBackend = createJavaScriptEngineBackend({ depth: 3, timeLimitMs: 1000 });
 const nativeBackend = createUcciEngineBackend({
-  command: "/path/to/pikafish-or-other-ucci-engine",
+  command: "/path/to/pikafish-or-other-native-engine",
+  protocol: "uci",
   depth: 8,
   timeLimitMs: 3000
 });
@@ -297,7 +299,7 @@ Coordinates use file letters `a` through `i` and ranks `0` through `9`, with ran
 ## Roadmap
 
 - Expand the opening book and repetition rule handling.
-- Harden the native/UCCI backend with richer time controls, engine option profiles, and production process supervision.
+- Harden the native UCI/UCCI backend with engine option profiles and production process supervision.
 - Add stronger time management and deeper late-game search extensions.
 - Expand benchmark positions and add engine-vs-engine comparison reports.
 - Connect the engine to a playable learning UI with move review, hints, and lesson generation.

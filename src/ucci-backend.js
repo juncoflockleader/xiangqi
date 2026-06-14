@@ -23,21 +23,23 @@ const DEFAULT_SEARCH_TIMEOUT_MS = 30000;
 
 export function createUcciEngineBackend(options = {}) {
   if (!options.command) {
-    throw new Error("UCCI backend requires a command.");
+    throw new Error("Native engine backend requires a command.");
   }
 
   const referenceEngine = options.referenceEngine ?? createEngine(options.referenceOptions ?? options);
   const client = new UcciProcessClient(options);
-  const name = options.name ?? "Native UCCI Engine";
+  const protocol = normalizeNativeProtocol(options.protocol);
+  const source = nativeSource(protocol);
+  const name = options.name ?? (protocol === "uci" ? "Native UCI Engine" : "Native UCCI Engine");
   let backend;
 
   backend = createEngineBackend({
-    id: options.id ?? "native-ucci",
+    id: options.id ?? source,
     name,
-    kind: "native-ucci",
-    description: options.description ?? "External UCCI-compatible engine backend for stronger native or WASM search.",
+    kind: source,
+    description: options.description ?? "External UCI/UCCI-compatible engine backend for stronger native or WASM search.",
     features: [
-      ENGINE_BACKEND_FEATURES.UCCI_COMPATIBLE,
+      protocol === "uci" ? ENGINE_BACKEND_FEATURES.UCI_COMPATIBLE : ENGINE_BACKEND_FEATURES.UCCI_COMPATIBLE,
       ENGINE_BACKEND_FEATURES.NATIVE_READY,
       ENGINE_BACKEND_FEATURES.ASYNC_SEARCH,
       ENGINE_BACKEND_FEATURES.EXPLANATION,
@@ -48,7 +50,8 @@ export function createUcciEngineBackend(options = {}) {
     chooseMove: async (position, searchOptions = {}) => {
       const mergedOptions = mergeNativeOptions(options, searchOptions, {
         lines: 1,
-        backendName: name
+        backendName: name,
+        protocol
       });
       const bookResult = maybeBookResult(referenceEngine, position, mergedOptions);
       if (bookResult) return bookResult;
@@ -58,7 +61,8 @@ export function createUcciEngineBackend(options = {}) {
       const lineCount = normalizeLineCount(searchOptions.lines ?? searchOptions.multiPv ?? searchOptions.multipv ?? options.lines ?? 3);
       const result = await nativeSearch(client, position, mergeNativeOptions(options, searchOptions, {
         lines: lineCount,
-        backendName: name
+        backendName: name,
+        protocol
       }));
       const bestScore = result.score;
 
@@ -82,6 +86,7 @@ export function createUcciEngineBackend(options = {}) {
     reviewMove: async (position, move, reviewOptions = {}) => nativeReviewMove(client, position, move, mergeNativeOptions(options, reviewOptions, {
       backendName: name,
       lines: 1,
+      protocol,
       useBook: false
     })),
     reviewGame: (moves, gameOptions = {}) => {
@@ -91,6 +96,7 @@ export function createUcciEngineBackend(options = {}) {
         reviewOptions: mergeNativeOptions(options, reviewOptions, {
           backendName: name,
           lines: 1,
+          protocol,
           useBook: false
         })
       });
@@ -103,6 +109,7 @@ export function createUcciEngineBackend(options = {}) {
         reviewOptions: mergeNativeOptions(options, reviewOptions, {
           backendName: name,
           lines: 1,
+          protocol,
           useBook: false
         })
       });
@@ -126,6 +133,7 @@ class UcciProcessClient {
     this.cwd = options.cwd;
     this.env = options.env;
     this.shell = options.shell ?? false;
+    this.protocol = normalizeNativeProtocol(options.protocol);
     this.engineOptions = options.engineOptions ?? {};
     this.startupTimeoutMs = options.startupTimeoutMs ?? DEFAULT_UCCI_TIMEOUT_MS;
     this.child = null;
@@ -159,7 +167,11 @@ class UcciProcessClient {
     if (this.ready) return;
     this.start();
 
-    await this.commandUntil("ucci", (lines) => lines.some((line) => line === "ucciok"), this.startupTimeoutMs);
+    const handshake = this.protocol === "uci"
+      ? { command: "uci", ok: "uciok" }
+      : { command: "ucci", ok: "ucciok" };
+
+    await this.commandUntil(handshake.command, (lines) => lines.some((line) => line === handshake.ok), this.startupTimeoutMs);
 
     for (const [name, value] of Object.entries(this.engineOptions)) {
       this.write(`setoption name ${name} value ${value}`);
@@ -175,13 +187,24 @@ class UcciProcessClient {
     this.write(`position fen ${toFen(position)}`);
 
     const bannedMoves = options.bannedMoves ?? [];
-    if (bannedMoves.length > 0) {
+    if (this.protocol === "ucci" && bannedMoves.length > 0) {
       this.write(`banmoves ${bannedMoves.map(compactMove).join(" ")}`);
     }
+    const protocolOptions = {
+      ...options,
+      protocol: this.protocol,
+      searchMoves: this.protocol === "uci" && bannedMoves.length > 0
+        ? legalSearchMoves(position, bannedMoves)
+        : options.searchMoves
+    };
+    const lineCount = normalizeLineCount(protocolOptions.lines ?? protocolOptions.multiPv ?? protocolOptions.multipv ?? 1);
+    if (this.protocol === "uci") {
+      this.write(`setoption name MultiPV value ${lineCount}`);
+    }
 
-    const timeBudget = resolveSearchBudget(options, options.side ?? position.turn);
+    const timeBudget = resolveSearchBudget(protocolOptions, protocolOptions.side ?? position.turn);
     const timeoutMs = options.commandTimeoutMs ?? Math.max(DEFAULT_SEARCH_TIMEOUT_MS, timeBudget.timeLimitMs + 5000);
-    return this.commandUntil(formatGoCommand(options), (lines) => lines.some((line) => line.startsWith("bestmove ")), timeoutMs);
+    return this.commandUntil(formatGoCommand(protocolOptions), (lines) => lines.some((line) => line.startsWith("bestmove ")), timeoutMs);
   }
 
   async commandUntil(command, predicate, timeoutMs) {
@@ -279,10 +302,12 @@ class UcciProcessClient {
 
 async function nativeSearch(client, position, options) {
   const searchOptions = { ...options, side: position.turn };
+  const protocol = normalizeNativeProtocol(options.protocol);
   const rawLines = await client.search(position, searchOptions);
   const parsed = parseUcciSearch(rawLines, position);
   const result = {
-    source: "native-ucci",
+    source: nativeSource(protocol),
+    protocol,
     bestMove: parsed.bestMove,
     score: parsed.score,
     depth: parsed.depth,
@@ -315,7 +340,7 @@ async function nativeReviewMove(client, position, moveOrNotation, options) {
     : await analyzePlayedNativeMove(client, position, move, options);
   const centipawnLoss = Math.max(0, bestAnalysis.score - playedCandidate.score);
   const reviewed = {
-    source: "native-ucci",
+    source: nativeSource(options.protocol),
     move,
     bestMove,
     bestScore: Math.round(bestAnalysis.score),
@@ -536,11 +561,12 @@ function resolvePrincipalVariation(position, moveTexts) {
 }
 
 function explainNativeMove(position, result, backendName) {
+  const protocolLabel = result.protocol === "uci" ? "UCI" : "UCCI";
   const move = result.bestMove;
   if (!move) {
     return {
       summary: `${backendName} found no legal move.`,
-      reasons: ["The native UCCI backend returned bestmove 0000."],
+      reasons: [`The native ${protocolLabel} backend returned bestmove 0000.`],
       alternatives: [],
       principalVariation: []
     };
@@ -548,7 +574,7 @@ function explainNativeMove(position, result, backendName) {
 
   const moveStory = explainMoveFeatures(position, move);
   const reasons = [
-    `${backendName} selected this move through UCCI search.`,
+    `${backendName} selected this move through ${protocolLabel} search.`,
     `The native search reported depth ${result.depth} and ${result.nodes} nodes.`,
     `It reported a score of ${formatScore(result.score)} for the side to move.`,
     ...moveStory.reasons
@@ -566,7 +592,7 @@ function explainNativeMove(position, result, backendName) {
       rank: index + 1,
       move: candidate.move.notation,
       score: Math.round(candidate.score),
-      note: `native UCCI line ${candidate.native?.multipv ?? index + 1} at depth ${candidate.native?.depth ?? result.depth}`
+      note: `native ${protocolLabel} line ${candidate.native?.multipv ?? index + 1} at depth ${candidate.native?.depth ?? result.depth}`
     })),
     principalVariation,
     principalVariationText: principalVariation.join(" "),
@@ -608,6 +634,7 @@ function formatGoCommand(options) {
   const depth = Math.max(1, Number.parseInt(options.depth ?? 4, 10) || 4);
   const lines = normalizeLineCount(options.lines ?? options.multiPv ?? options.multipv ?? 1);
   const explicitMoveTime = numberOption(options.timeLimitMs, options.movetime, options.moveTimeMs, options.moveTime);
+  const protocol = normalizeNativeProtocol(options.protocol);
   const parts = ["go", "depth", depth];
 
   if (hasClockTimeControl(options) && explicitMoveTime === null) {
@@ -621,7 +648,11 @@ function formatGoCommand(options) {
     parts.push("movetime", timeBudget.timeLimitMs);
   }
 
-  if (lines > 1) parts.push("multipv", lines);
+  if (protocol === "uci" && options.searchMoves?.length > 0) {
+    parts.push("searchmoves", ...options.searchMoves.map(compactMove));
+  }
+
+  if (lines > 1 && protocol !== "uci") parts.push("multipv", lines);
   return parts.join(" ");
 }
 
@@ -648,6 +679,22 @@ function mergeNativeOptions(baseOptions, searchOptions, extras) {
   }
 
   return merged;
+}
+
+function normalizeNativeProtocol(value = "ucci") {
+  const normalized = String(value ?? "ucci").toLowerCase();
+  if (normalized === "uci") return "uci";
+  return "ucci";
+}
+
+function nativeSource(protocol) {
+  return normalizeNativeProtocol(protocol) === "uci" ? "native-uci" : "native-ucci";
+}
+
+function legalSearchMoves(position, bannedMoves) {
+  const bannedMoveKeys = new Set(bannedMoves.map(toMoveKey));
+  return generateLegalMoves(position, position.turn)
+    .filter((move) => !bannedMoveKeys.has(moveKey(move)));
 }
 
 function addGoNumber(parts, name, value) {
@@ -708,6 +755,10 @@ function numberOption(...values) {
 
 function compactMove(move) {
   return (typeof move === "string" ? move : move.notation ?? moveToNotation(move)).replace("-", "");
+}
+
+function toMoveKey(move) {
+  return moveKey(typeof move === "string" ? parseMoveNotation(move) : move);
 }
 
 function moveKeyMatches(left, right) {
