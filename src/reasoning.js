@@ -94,7 +94,7 @@ export function explainBookMove(position, bookResult) {
       tableSize: bookResult.tableSize,
       stats: bookResult.stats,
       iterations: [],
-      source: "opening-book"
+      source: bookResult.source ?? "opening-book"
     }
   };
 }

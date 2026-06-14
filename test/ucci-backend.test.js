@@ -9,6 +9,25 @@ import {
 
 const MOCK_UCCI_PATH = new URL("../fixtures/mock-ucci.mjs", import.meta.url);
 
+test("UCCI backend uses the explainable opening book before native search", async () => {
+  const backend = createUcciEngineBackend({
+    command: "/path/that/should/not/start",
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 100,
+    commandTimeoutMs: 100
+  });
+
+  const result = await backend.chooseMove(createInitialPosition());
+
+  assert.equal(result.source, "opening-book");
+  assert.equal(result.bestMove.notation, "h7-e7");
+  assert.equal(result.depth, 0);
+  assert.equal(result.native.skipped, true);
+  assert.ok(result.explanation.reasons.some((reason) => reason.includes("Opening book")));
+  await backend.close();
+});
+
 test("UCCI backend searches through an external process", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,
@@ -20,7 +39,7 @@ test("UCCI backend searches through an external process", async () => {
   });
 
   try {
-    const result = await backend.chooseMove(createInitialPosition());
+    const result = await backend.chooseMove(createInitialPosition(), { useBook: false });
     const description = describeEngineBackend(backend);
 
     assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.NATIVE_READY), true);

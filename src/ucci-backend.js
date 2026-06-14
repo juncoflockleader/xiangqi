@@ -9,8 +9,9 @@ import {
   toFen
 } from "./board.js";
 import { ENGINE_BACKEND_FEATURES, createEngineBackend } from "./backend.js";
+import { bookMoveToCandidate } from "./book.js";
 import { createEngine } from "./engine.js";
-import { explainMoveFeatures, formatScore } from "./reasoning.js";
+import { explainBookMove, explainMoveFeatures, formatScore } from "./reasoning.js";
 import { annotateMove, generateLegalMoves } from "./movegen.js";
 
 const DEFAULT_UCCI_TIMEOUT_MS = 5000;
@@ -35,12 +36,17 @@ export function createUcciEngineBackend(options = {}) {
       ENGINE_BACKEND_FEATURES.NATIVE_READY,
       ENGINE_BACKEND_FEATURES.ASYNC_SEARCH
     ],
-    chooseMove: async (position, searchOptions = {}) => nativeSearch(client, position, {
-      ...options,
-      ...searchOptions,
-      lines: 1,
-      backendName: name
-    }),
+    chooseMove: async (position, searchOptions = {}) => {
+      const mergedOptions = {
+        ...options,
+        ...searchOptions,
+        lines: 1,
+        backendName: name
+      };
+      const bookResult = maybeBookResult(referenceEngine, position, mergedOptions);
+      if (bookResult) return bookResult;
+      return nativeSearch(client, position, mergedOptions);
+    },
     analyzePosition: async (position, searchOptions = {}) => {
       const lineCount = normalizeLineCount(searchOptions.lines ?? searchOptions.multiPv ?? searchOptions.multipv ?? options.lines ?? 3);
       const result = await nativeSearch(client, position, {
@@ -256,6 +262,44 @@ async function nativeSearch(client, position, options) {
   return {
     ...result,
     explanation: explainNativeMove(position, result, options.backendName)
+  };
+}
+
+function maybeBookResult(referenceEngine, position, options) {
+  if (options.useBook === false) return null;
+
+  const bookHit = referenceEngine.openingBook(position, options);
+  if (!bookHit) return null;
+
+  const candidates = bookHit.entries.map(bookMoveToCandidate);
+  const result = {
+    source: bookHit.source ?? "opening-book",
+    bestMove: bookHit.move,
+    score: bookHit.entry.weight,
+    depth: 0,
+    nodes: 0,
+    principalVariation: [bookHit.move],
+    candidates,
+    iterations: [],
+    timedOut: false,
+    tableSize: null,
+    stats: createEmptyStats(),
+    book: {
+      name: bookHit.entry.name,
+      idea: bookHit.entry.idea,
+      tags: bookHit.entry.tags,
+      weight: bookHit.entry.weight
+    },
+    bookAlternatives: bookHit.entries,
+    native: {
+      skipped: true,
+      reason: "opening-book"
+    }
+  };
+
+  return {
+    ...result,
+    explanation: explainBookMove(position, result)
   };
 }
 
@@ -485,7 +529,15 @@ function formatGoCommand(options) {
 
 function createNativeStats(parsed) {
   return {
+    ...createEmptyStats(),
     nodes: parsed.nodes ?? 0,
+    native: true
+  };
+}
+
+function createEmptyStats() {
+  return {
+    nodes: 0,
     qnodes: 0,
     qchecks: 0,
     ttHits: 0,
@@ -503,8 +555,7 @@ function createNativeStats(parsed) {
     lmrResearches: 0,
     pvsResearches: 0,
     nullMovePrunes: 0,
-    repetitions: 0,
-    native: true
+    repetitions: 0
   };
 }
 

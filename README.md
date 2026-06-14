@@ -101,10 +101,13 @@ const nativeBackend = createUcciEngineBackend({
 const nativeResult = await nativeBackend.chooseMove(position);
 console.log(nativeResult.bestMove.notation);
 console.log(nativeResult.explanation.summary);
+
+const pureNativeResult = await nativeBackend.chooseMove(position, { useBook: false });
+console.log(pureNativeResult.source);
 await nativeBackend.close();
 ```
 
-The JavaScript backend is the reference learning engine. The UCCI backend is async because it talks to an external process. Both expose the same `chooseMove`, `analyzePosition`, `reviewMove`, `openingBook`, `play`, and `legalMoves` contract, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
+The JavaScript backend is the reference learning engine. The UCCI backend is async because it talks to an external process. By default it checks the JS/imported opening book before starting native search, and `useBook: false` forces a pure native search. Both backends expose the same `chooseMove`, `analyzePosition`, `reviewMove`, `openingBook`, `play`, and `legalMoves` contract, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
 
 Review a player's move:
 
