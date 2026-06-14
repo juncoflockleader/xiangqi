@@ -172,6 +172,7 @@ function buildProbeReport(backend, decision, review, options) {
     principalVariation: (decision.principalVariation ?? []).map(notationFor),
     summary: decision.explanation?.summary ?? "",
     reasons: [...(decision.explanation?.reasons ?? [])],
+    comparison: decision.explanation?.comparison ?? null,
     alternatives: (decision.explanation?.alternatives ?? []).map((alternative) => ({
       rank: alternative.rank,
       move: alternative.move,
@@ -201,7 +202,13 @@ function formatProbeReport(report) {
   ];
 
   if (report.summary) lines.push(`Summary: ${report.summary}`);
-  for (const reason of report.reasons.slice(0, 4)) {
+  if (report.comparison?.reason) {
+    lines.push(`Comparison: ${report.comparison.reason}`);
+  }
+  const displayedReasons = report.reasons
+    .filter((reason) => reason !== report.comparison?.reason)
+    .slice(0, 4);
+  for (const reason of displayedReasons) {
     lines.push(`Reason: ${reason}`);
   }
 

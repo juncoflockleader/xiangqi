@@ -36,6 +36,9 @@ test("native probe CLI verifies a configured UCI backend", async () => {
   ]);
   assert.equal(report.bestMove, "h9-g7");
   assert.equal(report.source, "native-uci");
+  assert.equal(report.comparison.bestMove, "h9-g7");
+  assert.equal(report.comparison.nextMove, "h7-e7");
+  assert.equal(report.comparison.scoreGap, 30);
   assert.equal(report.alternatives.length, 2);
   assert.equal(report.alternatives[0].move, "h9-g7");
   assert.equal(report.review.move, "h9-g7");

@@ -52,6 +52,10 @@ rl.on("line", (line) => {
       write(`info string command ${trimmed}`);
       write(`info depth 2 score cp 55 nodes 321 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
       write(`bestmove ${nativeMove("h9g7")}`);
+    } else if (hasOption("MockTie")) {
+      write(`info multipv 1 depth 2 score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+      write(`info multipv 2 depth 2 score cp 38 nodes 123 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);
+      write(`bestmove ${nativeMove("h9g7")}`);
     } else if (/\bmultipv\s+2\b/i.test(trimmed) || currentMultiPv === 2) {
       write(`info multipv 1 depth 1 score cp 20 nodes 40 pv ${nativeMove("a9a8")}`);
       write(`info multipv 2 depth 1 score cp 10 nodes 40 pv ${nativeMove("a6a5")}`);
@@ -67,6 +71,10 @@ rl.on("line", (line) => {
     process.exit(0);
   }
 });
+
+function hasOption(name) {
+  return appliedOptions.some((option) => option.includes(`name ${name}`));
+}
 
 function nativeMove(moveText) {
   if (currentProtocol !== "uci") return moveText;

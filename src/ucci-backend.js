@@ -603,12 +603,14 @@ function explainNativeMove(position, result, backendName) {
   }
 
   const moveStory = explainMoveFeatures(position, move);
+  const comparison = buildNativeComparisonEvidence(result, position);
   const reasons = [
     `${backendName} selected this move through ${protocolLabel} search.`,
     `The native search reported depth ${result.depth} and ${result.nodes} nodes.`,
     `It reported a score of ${formatScore(result.score)} for the side to move.`,
+    comparison?.reason,
     ...moveStory.reasons
-  ];
+  ].filter(Boolean);
   const principalVariation = result.principalVariation.map((candidate) => candidate.notation ?? moveToNotation(candidate));
 
   if (principalVariation.length > 1) {
@@ -622,6 +624,7 @@ function explainNativeMove(position, result, backendName) {
     principalVariation,
     principalVariationText: principalVariation.join(" "),
     linePlan: buildLinePlan(position, result.principalVariation),
+    comparison,
     evaluationDelta: moveStory.evaluationDelta,
     confidence: assessSearchConfidence(result, { source: result.source ?? result.protocol ?? "native" }),
     search: {
@@ -632,6 +635,48 @@ function explainNativeMove(position, result, backendName) {
       stats: result.stats,
       iterations: result.iterations
     }
+  };
+}
+
+function buildNativeComparisonEvidence(result, position) {
+  const [best, next] = result.candidates ?? [];
+  if (!best || !next) return null;
+
+  const bestMove = best.move.notation ?? moveToNotation(best.move);
+  const nextMove = next.move.notation ?? moveToNotation(next.move);
+  const bestScore = Math.round(best.score);
+  const nextScore = Math.round(next.score);
+  const scoreGap = Math.max(0, bestScore - nextScore);
+  const bestLine = (best.principalVariation ?? []).map((move) => move.notation ?? moveToNotation(move));
+  const nextLine = (next.principalVariation ?? []).map((move) => move.notation ?? moveToNotation(move));
+  const bestPlan = buildLinePlan(position, best.principalVariation ?? [best.move], {
+    perspective: position.turn
+  });
+  const nextPlan = buildLinePlan(position, next.principalVariation ?? [next.move], {
+    perspective: position.turn
+  });
+  const nearlyTied = scoreGap <= 15;
+  const reason = nearlyTied
+    ? `Native MultiPV shows ${bestMove} and ${nextMove} are nearly tied, separated by ${scoreGap} centipawns.`
+    : `Native MultiPV rates ${bestMove} ${scoreGap} centipawns above the next candidate ${nextMove}.`;
+
+  return {
+    bestMove,
+    nextMove,
+    scoreGap,
+    scoreGapText: `${scoreGap} cp`,
+    bestScore,
+    nextScore,
+    bestScoreText: formatScore(bestScore),
+    nextScoreText: formatScore(nextScore),
+    verdict: nearlyTied ? "near-tie" : nativeAlternativeVerdict(1, scoreGap),
+    reason,
+    bestLine,
+    nextLine,
+    bestLineText: bestLine.join(" "),
+    nextLineText: nextLine.join(" "),
+    bestLinePlan: bestPlan.summary,
+    nextLinePlan: nextPlan.summary
   };
 }
 

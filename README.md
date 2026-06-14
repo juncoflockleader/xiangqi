@@ -214,9 +214,9 @@ npm run probe:native -- --protocol uci \
 ```
 
 The probe prints the native backend description, normalized options, selected
-move, top alternatives, principal reasoning summary, and optional move review
-via `--review h7-e7`. Add `--json` when a script or CI job should parse the
-result.
+move, top alternatives, principal reasoning summary, best-vs-next MultiPV
+comparison, and optional move review via `--review h7-e7`. Add `--json` when a
+script or CI job should parse the result.
 
 Set `native: false` or `preferNative: false` to force the JS learning engine, or
 pass a nested `native: { command, args, protocol }` object when the app keeps

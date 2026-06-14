@@ -172,6 +172,12 @@ test("UCCI backend chooseMove can include native MultiPV alternatives", async ()
     assert.equal(result.candidates[0].move.notation, "h9-g7");
     assert.equal(result.candidates[1].move.notation, "h7-e7");
     assert.equal(result.explanation.alternatives.length, 2);
+    assert.equal(result.explanation.comparison.bestMove, "h9-g7");
+    assert.equal(result.explanation.comparison.nextMove, "h7-e7");
+    assert.equal(result.explanation.comparison.scoreGap, 30);
+    assert.equal(result.explanation.comparison.verdict, "playable");
+    assert.ok(result.explanation.comparison.reason.includes("30 centipawns"));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("Native MultiPV rates h9-g7 30 centipawns above")));
     assert.equal(result.explanation.alternatives[0].verdict, "best");
     assert.equal(result.explanation.alternatives[0].centipawnLoss, 0);
     assert.equal(result.explanation.alternatives[0].expectedReply, "h0-g2");
@@ -184,6 +190,36 @@ test("UCCI backend chooseMove can include native MultiPV alternatives", async ()
     assert.ok(result.explanation.alternatives[1].principalVariationText.includes("h7-e7"));
     assert.ok(result.explanation.alternatives[1].note.includes("native UCCI line 2"));
     assert.ok(result.raw.some((line) => line.includes("multipv 2")));
+  } finally {
+    await backend.close();
+  }
+});
+
+test("UCCI backend explains near-tied native alternatives", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockTie: true
+    }
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), {
+      useBook: false,
+      lines: 2
+    });
+
+    assert.equal(result.bestMove.notation, "h9-g7");
+    assert.equal(result.explanation.comparison.bestMove, "h9-g7");
+    assert.equal(result.explanation.comparison.nextMove, "h7-e7");
+    assert.equal(result.explanation.comparison.scoreGap, 4);
+    assert.equal(result.explanation.comparison.verdict, "near-tie");
+    assert.ok(result.explanation.comparison.reason.includes("nearly tied"));
   } finally {
     await backend.close();
   }
