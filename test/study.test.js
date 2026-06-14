@@ -257,6 +257,40 @@ test("backend position study preserves structured decision alternatives", async 
   }
 });
 
+test("backend position study preserves native ponder replies", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    depth: 2,
+    timeLimitMs: 100,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockShortPvPonder: true
+    }
+  });
+
+  try {
+    const study = await studyPositionWithBackend(backend, createInitialPosition(), {
+      useBook: false,
+      depth: 2,
+      timeLimitMs: 100,
+      lines: 1
+    });
+    const text = formatPositionStudy(study);
+
+    assert.equal(study.bestMove, "h9-g7");
+    assert.equal(study.decision.ponderMove, "h0-g2");
+    assert.deepEqual(study.decision.principalVariation, ["h9-g7", "h0-g2"]);
+    assert.equal(study.decision.linePlan.expectedReply, "h0-g2");
+    assert.equal(study.candidateLines[0].linePlan.expectedReply, "h0-g2");
+    assert.match(text, /Plan: Start with h9-g7; expect h0-g2; theme: creates threat\./);
+  } finally {
+    await backend.close();
+  }
+});
+
 test("backend position study preserves played-move review alternatives", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,

@@ -210,6 +210,7 @@ function summarizeDecision(decision) {
   return {
     source: decision.source ?? "search",
     bestMove: notationFor(decision.bestMove),
+    ponderMove: notationFor(decision.ponderMove) ?? decision.explanation?.search?.ponderMove ?? null,
     score: Math.round(decision.score ?? 0),
     scoreDetail: scoreDetailFor(decision),
     scoreText: scoreTextFor(decision),

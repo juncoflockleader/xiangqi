@@ -516,6 +516,7 @@ async function nativeSearch(client, position, options) {
     wdl: parsed.wdl,
     depth: parsed.depth,
     nodes: parsed.nodes,
+    ponderMove: parsed.ponderMove,
     principalVariation: parsed.principalVariation,
     candidates: parsed.candidates,
     iterations: parsed.iterations,
@@ -680,8 +681,9 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
   const bestLine = [...lines].reverse().find((line) => line.startsWith("bestmove "));
   if (!bestLine) throw new Error("UCCI search did not return bestmove.");
 
-  const bestToken = nativeMoveTokenToInternal(bestLine.split(/\s+/)[1], protocol);
+  const { bestToken, ponderToken } = parseBestMoveLine(bestLine, protocol);
   const bestMove = bestToken === "0000" ? null : resolveLegalMove(position, bestToken);
+  const ponderMove = resolvePonderMove(position, bestMove, ponderToken);
   const infos = lines
     .filter((line) => line.startsWith("info "))
     .map(parseInfoLine)
@@ -693,13 +695,15 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     ?? choosePrimaryInfo(pvInfos, bestToken)
     ?? infos.at(-1)
     ?? {};
-  const principalVariation = primaryInfo.pv
+  const primaryVariation = primaryInfo.pv
     ? resolvePrincipalVariation(position, primaryInfo.pv)
     : bestMove ? [bestMove] : [];
-  const candidates = buildNativeCandidates(position, candidateInfos, bestMove, primaryInfo);
+  const principalVariation = addPonderToPrincipalVariation(primaryVariation, bestMove, ponderMove);
+  const candidates = buildNativeCandidates(position, candidateInfos, bestMove, primaryInfo, ponderMove);
 
   return {
     bestMove,
+    ponderMove,
     score: primaryInfo.score ?? 0,
     scoreDetail: nativeScoreDetail(primaryInfo),
     wdl: nativeWdl(primaryInfo),
@@ -720,6 +724,42 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
         stats: createNativeStats({ nodes: info.nodes ?? 0 })
       }))
   };
+}
+
+function parseBestMoveLine(line, protocol) {
+  const tokens = line.split(/\s+/);
+  const bestToken = nativeMoveTokenToInternal(tokens[1], protocol);
+  const ponderIndex = tokens.findIndex((token) => token.toLowerCase() === "ponder");
+  const ponderToken = ponderIndex >= 0 && tokens[ponderIndex + 1]
+    ? nativeMoveTokenToInternal(tokens[ponderIndex + 1], protocol)
+    : null;
+
+  return {
+    bestToken,
+    ponderToken
+  };
+}
+
+function resolvePonderMove(position, bestMove, ponderToken) {
+  if (!bestMove || !ponderToken || ponderToken === "0000") return null;
+
+  let parsed;
+  try {
+    parsed = parseMoveNotation(ponderToken);
+  } catch {
+    return null;
+  }
+
+  const next = makeMove(position, bestMove);
+  const legalMove = generateLegalMoves(next, next.turn)
+    .find((move) => sameMove(move, parsed));
+  return legalMove ? annotateMove(next, legalMove) : null;
+}
+
+function addPonderToPrincipalVariation(principalVariation, bestMove, ponderMove) {
+  if (!ponderMove || principalVariation.length !== 1) return principalVariation;
+  if (bestMove && !sameMove(principalVariation[0], bestMove)) return principalVariation;
+  return [...principalVariation, ponderMove];
 }
 
 function parseInfoLine(line) {
@@ -806,11 +846,15 @@ function choosePrimaryInfo(infos, bestToken) {
     ?? infos.at(-1);
 }
 
-function buildNativeCandidates(position, infos, bestMove, primaryInfo) {
+function buildNativeCandidates(position, infos, bestMove, primaryInfo, ponderMove = null) {
   const candidates = infos
     .sort((a, b) => a.multipv - b.multipv)
     .map((info) => {
-      const principalVariation = resolvePrincipalVariation(position, info.pv);
+      const principalVariation = addPonderToPrincipalVariation(
+        resolvePrincipalVariation(position, info.pv),
+        bestMove,
+        ponderMove
+      );
       const move = principalVariation[0];
       if (!move) return null;
       return {
@@ -836,7 +880,7 @@ function buildNativeCandidates(position, infos, bestMove, primaryInfo) {
   return [{
     move: bestMove,
     score: primaryInfo.score ?? 0,
-    principalVariation: [bestMove],
+    principalVariation: addPonderToPrincipalVariation([bestMove], bestMove, ponderMove),
     native: {
       depth: primaryInfo.depth ?? 0,
       nodes: primaryInfo.nodes ?? 0,
@@ -958,22 +1002,25 @@ function explainNativeMove(position, result, backendName) {
   const comparison = buildNativeComparisonEvidence(result, position);
   const validation = result.openingHeuristicValidation;
   const scoreText = result.scoreDetail?.text ?? formatScore(result.score);
+  const principalVariation = result.principalVariation.map((candidate) => candidate.notation ?? moveToNotation(candidate));
+  const ponderMove = result.ponderMove?.notation ?? (result.ponderMove ? moveToNotation(result.ponderMove) : null);
+  const continuationReason = principalVariation.length > 1
+    ? (ponderMove && principalVariation[1] === ponderMove
+        ? `The native engine expects ${ponderMove} as the ponder reply.`
+        : `The reported principal variation continues ${principalVariation.slice(1, 4).join(" ")}.`)
+    : null;
   const reasons = [
     `${backendName} selected this move through ${protocolLabel} search.`,
     `The native search reported depth ${result.depth} and ${result.nodes} nodes.`,
     `It reported a score of ${scoreText} for the side to move.`,
     nativeWdlReason(result.wdl),
     comparison?.reason,
+    continuationReason,
     validation?.status === "rejected"
       ? `Rejected opening heuristic ${validation.heuristicMove} because native search found it loses about ${validation.centipawnLoss} centipawns compared with ${validation.searchBestMove}.`
       : null,
     ...moveStory.reasons
   ].filter(Boolean);
-  const principalVariation = result.principalVariation.map((candidate) => candidate.notation ?? moveToNotation(candidate));
-
-  if (principalVariation.length > 1) {
-    reasons.push(`The reported principal variation continues ${principalVariation.slice(1, 4).join(" ")}.`);
-  }
 
   return {
     summary: `${pieceLabel(move.piece)} ${moveToNotation(move)} is selected by ${backendName} at depth ${result.depth}, with a reported score of ${scoreText}.`,
@@ -994,7 +1041,8 @@ function explainNativeMove(position, result, backendName) {
       iterations: result.iterations,
       openingHeuristicValidation: result.openingHeuristicValidation ?? null,
       scoreDetail: result.scoreDetail ?? null,
-      wdl: result.wdl ?? null
+      wdl: result.wdl ?? null,
+      ponderMove
     }
   };
 }

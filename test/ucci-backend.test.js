@@ -428,6 +428,35 @@ test("native backend can use a UCI handshake for top-engine compatibility", asyn
   }
 });
 
+test("native backend uses bestmove ponder as an expected reply when PV is short", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockShortPvPonder: true
+    }
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), { useBook: false });
+
+    assert.equal(result.bestMove.notation, "h9-g7");
+    assert.equal(result.ponderMove.notation, "h0-g2");
+    assert.deepEqual(result.principalVariation.map((move) => move.notation), ["h9-g7", "h0-g2"]);
+    assert.deepEqual(result.candidates[0].principalVariation.map((move) => move.notation), ["h9-g7", "h0-g2"]);
+    assert.equal(result.explanation.linePlan.expectedReply, "h0-g2");
+    assert.equal(result.explanation.search.ponderMove, "h0-g2");
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("expects h0-g2 as the ponder reply")));
+  } finally {
+    await backend.close();
+  }
+});
+
 test("native backend preserves mate and WDL score details", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,

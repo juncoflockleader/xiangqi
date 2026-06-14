@@ -67,6 +67,9 @@ rl.on("line", (line) => {
         write(`info string command ${trimmed}`);
         write(`info depth ${depth} score cp 55 nodes 321 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
         write(`bestmove ${nativeMove("h9g7")}`);
+      } else if (hasOption("MockShortPvPonder")) {
+        write(`info depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")}`);
+        write(`bestmove ${nativeMove("h9g7")} ponder ${nativeMove("h0g2")}`);
       } else if (hasOption("MockTie")) {
         write(`info multipv 1 depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
         write(`info multipv 2 depth ${depth} score cp 38 nodes 123 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);
