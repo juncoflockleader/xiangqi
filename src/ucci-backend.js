@@ -59,7 +59,35 @@ export function createUcciEngineBackend(options = {}) {
         protocol
       });
       const bookResult = maybeBookResult(referenceEngine, position, mergedOptions);
-      if (bookResult) return bookResult;
+      if (bookResult) {
+        const validation = await validateNativeOpeningHeuristic(client, position, bookResult, mergedOptions);
+        if (!validation) return bookResult;
+        if (validation.accepted) {
+          const accepted = {
+            ...bookResult,
+            openingHeuristicValidation: validation.summary,
+            native: {
+              skipped: true,
+              reason: "opening-heuristic-accepted-after-native-validation",
+              validationSource: nativeSource(protocol)
+            }
+          };
+          return {
+            ...accepted,
+            explanation: explainBookMove(position, accepted)
+          };
+        }
+
+        const guardedSearch = {
+          ...validation.search,
+          openingHeuristicValidation: validation.summary
+        };
+
+        return {
+          ...guardedSearch,
+          explanation: explainNativeMove(position, guardedSearch, name)
+        };
+      }
       return nativeSearch(client, position, mergedOptions);
     },
     analyzePosition: async (position, searchOptions = {}) => {
@@ -424,6 +452,61 @@ function maybeBookResult(referenceEngine, position, options) {
   };
 }
 
+async function validateNativeOpeningHeuristic(client, position, bookResult, options) {
+  if (bookResult.source !== "opening-heuristic") return null;
+  if (options.validateOpeningHeuristics === false) return null;
+
+  const validationOptions = mergeNativeOptions(options, {
+    depth: options.openingHeuristicValidationDepth
+      ?? Math.max(2, Math.min(options.depth ?? 4, 8)),
+    timeLimitMs: options.openingHeuristicValidationTimeMs
+      ?? Math.max(options.timeLimitMs ?? 1000, 750),
+    useBook: false,
+    lines: options.openingHeuristicValidationLines
+      ?? Math.max(2, normalizeLineCount(options.lines ?? options.multiPv ?? options.multipv ?? 2))
+  });
+  const search = await nativeSearch(client, position, validationOptions);
+  const candidate = search.candidates.find((entry) => sameMove(entry.move, bookResult.bestMove));
+  const playedCandidate = candidate
+    ? {
+        score: candidate.score,
+        nodes: 0,
+        principalVariation: candidate.principalVariation
+      }
+    : sameMove(search.bestMove, bookResult.bestMove)
+      ? {
+          score: search.score,
+          nodes: 0,
+          principalVariation: search.principalVariation
+        }
+      : await analyzePlayedNativeMove(client, position, bookResult.bestMove, validationOptions);
+  const maxLoss = options.openingHeuristicMaxCentipawnLoss ?? 160;
+  const centipawnLoss = Math.max(0, Math.round(search.score - playedCandidate.score));
+  const conclusive = search.depth >= 1 && !search.fallback;
+  const accepted = !conclusive || centipawnLoss <= maxLoss;
+
+  return {
+    accepted,
+    search,
+    summary: {
+      status: accepted ? (conclusive ? "accepted" : "inconclusive") : "rejected",
+      reason: accepted
+        ? (conclusive ? "within-threshold" : "inconclusive-search")
+        : "tactical-loss",
+      heuristicMove: bookResult.bestMove.notation,
+      searchBestMove: search.bestMove?.notation ?? null,
+      searchDepth: search.depth,
+      searchScore: Math.round(search.score),
+      heuristicScore: Math.round(playedCandidate.score),
+      centipawnLoss,
+      maxCentipawnLoss: maxLoss,
+      nodes: search.nodes + (playedCandidate.nodes ?? 0),
+      timedOut: search.timedOut,
+      source: nativeSource(options.protocol)
+    }
+  };
+}
+
 function parseUcciSearch(lines, position, protocol = "ucci") {
   const bestLine = [...lines].reverse().find((line) => line.startsWith("bestmove "));
   if (!bestLine) throw new Error("UCCI search did not return bestmove.");
@@ -606,11 +689,15 @@ function explainNativeMove(position, result, backendName) {
 
   const moveStory = explainMoveFeatures(position, move);
   const comparison = buildNativeComparisonEvidence(result, position);
+  const validation = result.openingHeuristicValidation;
   const reasons = [
     `${backendName} selected this move through ${protocolLabel} search.`,
     `The native search reported depth ${result.depth} and ${result.nodes} nodes.`,
     `It reported a score of ${formatScore(result.score)} for the side to move.`,
     comparison?.reason,
+    validation?.status === "rejected"
+      ? `Rejected opening heuristic ${validation.heuristicMove} because native search found it loses about ${validation.centipawnLoss} centipawns compared with ${validation.searchBestMove}.`
+      : null,
     ...moveStory.reasons
   ].filter(Boolean);
   const principalVariation = result.principalVariation.map((candidate) => candidate.notation ?? moveToNotation(candidate));
@@ -635,7 +722,8 @@ function explainNativeMove(position, result, backendName) {
       timedOut: result.timedOut,
       tableSize: result.tableSize,
       stats: result.stats,
-      iterations: result.iterations
+      iterations: result.iterations,
+      openingHeuristicValidation: result.openingHeuristicValidation ?? null
     }
   };
 }

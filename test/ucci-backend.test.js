@@ -28,6 +28,43 @@ test("UCCI backend uses the explainable opening book before native search", asyn
   await backend.close();
 });
 
+test("UCCI backend validates and rejects unsafe opening heuristics with native search", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockRejectHeuristic: true
+    }
+  });
+  let position = createInitialPosition();
+  for (const move of ["h7-e7", "h0-g2", "h9-g7", "g3-g4", "b9-c7", "i0-h0"]) {
+    position = backend.play(position, move);
+  }
+
+  try {
+    const raw = await backend.chooseMove(position, { validateOpeningHeuristics: false });
+    const result = await backend.chooseMove(position, { lines: 2 });
+
+    assert.equal(raw.source, "opening-heuristic");
+    assert.equal(raw.bestMove.notation, "e7-e3");
+    assert.equal(result.source, "native-ucci");
+    assert.equal(result.bestMove.notation, "b7-b3");
+    assert.equal(result.openingHeuristicValidation.status, "rejected");
+    assert.equal(result.openingHeuristicValidation.source, "native-ucci");
+    assert.equal(result.openingHeuristicValidation.heuristicMove, "e7-e3");
+    assert.equal(result.openingHeuristicValidation.searchBestMove, "b7-b3");
+    assert.ok(result.openingHeuristicValidation.centipawnLoss > result.openingHeuristicValidation.maxCentipawnLoss);
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("Rejected opening heuristic e7-e3")));
+    assert.equal(result.explanation.search.openingHeuristicValidation.status, "rejected");
+  } finally {
+    await backend.close();
+  }
+});
+
 test("UCCI backend searches through an external process", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,

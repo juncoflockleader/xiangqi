@@ -45,7 +45,13 @@ rl.on("line", (line) => {
       write(`info string position ${currentPosition}`);
     }
 
-    if (/\sb(?:\s|$)/.test(currentPosition)) {
+    if (hasOption("MockRejectHeuristic") && /\sb(?:\s|$)/.test(currentPosition)) {
+      write(`info depth 2 score cp 240 nodes 88 pv ${nativeMove("g2e3")}`);
+      write(`bestmove ${nativeMove("g2e3")}`);
+    } else if (hasOption("MockRejectHeuristic")) {
+      write(`info depth 2 score cp 320 nodes 144 pv ${nativeMove("b7b3")} ${nativeMove("h2h4")}`);
+      write(`bestmove ${nativeMove("b7b3")}`);
+    } else if (/\sb(?:\s|$)/.test(currentPosition)) {
       write(`info depth 2 score cp 17 nodes 77 pv ${nativeMove("h0g2")}`);
       write(`bestmove ${nativeMove("h0g2")}`);
     } else if (/\bwtime\s+\d+/i.test(trimmed)) {

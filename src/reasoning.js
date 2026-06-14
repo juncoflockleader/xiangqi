@@ -634,14 +634,17 @@ function assessBookConfidence(result, source) {
     const validation = result.openingHeuristicValidation;
     const loss = validation.centipawnLoss ?? null;
     const accepted = validation.status === "accepted";
-    const impact = accepted ? 12 : -10;
+    const rejected = validation.status === "rejected";
+    const impact = accepted ? 12 : rejected ? 6 : -10;
     score += impact;
     factors.push({
       kind: "heuristic-validation",
       impact,
       text: accepted
         ? `Tactical validation kept the heuristic within ${loss} centipawns of search.`
-        : "Tactical validation was inconclusive, so this heuristic has lower confidence."
+        : rejected
+          ? `Tactical validation rejected the heuristic after finding about ${loss} centipawns of loss.`
+          : "Tactical validation was inconclusive, so this heuristic has lower confidence."
     });
   }
 
