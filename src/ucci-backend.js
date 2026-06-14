@@ -205,7 +205,7 @@ class UcciProcessClient {
       this.write(`setoption name MultiPV value ${lineCount}`);
     }
 
-    const timeBudget = resolveSearchBudget(protocolOptions, protocolOptions.side ?? position.turn);
+    const timeBudget = resolveSearchBudget(protocolOptions, protocolOptions.side ?? position.turn, {}, { position });
     const timeoutMs = options.commandTimeoutMs ?? Math.max(DEFAULT_SEARCH_TIMEOUT_MS, timeBudget.timeLimitMs + 5000);
     return this.commandUntil(formatGoCommand(protocolOptions), (lines) => lines.some((line) => line.startsWith("bestmove ")), timeoutMs);
   }

@@ -22,7 +22,7 @@ The current engine is dependency-free JavaScript and includes:
 - Game-history helpers for play sessions, reviewed move logs, engine decision logs, position history, repeated-position detection, and async native-backend play.
 - A backend adapter contract and async UCI/UCCI process wrapper so the JS reference engine can sit beside a native C++/WASM engine without changing the learning-app API.
 - Named engine profiles for fast play, balanced play, deeper analysis, and native UCI/UCCI analysis setups.
-- Shared time-control budgeting for fixed movetime and clock-based `wtime`/`btime`/increment searches.
+- Shared time-control budgeting for fixed movetime and clock-based `wtime`/`btime`/increment searches, with phase-aware moves-to-go estimates, low-clock caps, and configurable move overhead.
 - Starter benchmark positions for opening, tactical, and forcing-search regressions.
 - A minimal UCCI-style protocol adapter for GUI/app integration and engine smoke testing.
 
@@ -309,6 +309,8 @@ lesson depth 1 movetime 500 cards 3
 ```
 
 The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, clock controls such as `wtime`, `btime`, `winc`, `binc`, and `movestogo`, `setoption name MultiPV value N`, `setoption name HashEntries value N`, `setoption name UseBook value false`, `analyze`, `hint`/`coach`, `probe`, `pressure`, `review`, `lesson`/`lessons`, `explain`, and `quit`. `hint ... levels N` emits the progressive coach ladder up to level `N`; level 4 includes the full reveal and `bestmove`. `lesson ... cards N` turns the loaded move history into prompt, hint, and answer card lines. `go` info lines include counters such as `qnodes`, `qchecks`, `tthits`, `ttstores`, `ttevict`, `asp`, `asphi`, `asplo`, `ext`, `futil`, `nmp`, and `pvs` for learning-app diagnostics.
+
+When `movestogo` is omitted, the JS engine estimates remaining moves from the current phase: opening positions spend more conservatively, endgames can use a larger share, and low-clock positions cap the maximum spend. `moveOverheadMs` can reserve GUI/process overhead from every allocated move.
 
 ## Movegen Validation
 

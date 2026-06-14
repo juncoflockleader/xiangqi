@@ -39,7 +39,7 @@ const NULL_MOVE_MIN_DEPTH = 3;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
-  const timeBudget = resolveSearchBudget(options, position.turn);
+  const timeBudget = resolveSearchBudget(options, position.turn, {}, { position });
   const timeLimitMs = timeBudget.timeLimitMs;
   const startedAt = performanceNow();
   const deadline = startedAt + timeLimitMs;

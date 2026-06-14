@@ -147,7 +147,7 @@ export class UcciSession {
   }
 
   go(line) {
-    const options = parseGoOptions(line, this.options, this.position.turn);
+    const options = parseGoOptions(line, this.options, this.position.turn, this.position);
     const multiPv = readTokenInteger(line.split(/\s+/), "multipv", this.options.multiPv);
     if (multiPv > 1) {
       return this.analyze(`analyze depth ${options.depth} movetime ${options.timeLimitMs} lines ${multiPv}`);
@@ -192,7 +192,7 @@ export class UcciSession {
 
   analyze(line) {
     const tokens = line.split(/\s+/);
-    const options = parseGoOptions(line.replace(/^analyze/i, "go"), this.options, this.position.turn);
+    const options = parseGoOptions(line.replace(/^analyze/i, "go"), this.options, this.position.turn, this.position);
     const lines = readTokenInteger(tokens, "lines", readTokenInteger(tokens, "multipv", 3));
     const result = this.engine.analyzePosition(this.position, {
       ...options,
@@ -269,7 +269,7 @@ export class UcciSession {
   review(line) {
     if (this.moveHistory.length === 0) return ["info string review no moves"];
 
-    const options = parseGoOptions(line.replace(/^review/i, "go"), this.options, this.initialPosition.turn);
+    const options = parseGoOptions(line.replace(/^review/i, "go"), this.options, this.initialPosition.turn, this.initialPosition);
     const result = this.engine.reviewGame(this.moveHistory, {
       initialPosition: this.initialPosition,
       reviewOptions: {
@@ -292,7 +292,7 @@ export class UcciSession {
     if (this.moveHistory.length === 0) return ["info string lesson no moves"];
 
     const tokens = line.split(/\s+/);
-    const options = parseGoOptions(line.replace(/^lessons?/i, "go"), this.options, this.initialPosition.turn);
+    const options = parseGoOptions(line.replace(/^lessons?/i, "go"), this.options, this.initialPosition.turn, this.initialPosition);
     const maxCards = readTokenInteger(tokens, "cards", readTokenInteger(tokens, "maxcards", 3));
     const includeBook = readTokenBoolean(tokens, "book", true);
     const includeModelMoves = readTokenBoolean(tokens, "model", false);
@@ -326,7 +326,7 @@ export class UcciSession {
 
   hint(line) {
     const tokens = line.split(/\s+/);
-    const options = parseGoOptions(line.replace(/^(hint|coach)/i, "go"), this.options, this.position.turn);
+    const options = parseGoOptions(line.replace(/^(hint|coach)/i, "go"), this.options, this.position.turn, this.position);
     const lines = readTokenInteger(tokens, "lines", readTokenInteger(tokens, "multipv", 3));
     const maxLevels = readTokenInteger(tokens, "levels", readTokenInteger(tokens, "maxlevels", this.options.hintLevels));
     const result = this.engine.coachMove(this.position, {
@@ -396,7 +396,7 @@ function formatIterationInfo(iteration) {
   return `info depth ${iteration.depth} currmove ${move} score cp ${Math.round(iteration.score)} nodes ${iteration.nodes} stable ${stable} pv ${pv}`;
 }
 
-function parseGoOptions(line, defaults, side = "red") {
+function parseGoOptions(line, defaults, side = "red", position = null) {
   const tokens = line.split(/\s+/);
   const depth = readTokenInteger(tokens, "depth", defaults.depth);
   const rawOptions = {
@@ -413,7 +413,7 @@ function parseGoOptions(line, defaults, side = "red") {
     maxTimeFraction: defaults.maxTimeFraction,
     incrementFraction: defaults.incrementFraction
   };
-  const timeBudget = resolveSearchBudget(rawOptions, side, defaults);
+  const timeBudget = resolveSearchBudget(rawOptions, side, defaults, { position });
 
   return {
     depth,
