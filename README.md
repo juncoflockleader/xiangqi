@@ -182,6 +182,7 @@ Choose an engine backend:
 import {
   createJavaScriptEngineBackend,
   createLearningEngineBackend,
+  createOracleReviewEngineBackend,
   createUcciEngineBackend,
   describeEngineBackend,
   ENGINE_BACKEND_FEATURES
@@ -274,6 +275,36 @@ native-engine configuration separate from shared search options. Set
 errors instead of recovering with the JS reference engine.
 
 The JavaScript backend is the reference learning engine. The native backend is async because it talks to an external UCI/UCCI process; UCCI is the default, and `protocol: "uci"` supports UCI-style engines such as Pikafish. For UCI Xiangqi engines, the adapter translates the app's readable FEN and coordinates into the common native dialect: horses/elephants use `N/B`, Red-to-move becomes `w`, and UCI rank coordinates are mirrored at the process boundary. By default it checks the JS/imported opening book before starting native search, and `useBook: false` forces a pure native search. Native `reviewMove` and `reviewGame` compare played moves against the external engine's preferred moves, then use the JS explanation layer to turn score gaps into learning feedback. The built-in backends expose `chooseMove`, `analyzePosition`, `reviewMove`, `reviewGame`, `coachMove`, `lessonPlan`, `openingBook`, `play`, and `legalMoves`, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
+
+Wrap a fast candidate backend with a stronger oracle reviewer when the app wants
+interactive speed plus a top-engine verdict on the current pick:
+
+```js
+const candidate = createJavaScriptEngineBackend({
+  profile: "balanced",
+  timeLimitMs: 1500
+});
+const oracle = createUcciEngineBackend({
+  command: "/path/to/pikafish",
+  profile: "native-uci",
+  depth: 10,
+  timeLimitMs: 5000
+});
+const reviewed = createOracleReviewEngineBackend(candidate, oracle);
+const decision = await reviewed.chooseMove(position, {
+  oracleReviewOptions: { depth: 8, timeLimitMs: 3000 }
+});
+
+console.log(decision.explanation.summary);
+console.log(decision.oracleReview.classification);
+console.log(decision.oracleReview.centipawnLoss);
+console.log(decision.oracleReview.verdict);
+await reviewed.close();
+```
+
+`oracleReview` is also copied into game-history decision summaries, so a future
+UI can show both why the candidate engine picked the move and how the stronger
+oracle graded it.
 
 Review a player's move:
 

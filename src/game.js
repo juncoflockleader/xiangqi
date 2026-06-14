@@ -255,6 +255,7 @@ function summarizeDecision(decision, engine = null) {
     principalVariation: (decision.principalVariation ?? [])
       .map((move) => move.notation ?? moveToNotation(move)),
     explanation: decision.explanation ?? null,
+    oracleReview: decision.oracleReview ?? decision.explanation?.oracleReview ?? null,
     backendFallback: decision.backendFallback ?? null,
     backendStatus: engine ? describeEngineBackendStatus(engine) : null
   };

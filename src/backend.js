@@ -10,7 +10,8 @@ export const ENGINE_BACKEND_FEATURES = Object.freeze({
   UCI_COMPATIBLE: "uci-compatible",
   NATIVE_READY: "native-ready",
   ASYNC_SEARCH: "async-search",
-  FALLBACK: "fallback"
+  FALLBACK: "fallback",
+  ORACLE_REVIEW: "oracle-review"
 });
 
 const REQUIRED_BACKEND_METHODS = Object.freeze([

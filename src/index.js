@@ -17,6 +17,7 @@ export * from "./backend-factory.js";
 export * from "./ucci-backend.js";
 export * from "./benchmark.js";
 export * from "./opening-oracle.js";
+export * from "./oracle-review.js";
 export * from "./sparring.js";
 export * from "./profiles.js";
 export * from "./review.js";
