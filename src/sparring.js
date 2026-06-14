@@ -1,11 +1,13 @@
 import { createJavaScriptEngineBackend, describeEngineBackendStatus } from "./backend.js";
 import { createGame, gameStatus, chooseAndPlayGameMoveAsync } from "./game.js";
 import { createInitialPosition, moveToNotation, parseFen, toFen } from "./board.js";
+import { reviewGameWithBackend } from "./review.js";
 
 const SIDES = Object.freeze(["red", "black"]);
 
 export async function runSparringMatch(players = null, options = {}) {
   const entries = normalizeSparringPlayers(players);
+  const referee = normalizeReferee(options.referee);
   const initialPosition = resolveInitialPosition(options);
   let game = createGame(initialPosition);
   const startedAt = performanceNow();
@@ -41,8 +43,19 @@ export async function runSparringMatch(players = null, options = {}) {
     stopReason = status.state;
   }
 
+  const playElapsedMs = Math.round(performanceNow() - startedAt);
+  const refereeReview = referee
+    ? await runRefereeReview(referee, game.moves, initialPosition, options)
+    : null;
+  const moves = game.moves.map((move, index) => summarizeSparringMove(
+    move,
+    entries,
+    refereeReview?.moves[index] ?? null
+  ));
+  const learningMoments = refereeReview
+    ? summarizeLearningMoments(refereeReview.keyMoments, moves)
+    : [];
   const elapsedMs = Math.round(performanceNow() - startedAt);
-  const moves = game.moves.map((move) => summarizeSparringMove(move, entries));
 
   return {
     initialFen: toFen(initialPosition),
@@ -50,11 +63,16 @@ export async function runSparringMatch(players = null, options = {}) {
     status,
     stopReason,
     elapsedMs,
+    playElapsedMs,
+    reviewElapsedMs: refereeReview?.elapsedMs ?? 0,
     totalPlies: game.moves.length,
     players: {
       red: summarizePlayer(entries.red),
       black: summarizePlayer(entries.black)
     },
+    referee: referee ? summarizePlayer(referee) : null,
+    refereeReview: refereeReview ? summarizeRefereeReview(refereeReview, learningMoments) : null,
+    learningMoments,
     aggregate: aggregateSparringMoves(moves, elapsedMs),
     moves,
     lastDecision,
@@ -72,6 +90,9 @@ export function formatSparringReport(report, options = {}) {
     ? `, fallbacks ${report.aggregate.fallbackCount}`
     : "";
   lines.push(`Search: avg depth ${report.aggregate.averageDepth}, ${formatNodes(report.aggregate.nodesPerSecond)}/s${fallbackText}`);
+  if (report.refereeReview) {
+    lines.push(`Referee: ${report.referee.name}, avg loss ${report.refereeReview.summary.averageCentipawnLoss} cp, ${report.learningMoments.length} learning moments`);
+  }
 
   for (const move of report.moves.slice(0, maxMoves)) {
     const source = move.source ? `, ${move.source}` : "";
@@ -79,6 +100,15 @@ export function formatSparringReport(report, options = {}) {
     const fallback = move.backendFallback ? ", fallback" : "";
     lines.push(`${move.ply}. ${capitalize(move.side)} ${move.notation} (${move.player.name}, ${depth}${source}${fallback})`);
     if (move.summary) lines.push(`  ${move.summary}`);
+  }
+
+  const maxLearningMoments = options.maxLearningMoments ?? Math.min(3, report.learningMoments.length);
+  if (maxLearningMoments > 0 && report.learningMoments.length > 0) {
+    lines.push("Learning moments:");
+    for (const moment of report.learningMoments.slice(0, maxLearningMoments)) {
+      lines.push(`  Ply ${moment.ply} ${moment.notation}: ${moment.classification}, ${moment.centipawnLoss} cp loss`);
+      if (moment.summary) lines.push(`    ${moment.summary}`);
+    }
   }
 
   if (report.moves.length > maxMoves) {
@@ -134,6 +164,26 @@ function normalizePlayerEntry(entry, side) {
   };
 }
 
+function normalizeReferee(entry) {
+  if (!entry) return null;
+
+  const engine = entry.engine ?? entry.backend ?? entry;
+  for (const method of ["reviewMove", "openingBook", "play"]) {
+    if (typeof engine?.[method] !== "function") {
+      throw new Error(`Sparring referee is missing ${method}.`);
+    }
+  }
+
+  return {
+    side: "referee",
+    id: entry.id ?? engine.id ?? "referee",
+    name: entry.name ?? engine.name ?? "Referee",
+    kind: entry.kind ?? engine.kind ?? "custom",
+    features: [...(entry.features ?? engine.features ?? [])],
+    engine
+  };
+}
+
 function resolveInitialPosition(options) {
   if (options.initialPosition) return options.initialPosition;
   if (options.initialFen) return parseFen(options.initialFen);
@@ -175,7 +225,7 @@ function summarizePlayer(entry) {
   };
 }
 
-function summarizeSparringMove(move, entries) {
+function summarizeSparringMove(move, entries, reviewedMove = null) {
   const sideEntry = entries[move.side];
   const decision = move.decision ?? {};
 
@@ -202,8 +252,71 @@ function summarizeSparringMove(move, entries) {
     confidence: decision.explanation?.confidence ?? null,
     backendStatus: decision.backendStatus ?? null,
     backendFallback: decision.backendFallback ?? null,
+    refereeReview: reviewedMove ? summarizeRefereeMove(reviewedMove) : null,
     review: move.review ?? null
   };
+}
+
+async function runRefereeReview(referee, moves, initialPosition, options) {
+  const startedAt = performanceNow();
+  const review = await reviewGameWithBackend(
+    referee.engine,
+    moves.map((move) => move.notation),
+    {
+      initialPosition,
+      ...(options.refereeOptions ?? {})
+    }
+  );
+
+  return {
+    ...review,
+    elapsedMs: Math.round(performanceNow() - startedAt)
+  };
+}
+
+function summarizeRefereeMove(move) {
+  const review = move.review;
+  return {
+    classification: review.classification,
+    centipawnLoss: review.centipawnLoss,
+    bestMove: notationFor(review.bestMove),
+    bestScore: review.bestScore,
+    playedScore: review.playedScore,
+    depth: review.depth,
+    nodes: review.nodes,
+    mistakes: review.mistakes,
+    summary: review.explanation?.summary ?? "",
+    reasons: [...(review.explanation?.reasons ?? [])],
+    book: move.book
+  };
+}
+
+function notationFor(move) {
+  if (!move) return null;
+  return move.notation ?? moveToNotation(move);
+}
+
+function summarizeRefereeReview(review, learningMoments) {
+  return {
+    elapsedMs: review.elapsedMs,
+    summary: review.summary,
+    status: review.status,
+    learningMoments,
+    keyMoments: learningMoments
+  };
+}
+
+function summarizeLearningMoments(keyMoments, moves) {
+  return keyMoments.map((moment) => {
+    const move = moves[moment.ply - 1] ?? null;
+    return {
+      ...moment,
+      player: move?.player ?? null,
+      source: move?.source ?? null,
+      positionBefore: move?.positionBefore ?? null,
+      positionAfter: move?.positionAfter ?? null
+    };
+  });
 }
 
 function aggregateSparringMoves(moves, elapsedMs) {

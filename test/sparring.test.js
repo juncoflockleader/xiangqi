@@ -51,6 +51,41 @@ test("sparring match validates player backends", async () => {
   );
 });
 
+test("sparring match can use a referee backend to surface learning moments", async () => {
+  const redBase = createJavaScriptEngineBackend({ id: "scripted-red-base", depth: 1, timeLimitMs: 100 });
+  const red = createScriptedBackend(redBase, "a9-a8");
+  const black = createJavaScriptEngineBackend({ id: "black-test", name: "Black Test", depth: 1, timeLimitMs: 100 });
+  const referee = createJavaScriptEngineBackend({ id: "referee-test", name: "Referee Test", depth: 2, timeLimitMs: 300 });
+
+  const report = await runSparringMatch({ red, black }, {
+    referee,
+    maxPlies: 1,
+    searchOptions: { useBook: false, depth: 1, timeLimitMs: 100 },
+    refereeOptions: {
+      reviewOptions: { depth: 2, timeLimitMs: 300 }
+    }
+  });
+  const text = formatSparringReport(report);
+
+  assert.equal(report.totalPlies, 1);
+  assert.equal(report.referee.name, "Referee Test");
+  assert.ok(report.reviewElapsedMs >= 0);
+  assert.equal(report.moves[0].refereeReview.classification, "blunder");
+  assert.ok(report.moves[0].refereeReview.centipawnLoss > 0);
+  assert.ok(report.learningMoments.length >= 1);
+  assert.equal(report.learningMoments[0].ply, 1);
+  assert.equal(report.learningMoments[0].player.name, "Scripted Test");
+  assert.ok(text.includes("Referee: Referee Test"));
+  assert.ok(text.includes("Learning moments:"));
+});
+
+test("sparring match validates referee backends", async () => {
+  await assert.rejects(
+    () => runSparringMatch(null, { referee: { reviewMove() {}, play() {} } }),
+    /referee is missing openingBook/
+  );
+});
+
 test("sparring match records hybrid backend fallback provenance", async () => {
   const red = createLearningEngineBackend({
     command: "/path/that/should/not/start",
@@ -82,3 +117,37 @@ test("sparring match records hybrid backend fallback provenance", async () => {
     await red.close();
   }
 });
+
+function createScriptedBackend(base, notation) {
+  return {
+    id: "scripted-test",
+    name: "Scripted Test",
+    kind: "scripted",
+    features: base.features,
+    chooseMove(position) {
+      const move = base.legalMoves(position).find((candidate) => candidate.notation === notation);
+      if (!move) return base.chooseMove(position, { useBook: false, depth: 1, timeLimitMs: 100 });
+
+      return {
+        bestMove: move,
+        source: "scripted",
+        score: 0,
+        depth: 0,
+        nodes: 0,
+        principalVariation: [move],
+        explanation: {
+          summary: `Scripted Test chooses ${notation}.`,
+          reasons: [`Scripted Test forces ${notation} for referee validation.`]
+        }
+      };
+    },
+    analyzePosition: (...args) => base.analyzePosition(...args),
+    reviewMove: (...args) => base.reviewMove(...args),
+    reviewGame: (...args) => base.reviewGame(...args),
+    coachMove: (...args) => base.coachMove(...args),
+    lessonPlan: (...args) => base.lessonPlan(...args),
+    openingBook: (...args) => base.openingBook(...args),
+    play: (...args) => base.play(...args),
+    legalMoves: (...args) => base.legalMoves(...args)
+  };
+}
