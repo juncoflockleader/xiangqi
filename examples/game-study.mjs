@@ -7,7 +7,7 @@ import {
   createUcciEngineBackend,
   describeEngineBackend,
   formatGameStudy,
-  parseGameMoveText
+  importGameMoveText
 } from "../src/index.js";
 import {
   parseNativeEngineOption,
@@ -30,9 +30,9 @@ if (options.help) {
   process.exit(0);
 }
 
-let moves;
+let importedGame;
 try {
-  moves = await loadMoves(options);
+  importedGame = await loadMoves(options);
 } catch (error) {
   console.error(error.message);
   process.exit(1);
@@ -41,7 +41,7 @@ try {
 const backend = createGameStudyBackend(options);
 
 try {
-  const study = await createGameStudyWithBackend(backend, moves, {
+  const study = await createGameStudyWithBackend(backend, importedGame.moves, {
     maxKeyMoments: options.maxKeyMoments,
     maxPositionStudies: options.maxPositionStudies,
     ...(options.positionStudyPlies.length > 0 ? { positionStudyPlies: options.positionStudyPlies } : {}),
@@ -77,7 +77,8 @@ try {
   const report = {
     ok: true,
     backend: describeEngineBackend(backend),
-    options: reportOptions(options, moves),
+    options: reportOptions(options, importedGame),
+    import: importSummary(importedGame),
     study
   };
 
@@ -136,6 +137,18 @@ function formatGameStudyReport(report) {
     `Moves: ${report.options.moveCount}`,
     formatGameStudy(study)
   ];
+
+  const metadataKeys = Object.keys(report.import.metadata);
+  if (metadataKeys.length > 0) {
+    lines.push(`Imported metadata: ${metadataKeys.map((key) => `${key}=${report.import.metadata[key]}`).join(", ")}`);
+  }
+
+  if (report.import.diagnostics.length > 0) {
+    lines.push(`Import diagnostics: ${report.import.diagnostics.length}`);
+    for (const diagnostic of report.import.diagnostics.slice(0, 4)) {
+      lines.push(`  - ${diagnostic.kind}: ${diagnostic.token ?? diagnostic.text}`);
+    }
+  }
 
   if (study.nextSteps.length > 0) {
     lines.push("Next steps:");
@@ -395,14 +408,14 @@ async function loadMoves(options) {
   }
   if (options.positionalMoves.length > 0) parts.push(options.positionalMoves.join(" "));
 
-  const moves = parseGameMoveText(parts.join(" "));
-  if (moves.length === 0) {
+  const imported = importGameMoveText(parts.join(" "));
+  if (imported.moves.length === 0) {
     throw new Error("Game study requires moves. Pass coordinate moves as args, --moves, or --file.");
   }
-  return moves;
+  return imported;
 }
 
-function reportOptions(options, moves) {
+function reportOptions(options, importedGame) {
   return {
     profile: options.profile,
     depth: options.depth,
@@ -417,13 +430,29 @@ function reportOptions(options, moves) {
     positionStudyPlies: [...options.positionStudyPlies],
     includePlayedMoveReview: options.includePlayedMoveReview,
     includePressure: options.includePressure,
-    moveCount: moves.length,
-    moves,
+    moveCount: importedGame.moves.length,
+    moves: importedGame.moves,
     movesFile: options.movesFile ?? null,
     engineCommand: options.engineCommand ?? null,
     engineProtocol: options.engineProtocol,
     oracleCommand: options.oracleCommand ?? null,
     oracleProtocol: options.oracleProtocol
+  };
+}
+
+function importSummary(importedGame) {
+  return {
+    type: importedGame.type,
+    metadata: { ...importedGame.metadata },
+    diagnostics: importedGame.diagnostics.map((diagnostic) => ({ ...diagnostic })),
+    tokens: importedGame.tokens.map((token) => ({
+      ply: token.ply,
+      token: token.token,
+      notation: token.notation,
+      side: token.side
+    })),
+    initialFen: importedGame.initialFen,
+    finalFen: importedGame.finalFen
   };
 }
 

@@ -169,7 +169,9 @@ npm run study:game -- --file ./game.json --max-position-studies 3
 
 The game-study importer accepts coordinate notation and common western Xiangqi
 notation (`C2=5`, `n8+7`, `R8+4`), so move lists copied from sites such as
-Xiangqi.com can be reviewed without hand-converting every move.
+Xiangqi.com can be reviewed without hand-converting every move. JSON output also
+includes import metadata, resolved move tokens, final FEN, and diagnostics for
+comments or non-move text that were skipped.
 
 Use named engine profiles when wiring the app:
 

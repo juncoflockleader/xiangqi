@@ -47,7 +47,13 @@ test("game study CLI emits JSON from a move file", async () => {
   const file = join(dir, "game.json");
 
   try {
-    await writeFile(file, JSON.stringify({ moves: ["h7-e7", "h0-g2"] }), "utf8");
+    await writeFile(file, JSON.stringify({
+      event: "CLI Fixture",
+      metadata: {
+        source: "unit-test"
+      },
+      moves: ["h7-e7", "h0-g2"]
+    }), "utf8");
     const { stdout } = await runGameStudyCli([
       "--file", file,
       "--depth", "1",
@@ -60,6 +66,10 @@ test("game study CLI emits JSON from a move file", async () => {
     assert.equal(report.ok, true);
     assert.equal(report.options.moveCount, 2);
     assert.deepEqual(report.options.moves, ["h7-e7", "h0-g2"]);
+    assert.equal(report.import.metadata.event, "CLI Fixture");
+    assert.equal(report.import.metadata.source, "unit-test");
+    assert.equal(report.import.tokens[0].token, "h7-e7");
+    assert.equal(report.import.tokens[0].notation, "h7-e7");
     assert.equal(report.study.type, "game-study");
     assert.equal(report.study.summary.totalMoves, 2);
     assert.equal(report.study.positionStudies.length, 0);

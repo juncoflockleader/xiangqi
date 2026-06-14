@@ -7,13 +7,16 @@ import {
   moveToNotation,
   parseMoveNotation,
   rankOf,
-  sameMove
+  sameMove,
+  toFen
 } from "./board.js";
 import { generateLegalMoves } from "./movegen.js";
 
 const COORDINATE_MOVE_PATTERN = /^[a-i][0-9]-?[a-i][0-9]$/i;
 const WESTERN_MOVE_PATTERN = /^[KGAEBNRHCPkgaebnrhcp][1-9][=+\-][1-9]$/;
 const MOVE_TOKEN_PATTERN = /[a-i][0-9]-?[a-i][0-9]|[KGAEBNRHCPkgaebnrhcp][1-9][=+\-][1-9]/g;
+const HEADER_PATTERN = /^\s*\[([A-Za-z][\w-]*)\s+"([^"]*)"\]\s*$/;
+const COLON_HEADER_PATTERN = /^\s*([A-Za-z][\w -]{1,40})\s*:\s*(\S.*)$/;
 
 const PIECE_LETTERS = Object.freeze({
   k: PIECES.KING,
@@ -35,25 +38,44 @@ const FILE_TARGET_PIECES = new Set([
 ]);
 
 export function parseGameMoveText(text, options = {}) {
-  const tokens = extractMoveTokens(text);
+  return importGameMoveText(text, options).moves;
+}
+
+export function importGameMoveText(text, options = {}) {
+  const record = normalizeMoveRecordInput(text);
+  const tokens = record.tokens ?? extractMoveTokens(record.text);
   const initialPosition = options.initialPosition ?? createInitialPosition();
   let position = initialPosition;
   const moves = [];
+  const parsedTokens = [];
 
   for (const token of tokens) {
     const move = parsePortableMoveNotation(position, token);
     const notation = moveToNotation(move);
     moves.push(notation);
+    parsedTokens.push({
+      ply: moves.length,
+      token,
+      notation,
+      side: position.turn,
+      fenBefore: toFen(position)
+    });
     position = makeMove(position, move);
   }
 
-  return moves;
+  return {
+    type: "game-move-import",
+    moves,
+    tokens: parsedTokens,
+    metadata: record.metadata,
+    diagnostics: record.diagnostics,
+    initialFen: toFen(initialPosition),
+    finalFen: toFen(position)
+  };
 }
 
 export function extractMoveTokens(text) {
-  const direct = normalizeMoveListInput(text);
-  if (direct) return direct;
-  return [...String(text ?? "").matchAll(MOVE_TOKEN_PATTERN)].map((match) => match[0]);
+  return normalizeMoveRecordInput(text).tokens;
 }
 
 export function parsePortableMoveNotation(position, text) {
@@ -107,23 +129,182 @@ function resolveCoordinateMove(position, text) {
   return match;
 }
 
-function normalizeMoveListInput(text) {
-  if (Array.isArray(text)) return text.map(String);
-  if (typeof text !== "string") return null;
+function normalizeMoveRecordInput(text) {
+  if (Array.isArray(text)) {
+    return {
+      text: text.join(" "),
+      tokens: text.map(String),
+      metadata: {},
+      diagnostics: []
+    };
+  }
+
+  if (typeof text !== "string") {
+    return {
+      text: "",
+      tokens: [],
+      metadata: {},
+      diagnostics: []
+    };
+  }
 
   const trimmed = text.trim();
-  if (!trimmed || !/^\s*[\[{"]/.test(trimmed)) return null;
+  if (!trimmed) {
+    return {
+      text: "",
+      tokens: [],
+      metadata: {},
+      diagnostics: []
+    };
+  }
 
+  if (/^\s*[\[{"]/.test(trimmed)) {
+    const jsonRecord = normalizeJsonMoveRecord(trimmed);
+    if (jsonRecord) return jsonRecord;
+  }
+
+  const { text: body, metadata, diagnostics } = stripHeadersAndComments(trimmed);
+  MOVE_TOKEN_PATTERN.lastIndex = 0;
+  const tokenMatches = [...body.matchAll(MOVE_TOKEN_PATTERN)];
+  return {
+    text: body,
+    tokens: tokenMatches.map((match) => match[0]),
+    metadata,
+    diagnostics: [
+      ...diagnostics,
+      ...skippedTokenDiagnostics(body, tokenMatches)
+    ]
+  };
+}
+
+function normalizeJsonMoveRecord(text) {
   try {
-    const data = JSON.parse(trimmed);
-    if (Array.isArray(data)) return data.map(String);
-    if (typeof data === "string") return extractMoveTokens(data);
-    if (Array.isArray(data?.moves)) return data.moves.map(String);
-    if (typeof data?.moves === "string") return extractMoveTokens(data.moves);
-    return null;
+    const data = JSON.parse(text);
+    if (Array.isArray(data)) {
+      return {
+        text: data.join(" "),
+        tokens: data.map(String),
+        metadata: {},
+        diagnostics: []
+      };
+    }
+    if (typeof data === "string") return normalizeMoveRecordInput(data);
+    if (!data || typeof data !== "object") return null;
+
+    const moves = data.moves ?? data.movetext ?? data.moveText ?? "";
+    const base = Array.isArray(moves)
+      ? {
+          text: moves.join(" "),
+          tokens: moves.map(String),
+          metadata: {},
+          diagnostics: []
+        }
+      : normalizeMoveRecordInput(String(moves ?? ""));
+    return {
+      ...base,
+      metadata: {
+        ...metadataFromJsonObject(data),
+        ...(base.metadata ?? {})
+      }
+    };
   } catch {
     return null;
   }
+}
+
+function metadataFromJsonObject(data) {
+  const metadata = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (["moves", "movetext", "moveText"].includes(key)) continue;
+    if (value === null || ["string", "number", "boolean"].includes(typeof value)) {
+      metadata[key] = value;
+    }
+  }
+  if (data.metadata && typeof data.metadata === "object" && !Array.isArray(data.metadata)) {
+    Object.assign(metadata, data.metadata);
+  }
+  return metadata;
+}
+
+function stripHeadersAndComments(text) {
+  const metadata = {};
+  const diagnostics = [];
+  const lines = [];
+
+  for (const line of text.split(/\r?\n/)) {
+    const header = line.match(HEADER_PATTERN);
+    if (header) {
+      metadata[header[1]] = header[2];
+      continue;
+    }
+
+    const colonHeader = line.match(COLON_HEADER_PATTERN);
+    if (colonHeader && !MOVE_TOKEN_PATTERN.test(line)) {
+      metadata[normalizeMetadataKey(colonHeader[1])] = colonHeader[2].trim();
+      MOVE_TOKEN_PATTERN.lastIndex = 0;
+      continue;
+    }
+    MOVE_TOKEN_PATTERN.lastIndex = 0;
+
+    lines.push(line);
+  }
+
+  const body = lines.join("\n")
+    .replace(/\{[^}]*\}/g, (match) => {
+      diagnostics.push({
+        kind: "comment",
+        text: match.slice(1, -1).trim()
+      });
+      return " ";
+    })
+    .replace(/;[^\n]*/g, (match) => {
+      diagnostics.push({
+        kind: "comment",
+        text: match.slice(1).trim()
+      });
+      return " ";
+    });
+
+  return { text: body, metadata, diagnostics };
+}
+
+function skippedTokenDiagnostics(text, tokenMatches) {
+  let remainder = text;
+  for (const match of tokenMatches) {
+    remainder = replaceSpan(remainder, match.index, match.index + match[0].length);
+  }
+
+  return remainder
+    .split(/[\s,;|]+/)
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .map(cleanResidualToken)
+    .filter(Boolean)
+    .filter((token) => !isIgnorableResidualToken(token))
+    .map((token) => ({
+      kind: "skipped-token",
+      token
+    }));
+}
+
+function replaceSpan(text, start, end) {
+  return `${text.slice(0, start)}${" ".repeat(Math.max(0, end - start))}${text.slice(end)}`;
+}
+
+function cleanResidualToken(token) {
+  return token.replace(/^[()[\]{}."'`]+|[()[\]{}."'`]+$/g, "");
+}
+
+function isIgnorableResidualToken(token) {
+  return !token
+    || /^\d+\.*$/.test(token)
+    || /^[-+]?\/?$/.test(token)
+    || /^(?:1-0|0-1|1\/2-1\/2|\*)$/.test(token)
+    || /^[-=:+]+$/.test(token);
+}
+
+function normalizeMetadataKey(key) {
+  return key.trim().replace(/\s+/g, " ");
 }
 
 function matchesWesternDestination(move, side, pieceType, action, target) {

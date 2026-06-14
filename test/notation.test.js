@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   createInitialPosition,
+  importGameMoveText,
   parseGameMoveText,
   parsePortableMoveNotation,
   parseWesternMoveNotation
@@ -46,6 +47,42 @@ test("game move text imports compressed Xiangqi.com move lists", () => {
   const text = "1.C2=5n8+72.N2+3p7+13.N8+7r9=84.C8=9n2+35.R9=8r1=26.R1=2p3+17.R8+4b7+58.P7+1p3+19.R8=7n3+410.P5+1c8+2";
 
   assert.deepEqual(parseGameMoveText(text), HU_GAME_COORDINATES);
+});
+
+test("structured game move import preserves metadata and diagnostics", () => {
+  const imported = importGameMoveText(`
+    [Event "Hu bot sparring"]
+    Site: Xiangqi.com
+    Round: test
+    1. C2=5 {central cannon} n8+7
+    2. N2+3 p7+1 result *
+  `);
+
+  assert.deepEqual(imported.moves, ["h7-e7", "h0-g2", "h9-g7", "g3-g4"]);
+  assert.equal(imported.metadata.Event, "Hu bot sparring");
+  assert.equal(imported.metadata.Site, "Xiangqi.com");
+  assert.equal(imported.metadata.Round, "test");
+  assert.equal(imported.tokens[0].token, "C2=5");
+  assert.equal(imported.tokens[0].notation, "h7-e7");
+  assert.equal(imported.tokens[0].side, "red");
+  assert.ok(imported.diagnostics.some((diagnostic) => diagnostic.kind === "comment" && diagnostic.text === "central cannon"));
+  assert.ok(imported.diagnostics.some((diagnostic) => diagnostic.kind === "skipped-token" && diagnostic.token === "result"));
+  assert.match(imported.finalFen, / r$/);
+});
+
+test("structured game move import accepts JSON metadata", () => {
+  const imported = importGameMoveText(JSON.stringify({
+    event: "JSON Game",
+    metadata: {
+      source: "fixture"
+    },
+    moves: ["h7-e7", "h0-g2"]
+  }));
+
+  assert.deepEqual(imported.moves, ["h7-e7", "h0-g2"]);
+  assert.equal(imported.metadata.event, "JSON Game");
+  assert.equal(imported.metadata.source, "fixture");
+  assert.equal(imported.diagnostics.length, 0);
 });
 
 test("portable move notation also accepts coordinate notation", () => {
