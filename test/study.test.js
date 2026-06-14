@@ -95,6 +95,44 @@ test("backend position study preserves oracle review evidence", async () => {
   }
 });
 
+test("backend position study turns oracle disagreement into a learning step", async () => {
+  const candidate = createJavaScriptEngineBackend({ depth: 1, timeLimitMs: 100 });
+  const oracle = createUcciEngineBackend({
+    name: "Mock Oracle",
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-ucci",
+    depth: 2,
+    timeLimitMs: 100,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+  const backend = createOracleReviewEngineBackend(candidate, oracle);
+
+  try {
+    const study = await studyPositionWithBackend(backend, createInitialPosition(), {
+      depth: 1,
+      timeLimitMs: 100,
+      lines: 2
+    });
+    const text = formatPositionStudy(study);
+
+    assert.equal(study.bestMove, "h7-e7");
+    assert.equal(study.oracleDisagreement.kind, "oracle-disagreement");
+    assert.equal(study.oracleDisagreement.move, "h7-e7");
+    assert.equal(study.oracleDisagreement.bestMove, "h9-g7");
+    assert.equal(study.oracleDisagreement.classification, "good");
+    assert.equal(study.oracleDisagreement.centipawnLoss, 59);
+    assert.equal(study.oracleDisagreement.backend.name, "Mock Oracle");
+    assert.equal(study.nextSteps[0].kind, "oracle-disagreement");
+    assert.match(study.nextSteps[0].text, /Mock Oracle prefers h9-g7 over h7-e7/);
+    assert.match(study.summary, /oracle prefers h9-g7 by 59 cp/);
+    assert.match(text, /Oracle correction: h7-e7 trails h9-g7 by 59 cp \(good\)/);
+  } finally {
+    await backend.close();
+  }
+});
+
 test("backend position study preserves native score details", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,

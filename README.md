@@ -162,12 +162,14 @@ console.log(study.hints.map((hint) => hint.text));
 console.log(study.candidateLines.map((line) => [line.move, line.scoreText]));
 console.log(study.playedMoveReview?.classification);
 console.log(study.practiceFocus?.title);
+console.log(study.oracleDisagreement?.bestMove);
 ```
 
 `studyPosition` returns one UI-ready bundle with the selected move, explanation,
 candidate lines, progressive hints, pressure/threat summary, optional played-move
-review, practice focus for detected mistake patterns, and any oracle-review
-evidence attached by the active backend.
+review, practice focus for detected mistake patterns, any oracle-review evidence
+attached by the active backend, and an `oracleDisagreement` learning step when a
+stronger reviewer prefers a different move.
 
 For a full played game, ask for a game study. It reuses the review pipeline,
 turns key moments into lesson cards, and attaches deeper position studies for

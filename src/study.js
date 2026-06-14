@@ -117,6 +117,10 @@ export function formatPositionStudy(study) {
     lines.push(`Oracle: ${study.oracleReview.verdict}`);
   }
 
+  if (study.oracleDisagreement) {
+    lines.push(`Oracle correction: ${study.oracleDisagreement.move} trails ${study.oracleDisagreement.bestMove} by ${study.oracleDisagreement.centipawnLoss} cp (${study.oracleDisagreement.classification}).`);
+  }
+
   if (study.hints.length > 0) {
     lines.push("Hints:");
     for (const hint of study.hints.slice(0, 4)) {
@@ -161,6 +165,7 @@ function buildPositionStudy(position, parts) {
     ?? coach?.bestMove
     ?? null;
   const oracleReview = decision?.oracleReview ?? playedMoveReview?.oracleReview ?? null;
+  const oracleDisagreement = summarizeOracleDisagreement(oracleReview);
 
   return {
     type: "position-study",
@@ -176,7 +181,8 @@ function buildPositionStudy(position, parts) {
     pressure,
     practiceFocus,
     oracleReview,
-    nextSteps: nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceFocus })
+    oracleDisagreement,
+    nextSteps: nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceFocus, oracleDisagreement })
   };
 }
 
@@ -265,6 +271,24 @@ function summarizeReview(review) {
   };
 }
 
+function summarizeOracleDisagreement(oracleReview) {
+  if (oracleReview?.status !== "reviewed" || oracleReview.isBestMove) return null;
+  if (!oracleReview.move || !oracleReview.bestMove) return null;
+
+  return {
+    kind: "oracle-disagreement",
+    move: oracleReview.move,
+    bestMove: oracleReview.bestMove,
+    classification: oracleReview.classification ?? "review",
+    centipawnLoss: Math.round(oracleReview.centipawnLoss ?? 0),
+    backend: oracleReview.backend ?? null,
+    verdict: oracleReview.verdict ?? "",
+    summary: oracleReview.summary ?? oracleReview.verdict ?? "",
+    reasons: [...(oracleReview.reasons ?? [])],
+    principalVariation: [...(oracleReview.principalVariation ?? [])]
+  };
+}
+
 function summarizePressure(pressure) {
   return {
     side: pressure.side,
@@ -295,12 +319,15 @@ function summarizeStudy({ side, bestMove, decision, playedMoveReview, oracleRevi
 
   if (!bestMove) return `No legal move is available for ${side}.`;
   if (oracleReview?.status === "reviewed" && !oracleReview.isBestMove) {
-    return `${bestMove} is the candidate move, but the oracle prefers ${oracleReview.bestMove}.`;
+    const loss = Number.isFinite(oracleReview.centipawnLoss)
+      ? ` by ${Math.round(oracleReview.centipawnLoss)} cp`
+      : "";
+    return `${bestMove} is the candidate move, but the oracle prefers ${oracleReview.bestMove}${loss}.`;
   }
   return decision?.summary ?? `${bestMove} is the recommended move for ${side}.`;
 }
 
-function nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceFocus }) {
+function nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceFocus, oracleDisagreement }) {
   const steps = [];
   if (playedMoveReview && !playedMoveReview.isBestMove) {
     steps.push({
@@ -313,6 +340,15 @@ function nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceF
       kind: "practice",
       text: practiceFocus.text,
       focus: practiceFocus
+    });
+  }
+  if (oracleDisagreement && !playedMoveReview) {
+    const backend = oracleDisagreement.backend?.name ?? "Oracle";
+    steps.push({
+      kind: "oracle-disagreement",
+      text: `${backend} prefers ${oracleDisagreement.bestMove} over ${oracleDisagreement.move} (${oracleDisagreement.centipawnLoss} cp, ${oracleDisagreement.classification}).`,
+      ref: "oracle-review",
+      oracleDisagreement
     });
   }
   if (coach?.levels?.[0]) {
