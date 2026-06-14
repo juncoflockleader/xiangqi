@@ -1,5 +1,7 @@
 #!/usr/bin/env node
+import { readFile } from "node:fs/promises";
 import {
+  createBenchmarkSuite,
   compareEngineToOracle,
   createJavaScriptEngineBackend,
   createUcciEngineBackend,
@@ -33,6 +35,14 @@ if (!options.oracleCommand) {
   process.exit(1);
 }
 
+let benchmarks;
+try {
+  benchmarks = await loadBenchmarkSuite(options);
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+
 const candidate = createJavaScriptEngineBackend({
   name: options.candidateName,
   profile: options.candidateProfile,
@@ -53,6 +63,7 @@ const oracle = createUcciEngineBackend({
 
 try {
   const report = await compareEngineToOracle(candidate, oracle, {
+    benchmarks,
     tag: options.tag,
     acceptableLossCp: options.acceptableLossCp,
     searchOptions: {
@@ -104,6 +115,7 @@ function parseArgs(args) {
       "XIANGQI_ORACLE_ENGINE_OPTIONS"
     ),
     acceptableLossCp: numberFromEnv(process.env.XIANGQI_ORACLE_ACCEPTABLE_LOSS_CP, 60),
+    benchmarkPath: process.env.XIANGQI_BENCHMARK_FILE,
     lines: numberFromEnv(process.env.XIANGQI_ORACLE_LINES, 3),
     startupTimeoutMs: numberFromEnv(process.env.XIANGQI_ORACLE_STARTUP_TIMEOUT_MS, 5000),
     commandTimeoutMs: numberFromEnv(process.env.XIANGQI_ORACLE_COMMAND_TIMEOUT_MS, 30000),
@@ -182,6 +194,10 @@ function parseArgs(args) {
       options.tag = args[++index];
       continue;
     }
+    if (arg === "--benchmarks" || arg === "--file") {
+      options.benchmarkPath = args[++index];
+      continue;
+    }
     if (arg === "--startup-timeout") {
       options.startupTimeoutMs = Number(args[++index]);
       continue;
@@ -203,6 +219,23 @@ function parseArgs(args) {
   assertPositiveInteger(options.startupTimeoutMs, "startup-timeout");
   assertPositiveInteger(options.commandTimeoutMs, "command-timeout");
   return options;
+}
+
+async function loadBenchmarkSuite(options) {
+  if (!options.benchmarkPath) return undefined;
+
+  let text;
+  try {
+    text = await readFile(options.benchmarkPath, "utf8");
+  } catch (error) {
+    throw new Error(`Could not read benchmark suite ${options.benchmarkPath}: ${error.message}`);
+  }
+
+  try {
+    return createBenchmarkSuite(text, { requireExpectedMoves: false });
+  } catch (error) {
+    throw new Error(`Could not load benchmark suite ${options.benchmarkPath}: ${error.message}`);
+  }
 }
 
 function numberFromEnv(value, fallback) {
@@ -242,6 +275,8 @@ Options:
   --candidate-time MS        JavaScript movetime in ms (default: 1000)
   --no-candidate-book        Disable candidate opening-book moves
   --acceptable-loss CP       Passing loss threshold in centipawns (default: 60)
+  --benchmarks FILE          Load a JSON benchmark suite.
+  --file FILE                Alias for --benchmarks.
   --tag TAG                  Only run benchmarks with a tag
   --lines N                  Oracle MultiPV lines to request (default: 3)
   --fail-on-review           Exit nonzero if any benchmark exceeds threshold

@@ -4,6 +4,7 @@ import {
   ENGINE_BENCHMARKS,
   compareEngineToOracle,
   compareEngineBackends,
+  createBenchmarkSuite,
   createJavaScriptEngineBackend,
   createLearningEngineBackend,
   formatBenchmarkReport,
@@ -45,6 +46,47 @@ test("benchmark report is readable", async () => {
   assert.ok(text.includes("depth"));
   assert.ok(text.includes("PASS book-central-cannon"));
   assert.ok(text.includes("opening-book"));
+});
+
+test("custom benchmark suites can be normalized and run", async () => {
+  const suite = createBenchmarkSuite({
+    defaults: {
+      tags: "custom learning",
+      options: {
+        depth: 2,
+        timeLimitMs: 1000,
+        useBook: false
+      }
+    },
+    benchmarks: [
+      {
+        id: "custom-rook-win",
+        name: "Custom Rook Win",
+        fen: "4k4/9/4r4/9/9/9/9/9/9/3KR4 r",
+        expectedMove: "e9-e2",
+        lesson: "Custom suites can capture lesson positions from sparring."
+      }
+    ]
+  });
+  const report = await runBenchmarkSuite(null, { benchmarks: suite });
+
+  assert.equal(suite[0].id, "custom-rook-win");
+  assert.deepEqual(suite[0].tags, ["custom", "learning"]);
+  assert.equal(suite[0].options.useBook, false);
+  assert.equal(report.total, 1);
+  assert.equal(report.failed, 0);
+  assert.equal(report.results[0].actualMove, "e9-e2");
+});
+
+test("custom benchmark suites validate required fields", () => {
+  assert.throws(
+    () => createBenchmarkSuite([{ id: "missing-fen", expectedMove: "h7-e7" }]),
+    /requires fen/
+  );
+  assert.throws(
+    () => createBenchmarkSuite([{ id: "missing-expected", fen: ENGINE_BENCHMARKS[0].fen }]),
+    /requires expectedMoves/
+  );
 });
 
 test("engine comparison reports multiple sync and async backends", async () => {

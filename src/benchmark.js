@@ -42,8 +42,37 @@ export const ENGINE_BENCHMARKS = Object.freeze([
       useBook: false
     }),
     lesson: "The engine should recognize an immediate winning general capture."
+  }),
+  Object.freeze({
+    id: "hu-central-cannon-trap",
+    name: "Opening Trap: Validate the Central Cannon Heuristic",
+    fen: "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r",
+    expectedMoves: Object.freeze(["b7-b3"]),
+    tags: Object.freeze(["trap", "learning", "search"]),
+    options: Object.freeze({
+      depth: 3,
+      timeLimitMs: 3000,
+      openingHeuristicValidationDepth: 2,
+      openingHeuristicValidationTimeMs: 4000
+    }),
+    lesson: "Heuristic opening moves must be rejected when search shows a tactical refutation."
   })
 ]);
+
+export function createBenchmarkSuite(data = {}, options = {}) {
+  const spec = normalizeBenchmarkSpec(data);
+  const defaults = {
+    ...(options.defaults ?? {}),
+    ...(spec.defaults ?? {})
+  };
+  const records = spec.benchmarks ?? spec.records ?? spec.positions ?? [];
+
+  return Object.freeze(records.map((record, index) => normalizeBenchmarkRecord(record, {
+    defaults,
+    index,
+    requireExpectedMoves: options.requireExpectedMoves ?? spec.requireExpectedMoves ?? true
+  })));
+}
 
 export async function runBenchmarkSuite(engineOrOptions = null, options = {}) {
   const engine = normalizeEngine(engineOrOptions, options);
@@ -296,10 +325,12 @@ async function runBenchmark(engine, benchmark, options) {
   const result = await engine.chooseMove(position, searchOptions);
   const elapsedMs = Math.round(performanceNow() - startedAt);
   const actualMove = result.bestMove ? moveToNotation(result.bestMove) : null;
-  const expectedMoves = [...benchmark.expectedMoves];
+  const expectedMoves = [...(benchmark.expectedMoves ?? [])];
   const sourceExpected = benchmark.expectedSource ?? null;
   const sourceMatched = sourceExpected ? result.source === sourceExpected : true;
-  const moveMatched = actualMove ? expectedMoves.includes(actualMove) : false;
+  const moveMatched = expectedMoves.length === 0
+    ? Boolean(actualMove)
+    : actualMove ? expectedMoves.includes(actualMove) : false;
   const solved = moveMatched && sourceMatched;
 
   return {
@@ -422,6 +453,83 @@ function filterBenchmarks(benchmarks, options) {
   const tag = options.tag ?? null;
   if (!tag) return [...benchmarks];
   return benchmarks.filter((benchmark) => benchmark.tags?.includes(tag));
+}
+
+function normalizeBenchmarkSpec(data) {
+  if (typeof data === "string") {
+    try {
+      return normalizeBenchmarkSpec(JSON.parse(data));
+    } catch (error) {
+      throw new Error(`Benchmark suite JSON could not be parsed: ${error.message}`);
+    }
+  }
+  if (Array.isArray(data)) return { benchmarks: data };
+  if (data && typeof data === "object") return data;
+  throw new Error("Benchmark suite must be an array, object, or JSON string.");
+}
+
+function normalizeBenchmarkRecord(record, context) {
+  if (!record || typeof record !== "object") {
+    throw new Error(`Benchmark record ${context.index + 1} must be an object.`);
+  }
+
+  const fen = requiredText(record.fen ?? record.position, `Benchmark record ${context.index + 1} requires fen.`);
+  parseFen(fen);
+  const expectedMoves = normalizeExpectedMoves(record);
+  if (context.requireExpectedMoves && expectedMoves.length === 0) {
+    throw new Error(`Benchmark record ${context.index + 1} requires expectedMoves, expectedMove, move, or bestMove.`);
+  }
+
+  return Object.freeze({
+    id: requiredText(record.id ?? `custom-${context.index + 1}`, `Benchmark record ${context.index + 1} requires id.`),
+    name: String(record.name ?? record.title ?? record.id ?? `Custom Benchmark ${context.index + 1}`),
+    fen,
+    expectedMoves: Object.freeze(expectedMoves),
+    ...(record.expectedSource ? { expectedSource: String(record.expectedSource) } : {}),
+    tags: Object.freeze(normalizeTags(record.tags ?? context.defaults.tags)),
+    options: Object.freeze({
+      ...(context.defaults.options ?? {}),
+      ...(record.options ?? {}),
+      ...pickSearchOptions(record)
+    }),
+    lesson: String(record.lesson ?? record.note ?? context.defaults.lesson ?? "")
+  });
+}
+
+function normalizeExpectedMoves(record) {
+  const raw = record.expectedMoves ?? record.expectedMove ?? record.expected ?? record.move ?? record.bestMove;
+  if (raw === undefined || raw === null || raw === "") return [];
+  const values = Array.isArray(raw) ? raw : String(raw).split(/[,\s]+/);
+  return Object.freeze(values.map((value) => String(value).trim()).filter(Boolean));
+}
+
+function normalizeTags(value) {
+  if (value === undefined || value === null || value === "") return [];
+  if (Array.isArray(value)) return value.map((tag) => String(tag).trim()).filter(Boolean);
+  return String(value).split(/[,\s]+/).map((tag) => tag.trim()).filter(Boolean);
+}
+
+function pickSearchOptions(record) {
+  const options = {};
+  for (const key of [
+    "depth",
+    "timeLimitMs",
+    "useBook",
+    "openingHeuristicValidationDepth",
+    "openingHeuristicValidationTimeMs",
+    "openingHeuristicMaxCentipawnLoss"
+  ]) {
+    if (Object.prototype.hasOwnProperty.call(record, key)) {
+      options[key] = record[key];
+    }
+  }
+  return options;
+}
+
+function requiredText(value, message) {
+  const text = String(value ?? "").trim();
+  if (!text) throw new Error(message);
+  return text;
 }
 
 function aggregateOracleResults(results, elapsedMs) {

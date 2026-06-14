@@ -426,7 +426,38 @@ const report = await runBenchmarkSuite();
 console.log(formatBenchmarkReport(report));
 ```
 
-The benchmark suite is intentionally small for now: it checks the opening layer, a clean tactical capture, and an immediate forcing win. It reports aggregate nodes, nodes per second, average depth, timeout count, and summed search stats, making it a regression guardrail for search changes and a foundation for comparing the JS reference backend with stronger native engines later.
+The benchmark suite is intentionally small for now: it checks the opening layer,
+a clean tactical capture, an immediate forcing win, and the Hu-bot central
+cannon trap where opening heuristics must defer to search. It reports aggregate
+nodes, nodes per second, average depth, timeout count, and summed search stats,
+making it a regression guardrail for search changes and a foundation for
+comparing the JS reference backend with stronger native engines later.
+
+Save sparring or lesson positions as a custom JSON suite when you want repeatable
+engine checks:
+
+```json
+{
+  "defaults": {
+    "tags": ["custom", "learning"],
+    "options": { "depth": 2, "timeLimitMs": 1000, "useBook": false }
+  },
+  "benchmarks": [
+    {
+      "id": "custom-rook-win",
+      "fen": "4k4/9/4r4/9/9/9/9/9/9/3KR4 r",
+      "expectedMove": "e9-e2",
+      "lesson": "Capture the loose rook instead of drifting."
+    }
+  ]
+}
+```
+
+Then run it directly:
+
+```sh
+npm run bench -- --benchmarks ./benchmarks.json --json
+```
 
 Compare the JavaScript learning engine to a native oracle:
 
@@ -443,7 +474,9 @@ npm run bench:oracle -- --oracle-protocol uci \
 
 The oracle benchmark lets the JavaScript candidate move first, asks the native
 engine for its own best move, then uses the oracle review path to grade the
-candidate move by centipawn loss and classification. Use `--tag opening`,
+candidate move by centipawn loss and classification. Use `--benchmarks
+./benchmarks.json` for custom positions; oracle-only suites can omit
+`expectedMove` because the oracle supplies the reference. Use `--tag opening`,
 `--tag tactic`, or `--json` for focused regression runs.
 
 Compare backends on the same benchmark suite:
