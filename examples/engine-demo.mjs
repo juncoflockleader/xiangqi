@@ -25,6 +25,12 @@ for (const candidate of result.explanation.alternatives) {
   console.log(`${candidate.rank}. ${candidate.move} (${candidate.score}) ${candidate.note}`);
 }
 
+const offBookOpening = engine.play(position, "a9-a8");
+const heuristicOpening = engine.chooseMove(offBookOpening);
+console.log("");
+console.log(`Opening fallback: ${heuristicOpening.bestMove.notation}`);
+console.log(heuristicOpening.explanation.summary);
+
 const analysis = engine.analyzePosition(position, { lines: 3, depth: 2, timeLimitMs: 2000 });
 console.log("");
 console.log("Analysis lines:");

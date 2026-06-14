@@ -67,14 +67,16 @@ export function explainBookMove(position, bookResult) {
   const move = bookResult.bestMove;
   const moveStory = explainMoveFeatures(position, move);
   const entry = bookResult.book;
+  const label = bookResult.source === "opening-heuristic" ? "Opening heuristic" : "Opening book";
+  const summaryType = bookResult.source === "opening-heuristic" ? "opening heuristic move" : "book move";
   const reasons = [
-    `Opening book: ${entry.name}.`,
+    `${label}: ${entry.name}.`,
     entry.idea,
     ...moveStory.reasons
   ];
 
   return {
-    summary: `${pieceLabel(move.piece)} ${moveToNotation(move)} is the book move: ${entry.name}.`,
+    summary: `${pieceLabel(move.piece)} ${moveToNotation(move)} is the ${summaryType}: ${entry.name}.`,
     reasons: unique(reasons).slice(0, 7),
     alternatives: bookResult.bookAlternatives.map((alternative, index) => ({
       rank: index + 1,

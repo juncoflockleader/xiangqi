@@ -10,6 +10,7 @@ import {
   moveKey,
   moveToNotation,
   opponent,
+  parseMoveNotation,
   positionKey,
   sameMove
 } from "./board.js";
@@ -50,6 +51,7 @@ export function searchBestMove(position, options = {}) {
   const candidateLimit = options.candidateLimit ?? 8;
   const exactRootScores = options.exactRootScores === true || !Number.isFinite(candidateLimit);
   const bannedMoveKeys = new Set((options.bannedMoves ?? []).map(moveKey));
+  const priorityMoveKeys = new Set((options.priorityMoves ?? []).map(toMoveKey));
   const repetitionCounts = buildRepetitionCounts(options.history ?? options.positionHistory ?? []);
   const rootMoves = generateLegalMoves(position, position.turn)
     .filter((move) => !bannedMoveKeys.has(moveKey(move)));
@@ -89,6 +91,7 @@ export function searchBestMove(position, options = {}) {
       history,
       killers,
       candidateLimit,
+      priorityMoveKeys,
       repetitionCounts: new Map(repetitionCounts),
       pathCounts: new Map(),
       maxExtensions: options.maxExtensions ?? DEFAULT_MAX_EXTENSIONS,
@@ -521,6 +524,7 @@ function orderMoves(position, moves, principalMove, context, ply) {
 function moveOrderingScore(position, move, principalMove, context, ply) {
   let score = 0;
 
+  if (context.priorityMoveKeys?.has(moveKey(move))) score += 1_500_000;
   if (sameMove(move, principalMove)) score += 1_000_000;
   if (move.captured) {
     const capture = getCaptureAnalysis(position, move, context);
@@ -554,6 +558,10 @@ function getCaptureAnalysis(position, move, context) {
   const analysis = analyzeCapture(position, move);
   context.tacticalCache.set(key, analysis);
   return analysis;
+}
+
+function toMoveKey(move) {
+  return moveKey(typeof move === "string" ? parseMoveNotation(move) : move);
 }
 
 function shouldExtend({ inCheck, givesCheck, move, extensionsRemaining }) {

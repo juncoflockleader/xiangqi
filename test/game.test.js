@@ -24,7 +24,7 @@ test("game helper chooses an engine move with session history", () => {
   const engine = createEngine({ depth: 1, timeLimitMs: 100 });
   let game = createGame();
   game = playGameMove(game, engine, "a9-a8", { review: false });
-  const result = chooseGameMove(game, engine, { depth: 1, timeLimitMs: 100 });
+  const result = chooseGameMove(game, engine, { depth: 1, timeLimitMs: 100, useBook: false });
 
   assert.ok(result.bestMove);
   assert.ok(result.stats.nodes > 0);

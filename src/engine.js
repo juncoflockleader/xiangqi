@@ -73,6 +73,7 @@ export function createEngine(defaultOptions = {}) {
         ...defaultOptions,
         ...options,
         candidateLimit: Number.POSITIVE_INFINITY,
+        priorityMoves: [move],
         transpositionTable
       });
       const candidate = search.candidates.find((entry) => sameMove(entry.move, move));
@@ -197,7 +198,7 @@ function maybeBookResult(position, options, tableSize) {
 
   const candidates = bookHit.entries.map(bookMoveToCandidate);
   const result = {
-    source: "opening-book",
+    source: bookHit.source ?? "opening-book",
     bestMove: bookHit.move,
     score: bookHit.entry.weight,
     depth: 0,

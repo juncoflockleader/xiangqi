@@ -56,3 +56,28 @@ test("opening book handles the next move in a known line", () => {
   assert.equal(result.source, "opening-book");
   assert.equal(result.bestMove.notation, "h0-g2");
 });
+
+test("opening book follows named deeper central cannon lines", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  let position = createInitialPosition();
+  for (const move of ["h7-e7", "h0-g2", "h9-g7"]) {
+    position = engine.play(position, move);
+  }
+
+  const result = engine.chooseMove(position);
+
+  assert.equal(result.source, "opening-book");
+  assert.equal(result.bestMove.notation, "b0-c2");
+  assert.equal(result.book.name, "Double Screen Horses");
+});
+
+test("opening heuristics cover early positions outside exact book", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  const position = engine.play(createInitialPosition(), "a9-a8");
+  const result = engine.chooseMove(position);
+
+  assert.equal(result.source, "opening-heuristic");
+  assert.ok(["b0-c2", "h0-g2"].includes(result.bestMove.notation));
+  assert.ok(result.book.tags.includes("heuristic"));
+  assert.ok(result.explanation.reasons.some((reason) => reason.includes("Opening heuristic")));
+});

@@ -9,7 +9,7 @@ The current engine is dependency-free JavaScript and includes:
 - Check detection, flying-general rules, and make/unmake-style immutable position updates.
 - Iterative-deepening negamax search with alpha-beta and principal variation search.
 - Zobrist hashing, bounded depth-preferred transposition table, aspiration windows, quiescence search with bounded quiet-check search, capture/check/history-based move ordering, bounded check extensions, guarded null-move pruning, shallow futility pruning, late-move reductions, repetition hooks, and root candidate analysis.
-- Explainable opening-book support with deterministic book move selection and pure-search opt-out.
+- Explainable opening-book support with a curated early repertoire, heuristic fallback for off-book opening positions, deterministic selection, and pure-search opt-out.
 - Evaluation terms for material, piece-square placement, mobility, threats, pawn progress, and king safety.
 - Capture safety analysis for distinguishing clean wins from tactically poisoned captures.
 - Immediate pressure/threat analysis for both sides.
@@ -50,7 +50,10 @@ Use the opening book or opt into pure search:
 const bookMove = engine.chooseMove(position);
 const searchMove = engine.chooseMove(position, { useBook: false });
 const book = engine.openingBook(position);
+const exactOnly = engine.openingBook(position, { openingHeuristics: false });
 ```
+
+The built-in book is intentionally small but structured as opening data: named entries, ideas, tags, and multi-ply lines. When an early position is not in the exact table, the engine can fall back to opening heuristics such as developing horses, contesting the central file, and activating rooks. This is a bridge toward importing a larger Xiangqi opening database later.
 
 Review a player's move:
 
