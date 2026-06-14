@@ -57,6 +57,7 @@ export async function runBenchmarkSuite(engineOrOptions = null, options = {}) {
   const elapsedMs = Math.round(performanceNow() - startedAt);
   const solved = results.filter((result) => result.solved).length;
   const sourceMatched = results.filter((result) => result.sourceMatched).length;
+  const aggregate = aggregateBenchmarkResults(results, elapsedMs);
 
   return {
     total: results.length,
@@ -64,6 +65,7 @@ export async function runBenchmarkSuite(engineOrOptions = null, options = {}) {
     failed: results.length - solved,
     sourceMatched,
     elapsedMs,
+    aggregate,
     results
   };
 }
@@ -91,6 +93,7 @@ export async function compareEngineBackends(backends, options = {}) {
       total: report.total,
       sourceMatched: report.sourceMatched,
       elapsedMs: report.elapsedMs,
+      aggregate: report.aggregate,
       failures: report.results
         .filter((result) => !result.solved)
         .map((result) => ({
@@ -114,7 +117,7 @@ export async function compareEngineBackends(backends, options = {}) {
 
 export function formatBenchmarkReport(report) {
   const lines = [
-    `Benchmarks: ${report.solved}/${report.total} solved in ${report.elapsedMs}ms`
+    `Benchmarks: ${report.solved}/${report.total} solved in ${report.elapsedMs}ms (${formatNodes(report.aggregate?.nodes)} nodes, ${formatNodes(report.aggregate?.nodesPerSecond)}/s)`
   ];
 
   for (const result of report.results) {
@@ -124,6 +127,8 @@ export function formatBenchmarkReport(report) {
       ? `${result.actualMove ?? "none"} from ${result.source ?? "unknown"}`
       : result.actualMove ?? "none";
     lines.push(`${status} ${result.id}: expected ${expected}, got ${detail}`);
+    const stats = `depth ${result.depth}, ${formatNodes(result.nodes)} nodes, ${result.elapsedMs}ms`;
+    lines.push(`  ${stats}`);
     if (result.summary) lines.push(`  ${result.summary}`);
   }
 
@@ -137,7 +142,7 @@ export function formatEngineComparisonReport(comparison) {
 
   for (const backend of comparison.backends) {
     const label = backend.kind ? `${backend.name} (${backend.kind})` : backend.name;
-    lines.push(`${label}: ${backend.solved}/${backend.total} solved, ${backend.sourceMatched}/${backend.total} source matches, ${backend.elapsedMs}ms`);
+    lines.push(`${label}: ${backend.solved}/${backend.total} solved, ${backend.sourceMatched}/${backend.total} source matches, ${backend.elapsedMs}ms, ${formatNodes(backend.aggregate?.nodes)} nodes`);
     if (backend.failures.length > 0) {
       const failed = backend.failures.map((failure) => `${failure.id}:${failure.actualMove ?? "none"}`).join(", ");
       lines.push(`  Failed: ${failed}`);
@@ -180,6 +185,8 @@ async function runBenchmark(engine, benchmark, options) {
     depth: result.depth ?? 0,
     nodes: result.nodes ?? 0,
     elapsedMs,
+    timedOut: result.timedOut === true,
+    stats: result.stats ? { ...result.stats } : null,
     summary: result.explanation?.summary ?? "",
     reasons: result.explanation?.reasons ?? [],
     principalVariation: (result.principalVariation ?? []).map((move) => move.notation ?? moveToNotation(move)),
@@ -221,6 +228,43 @@ function filterBenchmarks(benchmarks, options) {
   const tag = options.tag ?? null;
   if (!tag) return [...benchmarks];
   return benchmarks.filter((benchmark) => benchmark.tags?.includes(tag));
+}
+
+function aggregateBenchmarkResults(results, elapsedMs) {
+  const nodes = sum(results, (result) => result.nodes);
+  const qnodes = sum(results, (result) => result.stats?.qnodes ?? 0);
+  const depthCompleted = sum(results, (result) => result.depth);
+  const timedOut = results.filter((result) => result.timedOut).length;
+  const nodesPerSecond = elapsedMs > 0 ? Math.round(nodes * 1000 / elapsedMs) : nodes;
+
+  return {
+    nodes,
+    qnodes,
+    nodesPerSecond,
+    averageDepth: results.length === 0 ? 0 : Number((depthCompleted / results.length).toFixed(2)),
+    timedOut,
+    stats: aggregateStats(results)
+  };
+}
+
+function aggregateStats(results) {
+  const totals = {};
+  for (const result of results) {
+    for (const [key, value] of Object.entries(result.stats ?? {})) {
+      if (typeof value !== "number") continue;
+      totals[key] = (totals[key] ?? 0) + value;
+    }
+  }
+  return totals;
+}
+
+function sum(items, valueFn) {
+  return items.reduce((total, item) => total + valueFn(item), 0);
+}
+
+function formatNodes(value) {
+  const count = Math.round(value ?? 0);
+  return count.toLocaleString("en-US");
 }
 
 function performanceNow() {

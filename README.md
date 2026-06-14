@@ -196,7 +196,7 @@ const report = await runBenchmarkSuite();
 console.log(formatBenchmarkReport(report));
 ```
 
-The benchmark suite is intentionally small for now: it checks the opening layer, a clean tactical capture, and an immediate forcing win. It is a regression guardrail for search changes and a foundation for comparing the JS reference backend with stronger native engines later.
+The benchmark suite is intentionally small for now: it checks the opening layer, a clean tactical capture, and an immediate forcing win. It reports aggregate nodes, nodes per second, average depth, timeout count, and summed search stats, making it a regression guardrail for search changes and a foundation for comparing the JS reference backend with stronger native engines later.
 
 Compare backends on the same benchmark suite:
 

@@ -15,8 +15,14 @@ test("benchmark suite solves the starter engine positions", async () => {
   assert.equal(report.total, ENGINE_BENCHMARKS.length);
   assert.equal(report.failed, 0);
   assert.equal(report.solved, report.total);
+  assert.ok(report.aggregate.nodes >= 0);
+  assert.ok(report.aggregate.nodesPerSecond >= 0);
+  assert.ok(report.aggregate.averageDepth >= 0);
+  assert.equal(report.aggregate.timedOut, 0);
+  assert.equal(typeof report.aggregate.stats.qnodes, "number");
   assert.ok(report.results.some((result) => result.id === "book-central-cannon" && result.sourceMatched));
   assert.ok(report.results.every((result) => result.summary.length > 0));
+  assert.ok(report.results.every((result) => result.stats));
 });
 
 test("benchmark suite can filter by tag", async () => {
@@ -32,6 +38,8 @@ test("benchmark report is readable", async () => {
   const text = formatBenchmarkReport(report);
 
   assert.ok(text.includes("Benchmarks: 1/1 solved"));
+  assert.ok(text.includes("nodes"));
+  assert.ok(text.includes("depth"));
   assert.ok(text.includes("PASS book-central-cannon"));
   assert.ok(text.includes("opening-book"));
 });
@@ -58,6 +66,7 @@ test("engine comparison reports multiple sync and async backends", async () => {
   assert.equal(comparison.backends[0].solved, 1);
   assert.equal(comparison.backends[1].solved, 1);
   assert.equal(comparison.backends[1].id, "async-reference");
+  assert.ok(comparison.backends[0].aggregate.nodes >= 0);
   assert.ok(text.includes("JavaScript Reference Engine"));
   assert.ok(text.includes("Async Reference"));
   assert.ok(text.includes("1/1 solved"));
