@@ -2,7 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   ENGINE_BENCHMARKS,
+  compareEngineBackends,
+  createJavaScriptEngineBackend,
   formatBenchmarkReport,
+  formatEngineComparisonReport,
   runBenchmarkSuite
 } from "../src/index.js";
 
@@ -31,4 +34,38 @@ test("benchmark report is readable", async () => {
   assert.ok(text.includes("Benchmarks: 1/1 solved"));
   assert.ok(text.includes("PASS book-central-cannon"));
   assert.ok(text.includes("opening-book"));
+});
+
+test("engine comparison reports multiple sync and async backends", async () => {
+  const jsBackend = createJavaScriptEngineBackend({ depth: 2, timeLimitMs: 500 });
+  const asyncBackend = {
+    id: "async-reference",
+    name: "Async Reference",
+    kind: "test",
+    chooseMove: async (position, options) => jsBackend.chooseMove(position, options)
+  };
+
+  const comparison = await compareEngineBackends([
+    jsBackend,
+    { engine: asyncBackend, searchOptions: { depth: 2, timeLimitMs: 500 } }
+  ], {
+    tag: "opening"
+  });
+  const text = formatEngineComparisonReport(comparison);
+
+  assert.equal(comparison.totalBackends, 2);
+  assert.equal(comparison.benchmarkTotal, 1);
+  assert.equal(comparison.backends[0].solved, 1);
+  assert.equal(comparison.backends[1].solved, 1);
+  assert.equal(comparison.backends[1].id, "async-reference");
+  assert.ok(text.includes("JavaScript Reference Engine"));
+  assert.ok(text.includes("Async Reference"));
+  assert.ok(text.includes("1/1 solved"));
+});
+
+test("engine comparison rejects entries without chooseMove", async () => {
+  await assert.rejects(
+    () => compareEngineBackends([{ id: "bad-engine" }]),
+    /missing chooseMove/
+  );
 });

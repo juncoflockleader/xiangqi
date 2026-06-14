@@ -153,6 +153,28 @@ console.log(formatBenchmarkReport(report));
 
 The benchmark suite is intentionally small for now: it checks the opening layer, a clean tactical capture, and an immediate forcing win. It is a regression guardrail for search changes and a foundation for comparing the JS reference backend with stronger native engines later.
 
+Compare backends on the same benchmark suite:
+
+```js
+import {
+  compareEngineBackends,
+  createJavaScriptEngineBackend,
+  createUcciEngineBackend,
+  formatEngineComparisonReport
+} from "./src/index.js";
+
+const jsBackend = createJavaScriptEngineBackend({ depth: 3, timeLimitMs: 1000 });
+const nativeBackend = createUcciEngineBackend({
+  command: "/path/to/pikafish-or-other-ucci-engine",
+  depth: 8,
+  timeLimitMs: 3000
+});
+
+const comparison = await compareEngineBackends([jsBackend, nativeBackend]);
+console.log(formatEngineComparisonReport(comparison));
+await nativeBackend.close();
+```
+
 Inspect threats without running a full search:
 
 ```js

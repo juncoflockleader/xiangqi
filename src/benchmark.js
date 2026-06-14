@@ -68,6 +68,50 @@ export async function runBenchmarkSuite(engineOrOptions = null, options = {}) {
   };
 }
 
+export async function compareEngineBackends(backends, options = {}) {
+  const entries = normalizeBackendEntries(backends);
+  const startedAt = performanceNow();
+  const reports = [];
+
+  for (const entry of entries) {
+    const report = await runBenchmarkSuite(entry.engine, {
+      ...options,
+      searchOptions: {
+        ...(options.searchOptions ?? {}),
+        ...(entry.searchOptions ?? {})
+      }
+    });
+    reports.push({
+      id: entry.id,
+      name: entry.name,
+      kind: entry.kind,
+      features: entry.features,
+      solved: report.solved,
+      failed: report.failed,
+      total: report.total,
+      sourceMatched: report.sourceMatched,
+      elapsedMs: report.elapsedMs,
+      failures: report.results
+        .filter((result) => !result.solved)
+        .map((result) => ({
+          id: result.id,
+          expectedMoves: result.expectedMoves,
+          actualMove: result.actualMove,
+          source: result.source,
+          sourceExpected: result.sourceExpected
+        })),
+      report
+    });
+  }
+
+  return {
+    totalBackends: reports.length,
+    benchmarkTotal: reports[0]?.total ?? 0,
+    elapsedMs: Math.round(performanceNow() - startedAt),
+    backends: reports
+  };
+}
+
 export function formatBenchmarkReport(report) {
   const lines = [
     `Benchmarks: ${report.solved}/${report.total} solved in ${report.elapsedMs}ms`
@@ -81,6 +125,23 @@ export function formatBenchmarkReport(report) {
       : result.actualMove ?? "none";
     lines.push(`${status} ${result.id}: expected ${expected}, got ${detail}`);
     if (result.summary) lines.push(`  ${result.summary}`);
+  }
+
+  return lines.join("\n");
+}
+
+export function formatEngineComparisonReport(comparison) {
+  const lines = [
+    `Engine comparison: ${comparison.totalBackends} backends on ${comparison.benchmarkTotal} benchmarks in ${comparison.elapsedMs}ms`
+  ];
+
+  for (const backend of comparison.backends) {
+    const label = backend.kind ? `${backend.name} (${backend.kind})` : backend.name;
+    lines.push(`${label}: ${backend.solved}/${backend.total} solved, ${backend.sourceMatched}/${backend.total} source matches, ${backend.elapsedMs}ms`);
+    if (backend.failures.length > 0) {
+      const failed = backend.failures.map((failure) => `${failure.id}:${failure.actualMove ?? "none"}`).join(", ");
+      lines.push(`  Failed: ${failed}`);
+    }
   }
 
   return lines.join("\n");
@@ -131,6 +192,28 @@ function normalizeEngine(engineOrOptions, options) {
   return createEngine({
     ...(engineOrOptions ?? {}),
     ...(options.engineOptions ?? {})
+  });
+}
+
+function normalizeBackendEntries(backends) {
+  const entries = Array.isArray(backends)
+    ? backends
+    : Object.entries(backends ?? {}).map(([id, engine]) => ({ id, engine }));
+
+  return entries.map((entry, index) => {
+    const engine = entry.engine ?? entry.backend ?? entry;
+    if (!engine?.chooseMove) {
+      throw new Error(`Engine comparison entry ${index + 1} is missing chooseMove.`);
+    }
+
+    return {
+      id: entry.id ?? engine.id ?? `engine-${index + 1}`,
+      name: entry.name ?? engine.name ?? entry.id ?? engine.id ?? `Engine ${index + 1}`,
+      kind: entry.kind ?? engine.kind ?? "custom",
+      features: [...(entry.features ?? engine.features ?? [])],
+      searchOptions: entry.searchOptions ?? {},
+      engine
+    };
   });
 }
 
