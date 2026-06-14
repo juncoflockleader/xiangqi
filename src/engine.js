@@ -49,6 +49,7 @@ export function createEngine(defaultOptions = {}) {
         ...engineOptions,
         ...options,
         candidateLimit: lineCount,
+        exactRootScores: options.exactRootScores ?? lineCount > 1,
         transpositionTable
       });
       const bestScore = search.score;
@@ -263,6 +264,7 @@ function maybeBookResult(position, options, tableSize) {
       countermoveStores: 0,
       countermoveHits: 0,
       rootScoreOrderHits: 0,
+      rootMovesSearched: 0,
       repetitions: 0
     },
     book: {

@@ -211,6 +211,7 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
     const line = [];
     const childAlpha = context.exactRootScores ? -INFINITY_SCORE : -beta;
     const childBeta = context.exactRootScores ? INFINITY_SCORE : -alpha;
+    context.stats.rootMovesSearched += 1;
     const score = normalizeScore(-negamax(next, depth - 1, childAlpha, childBeta, 1, context, line, context.maxExtensions, true, move));
     const annotated = annotateMove(position, move);
 
@@ -856,6 +857,7 @@ function createSearchStats() {
     countermoveStores: 0,
     countermoveHits: 0,
     rootScoreOrderHits: 0,
+    rootMovesSearched: 0,
     repetitions: 0
   };
 }
@@ -884,6 +886,7 @@ function mergeSearchStats(total, next) {
     countermoveStores: total.countermoveStores + next.countermoveStores,
     countermoveHits: total.countermoveHits + next.countermoveHits,
     rootScoreOrderHits: total.rootScoreOrderHits + next.rootScoreOrderHits,
+    rootMovesSearched: total.rootMovesSearched + next.rootMovesSearched,
     repetitions: total.repetitions + next.repetitions
   };
 }

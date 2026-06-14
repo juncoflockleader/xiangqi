@@ -31,13 +31,13 @@ console.log("");
 console.log(`Opening fallback: ${heuristicOpening.bestMove.notation}`);
 console.log(heuristicOpening.explanation.summary);
 
-const analysis = engine.analyzePosition(position, { lines: 3, depth: 2, timeLimitMs: 2000 });
+const analysis = engine.analyzePosition(position, { lines: 3, depth: 2, timeLimitMs: 5000 });
 console.log("");
 console.log("Analysis lines:");
 for (const line of analysis.lines) {
   console.log(`${line.rank}. ${line.move.notation} ${line.explanation.summary}`);
 }
-console.log(`Search stats: ${analysis.nodes} nodes, ${analysis.stats.qnodes} qnodes, ${analysis.stats.qchecks} quiet checks, ${analysis.stats.ttStores} TT stores, ${analysis.stats.ttEvictions} TT evictions, ${analysis.stats.aspirationSearches} aspiration searches, ${analysis.stats.futilityPrunes} futility prunes, ${analysis.stats.deltaPrunes} delta prunes, ${analysis.stats.pvsResearches} PVS re-searches, ${analysis.stats.nullMovePrunes} null-move prunes, ${analysis.stats.countermoveHits} countermove hits, ${analysis.stats.rootScoreOrderHits} root-score order hits`);
+console.log(`Search stats: ${analysis.nodes} nodes, ${analysis.stats.qnodes} qnodes, ${analysis.stats.qchecks} quiet checks, ${analysis.stats.ttStores} TT stores, ${analysis.stats.ttEvictions} TT evictions, ${analysis.stats.aspirationSearches} aspiration searches, ${analysis.stats.futilityPrunes} futility prunes, ${analysis.stats.deltaPrunes} delta prunes, ${analysis.stats.pvsResearches} PVS re-searches, ${analysis.stats.nullMovePrunes} null-move prunes, ${analysis.stats.countermoveHits} countermove hits, ${analysis.stats.rootScoreOrderHits} root-score order hits, ${analysis.stats.rootMovesSearched} root moves searched`);
 const latestIteration = analysis.explanation.search.iterations.at(-1);
 if (latestIteration) {
   const stability = latestIteration.stableBestMove === null ? "initial pick" : latestIteration.stableBestMove ? "stable" : "changed";

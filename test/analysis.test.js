@@ -5,6 +5,7 @@ import {
   buildLinePlan,
   createEngine,
   createInitialPosition,
+  generateLegalMoves,
   parseFen
 } from "../src/index.js";
 
@@ -30,6 +31,23 @@ test("standalone analyzePosition helper mirrors engine analysis", () => {
   assert.equal(analysis.lines.length, 2);
   assert.ok(analysis.explanation.summary.includes(analysis.bestMove.notation));
   assert.equal(analysis.explanation.linePlan.firstMove, analysis.bestMove.notation);
+});
+
+test("multi-line analysis searches exact root candidates by default", () => {
+  const position = parseFen("4k4/9/9/9/9/9/9/9/9/3KR4 r");
+  const engine = createEngine({ depth: 2, timeLimitMs: 1000 });
+  const analysis = engine.analyzePosition(position, {
+    useBook: false,
+    lines: 3,
+    depth: 2,
+    timeLimitMs: 1000
+  });
+  const legalMoveCount = generateLegalMoves(position).length;
+
+  assert.equal(analysis.depth, 2);
+  assert.equal(analysis.lines.length, 3);
+  assert.equal(analysis.stats.rootMovesSearched, legalMoveCount * analysis.depth);
+  assert.equal(analysis.stats.aspirationSearches, 0);
 });
 
 test("move explanations contrast root alternatives", () => {
