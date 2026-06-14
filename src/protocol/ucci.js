@@ -152,14 +152,20 @@ export class UcciSession {
     }
 
     const pv = result.principalVariation.map(protocolMove).join(" ");
-    const outputs = [
-      `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes} qnodes ${result.stats.qnodes} tthits ${result.stats.ttHits} asp ${result.stats.aspirationSearches} asphi ${result.stats.aspirationFailHigh} asplo ${result.stats.aspirationFailLow} ext ${result.stats.extensions} nmp ${result.stats.nullMovePrunes} pvs ${result.stats.pvsResearches} pv ${pv}`,
-      `info string ${result.explanation.summary}`
-    ];
+    const outputs = [];
 
     if (result.source === "opening-book") {
-      outputs.unshift(`info string book ${result.book.name}: ${result.book.idea}`);
+      outputs.push(`info string book ${result.book.name}: ${result.book.idea}`);
     }
+
+    for (const iteration of result.iterations ?? []) {
+      outputs.push(formatIterationInfo(iteration));
+    }
+
+    outputs.push(
+      `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes} qnodes ${result.stats.qnodes} tthits ${result.stats.ttHits} asp ${result.stats.aspirationSearches} asphi ${result.stats.aspirationFailHigh} asplo ${result.stats.aspirationFailLow} ext ${result.stats.extensions} nmp ${result.stats.nullMovePrunes} pvs ${result.stats.pvsResearches} pv ${pv}`,
+      `info string ${result.explanation.summary}`
+    );
 
     for (const reason of result.explanation.reasons.slice(0, 3)) {
       outputs.push(`info string reason: ${reason}`);
@@ -289,6 +295,16 @@ export function protocolMove(move) {
 
 function stripMoveSeparator(notation) {
   return notation.replace("-", "");
+}
+
+function formatIterationInfo(iteration) {
+  const move = iteration.bestMove ? protocolMove(iteration.bestMove) : "0000";
+  const pv = (iteration.principalVariation ?? []).map(protocolMove).join(" ");
+  const stable = iteration.stableBestMove === null
+    ? "initial"
+    : iteration.stableBestMove ? "true" : "false";
+
+  return `info depth ${iteration.depth} currmove ${move} score cp ${Math.round(iteration.score)} nodes ${iteration.nodes} stable ${stable} pv ${pv}`;
 }
 
 function parseGoOptions(line, defaults) {

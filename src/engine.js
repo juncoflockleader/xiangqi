@@ -196,6 +196,7 @@ function maybeBookResult(position, options, tableSize) {
     nodes: 0,
     principalVariation: [bookHit.move],
     candidates,
+    iterations: [],
     timedOut: false,
     tableSize,
     stats: {

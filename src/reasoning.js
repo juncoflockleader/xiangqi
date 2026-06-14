@@ -31,6 +31,9 @@ export function explainMove(position, searchResult) {
     reasons.push(`Search rates this ${Math.round(candidateGap)} centipawns better than the next candidate.`);
   }
 
+  const stability = searchStabilityReason(searchResult.iterations ?? []);
+  if (stability) reasons.push(stability);
+
   if (reasons.length === 0) {
     reasons.push("It is the highest-scoring move after search and keeps the position coordinated.");
   }
@@ -40,7 +43,7 @@ export function explainMove(position, searchResult) {
 
   return {
     summary,
-    reasons: unique(reasons).slice(0, 6),
+    reasons: unique(reasons).slice(0, 7),
     alternatives: explainAlternatives(searchResult.candidates ?? []),
     principalVariation: bestLine.map((candidate) => candidate.notation ?? moveToNotation(candidate)),
     principalVariationText: formatPrincipalVariation(bestLine),
@@ -50,7 +53,8 @@ export function explainMove(position, searchResult) {
       nodes: searchResult.nodes,
       timedOut: searchResult.timedOut,
       tableSize: searchResult.tableSize,
-      stats: searchResult.stats
+      stats: searchResult.stats,
+      iterations: summarizeIterations(searchResult.iterations ?? [])
     }
   };
 }
@@ -83,6 +87,7 @@ export function explainBookMove(position, bookResult) {
       timedOut: false,
       tableSize: bookResult.tableSize,
       stats: bookResult.stats,
+      iterations: [],
       source: "opening-book"
     }
   };
@@ -226,6 +231,36 @@ function candidateScoreGap(searchResult) {
   const candidates = searchResult.candidates ?? [];
   if (candidates.length < 2) return null;
   return candidates[0].score - candidates[1].score;
+}
+
+function searchStabilityReason(iterations) {
+  if (iterations.length < 2) return null;
+
+  const previous = iterations.at(-2);
+  const latest = iterations.at(-1);
+  const latestMove = latest.bestMove?.notation ?? (latest.bestMove ? moveToNotation(latest.bestMove) : null);
+  if (!latestMove) return null;
+
+  if (latest.stableBestMove) {
+    return `The top move stayed ${latestMove} from depth ${previous.depth} to depth ${latest.depth}, which improves confidence in the line.`;
+  }
+
+  const previousMove = previous.bestMove?.notation ?? (previous.bestMove ? moveToNotation(previous.bestMove) : null);
+  if (!previousMove) return null;
+
+  return `The top move changed from ${previousMove} at depth ${previous.depth} to ${latestMove} at depth ${latest.depth}, so the deeper search found a better line.`;
+}
+
+function summarizeIterations(iterations) {
+  return iterations.map((iteration) => ({
+    depth: iteration.depth,
+    bestMove: iteration.bestMove?.notation ?? (iteration.bestMove ? moveToNotation(iteration.bestMove) : null),
+    score: Math.round(iteration.score),
+    nodes: iteration.nodes,
+    stableBestMove: iteration.stableBestMove,
+    principalVariation: (iteration.principalVariation ?? [])
+      .map((move) => move.notation ?? moveToNotation(move))
+  }));
 }
 
 function capitalize(text) {

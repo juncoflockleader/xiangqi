@@ -14,7 +14,7 @@ The current engine is dependency-free JavaScript and includes:
 - Capture safety analysis for distinguishing clean wins from tactically poisoned captures.
 - Immediate pressure/threat analysis for both sides.
 - Perft helpers for validating move generation while the engine grows.
-- Explainable move output for learning-app use cases.
+- Explainable move output for learning-app use cases, including depth-by-depth search trace and best-move stability.
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
 - Whole-game review with side summaries, opening-book matches, and key learning moments.
 - Game-history helpers for play sessions, reviewed move logs, position history, and repeated-position detection.
@@ -42,7 +42,7 @@ console.log(result.bestMove.notation);
 console.log(result.explanation.summary);
 ```
 
-`chooseMove` returns the selected legal move, search score, principal variation, root candidates, selective-search stats, and a learning-friendly explanation. The explanation is based on engine-visible facts such as search score, tactical features, evaluation deltas, and comparison against alternatives.
+`chooseMove` returns the selected legal move, search score, principal variation, root candidates, selective-search stats, per-depth iteration trace, and a learning-friendly explanation. The explanation is based on engine-visible facts such as search score, tactical features, evaluation deltas, best-move stability across depths, and comparison against alternatives.
 
 Use the opening book or opt into pure search:
 

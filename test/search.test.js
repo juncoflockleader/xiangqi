@@ -63,3 +63,18 @@ test("search uses aspiration windows after the first completed depth", () => {
   assert.ok(result.stats.aspirationSearches > 0);
   assert.equal(withoutAspiration.stats.aspirationSearches, 0);
 });
+
+test("search records a per-depth iterative deepening trace", () => {
+  const position = parseFen("4k4/9/4r4/9/9/9/9/9/9/3KR4 r");
+  const result = searchBestMove(position, {
+    depth: 2,
+    timeLimitMs: 1000
+  });
+
+  assert.equal(result.iterations.length, 2);
+  assert.deepEqual(result.iterations.map((iteration) => iteration.depth), [1, 2]);
+  assert.equal(result.iterations[0].stableBestMove, null);
+  assert.equal(result.iterations[1].bestMove.notation, result.bestMove.notation);
+  assert.equal(result.iterations[1].stableBestMove, true);
+  assert.ok(result.iterations.every((iteration) => iteration.principalVariation.length > 0));
+});

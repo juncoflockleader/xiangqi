@@ -54,6 +54,7 @@ export function searchBestMove(position, options = {}) {
       nodes: 0,
       principalVariation: [],
       candidates: [],
+      iterations: [],
       timedOut: false,
       tableSize: table.size,
       stats: createSearchStats()
@@ -70,6 +71,7 @@ export function searchBestMove(position, options = {}) {
   let candidates = [];
   let previousBest = null;
   let previousScore = null;
+  const iterations = [];
 
   for (let depth = 1; depth <= depthLimit; depth += 1) {
     const context = {
@@ -108,6 +110,7 @@ export function searchBestMove(position, options = {}) {
     bestLine = root.principalVariation;
     candidates = root.candidates;
     completedDepth = depth;
+    iterations.push(createIterationRecord(position, depth, root, context, previousBest));
     previousBest = bestMove;
     previousScore = bestScore;
   }
@@ -119,6 +122,7 @@ export function searchBestMove(position, options = {}) {
     nodes,
     principalVariation: bestLine,
     candidates,
+    iterations,
     timedOut,
     tableSize: table.size,
     stats
@@ -202,6 +206,19 @@ function shouldUseAspiration(depth, previousScore, context) {
   if (depth <= 1 || previousScore === null) return false;
   if (Math.abs(previousScore) >= MATE_SCORE - 1000) return false;
   return context.aspirationWindow > 0 && context.aspirationWindow < INFINITY_SCORE;
+}
+
+function createIterationRecord(position, depth, root, context, previousBest) {
+  return {
+    depth,
+    bestMove: root.bestMove ? annotateMove(position, root.bestMove) : null,
+    score: root.score,
+    nodes: context.nodes,
+    principalVariation: root.principalVariation,
+    candidates: root.candidates,
+    stableBestMove: previousBest ? sameMove(root.bestMove, previousBest) : null,
+    stats: { ...context.stats }
+  };
 }
 
 function negamax(position, depth, alpha, beta, ply, context, lineOut, extensionsRemaining, allowNullMove) {
