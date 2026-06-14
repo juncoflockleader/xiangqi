@@ -205,6 +205,9 @@ function maybeBookResult(position, options, tableSize) {
       cutoffs: 0,
       extensions: 0,
       reductions: 0,
+      lmrResearches: 0,
+      pvsResearches: 0,
+      nullMovePrunes: 0,
       repetitions: 0
     },
     book: {

@@ -7,8 +7,8 @@ The current engine is dependency-free JavaScript and includes:
 - Full Xiangqi board representation and FEN parsing.
 - Legal move generation for generals, advisors, elephants, horses, rooks, cannons, and pawns.
 - Check detection, flying-general rules, and make/unmake-style immutable position updates.
-- Iterative-deepening negamax search with alpha-beta pruning.
-- Zobrist hashing, transposition table, quiescence search, capture/check/history-based move ordering, bounded check extensions, late-move reductions, repetition hooks, and root candidate analysis.
+- Iterative-deepening negamax search with alpha-beta and principal variation search.
+- Zobrist hashing, transposition table, quiescence search, capture/check/history-based move ordering, bounded check extensions, guarded null-move pruning, late-move reductions, repetition hooks, and root candidate analysis.
 - Explainable opening-book support with deterministic book move selection and pure-search opt-out.
 - Evaluation terms for material, piece-square placement, mobility, threats, pawn progress, and king safety.
 - Capture safety analysis for distinguishing clean wins from tactically poisoned captures.
@@ -42,7 +42,7 @@ console.log(result.bestMove.notation);
 console.log(result.explanation.summary);
 ```
 
-`chooseMove` returns the selected legal move, search score, principal variation, root candidates, and a learning-friendly explanation. The explanation is based on engine-visible facts such as search score, tactical features, evaluation deltas, and comparison against alternatives.
+`chooseMove` returns the selected legal move, search score, principal variation, root candidates, selective-search stats, and a learning-friendly explanation. The explanation is based on engine-visible facts such as search score, tactical features, evaluation deltas, and comparison against alternatives.
 
 Use the opening book or opt into pure search:
 
@@ -129,7 +129,7 @@ book
 review depth 1 movetime 500
 ```
 
-The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, `setoption name MultiPV value N`, `setoption name UseBook value false`, `analyze`, `probe`, `pressure`, `review`, `explain`, and `quit`.
+The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, `setoption name MultiPV value N`, `setoption name UseBook value false`, `analyze`, `probe`, `pressure`, `review`, `explain`, and `quit`. `go` info lines include counters such as `qnodes`, `tthits`, `ext`, `nmp`, and `pvs` for learning-app diagnostics.
 
 ## Movegen Validation
 

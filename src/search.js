@@ -2,6 +2,7 @@ import {
   DRAW_SCORE,
   INFINITY_SCORE,
   MATE_SCORE,
+  PIECES,
   PIECE_VALUES
 } from "./constants.js";
 import {
@@ -27,6 +28,7 @@ const LOWER = "lower";
 const UPPER = "upper";
 const DEFAULT_MAX_EXTENSIONS = 4;
 const DEFAULT_MAX_PLY = 80;
+const NULL_MOVE_MIN_DEPTH = 3;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -78,6 +80,8 @@ export function searchBestMove(position, options = {}) {
       pathCounts: new Map(),
       maxExtensions: options.maxExtensions ?? DEFAULT_MAX_EXTENSIONS,
       maxPly: options.maxPly ?? DEFAULT_MAX_PLY,
+      useNullMove: options.useNullMove !== false,
+      usePvs: options.usePvs !== false,
       tacticalCache: new Map(),
       stats: createSearchStats(),
       nodes: 0,
@@ -131,7 +135,7 @@ function searchRoot(position, depth, previousBest, context, rootMoves) {
 
     const next = makeMove(position, move);
     const line = [];
-    const score = normalizeScore(-negamax(next, depth - 1, -INFINITY_SCORE, INFINITY_SCORE, 1, context, line, context.maxExtensions));
+    const score = normalizeScore(-negamax(next, depth - 1, -INFINITY_SCORE, INFINITY_SCORE, 1, context, line, context.maxExtensions, true));
     const annotated = annotateMove(position, move);
 
     candidates.push({
@@ -159,7 +163,7 @@ function searchRoot(position, depth, previousBest, context, rootMoves) {
   };
 }
 
-function negamax(position, depth, alpha, beta, ply, context, lineOut, extensionsRemaining) {
+function negamax(position, depth, alpha, beta, ply, context, lineOut, extensionsRemaining, allowNullMove) {
   context.nodes += 1;
   context.stats.nodes += 1;
   if (isTimedOut(context)) {
@@ -211,6 +215,33 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     }
   }
 
+  if (shouldTryNullMove(position, depth, beta, inCheck, context, allowNullMove)) {
+    const reduction = nullMoveReduction(depth);
+    const nullPosition = makeNullMove(position);
+    const nullScore = normalizeScore(-negamax(
+      nullPosition,
+      depth - 1 - reduction,
+      -beta,
+      -beta + 1,
+      ply + 1,
+      context,
+      null,
+      extensionsRemaining,
+      false
+    ));
+
+    if (context.timedOut) {
+      leavePosition(context, repetitionKey);
+      return nullScore;
+    }
+
+    if (nullScore >= beta) {
+      context.stats.nullMovePrunes += 1;
+      leavePosition(context, repetitionKey);
+      return beta;
+    }
+  }
+
   const legalMoves = generateLegalMoves(position, position.turn);
 
   if (legalMoves.length === 0) {
@@ -226,7 +257,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   for (let index = 0; index < ordered.length; index += 1) {
     const move = ordered[index];
     const next = makeMove(position, move);
-    const childLine = [];
+    let childLine = [];
     const givesCheck = isInCheck(next, next.turn);
     const extension = shouldExtend({ inCheck, givesCheck, move, extensionsRemaining }) ? 1 : 0;
     const childExtensions = extensionsRemaining - extension;
@@ -235,18 +266,55 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     let reduction = shouldReduce({ depth, index, move, inCheck, givesCheck }) ? 1 : 0;
     if (reduction > 0) context.stats.reductions += 1;
 
-    let score = normalizeScore(-negamax(
-      next,
-      depth - 1 + extension - reduction,
-      -beta,
-      -alpha,
-      ply + 1,
-      context,
-      childLine,
-      childExtensions
-    ));
+    let childDepth = depth - 1 + extension - reduction;
+    let score;
 
-    if (reduction > 0 && score > alpha) {
+    if (index > 0 && context.usePvs) {
+      score = normalizeScore(-negamax(
+        next,
+        childDepth,
+        -alpha - 1,
+        -alpha,
+        ply + 1,
+        context,
+        childLine,
+        childExtensions,
+        true
+      ));
+    } else {
+      score = normalizeScore(-negamax(
+        next,
+        childDepth,
+        -beta,
+        -alpha,
+        ply + 1,
+        context,
+        childLine,
+        childExtensions,
+        true
+      ));
+    }
+
+    if (reduction > 0 && score > alpha && !context.timedOut) {
+      context.stats.lmrResearches += 1;
+      childDepth = depth - 1 + extension;
+      childLine = [];
+      score = normalizeScore(-negamax(
+        next,
+        childDepth,
+        context.usePvs && index > 0 ? -alpha - 1 : -beta,
+        -alpha,
+        ply + 1,
+        context,
+        childLine,
+        childExtensions,
+        true
+      ));
+    }
+
+    if (index > 0 && context.usePvs && score > alpha && score < beta && !context.timedOut) {
+      context.stats.pvsResearches += 1;
+      childLine = [];
       score = normalizeScore(-negamax(
         next,
         depth - 1 + extension,
@@ -255,7 +323,8 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
         ply + 1,
         context,
         childLine,
-        childExtensions
+        childExtensions,
+        true
       ));
     }
 
@@ -380,6 +449,33 @@ function shouldReduce({ depth, index, move, inCheck, givesCheck }) {
   return true;
 }
 
+function shouldTryNullMove(position, depth, beta, inCheck, context, allowNullMove) {
+  if (!context.useNullMove || !allowNullMove) return false;
+  if (inCheck || depth < NULL_MOVE_MIN_DEPTH) return false;
+  if (beta >= MATE_SCORE - 1000 || beta <= -MATE_SCORE + 1000) return false;
+  if (!hasNullMoveMaterial(position, position.turn)) return false;
+  return true;
+}
+
+function nullMoveReduction(depth) {
+  return depth >= 5 ? 3 : 2;
+}
+
+function makeNullMove(position) {
+  return {
+    ...position,
+    turn: opponent(position.turn),
+    halfmove: (position.halfmove ?? 0) + 1
+  };
+}
+
+function hasNullMoveMaterial(position, side) {
+  return position.board.some((piece) => (
+    piece?.side === side
+    && (piece.type === PIECES.ROOK || piece.type === PIECES.CANNON || piece.type === PIECES.HORSE)
+  ));
+}
+
 function rememberKiller(killers, ply, move) {
   const existing = killers.get(ply) ?? [];
   if (existing.some((candidate) => sameMove(candidate, move))) return;
@@ -437,6 +533,9 @@ function createSearchStats() {
     cutoffs: 0,
     extensions: 0,
     reductions: 0,
+    lmrResearches: 0,
+    pvsResearches: 0,
+    nullMovePrunes: 0,
     repetitions: 0
   };
 }
@@ -449,6 +548,9 @@ function mergeSearchStats(total, next) {
     cutoffs: total.cutoffs + next.cutoffs,
     extensions: total.extensions + next.extensions,
     reductions: total.reductions + next.reductions,
+    lmrResearches: total.lmrResearches + next.lmrResearches,
+    pvsResearches: total.pvsResearches + next.pvsResearches,
+    nullMovePrunes: total.nullMovePrunes + next.nullMovePrunes,
     repetitions: total.repetitions + next.repetitions
   };
 }
