@@ -43,9 +43,10 @@ npm test
 
 For an interactive terminal game, run `npm run play`. The default demo lets you play
 red against the fast JavaScript engine; use `npm run play -- --side black`,
-`--depth 3`, `--time 1500`, or `--no-book` to experiment. Moves use coordinate
-notation such as `h9-g7` or `h9g7`, and the `hint`, `best`, and `why` commands
-show the learning-oriented explanation layer while you play.
+`--depth 3`, `--time 1500`, `--book ./oracle-opening-book.json`, or `--no-book`
+to experiment. Moves use coordinate notation such as `h9-g7` or `h9g7`, and the
+`hint`, `best`, and `why` commands show the learning-oriented explanation layer
+while you play.
 
 ## API Sketch
 
@@ -162,6 +163,12 @@ const oracleBook = createOpeningBookFromOracleArtifact(artifact);
 const engine = createEngine({
   book: mergeOpeningBooks(DEFAULT_OPENING_BOOK, oracleBook)
 });
+```
+
+You can also try the generated book directly in the terminal game:
+
+```sh
+npm run play -- --side black --book ./oracle-opening-book.json
 ```
 
 Use `--records-only` when you only want the raw records array for

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { readFile } from "node:fs/promises";
+import { extname } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import {
@@ -7,6 +9,9 @@ import {
   chooseGameMove,
   createEngine,
   createGame,
+  createOpeningBookFromCsv,
+  createOpeningBookFromOracleArtifact,
+  createOpeningBookFromText,
   formatBoard,
   gameStatus,
   historyKeys,
@@ -30,10 +35,19 @@ if (options.help) {
   process.exit(0);
 }
 
+let openingBook;
+try {
+  openingBook = await loadOpeningBook(options);
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+
 const engine = createEngine({
   profile: options.profile,
   depth: options.depth,
-  timeLimitMs: options.timeLimitMs
+  timeLimitMs: options.timeLimitMs,
+  ...(openingBook ? { book: openingBook } : {})
 });
 const rl = createInterface({ input, output });
 const engineSide = opponent(options.playerSide);
@@ -47,6 +61,9 @@ rl.on("close", () => {
 
 console.log("Xiangqi CLI demo");
 console.log(`You are ${options.playerSide}; engine is ${engineSide}.`);
+if (options.bookPath) {
+  console.log(`Opening book: ${options.bookPath} (${resolveBookFormat(options.bookPath, options.bookFormat)})`);
+}
 console.log("Move notation uses board coordinates, for example h9-g7 or h9g7.");
 console.log("Commands: moves, hint, best, why, fen, undo, help, quit.");
 console.log("");
@@ -275,12 +292,15 @@ Usage:
   npm run play
   npm run play -- --side black
   npm run play -- --depth 3 --time 1500 --no-book
+  npm run play -- --side black --book ./oracle-opening-book.json
 
 Options:
   --side red|black      Choose your side. Default: red.
   --profile name        Engine profile. Default: fast.
   --depth n             Search depth. Default: 2.
   --time ms             Move time budget. Default: 750.
+  --book file           Load opening book data from JSON, CSV/TSV, or text.
+  --book-format format  Book format: auto, json, csv, tsv, text.
   --no-book             Disable opening book moves.
 
 Commands during play:
@@ -309,6 +329,8 @@ function parseArgs(args) {
     profile: "fast",
     depth: 2,
     timeLimitMs: 750,
+    bookPath: process.env.XIANGQI_OPENING_BOOK,
+    bookFormat: process.env.XIANGQI_OPENING_BOOK_FORMAT ?? "auto",
     useBook: true,
     help: false
   };
@@ -343,10 +365,21 @@ function parseArgs(args) {
       index += 1;
       continue;
     }
+    if (arg === "--book") {
+      parsed.bookPath = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--book-format") {
+      parsed.bookFormat = parseBookFormat(requireValue(args, index, arg));
+      index += 1;
+      continue;
+    }
 
     throw new Error(`Unknown option: ${arg}`);
   }
 
+  parsed.bookFormat = parseBookFormat(parsed.bookFormat);
   return parsed;
 }
 
@@ -369,6 +402,45 @@ function parsePositiveInteger(value, option) {
     throw new Error(`${option} must be a positive integer.`);
   }
   return parsed;
+}
+
+async function loadOpeningBook(options) {
+  if (!options.bookPath) return null;
+
+  const format = resolveBookFormat(options.bookPath, options.bookFormat);
+  let text;
+  try {
+    text = await readFile(options.bookPath, "utf8");
+  } catch (error) {
+    throw new Error(`Could not read opening book ${options.bookPath}: ${error.message}`);
+  }
+
+  try {
+    if (format === "json") return createOpeningBookFromOracleArtifact(text);
+    if (format === "csv") return createOpeningBookFromCsv(text);
+    if (format === "tsv") return createOpeningBookFromCsv(text, { delimiter: "\t" });
+    return createOpeningBookFromText(text);
+  } catch (error) {
+    throw new Error(`Could not load opening book ${options.bookPath}: ${error.message}`);
+  }
+}
+
+function resolveBookFormat(path, requested = "auto") {
+  const format = parseBookFormat(requested);
+  if (format !== "auto") return format;
+
+  const extension = extname(path).toLowerCase();
+  if (extension === ".json") return "json";
+  if (extension === ".csv") return "csv";
+  if (extension === ".tsv") return "tsv";
+  return "text";
+}
+
+function parseBookFormat(value = "auto") {
+  const normalized = String(value).toLowerCase();
+  if (normalized === "oracle" || normalized === "records") return "json";
+  if (["auto", "json", "csv", "tsv", "text"].includes(normalized)) return normalized;
+  throw new Error("--book-format must be auto, json, csv, tsv, or text.");
 }
 
 function findLastEngineDecision(currentGame) {
