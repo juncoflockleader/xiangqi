@@ -18,7 +18,7 @@ The current engine is dependency-free JavaScript and includes:
 - Progressive coach hints that can reveal an idea, tactical clue, candidate focus, and full best-move reasoning.
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
 - Whole-game review with side summaries, opening-book matches, and key learning moments.
-- Game-history helpers for play sessions, reviewed move logs, position history, and repeated-position detection.
+- Game-history helpers for play sessions, reviewed move logs, engine decision logs, position history, repeated-position detection, and async native-backend play.
 - A backend adapter contract and async UCCI process wrapper so the JS reference engine can sit beside a native C++/WASM engine without changing the learning-app API.
 - Shared time-control budgeting for fixed movetime and clock-based `wtime`/`btime`/increment searches.
 - Starter benchmark positions for opening, tactical, and forcing-search regressions.
@@ -117,7 +117,7 @@ console.log(nativeGameReview.summary);
 await nativeBackend.close();
 ```
 
-The JavaScript backend is the reference learning engine. The UCCI backend is async because it talks to an external process. By default it checks the JS/imported opening book before starting native search, and `useBook: false` forces a pure native search. Native `reviewMove` and `reviewGame` compare played moves against the UCCI engine's preferred moves, then use the JS explanation layer to turn score gaps into learning feedback. The built-in backends expose `chooseMove`, `analyzePosition`, `reviewMove`, `reviewGame`, `openingBook`, `play`, and `legalMoves`, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
+The JavaScript backend is the reference learning engine. The UCCI backend is async because it talks to an external process. By default it checks the JS/imported opening book before starting native search, and `useBook: false` forces a pure native search. Native `reviewMove` and `reviewGame` compare played moves against the UCCI engine's preferred moves, then use the JS explanation layer to turn score gaps into learning feedback. The built-in backends expose `chooseMove`, `analyzePosition`, `reviewMove`, `reviewGame`, `coachMove`, `openingBook`, `play`, and `legalMoves`, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
 
 Review a player's move:
 
@@ -201,15 +201,30 @@ console.log(pressure.opponentThreats[0]?.summary);
 Track a play session:
 
 ```js
-import { chooseGameMove, createGame, playGameMove, gameStatus } from "./src/index.js";
+import {
+  chooseAndPlayGameMove,
+  chooseAndPlayGameMoveAsync,
+  createGame,
+  gameStatus,
+  playGameMove,
+  playGameMoveAsync
+} from "./src/index.js";
 
 let game = createGame();
 game = playGameMove(game, engine, "a9-a8");
-const reply = chooseGameMove(game, engine);
+game = chooseAndPlayGameMove(game, engine, {
+  searchOptions: { depth: 2, timeLimitMs: 1000 }
+});
 
 console.log(game.moves.at(-1).review.explanation.summary);
-console.log(reply.explanation.summary);
+console.log(game.moves.at(-1).decision.explanation.summary);
 console.log(gameStatus(game));
+
+game = await playGameMoveAsync(game, nativeBackend, "h9-g7");
+game = await chooseAndPlayGameMoveAsync(game, nativeBackend, {
+  searchOptions: { useBook: false, depth: 8, timeLimitMs: 3000 },
+  reviewOptions: { depth: 8, timeLimitMs: 3000 }
+});
 ```
 
 Review a completed or partial game:
