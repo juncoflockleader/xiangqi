@@ -86,3 +86,42 @@ test("backend position study preserves oracle review evidence", async () => {
     await backend.close();
   }
 });
+
+test("backend position study preserves native score details", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    depth: 3,
+    timeLimitMs: 100,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockMateWdl: true
+    }
+  });
+
+  try {
+    const study = await studyPositionWithBackend(backend, createInitialPosition(), {
+      useBook: false,
+      depth: 3,
+      timeLimitMs: 100,
+      lines: 2
+    });
+
+    assert.equal(study.bestMove, "h9-g7");
+    assert.equal(study.decision.scoreDetail.kind, "mate");
+    assert.equal(study.decision.scoreDetail.text, "mate in 2");
+    assert.equal(study.decision.scoreText, "mate in 2");
+    assert.equal(study.decision.wdl.text, "98% win, 2% draw, 0% loss");
+    assert.ok(study.decision.summary.includes("mate in 2"));
+    assert.equal(study.candidateLines[0].scoreDetail.text, "mate in 2");
+    assert.equal(study.candidateLines[0].scoreText, "mate in 2");
+    assert.equal(study.candidateLines[0].wdl.text, "98% win, 2% draw, 0% loss");
+    assert.equal(study.coach.scoreDetail.text, "mate in 2");
+    assert.equal(study.coach.wdl.text, "98% win, 2% draw, 0% loss");
+    assert.equal(study.coach.alternatives[0].scoreDetail.text, "mate in 2");
+  } finally {
+    await backend.close();
+  }
+});

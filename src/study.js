@@ -160,7 +160,9 @@ function summarizeDecision(decision) {
     source: decision.source ?? "search",
     bestMove: notationFor(decision.bestMove),
     score: Math.round(decision.score ?? 0),
-    scoreText: formatCentipawns(decision.score),
+    scoreDetail: scoreDetailFor(decision),
+    scoreText: scoreTextFor(decision),
+    wdl: decision.wdl ?? decision.explanation?.search?.wdl ?? null,
     depth: decision.depth ?? 0,
     nodes: decision.nodes ?? 0,
     summary: decision.explanation?.summary ?? "",
@@ -178,7 +180,9 @@ function summarizeCandidateLines(analysis) {
     rank: line.rank,
     move: notationFor(line.move),
     score: Math.round(line.score ?? 0),
-    scoreText: formatCentipawns(line.score),
+    scoreDetail: scoreDetailFor(line),
+    scoreText: scoreTextFor(line),
+    wdl: line.wdl ?? null,
     centipawnLoss: Math.round(line.centipawnLoss ?? 0),
     principalVariation: [...(line.principalVariation ?? [])],
     summary: line.explanation?.summary ?? "",
@@ -192,11 +196,18 @@ function summarizeCoach(coach) {
   return {
     source: coach.source ?? "search",
     bestMove: notationFor(coach.bestMove),
+    score: Math.round(coach.score ?? 0),
+    scoreDetail: scoreDetailFor(coach),
+    scoreText: scoreTextFor(coach),
+    wdl: coach.wdl ?? null,
     summary: coach.summary,
     levels: (coach.levels ?? []).map((level) => ({ ...level })),
     alternatives: (coach.alternatives ?? []).map((alternative) => ({
       ...alternative,
-      move: notationFor(alternative.move)
+      move: notationFor(alternative.move),
+      scoreDetail: scoreDetailFor(alternative),
+      scoreText: scoreTextFor(alternative),
+      wdl: alternative.wdl ?? alternative.native?.wdl ?? null
     })),
     principalVariation: [...(coach.principalVariation ?? [])]
   };
@@ -211,6 +222,9 @@ function summarizeReview(review) {
     isBestMove: Boolean(review.isBestMove),
     playedScore: Math.round(review.playedScore ?? 0),
     bestScore: Math.round(review.bestScore ?? 0),
+    bestScoreDetail: scoreDetailFor(review.bestAnalysis),
+    bestScoreText: scoreTextFor(review.bestAnalysis ?? { score: review.bestScore }),
+    bestWdl: review.bestAnalysis?.wdl ?? null,
     depth: review.depth ?? 0,
     nodes: review.nodes ?? 0,
     summary: review.explanation?.summary ?? "",
@@ -316,6 +330,15 @@ function notationFor(move) {
 function formatCentipawns(value) {
   const rounded = Math.round(value ?? 0);
   return `${rounded >= 0 ? "+" : ""}${rounded} cp`;
+}
+
+function scoreDetailFor(entry) {
+  if (!entry) return null;
+  return entry.scoreDetail ?? entry.native?.scoreDetail ?? entry.explanation?.search?.scoreDetail ?? null;
+}
+
+function scoreTextFor(entry) {
+  return scoreDetailFor(entry)?.text ?? formatCentipawns(entry?.score);
 }
 
 function capitalize(text) {

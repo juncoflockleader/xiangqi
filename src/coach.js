@@ -119,6 +119,9 @@ function buildCoachMove(position, result, options) {
     source: result.source ?? "search",
     bestMove: result.bestMove,
     score: Math.round(result.score ?? 0),
+    scoreDetail: scoreDetailFor(result),
+    scoreText: scoreTextFor(result),
+    wdl: result.wdl ?? result.explanation?.search?.wdl ?? null,
     depth: result.depth ?? 0,
     nodes: result.nodes ?? 0,
     summary: `Try to find the best move for ${position.turn}.`,
@@ -219,11 +222,22 @@ function normalizeAlternatives(result) {
     move: candidate.move,
     notation: candidate.move.notation ?? moveToNotation(candidate.move),
     score: Math.round(candidate.score ?? 0),
+    scoreDetail: scoreDetailFor(candidate),
+    scoreText: scoreTextFor(candidate),
+    wdl: candidate.wdl ?? candidate.native?.wdl ?? null,
     principalVariation: (candidate.principalVariation ?? [])
       .map((move) => move.notation ?? moveToNotation(move)),
     book: candidate.book ?? null,
     native: candidate.native ?? null
   }));
+}
+
+function scoreDetailFor(entry) {
+  return entry?.scoreDetail ?? entry?.native?.scoreDetail ?? entry?.explanation?.search?.scoreDetail ?? null;
+}
+
+function scoreTextFor(entry) {
+  return scoreDetailFor(entry)?.text ?? formatScore(entry?.score ?? 0);
 }
 
 function normalizePrincipalVariation(result) {
