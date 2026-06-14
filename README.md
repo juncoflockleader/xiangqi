@@ -20,12 +20,14 @@ The current engine is dependency-free JavaScript and includes:
 - Game-history helpers for play sessions, reviewed move logs, position history, and repeated-position detection.
 - A backend adapter contract and async UCCI process wrapper so the JS reference engine can sit beside a native C++/WASM engine without changing the learning-app API.
 - Shared time-control budgeting for fixed movetime and clock-based `wtime`/`btime`/increment searches.
+- Starter benchmark positions for opening, tactical, and forcing-search regressions.
 - A minimal UCCI-style protocol adapter for GUI/app integration and engine smoke testing.
 
 ## Quick Start
 
 ```sh
 node examples/engine-demo.mjs
+node examples/benchmark.mjs
 node examples/perft.mjs 2
 node bin/xiangqi-ucci.mjs
 node --test
@@ -134,6 +136,17 @@ for (const line of analysis.lines) {
 
 `analyzePosition` returns ranked candidate lines with scores, centipawn loss against the best move, principal variations, and individual explanations.
 
+Run benchmark positions:
+
+```js
+import { formatBenchmarkReport, runBenchmarkSuite } from "./src/index.js";
+
+const report = await runBenchmarkSuite();
+console.log(formatBenchmarkReport(report));
+```
+
+The benchmark suite is intentionally small for now: it checks the opening layer, a clean tactical capture, and an immediate forcing win. It is a regression guardrail for search changes and a foundation for comparing the JS reference backend with stronger native engines later.
+
 Inspect threats without running a full search:
 
 ```js
@@ -211,5 +224,5 @@ Coordinates use file letters `a` through `i` and ranks `0` through `9`, with ran
 - Expand the opening book and repetition rule handling.
 - Harden the native/UCCI backend with richer time controls, engine option profiles, and production process supervision.
 - Add stronger time management and deeper late-game search extensions.
-- Add engine-vs-engine benchmark positions.
+- Expand benchmark positions and add engine-vs-engine comparison reports.
 - Connect the engine to a playable learning UI with move review, hints, and lesson generation.

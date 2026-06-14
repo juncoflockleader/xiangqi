@@ -1,5 +1,5 @@
 import { applyLegalMove, annotateMove, generateLegalMoves, legalMovesWithNotation } from "./movegen.js";
-import { moveToNotation, parseMoveNotation, sameMove } from "./board.js";
+import { makeMove, moveToNotation, parseMoveNotation, sameMove } from "./board.js";
 import { bookMoveToCandidate, lookupOpeningBook } from "./book.js";
 import { evaluatePosition } from "./evaluate.js";
 import { analyzePressure } from "./pressure.js";
@@ -76,11 +76,8 @@ export function createEngine(defaultOptions = {}) {
         priorityMoves: [move],
         transpositionTable
       });
-      const candidate = search.candidates.find((entry) => sameMove(entry.move, move));
-
-      if (!candidate) {
-        throw new Error(`Search did not score legal move ${moveToNotation(move)}.`);
-      }
+      const candidate = search.candidates.find((entry) => sameMove(entry.move, move))
+        ?? fallbackReviewedCandidate(position, move);
 
       const bestMove = search.bestMove;
       const isBestMove = sameMove(move, bestMove);
@@ -182,6 +179,17 @@ function resolveLegalMove(position, moveOrNotation) {
   }
 
   return move;
+}
+
+function fallbackReviewedCandidate(position, move) {
+  const annotated = annotateMove(position, move);
+  const after = makeMove(position, move);
+  return {
+    move: annotated,
+    score: evaluatePosition(after, position.turn, { detailed: false }).score,
+    principalVariation: [annotated],
+    fallback: "static-evaluation"
+  };
 }
 
 function normalizeLineCount(value) {

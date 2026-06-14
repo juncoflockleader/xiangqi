@@ -47,3 +47,15 @@ test("standalone game review helper accepts an engine", () => {
   assert.equal(review.moves.length, 1);
   assert.equal(review.moves[0].notation, "h7-e7");
 });
+
+test("move review falls back when timeout prevents root candidate scoring", () => {
+  const engine = createEngine({ depth: 3, timeLimitMs: 1 });
+  const review = engine.reviewMove(createInitialPosition(), "h7-e7", {
+    depth: 3,
+    timeLimitMs: 1
+  });
+
+  assert.equal(review.move.notation, "h7-e7");
+  assert.ok(Number.isFinite(review.playedScore));
+  assert.ok(review.principalVariation.includes("h7-e7"));
+});
