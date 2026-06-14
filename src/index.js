@@ -24,6 +24,7 @@ export * from "./review.js";
 export * from "./coach.js";
 export * from "./lesson.js";
 export * from "./study.js";
+export * from "./game-study.js";
 export * from "./protocol/ucci.js";
 export * from "./game.js";
 export * from "./perft.js";

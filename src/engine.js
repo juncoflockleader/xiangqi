@@ -9,6 +9,7 @@ import { reviewGameWithEngine } from "./review.js";
 import { coachMoveWithEngine } from "./coach.js";
 import { createLessonPlanWithEngine } from "./lesson.js";
 import { studyPositionWithEngine } from "./study.js";
+import { createGameStudyWithEngine } from "./game-study.js";
 import { resolveEngineOptions } from "./profiles.js";
 import { searchBestMove } from "./search.js";
 import { createTranspositionTable } from "./transposition.js";
@@ -169,6 +170,20 @@ export function createEngine(defaultOptions = {}) {
         reviewOptions: {
           ...engineOptions,
           ...(options.reviewOptions ?? {})
+        }
+      });
+    },
+
+    gameStudy(moves, options = {}) {
+      return createGameStudyWithEngine(this, moves, {
+        ...options,
+        reviewOptions: {
+          ...engineOptions,
+          ...(options.reviewOptions ?? {})
+        },
+        studyOptions: {
+          ...engineOptions,
+          ...(options.studyOptions ?? {})
         }
       });
     },

@@ -19,6 +19,7 @@ import { reviewGameWithBackend } from "./review.js";
 import { coachMoveWithBackend } from "./coach.js";
 import { createLessonPlanWithBackend } from "./lesson.js";
 import { studyPositionWithBackend } from "./study.js";
+import { createGameStudyWithBackend } from "./game-study.js";
 import { resolveEngineOptions } from "./profiles.js";
 
 const DEFAULT_UCCI_TIMEOUT_MS = 5000;
@@ -145,6 +146,22 @@ export function createUcciEngineBackend(options = {}) {
           lines: 1,
           protocol,
           useBook: false
+        })
+      });
+    },
+    gameStudy: (moves, gameStudyOptions = {}) => {
+      const { reviewOptions = {}, studyOptions = {}, ...studyPlanOptions } = gameStudyOptions;
+      return createGameStudyWithBackend(backend, moves, {
+        ...studyPlanOptions,
+        reviewOptions: mergeNativeOptions(backendOptions, reviewOptions, {
+          backendName: name,
+          lines: 1,
+          protocol,
+          useBook: false
+        }),
+        studyOptions: mergeNativeOptions(backendOptions, studyOptions, {
+          backendName: name,
+          protocol
         })
       });
     },

@@ -137,6 +137,27 @@ console.log(study.playedMoveReview?.classification);
 candidate lines, progressive hints, pressure/threat summary, optional played-move
 review, and any oracle-review evidence attached by the active backend.
 
+For a full played game, ask for a game study. It reuses the review pipeline,
+turns key moments into lesson cards, and attaches deeper position studies for
+the most important decisions:
+
+```js
+const gameStudy = engine.gameStudy(["h7-e7", "h0-g2", "h9-g7"], {
+  maxPositionStudies: 2,
+  reviewOptions: { depth: 2, timeLimitMs: 1000 },
+  studyOptions: { lines: 3, depth: 2, timeLimitMs: 1000 },
+  lessonOptions: { maxCards: 3 }
+});
+
+console.log(gameStudy.summary);
+console.log(gameStudy.lessonPlan.cards[0]?.prompt);
+console.log(gameStudy.positionStudies[0]?.summary);
+```
+
+`gameStudy` returns the full move review, compact key moments, lesson cards,
+position-study bundles for selected plies, final FEN, and next-step prompts so a
+learning UI can move from game recap into focused practice.
+
 Use named engine profiles when wiring the app:
 
 ```js
@@ -346,7 +367,7 @@ native-engine configuration separate from shared search options. Set
 `fallbackOnNativeError: false` for strict native behavior that reports process
 errors instead of recovering with the JS reference engine.
 
-The JavaScript backend is the reference learning engine. The native backend is async because it talks to an external UCI/UCCI process; UCCI is the default, and `protocol: "uci"` supports UCI-style engines such as Pikafish. For UCI Xiangqi engines, the adapter translates the app's readable FEN and coordinates into the common native dialect: horses/elephants use `N/B`, Red-to-move becomes `w`, and UCI rank coordinates are mirrored at the process boundary. By default it checks the JS/imported opening book before starting native search, and `useBook: false` forces a pure native search. Native `reviewMove` and `reviewGame` compare played moves against the external engine's preferred moves, then use the JS explanation layer to turn score gaps into learning feedback. The built-in backends expose `chooseMove`, `analyzePosition`, `reviewMove`, `reviewGame`, `coachMove`, `lessonPlan`, `openingBook`, `play`, and `legalMoves`, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
+The JavaScript backend is the reference learning engine. The native backend is async because it talks to an external UCI/UCCI process; UCCI is the default, and `protocol: "uci"` supports UCI-style engines such as Pikafish. For UCI Xiangqi engines, the adapter translates the app's readable FEN and coordinates into the common native dialect: horses/elephants use `N/B`, Red-to-move becomes `w`, and UCI rank coordinates are mirrored at the process boundary. By default it checks the JS/imported opening book before starting native search, and `useBook: false` forces a pure native search. Native `reviewMove` and `reviewGame` compare played moves against the external engine's preferred moves, then use the JS explanation layer to turn score gaps into learning feedback. The built-in backends expose `chooseMove`, `analyzePosition`, `reviewMove`, `reviewGame`, `coachMove`, `lessonPlan`, `studyPosition`, `gameStudy`, `openingBook`, `play`, and `legalMoves`, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
 
 Wrap a fast candidate backend with a stronger oracle reviewer when the app wants
 interactive speed plus a top-engine verdict on the current pick:

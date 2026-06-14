@@ -475,3 +475,29 @@ test("UCCI backend creates lesson plans from native reviews", async () => {
     await backend.close();
   }
 });
+
+test("UCCI backend creates full game studies from native reviews", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const study = await backend.gameStudy(["h7-e7"], {
+      maxPositionStudies: 0,
+      reviewOptions: { depth: 2, timeLimitMs: 500 },
+      lessonOptions: { maxCards: 1 }
+    });
+
+    assert.equal(study.type, "game-study");
+    assert.equal(study.summary.totalMoves, 1);
+    assert.equal(study.review.moves[0].review.source, "native-ucci");
+    assert.equal(study.lessonPlan.cards[0].bestMove, "h9-g7");
+    assert.equal(study.positionStudies.length, 0);
+  } finally {
+    await backend.close();
+  }
+});

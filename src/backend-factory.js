@@ -119,6 +119,7 @@ export function createFallbackEngineBackend(primaryBackend, fallbackBackend, opt
     coachMove: (...args) => searchWithFallback("coachMove", args),
     studyPosition: (...args) => searchWithFallback("studyPosition", args),
     lessonPlan: (...args) => searchWithFallback("lessonPlan", args),
+    gameStudy: (...args) => searchWithFallback("gameStudy", args),
     openingBook: (...args) => auxiliaryWithFallback("openingBook", args),
     evaluate: (...args) => auxiliaryWithFallback("evaluate", args),
     pressure: (...args) => auxiliaryWithFallback("pressure", args),

@@ -45,6 +45,7 @@ export function createJavaScriptEngineBackend(options = {}) {
     coachMove: (position, coachOptions = {}) => engine.coachMove(position, coachOptions),
     studyPosition: (position, studyOptions = {}) => engine.studyPosition(position, studyOptions),
     lessonPlan: (moves, lessonOptions = {}) => engine.lessonPlan(moves, lessonOptions),
+    gameStudy: (moves, gameStudyOptions = {}) => engine.gameStudy(moves, gameStudyOptions),
     openingBook: (position, bookOptions = {}) => engine.openingBook(position, bookOptions),
     evaluate: (position, evaluationOptions = {}) => engine.evaluate(position, evaluationOptions),
     pressure: (position, pressureOptions = {}) => engine.pressure(position, pressureOptions),
