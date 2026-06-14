@@ -6,6 +6,7 @@ import { analyzePressure } from "./pressure.js";
 import { explainBookMove, explainCandidateMove, explainMove, explainReviewedMove } from "./reasoning.js";
 import { reviewGameWithEngine } from "./review.js";
 import { coachMoveWithEngine } from "./coach.js";
+import { createLessonPlanWithEngine } from "./lesson.js";
 import { searchBestMove } from "./search.js";
 import { createTranspositionTable } from "./transposition.js";
 
@@ -110,11 +111,11 @@ export function createEngine(defaultOptions = {}) {
 
     reviewGame(moves, options = {}) {
       return reviewGameWithEngine(this, moves, {
+        ...options,
         reviewOptions: {
           ...defaultOptions,
           ...(options.reviewOptions ?? {})
-        },
-        ...options
+        }
       });
     },
 
@@ -122,6 +123,16 @@ export function createEngine(defaultOptions = {}) {
       return coachMoveWithEngine(this, position, {
         ...defaultOptions,
         ...options
+      });
+    },
+
+    lessonPlan(moves, options = {}) {
+      return createLessonPlanWithEngine(this, moves, {
+        ...options,
+        reviewOptions: {
+          ...defaultOptions,
+          ...(options.reviewOptions ?? {})
+        }
       });
     },
 

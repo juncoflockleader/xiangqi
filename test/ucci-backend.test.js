@@ -193,3 +193,28 @@ test("UCCI backend reviews games with native move reviews", async () => {
     await backend.close();
   }
 });
+
+test("UCCI backend creates lesson plans from native reviews", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const plan = await backend.lessonPlan(["h7-e7"], {
+      reviewOptions: { depth: 2, timeLimitMs: 500 },
+      lessonOptions: { maxCards: 1 }
+    });
+
+    assert.equal(plan.cards.length, 1);
+    assert.equal(plan.cards[0].type, "opening");
+    assert.equal(plan.cards[0].bestMove, "h9-g7");
+    assert.equal(plan.cards[0].answer.move, "h7-e7");
+    assert.equal(plan.cards[0].answer.principalVariation[0], "h7-e7");
+  } finally {
+    await backend.close();
+  }
+});

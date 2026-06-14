@@ -76,3 +76,15 @@ console.log(`Game review: ${gameReview.summary.totalMoves} moves, ${gameReview.s
 for (const moment of gameReview.keyMoments.slice(0, 2)) {
   console.log(`- ${moment.side} ${moment.notation}: ${moment.summary}`);
 }
+
+const lesson = engine.lessonPlan(["h7-e7", "h0-g2"], {
+  reviewOptions: { depth: 1, timeLimitMs: 500 },
+  lessonOptions: { maxCards: 1 }
+});
+const firstCard = lesson.cards[0];
+if (firstCard) {
+  console.log("");
+  console.log(`Lesson card: ${firstCard.title}`);
+  console.log(firstCard.prompt);
+  console.log(`Answer: ${firstCard.answer.move}`);
+}

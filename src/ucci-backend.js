@@ -16,6 +16,7 @@ import { annotateMove, generateLegalMoves } from "./movegen.js";
 import { hasClockTimeControl, resolveSearchBudget } from "./time.js";
 import { reviewGameWithBackend } from "./review.js";
 import { coachMoveWithBackend } from "./coach.js";
+import { createLessonPlanWithBackend } from "./lesson.js";
 
 const DEFAULT_UCCI_TIMEOUT_MS = 5000;
 const DEFAULT_SEARCH_TIMEOUT_MS = 30000;
@@ -95,6 +96,17 @@ export function createUcciEngineBackend(options = {}) {
       });
     },
     coachMove: (position, coachOptions = {}) => coachMoveWithBackend(backend, position, coachOptions),
+    lessonPlan: (moves, lessonOptions = {}) => {
+      const { reviewOptions = {}, ...planOptions } = lessonOptions;
+      return createLessonPlanWithBackend(backend, moves, {
+        ...planOptions,
+        reviewOptions: mergeNativeOptions(options, reviewOptions, {
+          backendName: name,
+          lines: 1,
+          useBook: false
+        })
+      });
+    },
     openingBook: (position, bookOptions = {}) => referenceEngine.openingBook(position, bookOptions),
     evaluate: (position, evaluationOptions = {}) => referenceEngine.evaluate(position, evaluationOptions),
     pressure: (position, pressureOptions = {}) => referenceEngine.pressure(position, pressureOptions),

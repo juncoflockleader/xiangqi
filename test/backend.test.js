@@ -22,10 +22,18 @@ test("javascript backend exposes the engine contract", () => {
   assert.equal(description.cacheCapacity, backend.cacheCapacity);
   assert.equal(typeof backend.reviewGame, "function");
   assert.equal(typeof backend.coachMove, "function");
+  assert.equal(typeof backend.lessonPlan, "function");
 
   const hint = backend.coachMove(position);
   assert.equal(hint.bestMove.notation, "h7-e7");
   assert.equal(hint.levels.at(-1).kind, "reveal");
+
+  const lesson = backend.lessonPlan(["h7-e7"], {
+    reviewOptions: { depth: 1, timeLimitMs: 500 },
+    lessonOptions: { maxCards: 1 }
+  });
+  assert.equal(lesson.cards.length, 1);
+  assert.equal(lesson.cards[0].type, "opening");
 
   const review = backend.reviewGame(["h7-e7"], {
     reviewOptions: { depth: 1, timeLimitMs: 500 }

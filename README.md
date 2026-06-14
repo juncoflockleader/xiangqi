@@ -18,6 +18,7 @@ The current engine is dependency-free JavaScript and includes:
 - Progressive coach hints that can reveal an idea, tactical clue, candidate focus, and full best-move reasoning.
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
 - Whole-game review with side summaries, opening-book matches, and key learning moments.
+- Lesson-plan generation that turns reviewed games into prompt, hint, and answer cards.
 - Game-history helpers for play sessions, reviewed move logs, engine decision logs, position history, repeated-position detection, and async native-backend play.
 - A backend adapter contract and async UCCI process wrapper so the JS reference engine can sit beside a native C++/WASM engine without changing the learning-app API.
 - Shared time-control budgeting for fixed movetime and clock-based `wtime`/`btime`/increment searches.
@@ -117,7 +118,7 @@ console.log(nativeGameReview.summary);
 await nativeBackend.close();
 ```
 
-The JavaScript backend is the reference learning engine. The UCCI backend is async because it talks to an external process. By default it checks the JS/imported opening book before starting native search, and `useBook: false` forces a pure native search. Native `reviewMove` and `reviewGame` compare played moves against the UCCI engine's preferred moves, then use the JS explanation layer to turn score gaps into learning feedback. The built-in backends expose `chooseMove`, `analyzePosition`, `reviewMove`, `reviewGame`, `coachMove`, `openingBook`, `play`, and `legalMoves`, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
+The JavaScript backend is the reference learning engine. The UCCI backend is async because it talks to an external process. By default it checks the JS/imported opening book before starting native search, and `useBook: false` forces a pure native search. Native `reviewMove` and `reviewGame` compare played moves against the UCCI engine's preferred moves, then use the JS explanation layer to turn score gaps into learning feedback. The built-in backends expose `chooseMove`, `analyzePosition`, `reviewMove`, `reviewGame`, `coachMove`, `lessonPlan`, `openingBook`, `play`, and `legalMoves`, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
 
 Review a player's move:
 
@@ -237,6 +238,21 @@ const gameReview = engine.reviewGame(["h7-e7", "h0-g2"], {
 console.log(gameReview.summary);
 console.log(gameReview.keyMoments[0]?.summary);
 ```
+
+Turn a review into lesson cards:
+
+```js
+const lesson = engine.lessonPlan(["h7-e7", "h0-g2"], {
+  reviewOptions: { depth: 2, timeLimitMs: 1000 },
+  lessonOptions: { maxCards: 3 }
+});
+
+console.log(lesson.cards[0].prompt);
+console.log(lesson.cards[0].hints.at(-1).text);
+console.log(lesson.cards[0].answer.move);
+```
+
+Lesson cards include the position FEN, side to move, played move, engine-preferred move, classification, centipawn loss, prompt text, progressive hints, answer explanation, and tags such as `opening`, `correction`, `book`, and `high-impact`.
 
 ## Protocol
 
