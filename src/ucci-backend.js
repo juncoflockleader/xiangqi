@@ -748,6 +748,7 @@ function createEmptyStats() {
     nullMovePrunes: 0,
     countermoveStores: 0,
     countermoveHits: 0,
+    historyMaluses: 0,
     rootScoreOrderHits: 0,
     rootMovesSearched: 0,
     repetitions: 0

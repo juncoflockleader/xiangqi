@@ -28,6 +28,7 @@ test("UCCI session searches a FEN position", () => {
   assert.ok(output.some((line) => line.includes("mdp")));
   assert.ok(output.some((line) => line.includes("razor")));
   assert.ok(output.some((line) => line.includes("futil")));
+  assert.ok(output.some((line) => line.includes("hmalus")));
   assert.ok(output.includes("bestmove e9e2"));
   assert.ok(output.some((line) => line.includes("reason: Wins a rook")));
 });

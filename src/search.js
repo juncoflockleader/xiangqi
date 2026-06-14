@@ -131,6 +131,7 @@ export function searchBestMove(position, options = {}) {
       useQuiescenceChecks: options.useQuiescenceChecks !== false,
       useRecaptureExtensions: options.useRecaptureExtensions !== false,
       useSeePruning: options.useSeePruning !== false,
+      useHistoryMalus: options.useHistoryMalus !== false,
       seePruneMargin: Math.max(0, numberOption(options.seePruneMargin, DEFAULT_SEE_PRUNE_MARGIN)),
       useSoftTimeManagement: options.useSoftTimeManagement !== false && !exactRootScores,
       softDeadline,
@@ -478,6 +479,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   let bestChildLine = [];
   const ordered = orderMoves(position, legalMoves, tt?.bestMove, context, ply, previousMove);
   const staticScore = inCheck ? null : evaluatePosition(position, position.turn).score;
+  const searchedQuietMoves = [];
 
   if (shouldRazor({ depth, inCheck, alpha, beta, staticScore, context })) {
     const razorScore = quiescence(position, alpha, beta, ply, context, context.qCheckDepth);
@@ -630,12 +632,15 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     if (alpha >= beta) {
       context.stats.cutoffs += 1;
       if (!move.captured) {
+        penalizeFailedQuietMoves(context, searchedQuietMoves, depth * depth);
         rememberKiller(context.killers, ply, move);
         rememberCountermove(context, previousMove, move);
         bumpHistory(context.history, move, depth * depth);
       }
       break;
     }
+
+    if (!move.captured) searchedQuietMoves.push(move);
   }
 
   const flag = bestScore <= alphaOriginal ? UPPER : bestScore >= beta ? LOWER : EXACT;
@@ -984,7 +989,13 @@ function isCountermove(context, previousMove, move) {
 
 function bumpHistory(history, move, amount) {
   const key = moveKey(move);
-  history.set(key, (history.get(key) ?? 0) + amount);
+  history.set(key, clampOrderingScore((history.get(key) ?? 0) + amount));
+}
+
+function penalizeFailedQuietMoves(context, moves, amount) {
+  if (!context.useHistoryMalus || moves.length === 0) return;
+  for (const move of moves) bumpHistory(context.history, move, -amount);
+  context.stats.historyMaluses += moves.length;
 }
 
 function isTimedOut(context) {
@@ -1080,6 +1091,7 @@ function createSearchStats() {
     nullMovePrunes: 0,
     countermoveStores: 0,
     countermoveHits: 0,
+    historyMaluses: 0,
     rootScoreOrderHits: 0,
     rootMovesSearched: 0,
     repetitions: 0
@@ -1116,6 +1128,7 @@ function mergeSearchStats(total, next) {
     nullMovePrunes: total.nullMovePrunes + next.nullMovePrunes,
     countermoveStores: total.countermoveStores + next.countermoveStores,
     countermoveHits: total.countermoveHits + next.countermoveHits,
+    historyMaluses: total.historyMaluses + next.historyMaluses,
     rootScoreOrderHits: total.rootScoreOrderHits + next.rootScoreOrderHits,
     rootMovesSearched: total.rootMovesSearched + next.rootMovesSearched,
     repetitions: total.repetitions + next.repetitions

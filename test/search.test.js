@@ -425,3 +425,23 @@ test("search can order replies with the countermove heuristic", () => {
   assert.equal(disabled.stats.countermoveStores, 0);
   assert.equal(disabled.stats.countermoveHits, 0);
 });
+
+test("search penalizes failed quiet moves in history ordering", () => {
+  const position = parseFen("4k4/9/4h4/4c4/4P4/9/4C4/9/9/4K4 r");
+  const result = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false
+  });
+  const disabled = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useHistoryMalus: false
+  });
+
+  assert.equal(result.depth, 3);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.ok(result.stats.historyMaluses > 0);
+  assert.equal(disabled.stats.historyMaluses, 0);
+});
