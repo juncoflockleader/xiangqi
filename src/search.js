@@ -44,6 +44,7 @@ const DEFAULT_SOFT_TIME_FRACTION = 0.55;
 const DEFAULT_SOFT_MIN_DEPTH = 2;
 const DEFAULT_SOFT_STABLE_DEPTHS = 1;
 const DEFAULT_SOFT_SCORE_GAP = 80;
+const DEFAULT_SEE_PRUNE_MARGIN = 120;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -129,6 +130,8 @@ export function searchBestMove(position, options = {}) {
       useDeltaPruning: options.useDeltaPruning !== false,
       useQuiescenceChecks: options.useQuiescenceChecks !== false,
       useRecaptureExtensions: options.useRecaptureExtensions !== false,
+      useSeePruning: options.useSeePruning !== false,
+      seePruneMargin: Math.max(0, numberOption(options.seePruneMargin, DEFAULT_SEE_PRUNE_MARGIN)),
       useSoftTimeManagement: options.useSoftTimeManagement !== false && !exactRootScores,
       softDeadline,
       softMinDepth: Math.max(1, Math.floor(numberOption(options.softMinDepth, DEFAULT_SOFT_MIN_DEPTH))),
@@ -510,6 +513,22 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       if (extensionReason === "recapture") context.stats.recaptureExtensions += 1;
     }
 
+    if (shouldPruneSee({
+      depth,
+      index,
+      move,
+      inCheck,
+      givesCheck,
+      extension,
+      alpha,
+      beta,
+      context,
+      position
+    })) {
+      context.stats.seePrunes += 1;
+      continue;
+    }
+
     if (shouldPruneFutility({
       depth,
       index,
@@ -828,6 +847,29 @@ function shouldPruneFutility({
   return staticScore + futilityMargin(depth) <= alpha;
 }
 
+function shouldPruneSee({
+  depth,
+  index,
+  move,
+  inCheck,
+  givesCheck,
+  extension,
+  alpha,
+  beta,
+  context,
+  position
+}) {
+  if (!context.useSeePruning) return false;
+  if (!move.captured) return false;
+  if (depth < 1 || depth > 2) return false;
+  if (index === 0) return false;
+  if (inCheck || givesCheck || extension > 0) return false;
+  if (alpha <= -MATE_SCORE + 1000 || beta >= MATE_SCORE - 1000) return false;
+
+  const capture = getCaptureAnalysis(position, move, context);
+  return capture.exchangeScore <= -context.seePruneMargin;
+}
+
 function shouldRazor({ depth, inCheck, alpha, beta, staticScore, context }) {
   if (!context.useRazoring) return false;
   if (inCheck || staticScore === null) return false;
@@ -1025,6 +1067,7 @@ function createSearchStats() {
     extensions: 0,
     recaptureExtensions: 0,
     softStops: 0,
+    seePrunes: 0,
     mateDistancePrunes: 0,
     mateDistanceWindows: 0,
     razorPrunes: 0,
@@ -1060,6 +1103,7 @@ function mergeSearchStats(total, next) {
     extensions: total.extensions + next.extensions,
     recaptureExtensions: total.recaptureExtensions + next.recaptureExtensions,
     softStops: total.softStops + next.softStops,
+    seePrunes: total.seePrunes + next.seePrunes,
     mateDistancePrunes: total.mateDistancePrunes + next.mateDistancePrunes,
     mateDistanceWindows: total.mateDistanceWindows + next.mateDistanceWindows,
     razorPrunes: total.razorPrunes + next.razorPrunes,

@@ -357,6 +357,30 @@ test("search prunes shallow quiet moves with futility margins", () => {
   assert.ok(withPruning.nodes < withoutPruning.nodes);
 });
 
+test("search prunes clearly losing shallow captures with static exchange", () => {
+  const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
+  const withPruning = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 3000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  });
+  const withoutPruning = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 3000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    useSeePruning: false
+  });
+
+  assert.equal(withPruning.depth, 4);
+  assert.equal(withPruning.bestMove.notation, withoutPruning.bestMove.notation);
+  assert.equal(Math.round(withPruning.score), Math.round(withoutPruning.score));
+  assert.ok(withPruning.stats.seePrunes > 0);
+  assert.equal(withoutPruning.stats.seePrunes, 0);
+  assert.ok(withPruning.nodes < withoutPruning.nodes);
+});
+
 test("search razors shallow quiet branches after quiescence verification", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const withRazoring = searchBestMove(position, {

@@ -735,6 +735,7 @@ function createEmptyStats() {
     extensions: 0,
     recaptureExtensions: 0,
     softStops: 0,
+    seePrunes: 0,
     mateDistancePrunes: 0,
     mateDistanceWindows: 0,
     razorPrunes: 0,
