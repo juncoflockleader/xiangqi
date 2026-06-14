@@ -23,11 +23,21 @@ if (options.help) {
 
 const red = createBackend("red", options);
 const black = createBackend("black", options);
+const referee = createRefereeBackend(options);
 
 try {
   const report = await runSparringMatch({ red, black }, {
     maxPlies: options.maxPlies,
     initialFen: options.initialFen,
+    referee,
+    refereeOptions: referee
+      ? {
+          reviewOptions: {
+            depth: options.refereeDepth,
+            timeLimitMs: options.refereeTimeLimitMs
+          }
+        }
+      : undefined,
     searchOptions: {
       depth: options.depth,
       timeLimitMs: options.timeLimitMs,
@@ -41,6 +51,7 @@ try {
 } finally {
   await red.engine.close?.();
   await black.engine.close?.();
+  await referee?.engine.close?.();
 }
 
 function createBackend(side, options) {
@@ -79,6 +90,41 @@ function createBackend(side, options) {
   };
 }
 
+function createRefereeBackend(options) {
+  const command = options.refereeCommand;
+  if (!options.referee && !command) return null;
+
+  if (!command) {
+    return {
+      id: "referee-js",
+      name: "Referee JS",
+      engine: createJavaScriptEngineBackend({
+        profile: "balanced",
+        depth: options.refereeDepth,
+        timeLimitMs: options.refereeTimeLimitMs
+      })
+    };
+  }
+
+  return {
+    id: "referee-native",
+    name: "Referee Native",
+    engine: createLearningEngineBackend({
+      command,
+      args: options.refereeArgs,
+      profile: options.refereeProtocol === "uci" ? "native-uci" : "native-ucci",
+      protocol: options.refereeProtocol,
+      depth: options.refereeDepth,
+      timeLimitMs: options.refereeTimeLimitMs,
+      javascript: {
+        profile: "balanced",
+        depth: options.refereeDepth,
+        timeLimitMs: options.refereeTimeLimitMs
+      }
+    })
+  };
+}
+
 function parseArgs(args) {
   const options = {
     depth: 1,
@@ -90,8 +136,12 @@ function parseArgs(args) {
     nativeCommand: process.env.XIANGQI_ENGINE_COMMAND,
     redCommand: process.env.XIANGQI_RED_ENGINE_COMMAND,
     blackCommand: process.env.XIANGQI_BLACK_ENGINE_COMMAND,
+    referee: Boolean(process.env.XIANGQI_REFEREE_ENGINE_COMMAND),
+    refereeCommand: process.env.XIANGQI_REFEREE_ENGINE_COMMAND,
+    refereeProtocol: process.env.XIANGQI_REFEREE_ENGINE_PROTOCOL ?? "ucci",
     redArgs: splitEnvArgs(process.env.XIANGQI_RED_ENGINE_ARGS ?? process.env.XIANGQI_ENGINE_ARGS),
-    blackArgs: splitEnvArgs(process.env.XIANGQI_BLACK_ENGINE_ARGS ?? process.env.XIANGQI_ENGINE_ARGS)
+    blackArgs: splitEnvArgs(process.env.XIANGQI_BLACK_ENGINE_ARGS ?? process.env.XIANGQI_ENGINE_ARGS),
+    refereeArgs: splitEnvArgs(process.env.XIANGQI_REFEREE_ENGINE_ARGS)
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -104,6 +154,10 @@ function parseArgs(args) {
       options.useBook = false;
       continue;
     }
+    if (arg === "--referee") {
+      options.referee = true;
+      continue;
+    }
     if (arg === "--depth") {
       options.depth = Number(args[++index]);
       continue;
@@ -112,12 +166,22 @@ function parseArgs(args) {
       options.nativeDepth = Number(args[++index]);
       continue;
     }
+    if (arg === "--referee-depth") {
+      options.refereeDepth = Number(args[++index]);
+      options.referee = true;
+      continue;
+    }
     if (arg === "--time") {
       options.timeLimitMs = Number(args[++index]);
       continue;
     }
     if (arg === "--native-time") {
       options.nativeTimeLimitMs = Number(args[++index]);
+      continue;
+    }
+    if (arg === "--referee-time") {
+      options.refereeTimeLimitMs = Number(args[++index]);
+      options.referee = true;
       continue;
     }
     if (arg === "--plies") {
@@ -144,19 +208,37 @@ function parseArgs(args) {
       options.blackCommand = args[++index];
       continue;
     }
+    if (arg === "--referee-command") {
+      options.refereeCommand = args[++index];
+      options.referee = true;
+      continue;
+    }
     if (arg === "--protocol") {
       options.protocol = args[++index];
+      continue;
+    }
+    if (arg === "--referee-protocol") {
+      options.refereeProtocol = args[++index];
+      options.referee = true;
       continue;
     }
     throw new Error(`Unknown option: ${arg}`);
   }
 
+  options.refereeDepth ??= options.nativeDepth ?? Math.max(options.depth, 2);
+  options.refereeTimeLimitMs ??= options.nativeTimeLimitMs ?? Math.max(options.timeLimitMs, 1000);
+
   assertPositiveInteger(options.depth, "depth");
   assertPositiveInteger(options.timeLimitMs, "time");
+  assertPositiveInteger(options.refereeDepth, "referee-depth");
+  assertPositiveInteger(options.refereeTimeLimitMs, "referee-time");
   assertNonNegativeInteger(options.maxPlies, "plies");
   assertNonNegativeInteger(options.maxMoves, "moves");
   if (options.protocol !== "uci" && options.protocol !== "ucci") {
     throw new Error("--protocol must be uci or ucci.");
+  }
+  if (options.refereeProtocol !== "uci" && options.refereeProtocol !== "ucci") {
+    throw new Error("--referee-protocol must be uci or ucci.");
   }
 
   return options;
@@ -189,14 +271,20 @@ Options:
   --depth N              JavaScript search depth (default: 1)
   --time MS              JavaScript movetime in ms (default: 500)
   --no-book              Disable opening-book moves
+  --referee              Review moves with a JS referee after the match
+  --referee-depth N      Referee review depth (default: max(depth, 2))
+  --referee-time MS      Referee review movetime (default: max(time, 1000))
   --fen FEN              Start from a custom FEN
   --native-command CMD   Use the same native UCI/UCCI command for both sides
   --red-command CMD      Use a native command only for Red
   --black-command CMD    Use a native command only for Black
+  --referee-command CMD  Use a native UCI/UCCI command as the referee
   --protocol uci|ucci    Native protocol (default: ucci)
+  --referee-protocol P   Referee protocol, uci or ucci (default: ucci)
 
 Environment:
-  XIANGQI_ENGINE_COMMAND, XIANGQI_RED_ENGINE_COMMAND, XIANGQI_BLACK_ENGINE_COMMAND
+  XIANGQI_ENGINE_COMMAND, XIANGQI_RED_ENGINE_COMMAND, XIANGQI_BLACK_ENGINE_COMMAND,
+  XIANGQI_REFEREE_ENGINE_COMMAND
 `);
 }
 
