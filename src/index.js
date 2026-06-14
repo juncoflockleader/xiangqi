@@ -11,6 +11,7 @@ export * from "./search.js";
 export * from "./reasoning.js";
 export * from "./engine.js";
 export * from "./backend.js";
+export * from "./ucci-backend.js";
 export * from "./review.js";
 export * from "./protocol/ucci.js";
 export * from "./game.js";

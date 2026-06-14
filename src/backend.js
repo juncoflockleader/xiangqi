@@ -7,7 +7,8 @@ export const ENGINE_BACKEND_FEATURES = Object.freeze({
   REVIEW: "review",
   PRESSURE: "pressure",
   UCCI_COMPATIBLE: "ucci-compatible",
-  NATIVE_READY: "native-ready"
+  NATIVE_READY: "native-ready",
+  ASYNC_SEARCH: "async-search"
 });
 
 const REQUIRED_BACKEND_METHODS = Object.freeze([

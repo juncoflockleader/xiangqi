@@ -18,7 +18,7 @@ The current engine is dependency-free JavaScript and includes:
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
 - Whole-game review with side summaries, opening-book matches, and key learning moments.
 - Game-history helpers for play sessions, reviewed move logs, position history, and repeated-position detection.
-- A backend adapter contract so the JS reference engine can later sit beside a native UCCI/WASM engine without changing the learning-app API.
+- A backend adapter contract and async UCCI process wrapper so the JS reference engine can sit beside a native C++/WASM engine without changing the learning-app API.
 - A minimal UCCI-style protocol adapter for GUI/app integration and engine smoke testing.
 
 ## Quick Start
@@ -82,6 +82,7 @@ Choose an engine backend:
 ```js
 import {
   createJavaScriptEngineBackend,
+  createUcciEngineBackend,
   describeEngineBackend,
   ENGINE_BACKEND_FEATURES
 } from "./src/index.js";
@@ -90,9 +91,20 @@ const backend = createJavaScriptEngineBackend({ depth: 3, timeLimitMs: 1000 });
 
 console.log(describeEngineBackend(backend));
 console.log(backend.supports(ENGINE_BACKEND_FEATURES.EXPLANATION));
+
+const nativeBackend = createUcciEngineBackend({
+  command: "/path/to/pikafish-or-other-ucci-engine",
+  depth: 8,
+  timeLimitMs: 3000
+});
+
+const nativeResult = await nativeBackend.chooseMove(position);
+console.log(nativeResult.bestMove.notation);
+console.log(nativeResult.explanation.summary);
+await nativeBackend.close();
 ```
 
-The JavaScript backend is the reference learning engine. A future native C++/UCCI or WASM backend should implement the same `chooseMove`, `analyzePosition`, `reviewMove`, `openingBook`, `play`, and `legalMoves` contract, then let the app keep the same explanation and review flow.
+The JavaScript backend is the reference learning engine. The UCCI backend is async because it talks to an external process. Both expose the same `chooseMove`, `analyzePosition`, `reviewMove`, `openingBook`, `play`, and `legalMoves` contract, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
 
 Review a player's move:
 
@@ -192,7 +204,7 @@ Coordinates use file letters `a` through `i` and ranks `0` through `9`, with ran
 ## Roadmap
 
 - Expand the opening book and repetition rule handling.
-- Add an optional native/UCCI backend adapter for stronger play while keeping JS explanations.
+- Harden the native/UCCI backend with richer time controls, engine option profiles, and production process supervision.
 - Add stronger time management and deeper late-game search extensions.
 - Add engine-vs-engine benchmark positions.
 - Connect the engine to a playable learning UI with move review, hints, and lesson generation.
