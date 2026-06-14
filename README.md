@@ -18,6 +18,7 @@ The current engine is dependency-free JavaScript and includes:
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
 - Whole-game review with side summaries, opening-book matches, and key learning moments.
 - Game-history helpers for play sessions, reviewed move logs, position history, and repeated-position detection.
+- A backend adapter contract so the JS reference engine can later sit beside a native UCCI/WASM engine without changing the learning-app API.
 - A minimal UCCI-style protocol adapter for GUI/app integration and engine smoke testing.
 
 ## Quick Start
@@ -54,6 +55,44 @@ const exactOnly = engine.openingBook(position, { openingHeuristics: false });
 ```
 
 The built-in book is intentionally small but structured as opening data: named entries, ideas, tags, and multi-ply lines. When an early position is not in the exact table, the engine can fall back to opening heuristics such as developing horses, contesting the central file, and activating rooks. This is a bridge toward importing a larger Xiangqi opening database later.
+
+Import or merge opening data:
+
+```js
+import {
+  createEngine,
+  createOpeningBookFromText,
+  DEFAULT_OPENING_BOOK,
+  mergeOpeningBooks
+} from "./src/index.js";
+
+const imported = createOpeningBookFromText(`
+  h9g7 h0g2 | games=120 | name=Horse Opening | tags=database,horse
+  h7e7 h0g2 | games=80 | name=Central Cannon | tags=database,cannon
+`);
+
+const book = mergeOpeningBooks(DEFAULT_OPENING_BOOK, imported);
+const engine = createEngine({ book });
+```
+
+The text importer accepts move lines plus optional `weight`, `count`, `frequency`, or `games` metadata. Repeated lines aggregate their weights, which makes it suitable for converting a larger opening database into engine heuristics.
+
+Choose an engine backend:
+
+```js
+import {
+  createJavaScriptEngineBackend,
+  describeEngineBackend,
+  ENGINE_BACKEND_FEATURES
+} from "./src/index.js";
+
+const backend = createJavaScriptEngineBackend({ depth: 3, timeLimitMs: 1000 });
+
+console.log(describeEngineBackend(backend));
+console.log(backend.supports(ENGINE_BACKEND_FEATURES.EXPLANATION));
+```
+
+The JavaScript backend is the reference learning engine. A future native C++/UCCI or WASM backend should implement the same `chooseMove`, `analyzePosition`, `reviewMove`, `openingBook`, `play`, and `legalMoves` contract, then let the app keep the same explanation and review flow.
 
 Review a player's move:
 
@@ -153,6 +192,7 @@ Coordinates use file letters `a` through `i` and ranks `0` through `9`, with ran
 ## Roadmap
 
 - Expand the opening book and repetition rule handling.
+- Add an optional native/UCCI backend adapter for stronger play while keeping JS explanations.
 - Add stronger time management and deeper late-game search extensions.
 - Add engine-vs-engine benchmark positions.
 - Connect the engine to a playable learning UI with move review, hints, and lesson generation.

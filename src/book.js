@@ -5,6 +5,7 @@ import {
   makeMove,
   moveKey,
   moveToNotation,
+  parseFen,
   parseMoveNotation,
   positionKey,
   rankOf,
@@ -149,6 +150,63 @@ const OPENING_LINES = Object.freeze([
 
 export const DEFAULT_OPENING_BOOK = buildDefaultOpeningBook();
 
+export function createOpeningBook(data = {}, options = {}) {
+  const spec = Array.isArray(data) ? { lines: data } : data ?? {};
+  const positions = new Map();
+  const initialPosition = normalizeInitialPosition(
+    spec.initialPosition ?? options.initialPosition ?? spec.initialFen ?? options.initialFen
+  );
+
+  if (spec.baseBook || options.baseBook) {
+    addBookPositions(positions, spec.baseBook ?? options.baseBook, { aggregate: true });
+  }
+
+  if (spec.positions || options.positions) {
+    addBookPositions(positions, spec.positions ?? options.positions, {
+      aggregate: options.aggregatePositions === true
+    });
+  }
+
+  const lineDefaults = {
+    ...(options.defaults ?? {}),
+    ...(spec.defaults ?? {})
+  };
+  const aggregateLines = options.aggregateLines !== false;
+
+  for (const line of spec.lines ?? options.lines ?? []) {
+    const entries = normalizeOpeningLine(line, lineDefaults);
+    addOpeningLine(positions, entries, { initialPosition, aggregate: aggregateLines });
+  }
+
+  return freezeOpeningPositions(positions);
+}
+
+export function createOpeningBookFromText(text, options = {}) {
+  return createOpeningBook({
+    baseBook: options.baseBook,
+    positions: options.positions,
+    initialPosition: options.initialPosition,
+    initialFen: options.initialFen,
+    defaults: options.defaults,
+    lines: parseOpeningBookText(text)
+  }, options);
+}
+
+export function parseOpeningBookText(text) {
+  return String(text)
+    .split(/\r?\n/)
+    .map((line, index) => parseOpeningBookLine(line, index + 1))
+    .filter(Boolean);
+}
+
+export function mergeOpeningBooks(...books) {
+  const positions = new Map();
+  for (const book of books) {
+    addBookPositions(positions, book, { aggregate: true });
+  }
+  return freezeOpeningPositions(positions);
+}
+
 export function lookupOpeningBook(position, options = {}) {
   const book = options.book ?? DEFAULT_OPENING_BOOK;
   if (book === false) return null;
@@ -208,7 +266,11 @@ function resolveBookEntry(position, entry, legalMoves) {
 function freezeBookEntry(entry) {
   return Object.freeze({
     ...entry,
-    tags: Object.freeze(entry.tags ?? [])
+    move: canonicalMoveNotation(entry.move),
+    name: entry.name ?? "Imported Opening Continuation",
+    weight: normalizeWeight(entry.weight),
+    idea: entry.idea ?? "This continuation comes from imported opening data and is weighted by its source frequency.",
+    tags: Object.freeze(normalizeTags(entry.tags))
   });
 }
 
@@ -228,22 +290,25 @@ function buildDefaultOpeningBook() {
   return freezeOpeningPositions(positions);
 }
 
-function addOpeningLine(positions, line) {
-  let position = createInitialPosition();
+function addOpeningLine(positions, line, options = {}) {
+  let position = options.initialPosition ?? createInitialPosition();
 
   for (const entry of line) {
-    addEntries(positions, positionKey(position), [entry]);
+    addEntries(positions, positionKey(position), [entry], { aggregate: options.aggregate });
     position = applyBookMove(position, entry.move);
   }
 }
 
-function addEntries(positions, key, entries) {
+function addEntries(positions, key, entries, options = {}) {
   const byMove = positions.get(key) ?? new Map();
 
   for (const entry of entries) {
-    const existing = byMove.get(entry.move);
-    if (!existing || entry.weight > existing.weight) {
-      byMove.set(entry.move, entry);
+    const normalized = freezeBookEntry(entry);
+    const existing = byMove.get(normalized.move);
+    if (existing && options.aggregate) {
+      byMove.set(normalized.move, mergeBookEntries(existing, normalized));
+    } else if (!existing || normalized.weight > existing.weight) {
+      byMove.set(normalized.move, normalized);
     }
   }
 
@@ -254,9 +319,148 @@ function freezeOpeningPositions(positions) {
   return Object.freeze(Object.fromEntries(
     [...positions.entries()].map(([key, entries]) => [
       key,
-      Object.freeze([...entries.values()].sort((a, b) => b.weight - a.weight))
+      Object.freeze([...entries.values()].sort((a, b) => b.weight - a.weight || a.move.localeCompare(b.move)))
     ])
   ));
+}
+
+function addBookPositions(positions, book, options = {}) {
+  if (!book) return;
+
+  if (Array.isArray(book)) {
+    for (const record of book) {
+      addEntries(positions, record.key ?? record.fen, record.entries ?? [], options);
+    }
+    return;
+  }
+
+  for (const [key, entries] of Object.entries(book)) {
+    addEntries(positions, key, entries, options);
+  }
+}
+
+function mergeBookEntries(existing, incoming) {
+  return freezeBookEntry({
+    ...existing,
+    weight: existing.weight + incoming.weight,
+    tags: uniqueTags([...existing.tags, ...incoming.tags]),
+    sources: (existing.sources ?? 1) + (incoming.sources ?? 1)
+  });
+}
+
+function normalizeOpeningLine(line, defaults = {}) {
+  if (Array.isArray(line)) {
+    return line.map((entry, index) => normalizeLineMove(entry, defaults, index));
+  }
+
+  if (typeof line === "string") {
+    return normalizeOpeningLine({ moves: line.trim().split(/\s+/).filter(Boolean) }, defaults);
+  }
+
+  if (!line || !Array.isArray(line.moves)) {
+    throw new Error("Opening line requires a moves array.");
+  }
+
+  const lineDefaults = {
+    ...defaults,
+    name: line.name ?? defaults.name,
+    idea: line.idea ?? defaults.idea,
+    weight: line.weight ?? line.count ?? line.frequency ?? line.games ?? defaults.weight,
+    tags: uniqueTags([...normalizeTags(defaults.tags), ...normalizeTags(line.tags), "imported"])
+  };
+
+  return line.moves.map((entry, index) => normalizeLineMove(entry, lineDefaults, index));
+}
+
+function normalizeLineMove(entry, defaults, index) {
+  if (typeof entry === "string") {
+    return freezeBookEntry({
+      move: entry,
+      name: defaults.name ?? `Imported Opening Continuation ${index + 1}`,
+      idea: defaults.idea,
+      weight: defaults.weight,
+      tags: defaults.tags
+    });
+  }
+
+  return freezeBookEntry({
+    ...defaults,
+    ...entry,
+    tags: uniqueTags([...normalizeTags(defaults.tags), ...normalizeTags(entry.tags)])
+  });
+}
+
+function parseOpeningBookLine(line, lineNumber) {
+  const trimmed = stripOpeningComment(line).trim();
+  if (!trimmed) return null;
+
+  const [movePart, ...metadataParts] = trimmed.split("|").map((part) => part.trim()).filter(Boolean);
+  const moves = movePart.split(/\s+/).filter(Boolean);
+  if (moves.length === 0) {
+    throw new Error(`Opening book line ${lineNumber} has no moves.`);
+  }
+
+  return {
+    moves,
+    ...parseLineMetadata(metadataParts)
+  };
+}
+
+function parseLineMetadata(parts) {
+  const metadata = {};
+
+  for (const part of parts) {
+    const match = part.match(/^([\w-]+)\s*(=|:)\s*(.*)$/);
+    if (!match) {
+      metadata.name = metadata.name ?? part;
+      continue;
+    }
+
+    const key = match[1].toLowerCase();
+    const value = match[3].trim();
+    if (["weight", "count", "frequency", "games"].includes(key)) {
+      metadata.weight = normalizeWeight(value);
+    } else if (key === "name") {
+      metadata.name = value;
+    } else if (key === "idea") {
+      metadata.idea = value;
+    } else if (key === "tags") {
+      metadata.tags = normalizeTags(value);
+    }
+  }
+
+  return metadata;
+}
+
+function stripOpeningComment(line) {
+  return line.replace(/\s*(#|\/\/).*$/, "");
+}
+
+function normalizeInitialPosition(value) {
+  if (!value) return createInitialPosition();
+  if (typeof value === "string") return parseFen(value);
+  return value;
+}
+
+function canonicalMoveNotation(move) {
+  return typeof move === "string"
+    ? moveToNotation(parseMoveNotation(move))
+    : moveToNotation(move);
+}
+
+function normalizeWeight(value) {
+  const parsed = Number(value ?? 1);
+  return Number.isFinite(parsed) ? Math.max(1, parsed) : 1;
+}
+
+function normalizeTags(tags) {
+  if (!tags) return [];
+  if (typeof tags === "string") return uniqueTags(tags.split(",").map((tag) => tag.trim()));
+  return uniqueTags(tags);
+}
+
+function uniqueTags(tags) {
+  return [...new Set(tags.filter(Boolean))];
 }
 
 function applyBookMove(position, notation) {

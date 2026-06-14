@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import {
   createEngine,
   createInitialPosition,
-  lookupOpeningBook
+  createOpeningBookFromText,
+  DEFAULT_OPENING_BOOK,
+  lookupOpeningBook,
+  mergeOpeningBooks
 } from "../src/index.js";
 
 test("opening book returns legal annotated entries from the initial position", () => {
@@ -80,4 +83,41 @@ test("opening heuristics cover early positions outside exact book", () => {
   assert.ok(["b0-c2", "h0-g2"].includes(result.bestMove.notation));
   assert.ok(result.book.tags.includes("heuristic"));
   assert.ok(result.explanation.reasons.some((reason) => reason.includes("Opening heuristic")));
+});
+
+test("opening book can be imported from weighted text lines", () => {
+  const imported = createOpeningBookFromText(`
+    h9g7 h0g2 | weight=4 | name=Imported Horse System | tags=database,horse | idea=Imported games prefer quick horse development.
+    h9-g7 b0-c2 | count=2 | name=Imported Horse System | tags=database,horse
+    h7-e7 h0-g2 | weight=1 | name=Imported Central Cannon
+  `);
+  const engine = createEngine({ book: imported, openingHeuristics: false, depth: 1, timeLimitMs: 500 });
+  const position = createInitialPosition();
+  const result = engine.chooseMove(position);
+
+  assert.equal(result.source, "opening-book");
+  assert.equal(result.bestMove.notation, "h9-g7");
+  assert.equal(result.book.weight, 6);
+  assert.ok(result.book.tags.includes("imported"));
+  assert.ok(result.book.tags.includes("database"));
+
+  const afterHorse = engine.play(position, "h9-g7");
+  const reply = engine.openingBook(afterHorse, { openingHeuristics: false });
+  assert.equal(reply.bestMove?.notation ?? reply.move.notation, "h0-g2");
+  assert.equal(reply.entries[0].weight, 4);
+  assert.equal(reply.entries[1].weight, 2);
+});
+
+test("imported opening data can merge with the curated default book", () => {
+  const imported = createOpeningBookFromText(`
+    b9-c7 | games=45 | name=Imported Left Horse Popularity | tags=database
+  `);
+  const merged = mergeOpeningBooks(DEFAULT_OPENING_BOOK, imported);
+  const engine = createEngine({ book: merged, depth: 1, timeLimitMs: 500 });
+  const result = engine.chooseMove(createInitialPosition());
+
+  assert.equal(result.source, "opening-book");
+  assert.equal(result.bestMove.notation, "b9-c7");
+  assert.equal(result.book.weight, 127);
+  assert.ok(result.book.tags.includes("database"));
 });
