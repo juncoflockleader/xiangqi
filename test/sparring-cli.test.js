@@ -59,3 +59,32 @@ test("sparring CLI forwards native engine options to players and referee", async
   assert.ok(stdout.includes("Referee: Referee Native"));
   assert.ok(stdout.includes("Referee options: Threads=2, Hash=128"));
 });
+
+test("sparring CLI supports asymmetric native opponent settings", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "examples/sparring.mjs",
+    "--plies", "2",
+    "--depth", "1",
+    "--time", "100",
+    "--no-book",
+    "--black-protocol", "uci",
+    "--black-depth", "4",
+    "--black-time", "200",
+    "--black-option", "MockDepthFromGo=true"
+  ], {
+    cwd: root,
+    timeout: 5000,
+    env: {
+      ...process.env,
+      XIANGQI_BLACK_ENGINE_COMMAND: process.execPath,
+      XIANGQI_BLACK_ENGINE_ARGS: "fixtures/mock-ucci.mjs"
+    }
+  });
+
+  assert.ok(stdout.includes("Sparring: Red JS (Red) vs Black Native (Black)"));
+  assert.ok(stdout.includes("1. Red"));
+  assert.ok(stdout.includes("(Red JS, d1, search)"));
+  assert.ok(stdout.includes("2. Black"));
+  assert.ok(stdout.includes("(Black Native, d4, native-uci)"));
+  assert.ok(stdout.includes("Native options: Black MockDepthFromGo=true"));
+});

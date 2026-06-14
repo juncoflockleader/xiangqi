@@ -38,6 +38,7 @@ rl.on("line", (line) => {
   } else if (command === "position") {
     currentPosition = trimmed;
   } else if (command === "go") {
+    const depth = hasOption("MockDepthFromGo") ? depthFromGo(trimmed) : 2;
     for (const option of appliedOptions) {
       write(`info string option ${option}`);
     }
@@ -46,30 +47,30 @@ rl.on("line", (line) => {
     }
 
     if (hasOption("MockRejectHeuristic") && /\sb(?:\s|$)/.test(currentPosition)) {
-      write(`info depth 2 score cp 240 nodes 88 pv ${nativeMove("g2e3")}`);
+      write(`info depth ${depth} score cp 240 nodes 88 pv ${nativeMove("g2e3")}`);
       write(`bestmove ${nativeMove("g2e3")}`);
     } else if (hasOption("MockRejectHeuristic")) {
-      write(`info depth 2 score cp 320 nodes 144 pv ${nativeMove("b7b3")} ${nativeMove("h2h4")}`);
+      write(`info depth ${depth} score cp 320 nodes 144 pv ${nativeMove("b7b3")} ${nativeMove("h2h4")}`);
       write(`bestmove ${nativeMove("b7b3")}`);
     } else if (/\sb(?:\s|$)/.test(currentPosition)) {
-      write(`info depth 2 score cp 17 nodes 77 pv ${nativeMove("h0g2")}`);
+      write(`info depth ${depth} score cp 17 nodes 77 pv ${nativeMove("h0g2")}`);
       write(`bestmove ${nativeMove("h0g2")}`);
     } else if (/\bwtime\s+\d+/i.test(trimmed)) {
       write(`info string command ${trimmed}`);
-      write(`info depth 2 score cp 55 nodes 321 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+      write(`info depth ${depth} score cp 55 nodes 321 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
       write(`bestmove ${nativeMove("h9g7")}`);
     } else if (hasOption("MockTie")) {
-      write(`info multipv 1 depth 2 score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
-      write(`info multipv 2 depth 2 score cp 38 nodes 123 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);
+      write(`info multipv 1 depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+      write(`info multipv 2 depth ${depth} score cp 38 nodes 123 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);
       write(`bestmove ${nativeMove("h9g7")}`);
     } else if (/\bmultipv\s+2\b/i.test(trimmed) || currentMultiPv === 2) {
       write(`info multipv 1 depth 1 score cp 20 nodes 40 pv ${nativeMove("a9a8")}`);
       write(`info multipv 2 depth 1 score cp 10 nodes 40 pv ${nativeMove("a6a5")}`);
-      write(`info multipv 1 depth 2 score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
-      write(`info multipv 2 depth 2 score cp 12 nodes 123 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);
+      write(`info multipv 1 depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+      write(`info multipv 2 depth ${depth} score cp 12 nodes 123 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);
       write(`bestmove ${nativeMove("h9g7")}`);
     } else {
-      write(`info depth 2 score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+      write(`info depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
       write(`bestmove ${nativeMove("h9g7")}`);
     }
     if (hasOption("MockExitAfterBestmove")) {
@@ -84,6 +85,11 @@ rl.on("line", (line) => {
 
 function hasOption(name) {
   return appliedOptions.some((option) => option.includes(`name ${name}`));
+}
+
+function depthFromGo(command) {
+  const match = command.match(/\bdepth\s+(\d+)/i);
+  return match ? Number.parseInt(match[1], 10) : 2;
 }
 
 function nativeMove(moveText) {

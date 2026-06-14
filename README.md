@@ -584,18 +584,23 @@ npm run probe:native -- --protocol uci \
 
 XIANGQI_BLACK_ENGINE_COMMAND=/path/to/pikafish \
 XIANGQI_REFEREE_ENGINE_COMMAND=/path/to/pikafish \
-npm run spar -- --protocol uci --referee-protocol uci --plies 20 --no-book \
+npm run spar -- --black-protocol uci --referee-protocol uci --plies 20 --no-book \
   --native-option Threads=4 \
   --native-option Hash=512 \
   --native-option EvalFile=/path/to/pikafish.nnue \
+  --black-depth 6 \
+  --black-time 1500 \
   --referee-depth 8 \
   --referee-time 3000
 ```
 
-Use `--red-option`, `--black-option`, or `--referee-option` to override an
-option for a specific process after the shared `--native-option` values. The
-same settings can be made repeatable with comma-separated environment values
-such as `XIANGQI_ENGINE_OPTIONS="Threads=4,Hash=512"` or JSON values such as
+Use `--red-depth`/`--black-depth`, `--red-time`/`--black-time`, and
+`--red-protocol`/`--black-protocol` for asymmetric JS-vs-native or
+native-vs-native matches. Use `--red-option`, `--black-option`, or
+`--referee-option` to override an option for a specific process after the shared
+`--native-option` values. The same settings can be made repeatable with
+comma-separated environment values such as
+`XIANGQI_ENGINE_OPTIONS="Threads=4,Hash=512"` or JSON values such as
 `XIANGQI_REFEREE_ENGINE_OPTIONS='{"Threads":4,"Hash":1024}'`. The sparring
 report prints the normalized native options so engine-vs-engine results carry
 their configuration with them.
