@@ -10,6 +10,7 @@ The current engine is dependency-free JavaScript and includes:
 - Iterative-deepening negamax search with alpha-beta pruning.
 - Zobrist hashing, transposition table, quiescence search, capture/check/history-based move ordering, bounded check extensions, late-move reductions, repetition hooks, and root candidate analysis.
 - Evaluation terms for material, piece-square placement, mobility, threats, pawn progress, and king safety.
+- Capture safety analysis for distinguishing clean wins from tactically poisoned captures.
 - Perft helpers for validating move generation while the engine grows.
 - Explainable move output for learning-app use cases.
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.

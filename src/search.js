@@ -20,6 +20,7 @@ import {
   isInCheck
 } from "./movegen.js";
 import { evaluatePosition } from "./evaluate.js";
+import { analyzeCapture, captureExchangeScore } from "./tactics.js";
 
 const EXACT = "exact";
 const LOWER = "lower";
@@ -77,6 +78,7 @@ export function searchBestMove(position, options = {}) {
       pathCounts: new Map(),
       maxExtensions: options.maxExtensions ?? DEFAULT_MAX_EXTENSIONS,
       maxPly: options.maxPly ?? DEFAULT_MAX_PLY,
+      tacticalCache: new Map(),
       stats: createSearchStats(),
       nodes: 0,
       timedOut: false
@@ -301,7 +303,7 @@ function quiescence(position, alpha, beta, ply, context) {
   if (standPat > alpha) alpha = standPat;
 
   const captures = orderMoves(position, generateCaptures(position), null, context, ply)
-    .filter((move) => isGoodCapture(move));
+    .filter((move) => isGoodCapture(position, move, context));
 
   for (const move of captures) {
     if (isTimedOut(context)) {
@@ -330,7 +332,10 @@ function moveOrderingScore(position, move, principalMove, context, ply) {
 
   if (sameMove(move, principalMove)) score += 1_000_000;
   if (move.captured) {
+    const capture = getCaptureAnalysis(position, move, context);
     score += 100_000 + (PIECE_VALUES[move.captured.type] * 10 - PIECE_VALUES[move.piece.type]);
+    score += capture.exchangeScore * 12;
+    score += capture.isSafe ? 8_000 : -12_000;
   }
 
   const next = makeMove(position, move);
@@ -342,9 +347,22 @@ function moveOrderingScore(position, move, principalMove, context, ply) {
   return score;
 }
 
-function isGoodCapture(move) {
+function isGoodCapture(position, move, context) {
   if (!move.captured) return false;
-  return PIECE_VALUES[move.captured.type] >= PIECE_VALUES[move.piece.type] * 0.55;
+  const exchangeScore = context
+    ? getCaptureAnalysis(position, move, context).exchangeScore
+    : captureExchangeScore(position, move);
+  return exchangeScore >= -40 || PIECE_VALUES[move.captured.type] >= PIECE_VALUES[move.piece.type] * 0.55;
+}
+
+function getCaptureAnalysis(position, move, context) {
+  const key = `${hashPosition(position)}:${moveKey(move)}`;
+  const cached = context.tacticalCache.get(key);
+  if (cached) return cached;
+
+  const analysis = analyzeCapture(position, move);
+  context.tacticalCache.set(key, analysis);
+  return analysis;
 }
 
 function shouldExtend({ inCheck, givesCheck, move, extensionsRemaining }) {

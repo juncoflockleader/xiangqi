@@ -8,6 +8,7 @@ import {
 import { evaluateMoveDelta, describeCapture, describeEvaluationTerms } from "./evaluate.js";
 import { generateLegalMoves, isInCheck } from "./movegen.js";
 import { formatPrincipalVariation } from "./search.js";
+import { analyzeCapture } from "./tactics.js";
 
 export function explainMove(position, searchResult) {
   const move = searchResult.bestMove;
@@ -60,8 +61,16 @@ export function explainMoveFeatures(position, move) {
   const legalReplyCount = generateLegalMoves(next, next.turn).length;
   const reasons = [];
   const capture = describeCapture(move);
+  const captureAnalysis = analyzeCapture(position, move);
 
-  if (capture) reasons.push(capitalize(capture));
+  if (captureAnalysis && captureAnalysis.exchangeScore < 0) {
+    reasons.push(capitalize(captureAnalysis.summary));
+  } else if (capture) {
+    reasons.push(capitalize(capture));
+  }
+  if (captureAnalysis?.isSafe) {
+    reasons.push("The capture is tactically safe against immediate recapture.");
+  }
   if (move.givesCheck || isInCheck(next, opponent(position.turn))) reasons.push("It gives check and forces the opponent to answer immediately.");
   if (isInCheck(position, position.turn)) reasons.push("It resolves the current check while keeping active play.");
   if (legalReplyCount <= 3) reasons.push(`It sharply limits the opponent to ${legalReplyCount} legal replies.`);

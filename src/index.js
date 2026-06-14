@@ -1,6 +1,7 @@
 export * from "./constants.js";
 export * from "./board.js";
 export * from "./hash.js";
+export * from "./tactics.js";
 export * from "./movegen.js";
 export * from "./evaluate.js";
 export * from "./search.js";
