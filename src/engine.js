@@ -1,7 +1,7 @@
 import { applyLegalMove, annotateMove, generateLegalMoves, legalMovesWithNotation } from "./movegen.js";
 import { moveToNotation, parseMoveNotation, sameMove } from "./board.js";
 import { evaluatePosition } from "./evaluate.js";
-import { explainMove, explainReviewedMove } from "./reasoning.js";
+import { explainCandidateMove, explainMove, explainReviewedMove } from "./reasoning.js";
 import { searchBestMove } from "./search.js";
 
 export function createEngine(defaultOptions = {}) {
@@ -17,6 +17,35 @@ export function createEngine(defaultOptions = {}) {
 
       return {
         ...search,
+        explanation: explainMove(position, search)
+      };
+    },
+
+    analyzePosition(position, options = {}) {
+      const lineCount = normalizeLineCount(options.lines ?? options.multiPv ?? options.multipv ?? 5);
+      const search = searchBestMove(position, {
+        ...defaultOptions,
+        ...options,
+        candidateLimit: lineCount,
+        transpositionTable
+      });
+      const bestScore = search.score;
+      const lines = search.candidates.slice(0, lineCount).map((candidate, index) => ({
+        rank: index + 1,
+        move: candidate.move,
+        score: Math.round(candidate.score),
+        centipawnLoss: Math.max(0, Math.round(bestScore - candidate.score)),
+        principalVariation: candidate.principalVariation.map((pvMove) => pvMove.notation ?? moveToNotation(pvMove)),
+        explanation: explainCandidateMove(position, candidate, {
+          rank: index + 1,
+          bestScore,
+          depth: search.depth
+        })
+      }));
+
+      return {
+        ...search,
+        lines,
         explanation: explainMove(position, search)
       };
     },
@@ -91,6 +120,10 @@ export function chooseMove(position, options = {}) {
   return createEngine(options).chooseMove(position, options);
 }
 
+export function analyzePosition(position, options = {}) {
+  return createEngine(options).analyzePosition(position, options);
+}
+
 export function hasLegalMoves(position) {
   return generateLegalMoves(position, position.turn).length > 0;
 }
@@ -113,4 +146,10 @@ function resolveLegalMove(position, moveOrNotation) {
   }
 
   return move;
+}
+
+function normalizeLineCount(value) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 5;
+  return Math.max(1, Math.min(12, parsed));
 }

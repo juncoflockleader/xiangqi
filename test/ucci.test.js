@@ -7,6 +7,7 @@ test("UCCI session identifies itself", () => {
   const output = session.handleLine("ucci");
 
   assert.ok(output.some((line) => line.startsWith("id name")));
+  assert.ok(output.some((line) => line.includes("MultiPV")));
   assert.ok(output.includes("ucciok"));
 });
 
@@ -19,6 +20,35 @@ test("UCCI session searches a FEN position", () => {
   assert.ok(output.some((line) => line.includes("nodes")));
   assert.ok(output.includes("bestmove e9e2"));
   assert.ok(output.some((line) => line.includes("reason: Wins a rook")));
+});
+
+test("UCCI analyze returns multiple principal variations", () => {
+  const session = new UcciSession({ depth: 2, timeLimitMs: 1000 });
+  session.handleLine("position fen 4k4/9/4r4/9/9/9/9/9/9/3KR4 r");
+  const output = session.handleLine("analyze depth 2 movetime 1000 lines 2");
+
+  assert.ok(output.some((line) => line.startsWith("info multipv 1 depth 2")));
+  assert.ok(output.some((line) => line.startsWith("info multipv 2 depth 2")));
+  assert.ok(output.some((line) => line.includes("line 1 reason:")));
+  assert.ok(output.includes("bestmove e9e2"));
+});
+
+test("UCCI go multipv delegates to analysis output", () => {
+  const session = new UcciSession({ depth: 1, timeLimitMs: 500 });
+  session.handleLine("position startpos");
+  const output = session.handleLine("go depth 1 movetime 500 multipv 3");
+
+  assert.equal(output.filter((line) => line.startsWith("info multipv ")).length, 3);
+  assert.ok(output.some((line) => line.startsWith("bestmove ")));
+});
+
+test("UCCI MultiPV option changes default go output", () => {
+  const session = new UcciSession({ depth: 1, timeLimitMs: 500 });
+  session.handleLine("setoption name MultiPV value 2");
+  session.handleLine("position startpos");
+  const output = session.handleLine("go depth 1 movetime 500");
+
+  assert.equal(output.filter((line) => line.startsWith("info multipv ")).length, 2);
 });
 
 test("UCCI banmoves excludes a root move", () => {

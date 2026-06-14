@@ -53,6 +53,18 @@ console.log(review.explanation.summary);
 
 `reviewMove` compares the played move against the searched best line and returns a practical grade: `best`, `excellent`, `good`, `inaccuracy`, `mistake`, or `blunder`.
 
+Analyze several candidate lines:
+
+```js
+const analysis = engine.analyzePosition(position, { lines: 3, depth: 3 });
+
+for (const line of analysis.lines) {
+  console.log(line.rank, line.move.notation, line.explanation.summary);
+}
+```
+
+`analyzePosition` returns ranked candidate lines with scores, centipawn loss against the best move, principal variations, and individual explanations.
+
 Track a play session:
 
 ```js
@@ -81,9 +93,10 @@ Example session:
 ucci
 position fen 4k4/9/4r4/9/9/9/9/9/9/3KR4 r
 go depth 2 movetime 1000
+analyze depth 2 movetime 1000 lines 3
 ```
 
-The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `go`, `probe`, `explain`, and `quit`.
+The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `go`, `go ... multipv N`, `setoption name MultiPV value N`, `analyze`, `probe`, `explain`, and `quit`.
 
 ## Movegen Validation
 

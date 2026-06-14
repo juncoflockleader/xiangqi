@@ -9,7 +9,8 @@ import { formatScore } from "../reasoning.js";
 
 const DEFAULT_OPTIONS = Object.freeze({
   depth: 4,
-  timeLimitMs: 2000
+  timeLimitMs: 2000,
+  multiPv: 1
 });
 
 export class UcciSession {
@@ -40,6 +41,8 @@ export class UcciSession {
           return this.setBannedMoves(trimmed);
         case "go":
           return this.go(trimmed);
+        case "analyze":
+          return this.analyze(trimmed);
         case "probe":
           return this.probe(trimmed);
         case "explain":
@@ -60,6 +63,7 @@ export class UcciSession {
       "id author juncoflockleader/codex",
       "option name Depth type spin default 4 min 1 max 8",
       "option name MoveTime type spin default 2000 min 50 max 60000",
+      "option name MultiPV type spin default 1 min 1 max 12",
       "option name Explain type check default true",
       "ucciok"
     ];
@@ -76,6 +80,8 @@ export class UcciSession {
       this.options.depth = clampInteger(value, 1, 12, this.options.depth);
     } else if (normalized === "movetime" || normalized === "timelimitms") {
       this.options.timeLimitMs = clampInteger(value, 50, 120000, this.options.timeLimitMs);
+    } else if (normalized === "multipv") {
+      this.options.multiPv = clampInteger(value, 1, 12, this.options.multiPv);
     }
 
     this.engine = createEngine(this.options);
@@ -112,6 +118,11 @@ export class UcciSession {
 
   go(line) {
     const options = parseGoOptions(line, this.options);
+    const multiPv = readTokenInteger(line.split(/\s+/), "multipv", this.options.multiPv);
+    if (multiPv > 1) {
+      return this.analyze(`analyze depth ${options.depth} movetime ${options.timeLimitMs} lines ${multiPv}`);
+    }
+
     const result = this.engine.chooseMove(this.position, {
       ...options,
       bannedMoves: this.bannedMoves
@@ -132,6 +143,33 @@ export class UcciSession {
 
     for (const reason of result.explanation.reasons.slice(0, 3)) {
       outputs.push(`info string reason: ${reason}`);
+    }
+
+    outputs.push(`bestmove ${protocolMove(result.bestMove)}`);
+    return outputs;
+  }
+
+  analyze(line) {
+    const tokens = line.split(/\s+/);
+    const options = parseGoOptions(line.replace(/^analyze/i, "go"), this.options);
+    const lines = readTokenInteger(tokens, "lines", readTokenInteger(tokens, "multipv", 3));
+    const result = this.engine.analyzePosition(this.position, {
+      ...options,
+      lines,
+      bannedMoves: this.bannedMoves
+    });
+
+    if (result.lines.length === 0) return ["info string no legal move"];
+
+    const outputs = result.lines.map((entry) => (
+      `info multipv ${entry.rank} depth ${result.depth} score cp ${entry.score} cploss ${entry.centipawnLoss} pv ${entry.principalVariation.map(stripMoveSeparator).join(" ")}`
+    ));
+
+    for (const entry of result.lines) {
+      outputs.push(`info string line ${entry.rank}: ${entry.explanation.summary}`);
+      for (const reason of entry.explanation.reasons.slice(0, 2)) {
+        outputs.push(`info string line ${entry.rank} reason: ${reason}`);
+      }
     }
 
     outputs.push(`bestmove ${protocolMove(result.bestMove)}`);
@@ -171,6 +209,10 @@ export class UcciSession {
 
 export function protocolMove(move) {
   return (move.notation ?? moveToNotation(move)).replace("-", "");
+}
+
+function stripMoveSeparator(notation) {
+  return notation.replace("-", "");
 }
 
 function parseGoOptions(line, defaults) {

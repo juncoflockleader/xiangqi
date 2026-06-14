@@ -120,6 +120,36 @@ export function explainReviewedMove(position, review) {
   };
 }
 
+export function explainCandidateMove(position, candidate, context = {}) {
+  const moveStory = explainMoveFeatures(position, candidate.move);
+  const rank = context.rank ?? 1;
+  const bestScore = context.bestScore ?? candidate.score;
+  const centipawnLoss = Math.max(0, Math.round(bestScore - candidate.score));
+  const notation = candidate.move.notation ?? moveToNotation(candidate.move);
+  const principalVariation = (candidate.principalVariation ?? [])
+    .map((move) => move.notation ?? moveToNotation(move));
+  const reasons = [];
+
+  if (rank === 1) {
+    reasons.push("This is the engine's top candidate in the current search.");
+  } else if (centipawnLoss <= 15) {
+    reasons.push(`This line is effectively tied with the top move, trailing by ${centipawnLoss} centipawns.`);
+  } else {
+    reasons.push(`This line trails the top move by about ${centipawnLoss} centipawns.`);
+  }
+
+  reasons.push(...moveStory.reasons);
+
+  return {
+    summary: `Candidate ${rank}: ${pieceLabel(candidate.move.piece)} ${notation} scores ${formatScore(candidate.score)} at depth ${context.depth ?? "?"}.`,
+    reasons: unique(reasons).slice(0, 7),
+    principalVariation,
+    principalVariationText: principalVariation.join(" "),
+    evaluationDelta: moveStory.evaluationDelta,
+    centipawnLoss
+  };
+}
+
 export function formatScore(score) {
   if (Math.abs(score) > 90000) return score > 0 ? "winning by force" : "losing by force";
   const pawns = score / 100;

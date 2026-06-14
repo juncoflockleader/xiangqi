@@ -5,7 +5,7 @@ import {
 } from "../src/index.js";
 
 const position = createInitialPosition();
-const engine = createEngine({ depth: 3, timeLimitMs: 1500 });
+const engine = createEngine({ depth: 2, timeLimitMs: 1000 });
 const result = engine.chooseMove(position);
 
 console.log(formatBoard(position));
@@ -23,6 +23,13 @@ console.log("");
 console.log("Top candidates:");
 for (const candidate of result.explanation.alternatives) {
   console.log(`${candidate.rank}. ${candidate.move} (${candidate.score}) ${candidate.note}`);
+}
+
+const analysis = engine.analyzePosition(position, { lines: 3, depth: 2, timeLimitMs: 1000 });
+console.log("");
+console.log("Analysis lines:");
+for (const line of analysis.lines) {
+  console.log(`${line.rank}. ${line.move.notation} ${line.explanation.summary}`);
 }
 
 const reviewPosition = engine.play(position, "a9-a8");
