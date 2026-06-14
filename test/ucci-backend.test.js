@@ -87,6 +87,34 @@ test("UCCI backend parses MultiPV analysis lines", async () => {
   }
 });
 
+test("UCCI backend chooseMove can include native MultiPV alternatives", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), {
+      useBook: false,
+      lines: 2
+    });
+
+    assert.equal(result.bestMove.notation, "h9-g7");
+    assert.equal(result.candidates.length, 2);
+    assert.equal(result.candidates[0].move.notation, "h9-g7");
+    assert.equal(result.candidates[1].move.notation, "h7-e7");
+    assert.equal(result.explanation.alternatives.length, 2);
+    assert.equal(result.explanation.alternatives[1].move, "h7-e7");
+    assert.ok(result.raw.some((line) => line.includes("multipv 2")));
+  } finally {
+    await backend.close();
+  }
+});
+
 test("native backend can use a UCI handshake for top-engine compatibility", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,

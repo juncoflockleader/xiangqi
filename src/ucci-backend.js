@@ -51,8 +51,9 @@ export function createUcciEngineBackend(options = {}) {
       ENGINE_BACKEND_FEATURES.PRESSURE
     ],
     chooseMove: async (position, searchOptions = {}) => {
+      const lineCount = resolveNativeChooseMoveLines(backendOptions, searchOptions);
       const mergedOptions = mergeNativeOptions(backendOptions, searchOptions, {
-        lines: 1,
+        lines: lineCount,
         backendName: name,
         protocol
       });
@@ -765,6 +766,19 @@ function normalizeLineCount(value) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed)) return 1;
   return Math.max(1, Math.min(12, parsed));
+}
+
+function resolveNativeChooseMoveLines(baseOptions, searchOptions) {
+  return normalizeLineCount(
+    searchOptions.lines
+      ?? searchOptions.multiPv
+      ?? searchOptions.multipv
+      ?? searchOptions.explanationLines
+      ?? baseOptions.chooseMoveLines
+      ?? baseOptions.explanationLines
+      ?? baseOptions.lines
+      ?? 1
+  );
 }
 
 function numberOption(...values) {
