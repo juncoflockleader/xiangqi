@@ -4,9 +4,11 @@ import {
   createInitialPosition,
   createJavaScriptEngineBackend,
   createEngine,
+  createOpeningBookFromRecords,
   createOracleReviewEngineBackend,
   createUcciEngineBackend,
   formatPositionStudy,
+  INITIAL_FEN,
   parseFen,
   studyPositionWithBackend
 } from "../src/index.js";
@@ -32,6 +34,50 @@ test("engine position study bundles decision, hints, candidates, and pressure", 
   assert.ok(Array.isArray(study.pressure.threats));
   assert.ok(study.nextSteps.length > 0);
   assert.match(text, /Position study: Red to move, best h7-e7/);
+});
+
+test("position study separates opening candidates from search candidates", () => {
+  const book = createOpeningBookFromRecords([
+    {
+      fen: INITIAL_FEN,
+      move: "h9-g7",
+      weight: 160,
+      name: "Oracle Horse",
+      idea: "Generated oracle book wants the horse developed before tactical drifting.",
+      tags: ["oracle", "generated"],
+      source: "Fixture Oracle",
+      engineScore: 42
+    },
+    {
+      fen: INITIAL_FEN,
+      move: "h7-e7",
+      weight: 120,
+      name: "Oracle Cannon",
+      idea: "A close central-cannon alternative from the same generated book.",
+      tags: ["oracle", "alternative"],
+      source: "Fixture Oracle",
+      engineScore: 31
+    }
+  ], { aggregateRecords: true });
+  const engine = createEngine({ book, depth: 1, timeLimitMs: 100 });
+  const study = engine.studyPosition(createInitialPosition(), {
+    depth: 1,
+    timeLimitMs: 100,
+    lines: 2
+  });
+  const text = formatPositionStudy(study);
+
+  assert.equal(study.bestMove, "h9-g7");
+  assert.equal(study.decision.source, "opening-book");
+  assert.equal(study.openingCandidates.length, 2);
+  assert.equal(study.openingCandidates[0].move, "h9-g7");
+  assert.equal(study.openingCandidates[0].name, "Oracle Horse");
+  assert.equal(study.openingCandidates[0].database.source, "Fixture Oracle");
+  assert.equal(study.searchDisagreement.openingMove, "h9-g7");
+  assert.equal(study.searchDisagreement.searchMove, "b7-b0");
+  assert.equal(study.nextSteps[0].kind, "opening-search-check");
+  assert.match(text, /Opening candidates:/);
+  assert.match(text, /Search check: b7-b0 is the top search candidate, while h9-g7 is the opening-book choice\./);
 });
 
 test("position study can include a played move review", () => {

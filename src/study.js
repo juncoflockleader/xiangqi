@@ -121,6 +121,18 @@ export function formatPositionStudy(study) {
     lines.push(`Oracle correction: ${study.oracleDisagreement.move} trails ${study.oracleDisagreement.bestMove} by ${study.oracleDisagreement.centipawnLoss} cp (${study.oracleDisagreement.classification}).`);
   }
 
+  if (study.searchDisagreement) {
+    lines.push(`Search check: ${study.searchDisagreement.searchMove} is the top search candidate, while ${study.searchDisagreement.openingMove} is the opening-book choice.`);
+  }
+
+  const openingCandidates = study.openingCandidates ?? [];
+  if (openingCandidates.length > 0) {
+    lines.push("Opening candidates:");
+    for (const candidate of openingCandidates.slice(0, 5)) {
+      lines.push(`  ${candidate.rank}. ${candidate.move} (${candidate.scoreText}) - ${candidate.name}`);
+    }
+  }
+
   if (study.hints.length > 0) {
     lines.push("Hints:");
     for (const hint of study.hints.slice(0, 4)) {
@@ -157,6 +169,8 @@ function buildPositionStudy(position, parts) {
   const decision = parts.decision ? summarizeDecision(parts.decision) : null;
   const candidateLines = summarizeCandidateLines(parts.analysis);
   const coach = summarizeCoach(parts.coach);
+  const openingCandidates = summarizeOpeningCandidates(decision, coach);
+  const searchDisagreement = summarizeSearchDisagreement(decision, candidateLines);
   const playedMoveReview = parts.review ? summarizeReview(parts.review) : null;
   const pressure = parts.pressure ? summarizePressure(parts.pressure) : null;
   const practiceFocus = playedMoveReview ? practiceFocusFromReview(playedMoveReview) : null;
@@ -175,6 +189,8 @@ function buildPositionStudy(position, parts) {
     summary: summarizeStudy({ side: position.turn, bestMove, decision, playedMoveReview, oracleReview }),
     decision,
     candidateLines,
+    openingCandidates,
+    searchDisagreement,
     hints: coach?.levels ?? [],
     coach,
     playedMoveReview,
@@ -182,7 +198,7 @@ function buildPositionStudy(position, parts) {
     practiceFocus,
     oracleReview,
     oracleDisagreement,
-    nextSteps: nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceFocus, oracleDisagreement })
+    nextSteps: nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceFocus, oracleDisagreement, searchDisagreement })
   };
 }
 
@@ -222,6 +238,60 @@ function summarizeCandidateLines(analysis) {
     reasons: [...(line.explanation?.reasons ?? [])],
     linePlan: line.explanation?.linePlan ?? null
   }));
+}
+
+function summarizeOpeningCandidates(decision, coach) {
+  if (coach?.source?.startsWith("opening") && coach.alternatives?.length > 0) {
+    return coach.alternatives.map((alternative) => ({
+      rank: alternative.rank,
+      move: alternative.move,
+      score: Math.round(alternative.score ?? 0),
+      scoreDetail: alternative.scoreDetail ?? null,
+      scoreText: alternative.scoreText ?? scoreTextFor(alternative),
+      wdl: alternative.wdl ?? null,
+      principalVariation: [...(alternative.principalVariation ?? [])],
+      name: alternative.book?.name ?? "Opening candidate",
+      idea: alternative.book?.idea ?? "",
+      tags: [...(alternative.book?.tags ?? [])],
+      weight: alternative.book?.weight ?? Math.round(alternative.score ?? 0),
+      database: alternative.book?.database ?? null
+    }));
+  }
+
+  if (!decision?.source?.startsWith("opening")) return [];
+  return (decision.alternatives ?? []).map((alternative) => ({
+    rank: alternative.rank,
+    move: alternative.move,
+    score: Math.round(alternative.score ?? 0),
+    scoreDetail: alternative.scoreDetail ?? null,
+    scoreText: alternative.scoreText ?? scoreTextFor(alternative),
+    wdl: alternative.wdl ?? null,
+    principalVariation: [...(alternative.principalVariation ?? [])],
+    name: "Opening candidate",
+    idea: alternative.note || alternative.summary || "",
+    tags: [],
+    weight: Math.round(alternative.score ?? 0),
+    database: null
+  }));
+}
+
+function summarizeSearchDisagreement(decision, candidateLines) {
+  if (!decision?.source?.startsWith("opening")) return null;
+  const topSearch = candidateLines[0];
+  if (!topSearch?.move || !decision.bestMove || topSearch.move === decision.bestMove) return null;
+
+  return {
+    kind: "opening-vs-search",
+    openingMove: decision.bestMove,
+    openingSource: decision.source,
+    openingScore: decision.score,
+    openingScoreText: decision.scoreText,
+    searchMove: topSearch.move,
+    searchScore: topSearch.score,
+    searchScoreText: topSearch.scoreText,
+    searchSummary: topSearch.summary,
+    summary: `${decision.bestMove} is the opening-book choice, while shallow search currently ranks ${topSearch.move} first.`
+  };
 }
 
 function summarizeCoach(coach) {
@@ -327,7 +397,7 @@ function summarizeStudy({ side, bestMove, decision, playedMoveReview, oracleRevi
   return decision?.summary ?? `${bestMove} is the recommended move for ${side}.`;
 }
 
-function nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceFocus, oracleDisagreement }) {
+function nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceFocus, oracleDisagreement, searchDisagreement }) {
   const steps = [];
   if (playedMoveReview && !playedMoveReview.isBestMove) {
     steps.push({
@@ -349,6 +419,14 @@ function nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceF
       text: `${backend} prefers ${oracleDisagreement.bestMove} over ${oracleDisagreement.move} (${oracleDisagreement.centipawnLoss} cp, ${oracleDisagreement.classification}).`,
       ref: "oracle-review",
       oracleDisagreement
+    });
+  }
+  if (searchDisagreement && !playedMoveReview) {
+    steps.push({
+      kind: "opening-search-check",
+      text: `Compare opening-book ${searchDisagreement.openingMove} with search candidate ${searchDisagreement.searchMove}.`,
+      ref: "search-disagreement",
+      searchDisagreement
     });
   }
   if (coach?.levels?.[0]) {
