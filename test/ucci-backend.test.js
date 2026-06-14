@@ -208,6 +208,8 @@ test("native backend can use a UCI handshake for top-engine compatibility", asyn
     assert.equal(description.kind, "native-uci");
     assert.equal(result.source, "native-uci");
     assert.equal(result.bestMove.notation, "h9-g7");
+    assert.ok(result.raw.some((line) => line.includes("position fen rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1")));
+    assert.ok(result.raw.some((line) => line === "bestmove h0g2"));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("UCI search")));
 
     const analysis = await backend.analyzePosition(createInitialPosition(), {

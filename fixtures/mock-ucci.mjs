@@ -8,6 +8,7 @@ const rl = readline.createInterface({
 
 let currentPosition = "";
 let currentMultiPv = 1;
+let currentProtocol = "ucci";
 const appliedOptions = [];
 
 function write(line) {
@@ -19,10 +20,12 @@ rl.on("line", (line) => {
   const command = trimmed.split(/\s+/, 1)[0]?.toLowerCase();
 
   if (command === "ucci") {
+    currentProtocol = "ucci";
     write("id name Mock Native UCCI");
     write("id author test");
     write("ucciok");
   } else if (command === "uci") {
+    currentProtocol = "uci";
     write("id name Mock Native UCI");
     write("id author test");
     write("uciok");
@@ -38,24 +41,36 @@ rl.on("line", (line) => {
     for (const option of appliedOptions) {
       write(`info string option ${option}`);
     }
+    if (currentPosition) {
+      write(`info string position ${currentPosition}`);
+    }
 
     if (/\sb(?:\s|$)/.test(currentPosition)) {
-      write("info depth 2 score cp 17 nodes 77 pv h0g2");
-      write("bestmove h0g2");
+      write(`info depth 2 score cp 17 nodes 77 pv ${nativeMove("h0g2")}`);
+      write(`bestmove ${nativeMove("h0g2")}`);
     } else if (/\bwtime\s+\d+/i.test(trimmed)) {
       write(`info string command ${trimmed}`);
-      write("info depth 2 score cp 55 nodes 321 pv h9g7 h0g2");
-      write("bestmove h9g7");
+      write(`info depth 2 score cp 55 nodes 321 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+      write(`bestmove ${nativeMove("h9g7")}`);
     } else if (/\bmultipv\s+2\b/i.test(trimmed) || currentMultiPv === 2) {
-      write("info multipv 1 depth 2 score cp 42 nodes 123 pv h9g7 h0g2");
-      write("info multipv 2 depth 2 score cp 12 nodes 123 pv h7e7 h0g2");
-      write("bestmove h9g7");
+      write(`info multipv 1 depth 1 score cp 20 nodes 40 pv ${nativeMove("a9a8")}`);
+      write(`info multipv 2 depth 1 score cp 10 nodes 40 pv ${nativeMove("a6a5")}`);
+      write(`info multipv 1 depth 2 score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+      write(`info multipv 2 depth 2 score cp 12 nodes 123 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);
+      write(`bestmove ${nativeMove("h9g7")}`);
     } else {
-      write("info depth 2 score cp 42 nodes 123 pv h9g7 h0g2");
-      write("bestmove h9g7");
+      write(`info depth 2 score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+      write(`bestmove ${nativeMove("h9g7")}`);
     }
   } else if (command === "quit") {
     write("bye");
     process.exit(0);
   }
 });
+
+function nativeMove(moveText) {
+  if (currentProtocol !== "uci") return moveText;
+  return moveText.replace(/^([a-i])([0-9])([a-i])([0-9])$/i, (_, fromFile, fromRank, toFile, toRank) => (
+    `${fromFile}${9 - Number(fromRank)}${toFile}${9 - Number(toRank)}`
+  ));
+}

@@ -191,7 +191,7 @@ class UcciProcessClient {
   async search(position, options = {}) {
     await this.ensureReady();
 
-    this.write(`position fen ${toFen(position)}`);
+    this.write(`position fen ${toNativeFen(position, this.protocol)}`);
 
     const bannedMoves = options.bannedMoves ?? [];
     if (this.protocol === "ucci" && bannedMoves.length > 0) {
@@ -311,7 +311,7 @@ async function nativeSearch(client, position, options) {
   const searchOptions = { ...options, side: position.turn };
   const protocol = normalizeNativeProtocol(options.protocol);
   const rawLines = await client.search(position, searchOptions);
-  const parsed = parseUcciSearch(rawLines, position);
+  const parsed = parseUcciSearch(rawLines, position, protocol);
   const result = {
     source: nativeSource(protocol),
     protocol,
@@ -422,22 +422,27 @@ function maybeBookResult(referenceEngine, position, options) {
   };
 }
 
-function parseUcciSearch(lines, position) {
+function parseUcciSearch(lines, position, protocol = "ucci") {
   const bestLine = [...lines].reverse().find((line) => line.startsWith("bestmove "));
   if (!bestLine) throw new Error("UCCI search did not return bestmove.");
 
-  const bestToken = bestLine.split(/\s+/)[1];
+  const bestToken = nativeMoveTokenToInternal(bestLine.split(/\s+/)[1], protocol);
   const bestMove = bestToken === "0000" ? null : resolveLegalMove(position, bestToken);
   const infos = lines
     .filter((line) => line.startsWith("info "))
     .map(parseInfoLine)
+    .map((info) => translateNativeInfoLine(info, protocol))
     .filter(Boolean);
   const pvInfos = infos.filter((info) => info.pv.length > 0);
-  const primaryInfo = choosePrimaryInfo(pvInfos, bestToken) ?? infos.at(-1) ?? {};
+  const candidateInfos = latestPvInfosByMultipv(pvInfos);
+  const primaryInfo = choosePrimaryInfo(candidateInfos, bestToken)
+    ?? choosePrimaryInfo(pvInfos, bestToken)
+    ?? infos.at(-1)
+    ?? {};
   const principalVariation = primaryInfo.pv
     ? resolvePrincipalVariation(position, primaryInfo.pv)
     : bestMove ? [bestMove] : [];
-  const candidates = buildNativeCandidates(position, pvInfos, bestMove, primaryInfo);
+  const candidates = buildNativeCandidates(position, candidateInfos, bestMove, primaryInfo);
 
   return {
     bestMove,
@@ -495,6 +500,22 @@ function parseInfoLine(line) {
   }
 
   return info;
+}
+
+function latestPvInfosByMultipv(infos) {
+  const latest = new Map();
+
+  for (const info of infos) {
+    const key = info.multipv || 1;
+    const current = latest.get(key);
+    if (!current || info.depth >= current.depth) {
+      latest.set(key, info);
+    }
+  }
+
+  return [...latest.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([, info]) => info);
 }
 
 function choosePrimaryInfo(infos, bestToken) {
@@ -707,7 +728,7 @@ function formatGoCommand(options) {
   }
 
   if (protocol === "uci" && options.searchMoves?.length > 0) {
-    parts.push("searchmoves", ...options.searchMoves.map(compactMove));
+    parts.push("searchmoves", ...options.searchMoves.map((move) => compactNativeMove(move, protocol)));
   }
 
   if (lines > 1 && protocol !== "uci") parts.push("multipv", lines);
@@ -747,6 +768,31 @@ function normalizeNativeProtocol(value = "ucci") {
 
 function nativeSource(protocol) {
   return normalizeNativeProtocol(protocol) === "uci" ? "native-uci" : "native-ucci";
+}
+
+function toNativeFen(position, protocol) {
+  const fen = toFen(position);
+  if (normalizeNativeProtocol(protocol) !== "uci") return fen;
+
+  const [board, side = "r"] = fen.split(/\s+/);
+  const nativeBoard = board.replace(/[hHeE]/g, (piece) => UCI_FEN_PIECES[piece] ?? piece);
+  const nativeSide = side === "r" ? "w" : "b";
+  return `${nativeBoard} ${nativeSide} - - 0 1`;
+}
+
+const UCI_FEN_PIECES = Object.freeze({
+  h: "n",
+  H: "N",
+  e: "b",
+  E: "B"
+});
+
+function translateNativeInfoLine(info, protocol) {
+  if (normalizeNativeProtocol(protocol) !== "uci") return info;
+  return {
+    ...info,
+    pv: info.pv.map((moveText) => nativeMoveTokenToInternal(moveText, protocol))
+  };
 }
 
 function normalizeNativeEngineOptions(engineOptions = {}) {
@@ -905,6 +951,37 @@ function numberOption(...values) {
 
 function compactMove(move) {
   return (typeof move === "string" ? move : move.notation ?? moveToNotation(move)).replace("-", "");
+}
+
+function compactNativeMove(move, protocol) {
+  const compact = compactMove(move);
+  return normalizeNativeProtocol(protocol) === "uci"
+    ? internalMoveTokenToNative(compact)
+    : compact;
+}
+
+function nativeMoveTokenToInternal(moveText, protocol) {
+  if (normalizeNativeProtocol(protocol) !== "uci") return moveText;
+  if (!moveText || moveText === "0000") return moveText;
+  return translateMoveTokenRanks(moveText);
+}
+
+function internalMoveTokenToNative(moveText) {
+  if (!moveText || moveText === "0000") return moveText;
+  return translateMoveTokenRanks(moveText);
+}
+
+function translateMoveTokenRanks(moveText) {
+  const compact = String(moveText).replace("-", "");
+  const match = compact.match(/^([a-i])([0-9])([a-i])([0-9])(.*)$/i);
+  if (!match) return moveText;
+
+  const [, fromFile, fromRank, toFile, toRank, suffix] = match;
+  return `${fromFile}${mirrorNativeRank(fromRank)}${toFile}${mirrorNativeRank(toRank)}${suffix}`;
+}
+
+function mirrorNativeRank(rank) {
+  return String(9 - Number(rank));
 }
 
 function toMoveKey(move) {

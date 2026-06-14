@@ -204,7 +204,7 @@ native-engine configuration separate from shared search options. Set
 `fallbackOnNativeError: false` for strict native behavior that reports process
 errors instead of recovering with the JS reference engine.
 
-The JavaScript backend is the reference learning engine. The native backend is async because it talks to an external UCI/UCCI process; UCCI is the default, and `protocol: "uci"` supports UCI-style engines such as Pikafish. By default it checks the JS/imported opening book before starting native search, and `useBook: false` forces a pure native search. Native `reviewMove` and `reviewGame` compare played moves against the external engine's preferred moves, then use the JS explanation layer to turn score gaps into learning feedback. The built-in backends expose `chooseMove`, `analyzePosition`, `reviewMove`, `reviewGame`, `coachMove`, `lessonPlan`, `openingBook`, `play`, and `legalMoves`, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
+The JavaScript backend is the reference learning engine. The native backend is async because it talks to an external UCI/UCCI process; UCCI is the default, and `protocol: "uci"` supports UCI-style engines such as Pikafish. For UCI Xiangqi engines, the adapter translates the app's readable FEN and coordinates into the common native dialect: horses/elephants use `N/B`, Red-to-move becomes `w`, and UCI rank coordinates are mirrored at the process boundary. By default it checks the JS/imported opening book before starting native search, and `useBook: false` forces a pure native search. Native `reviewMove` and `reviewGame` compare played moves against the external engine's preferred moves, then use the JS explanation layer to turn score gaps into learning feedback. The built-in backends expose `chooseMove`, `analyzePosition`, `reviewMove`, `reviewGame`, `coachMove`, `lessonPlan`, `openingBook`, `play`, and `legalMoves`, so the app can use a strong native engine for play while keeping JS-powered opening, review, and explanation helpers around it.
 
 Review a player's move:
 
@@ -311,6 +311,28 @@ console.log(sparring.aggregate.fallbackCount);
 ```
 
 The sparring harness uses the same game-history layer as a play session, so every move keeps the chosen notation, position FENs, search source, score, depth, nodes, principal variation, explanation summary/reasons, backend status, and native-fallback provenance. When a `referee` backend is supplied, the match also gets reviewed for centipawn loss, classifications, best-move corrections, and learning moments. It is meant for repeatable engine-vs-engine smoke tests before trying brittle online boards. Run `npm run spar -- --plies 20 --depth 2 --time 1000`, add `--referee --referee-depth 4 --referee-time 2000` for a JS review pass, or set `XIANGQI_REFEREE_ENGINE_COMMAND`/`--referee-command` to grade the match with a native UCI/UCCI engine. Set `XIANGQI_ENGINE_COMMAND` to put a native UCI/UCCI engine on both playing sides through the learning backend.
+
+To spar against a strong UCI engine such as Pikafish without checking binaries
+into this repo, point one side and the referee at a local executable:
+
+```sh
+XIANGQI_BLACK_ENGINE_COMMAND=/path/to/pikafish \
+XIANGQI_REFEREE_ENGINE_COMMAND=/path/to/pikafish \
+npm run spar -- --protocol uci --referee-protocol uci --plies 20 --no-book \
+  --native-option Threads=4 \
+  --native-option Hash=512 \
+  --native-option EvalFile=/path/to/pikafish.nnue \
+  --referee-depth 8 \
+  --referee-time 3000
+```
+
+Use `--red-option`, `--black-option`, or `--referee-option` to override an
+option for a specific process after the shared `--native-option` values. The
+same settings can be made repeatable with comma-separated environment values
+such as `XIANGQI_ENGINE_OPTIONS="Threads=4,Hash=512"` or JSON values such as
+`XIANGQI_REFEREE_ENGINE_OPTIONS='{"Threads":4,"Hash":1024}'`. The sparring
+report prints the normalized native options so engine-vs-engine results carry
+their configuration with them.
 
 Inspect threats without running a full search:
 

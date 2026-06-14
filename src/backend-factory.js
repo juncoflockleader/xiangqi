@@ -146,6 +146,11 @@ export function createFallbackEngineBackend(primaryBackend, fallbackBackend, opt
     get fallbackBackend() {
       return fallbackBackend;
     },
+    get nativeOptions() {
+      return Array.isArray(primaryBackend.nativeOptions)
+        ? primaryBackend.nativeOptions.map((option) => ({ ...option }))
+        : [];
+    },
     get fallbackActive() {
       return Boolean(state.error);
     },

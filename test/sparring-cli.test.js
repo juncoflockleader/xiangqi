@@ -27,3 +27,35 @@ test("sparring CLI can run with a referee review pass", async () => {
   assert.ok(stdout.includes("Referee: Referee JS"));
   assert.ok(stdout.includes("Final FEN:"));
 });
+
+test("sparring CLI forwards native engine options to players and referee", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "examples/sparring.mjs",
+    "--plies", "1",
+    "--depth", "1",
+    "--time", "100",
+    "--no-book",
+    "--protocol", "ucci",
+    "--referee-protocol", "ucci",
+    "--referee-depth", "1",
+    "--referee-time", "100",
+    "--native-option", "Threads=2",
+    "--red-option", "Hash=64",
+    "--referee-option", "Hash=128"
+  ], {
+    cwd: root,
+    timeout: 5000,
+    env: {
+      ...process.env,
+      XIANGQI_RED_ENGINE_COMMAND: process.execPath,
+      XIANGQI_RED_ENGINE_ARGS: "fixtures/mock-ucci.mjs",
+      XIANGQI_REFEREE_ENGINE_COMMAND: process.execPath,
+      XIANGQI_REFEREE_ENGINE_ARGS: "fixtures/mock-ucci.mjs"
+    }
+  });
+
+  assert.ok(stdout.includes("Sparring: Red Native (Red) vs Black JS (Black)"));
+  assert.ok(stdout.includes("Native options: Red Threads=2, Hash=64"));
+  assert.ok(stdout.includes("Referee: Referee Native"));
+  assert.ok(stdout.includes("Referee options: Threads=2, Hash=128"));
+});

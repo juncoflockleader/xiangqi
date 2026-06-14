@@ -1,4 +1,4 @@
-import { createJavaScriptEngineBackend, describeEngineBackendStatus } from "./backend.js";
+import { createJavaScriptEngineBackend, describeEngineBackend } from "./backend.js";
 import { createGame, gameStatus, chooseAndPlayGameMoveAsync } from "./game.js";
 import { createInitialPosition, moveToNotation, parseFen, toFen } from "./board.js";
 import { reviewGameWithBackend } from "./review.js";
@@ -90,8 +90,13 @@ export function formatSparringReport(report, options = {}) {
     ? `, fallbacks ${report.aggregate.fallbackCount}`
     : "";
   lines.push(`Search: avg depth ${report.aggregate.averageDepth}, ${formatNodes(report.aggregate.nodesPerSecond)}/s${fallbackText}`);
+  const playerNativeOptions = formatPlayerNativeOptions([report.players.red, report.players.black]);
+  if (playerNativeOptions) lines.push(`Native options: ${playerNativeOptions}`);
   if (report.refereeReview) {
     lines.push(`Referee: ${report.referee.name}, avg loss ${report.refereeReview.summary.averageCentipawnLoss} cp, ${report.learningMoments.length} learning moments`);
+    if (report.referee.nativeOptions.length > 0) {
+      lines.push(`Referee options: ${formatNativeOptions(report.referee.nativeOptions)}`);
+    }
   }
 
   for (const move of report.moves.slice(0, maxMoves)) {
@@ -215,13 +220,16 @@ function reviewOptionsFor(entry, side, options) {
 }
 
 function summarizePlayer(entry) {
+  const description = describeEngineBackend(entry.engine);
+
   return {
     id: entry.id,
     name: entry.name,
     side: entry.side,
     kind: entry.kind,
     features: [...entry.features],
-    status: describeEngineBackendStatus(entry.engine)
+    nativeOptions: description.nativeOptions,
+    status: description.status
   };
 }
 
@@ -359,6 +367,25 @@ function sum(items, valueFn) {
 function formatNodes(value) {
   const count = Math.round(value ?? 0);
   return count.toLocaleString("en-US");
+}
+
+function formatPlayerNativeOptions(players) {
+  return players
+    .filter((player) => player.nativeOptions.length > 0)
+    .map((player) => `${capitalize(player.side)} ${formatNativeOptions(player.nativeOptions)}`)
+    .join("; ");
+}
+
+function formatNativeOptions(options) {
+  return options.map((option) => {
+    if (option.value === null) return option.name;
+    return `${option.name}=${formatNativeOptionValue(option.value)}`;
+  }).join(", ");
+}
+
+function formatNativeOptionValue(value) {
+  if (Array.isArray(value)) return value.join(" ");
+  return String(value);
 }
 
 function capitalize(text) {

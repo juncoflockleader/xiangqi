@@ -142,7 +142,11 @@ test("learning backend factory selects a native engine when configured", async (
     depth: 2,
     timeLimitMs: 500,
     startupTimeoutMs: 1000,
-    commandTimeoutMs: 1000
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      Threads: 2,
+      Hash: 64
+    }
   });
 
   try {
@@ -158,6 +162,10 @@ test("learning backend factory selects a native engine when configured", async (
     assert.equal(description.status.fallback, true);
     assert.equal(description.status.primaryBackend.kind, "native-ucci");
     assert.equal(description.status.fallbackBackend.kind, "javascript");
+    assert.deepEqual(description.nativeOptions, [
+      { name: "Threads", value: 2 },
+      { name: "Hash", value: 64 }
+    ]);
     assert.equal(isNativeEngineBackend(backend), true);
     assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.FALLBACK), true);
     assert.equal(result.source, "native-ucci");
