@@ -741,6 +741,7 @@ function createEmptyStats() {
     nullMovePrunes: 0,
     countermoveStores: 0,
     countermoveHits: 0,
+    rootScoreOrderHits: 0,
     repetitions: 0
   };
 }

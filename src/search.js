@@ -87,6 +87,7 @@ export function searchBestMove(position, options = {}) {
   let candidates = [];
   let previousBest = null;
   let previousScore = null;
+  let previousRootScores = new Map();
   const iterations = [];
 
   for (let depth = 1; depth <= depthLimit; depth += 1) {
@@ -104,6 +105,7 @@ export function searchBestMove(position, options = {}) {
       maxExtensions: options.maxExtensions ?? DEFAULT_MAX_EXTENSIONS,
       maxPly: options.maxPly ?? DEFAULT_MAX_PLY,
       exactRootScores,
+      rootMoveScores: previousRootScores,
       aspirationWindow: options.aspirationWindow ?? DEFAULT_ASPIRATION_WINDOW,
       qCheckDepth: options.qCheckDepth ?? DEFAULT_QCHECK_DEPTH,
       deltaMargin: options.deltaMargin ?? DEFAULT_DELTA_MARGIN,
@@ -111,6 +113,7 @@ export function searchBestMove(position, options = {}) {
       useNullMove: options.useNullMove !== false,
       usePvs: options.usePvs !== false,
       useCountermoves: options.useCountermoves !== false,
+      useRootScoreOrdering: options.useRootScoreOrdering !== false,
       useFutilityPruning: options.useFutilityPruning !== false,
       useDeltaPruning: options.useDeltaPruning !== false,
       useQuiescenceChecks: options.useQuiescenceChecks !== false,
@@ -137,6 +140,7 @@ export function searchBestMove(position, options = {}) {
     iterations.push(createIterationRecord(position, depth, root, context, previousBest));
     previousBest = bestMove;
     previousScore = bestScore;
+    previousRootScores = root.rootMoveScores;
   }
 
   let fallback = null;
@@ -236,7 +240,8 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
     bestMove: bestMove ?? moves[0],
     score: bestScore,
     principalVariation: bestLine,
-    candidates: candidates.slice(0, context.candidateLimit)
+    candidates: candidates.slice(0, context.candidateLimit),
+    rootMoveScores: createRootMoveScoreMap(candidates)
   };
 }
 
@@ -606,6 +611,10 @@ function moveOrderingScore(position, move, principalMove, context, ply, previous
 
   if (context.priorityMoveKeys?.has(moveKey(move))) score += 1_500_000;
   if (sameMove(move, principalMove)) score += 1_000_000;
+  if (ply === 0 && context.useRootScoreOrdering && context.rootMoveScores?.has(moveKey(move))) {
+    score += 500_000 + clampOrderingScore(context.rootMoveScores.get(moveKey(move)));
+    context.stats.rootScoreOrderHits += 1;
+  }
   if (isCountermove(context, previousMove, move)) score += 30_000;
   if (move.captured) {
     const capture = getCaptureAnalysis(position, move, context);
@@ -643,6 +652,14 @@ function getCaptureAnalysis(position, move, context) {
 
 function toMoveKey(move) {
   return moveKey(typeof move === "string" ? parseMoveNotation(move) : move);
+}
+
+function createRootMoveScoreMap(candidates) {
+  return new Map(candidates.map((candidate) => [moveKey(candidate.move), candidate.score]));
+}
+
+function clampOrderingScore(score) {
+  return Math.max(-200_000, Math.min(200_000, Math.round(score)));
 }
 
 function shouldExtend({ inCheck, givesCheck, move, extensionsRemaining }) {
@@ -838,6 +855,7 @@ function createSearchStats() {
     nullMovePrunes: 0,
     countermoveStores: 0,
     countermoveHits: 0,
+    rootScoreOrderHits: 0,
     repetitions: 0
   };
 }
@@ -865,6 +883,7 @@ function mergeSearchStats(total, next) {
     nullMovePrunes: total.nullMovePrunes + next.nullMovePrunes,
     countermoveStores: total.countermoveStores + next.countermoveStores,
     countermoveHits: total.countermoveHits + next.countermoveHits,
+    rootScoreOrderHits: total.rootScoreOrderHits + next.rootScoreOrderHits,
     repetitions: total.repetitions + next.repetitions
   };
 }
