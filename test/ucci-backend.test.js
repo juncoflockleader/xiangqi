@@ -63,6 +63,70 @@ test("UCCI backend searches through an external process", async () => {
   }
 });
 
+test("UCCI backend applies native engine options before search", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      Threads: 2,
+      Hash: 64,
+      UCI_ShowWDL: true
+    }
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), { useBook: false });
+    const description = describeEngineBackend(backend);
+
+    assert.deepEqual(description.nativeOptions, [
+      { name: "Threads", value: 2 },
+      { name: "Hash", value: 64 },
+      { name: "UCI_ShowWDL", value: true }
+    ]);
+    assert.ok(result.raw.some((line) => line.includes("setoption name Threads value 2")));
+    assert.ok(result.raw.some((line) => line.includes("setoption name Hash value 64")));
+    assert.ok(result.raw.some((line) => line.includes("setoption name UCI_ShowWDL value true")));
+  } finally {
+    await backend.close();
+  }
+});
+
+test("UCCI backend accepts array and button-style native options", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: [
+      ["Hash", 128],
+      { name: "EvalFile", value: "pikafish.nnue" },
+      { name: "Clear Hash" }
+    ]
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), { useBook: false });
+    const description = describeEngineBackend(backend);
+
+    assert.deepEqual(description.nativeOptions, [
+      { name: "Hash", value: 128 },
+      { name: "EvalFile", value: "pikafish.nnue" },
+      { name: "Clear Hash", value: null }
+    ]);
+    assert.ok(result.raw.some((line) => line.includes("setoption name Hash value 128")));
+    assert.ok(result.raw.some((line) => line.includes("setoption name EvalFile value pikafish.nnue")));
+    assert.ok(result.raw.some((line) => line.includes("setoption name Clear Hash")));
+  } finally {
+    await backend.close();
+  }
+});
+
 test("UCCI backend parses MultiPV analysis lines", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,

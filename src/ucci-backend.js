@@ -124,7 +124,10 @@ export function createUcciEngineBackend(options = {}) {
     play: (position, notation) => referenceEngine.play(position, notation),
     legalMoves: (position) => referenceEngine.legalMoves(position),
     ready: () => client.ensureReady(),
-    close: () => client.close()
+    close: () => client.close(),
+    get nativeOptions() {
+      return client.engineOptions.map((option) => ({ ...option }));
+    }
   });
 
   return backend;
@@ -138,7 +141,7 @@ class UcciProcessClient {
     this.env = options.env;
     this.shell = options.shell ?? false;
     this.protocol = normalizeNativeProtocol(options.protocol);
-    this.engineOptions = options.engineOptions ?? {};
+    this.engineOptions = normalizeNativeEngineOptions(options.engineOptions);
     this.startupTimeoutMs = options.startupTimeoutMs ?? DEFAULT_UCCI_TIMEOUT_MS;
     this.child = null;
     this.lines = [];
@@ -177,8 +180,8 @@ class UcciProcessClient {
 
     await this.commandUntil(handshake.command, (lines) => lines.some((line) => line === handshake.ok), this.startupTimeoutMs);
 
-    for (const [name, value] of Object.entries(this.engineOptions)) {
-      this.write(`setoption name ${name} value ${value}`);
+    for (const option of this.engineOptions) {
+      this.write(formatSetOptionCommand(option));
     }
 
     await this.commandUntil("isready", (lines) => lines.some((line) => line === "readyok"), this.startupTimeoutMs);
@@ -744,6 +747,70 @@ function normalizeNativeProtocol(value = "ucci") {
 
 function nativeSource(protocol) {
   return normalizeNativeProtocol(protocol) === "uci" ? "native-uci" : "native-ucci";
+}
+
+function normalizeNativeEngineOptions(engineOptions = {}) {
+  return engineOptionEntries(engineOptions)
+    .map(normalizeNativeEngineOption)
+    .filter(Boolean);
+}
+
+function engineOptionEntries(engineOptions) {
+  if (engineOptions instanceof Map) {
+    return [...engineOptions.entries()].map(([name, value]) => ({ name, value }));
+  }
+
+  if (Array.isArray(engineOptions)) return engineOptions;
+
+  if (engineOptions && typeof engineOptions === "object") {
+    return Object.entries(engineOptions).map(([name, value]) => ({ name, value }));
+  }
+
+  if (typeof engineOptions === "string") return [engineOptions];
+  return [];
+}
+
+function normalizeNativeEngineOption(entry) {
+  if (typeof entry === "string") {
+    const name = entry.trim();
+    return name ? { name, value: null } : null;
+  }
+
+  if (Array.isArray(entry)) {
+    const [name, value = null] = entry;
+    return normalizeNativeEngineOption({ name, value });
+  }
+
+  if (!entry || typeof entry !== "object") return null;
+
+  const rawName = entry.name ?? entry.key ?? entry.option;
+  if (typeof rawName !== "string" && typeof rawName !== "number") return null;
+
+  const name = String(rawName).trim();
+  if (!name) return null;
+
+  const value = Object.prototype.hasOwnProperty.call(entry, "value")
+    ? entry.value
+    : Object.prototype.hasOwnProperty.call(entry, "defaultValue")
+      ? entry.defaultValue
+      : null;
+
+  return {
+    name,
+    value: value === undefined ? null : value
+  };
+}
+
+function formatSetOptionCommand(option) {
+  const name = String(option.name).trim();
+  if (option.value === null) return `setoption name ${name}`;
+  return `setoption name ${name} value ${formatOptionValue(option.value)}`;
+}
+
+function formatOptionValue(value) {
+  if (Array.isArray(value)) return value.join(" ");
+  if (typeof value === "boolean") return value ? "true" : "false";
+  return String(value);
 }
 
 function legalSearchMoves(position, bannedMoves) {

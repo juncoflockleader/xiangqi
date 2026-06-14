@@ -8,6 +8,7 @@ const rl = readline.createInterface({
 
 let currentPosition = "";
 let currentMultiPv = 1;
+const appliedOptions = [];
 
 function write(line) {
   process.stdout.write(`${line}\n`);
@@ -28,11 +29,16 @@ rl.on("line", (line) => {
   } else if (command === "isready") {
     write("readyok");
   } else if (command === "setoption") {
+    appliedOptions.push(trimmed);
     const match = trimmed.match(/\bname\s+MultiPV\s+value\s+(\d+)/i);
     if (match) currentMultiPv = Number.parseInt(match[1], 10) || 1;
   } else if (command === "position") {
     currentPosition = trimmed;
   } else if (command === "go") {
+    for (const option of appliedOptions) {
+      write(`info string option ${option}`);
+    }
+
     if (/\sb(?:\s|$)/.test(currentPosition)) {
       write("info depth 2 score cp 17 nodes 77 pv h0g2");
       write("bestmove h0g2");

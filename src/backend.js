@@ -107,6 +107,9 @@ export function describeEngineBackend(backend) {
     features: [...(backend.features ?? [])],
     cacheSize: typeof backend.cacheSize === "number" ? backend.cacheSize : null,
     cacheCapacity: typeof backend.cacheCapacity === "number" ? backend.cacheCapacity : null,
+    nativeOptions: Array.isArray(backend.nativeOptions)
+      ? backend.nativeOptions.map((option) => ({ ...option }))
+      : [],
     status: describeEngineBackendStatus(backend)
   };
 }

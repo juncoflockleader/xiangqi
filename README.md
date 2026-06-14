@@ -144,7 +144,12 @@ console.log(backend.supports(ENGINE_BACKEND_FEATURES.EXPLANATION));
 const nativeBackend = createUcciEngineBackend({
   command: "/path/to/pikafish-or-other-native-engine",
   profile: "native-uci",
-  depth: 8
+  depth: 8,
+  engineOptions: {
+    Threads: 4,
+    Hash: 512,
+    EvalFile: "/path/to/pikafish.nnue"
+  }
 });
 
 const nativeResult = await nativeBackend.chooseMove(position);
@@ -185,6 +190,13 @@ console.log(result.explanation.alternatives);
 console.log(result.backendFallback?.message);
 await backend.close?.();
 ```
+
+`engineOptions` are sent to the native process as `setoption` commands before
+the first `isready` check after handshake. Use an object for ordinary options
+such as `{ Threads: 4, Hash: 512 }`, or an array for button-style options such
+as `[{ name: "Clear Hash" }]`. `describeEngineBackend(nativeBackend)` includes
+the normalized `nativeOptions` list so the app can show exactly how a strong
+engine was configured.
 
 Set `native: false` or `preferNative: false` to force the JS learning engine, or
 pass a nested `native: { command, args, protocol }` object when the app keeps
