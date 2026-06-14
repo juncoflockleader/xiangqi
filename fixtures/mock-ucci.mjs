@@ -47,8 +47,10 @@ rl.on("line", (line) => {
     }
 
     if (hasOption("MockMateWdl")) {
-      write(`info depth ${depth} score mate 2 wdl 980 20 0 nodes 456 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
-      write(`bestmove ${nativeMove("h9g7")}`);
+      const move = /\sb(?:\s|$)/.test(currentPosition) ? "h0g2" : "h9g7";
+      const reply = /\sb(?:\s|$)/.test(currentPosition) ? "h9g7" : "h0g2";
+      write(`info depth ${depth} score mate 2 wdl 980 20 0 nodes 456 pv ${nativeMove(move)} ${nativeMove(reply)}`);
+      write(`bestmove ${nativeMove(move)}`);
     } else if (hasOption("MockRejectHeuristic") && /\sb(?:\s|$)/.test(currentPosition)) {
       write(`info depth ${depth} score cp 240 nodes 88 pv ${nativeMove("g2e3")}`);
       write(`bestmove ${nativeMove("g2e3")}`);

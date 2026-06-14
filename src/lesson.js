@@ -80,12 +80,20 @@ function createLessonCard(move, rank) {
     bestMove,
     classification: move.review.classification,
     centipawnLoss: move.review.centipawnLoss,
+    bestScore: Math.round(move.review.bestScore ?? 0),
+    bestScoreDetail: scoreDetailFor(move.review.bestAnalysis),
+    bestScoreText: scoreTextFor(move.review.bestAnalysis ?? { score: move.review.bestScore }),
+    bestWdl: move.review.bestAnalysis?.wdl ?? null,
     mistakes: move.review.mistakes,
     tags,
     hints: lessonHints(move, type, bestMove),
     answer: {
       move: answerMove,
       playedMove,
+      bestScore: Math.round(move.review.bestScore ?? 0),
+      bestScoreDetail: scoreDetailFor(move.review.bestAnalysis),
+      bestScoreText: scoreTextFor(move.review.bestAnalysis ?? { score: move.review.bestScore }),
+      bestWdl: move.review.bestAnalysis?.wdl ?? null,
       summary: move.review.explanation.summary,
       reasons: move.review.explanation.reasons,
       principalVariation: move.review.principalVariation ?? []
@@ -223,4 +231,18 @@ function capitalize(text) {
 function formatMove(move) {
   if (!move) return "0000";
   return move.notation ?? moveToNotation(move);
+}
+
+function scoreDetailFor(entry) {
+  if (!entry) return null;
+  return entry.scoreDetail ?? entry.explanation?.search?.scoreDetail ?? null;
+}
+
+function scoreTextFor(entry) {
+  return scoreDetailFor(entry)?.text ?? formatCentipawns(entry?.score);
+}
+
+function formatCentipawns(value) {
+  const rounded = Math.round(value ?? 0);
+  return `${rounded >= 0 ? "+" : ""}${rounded} cp`;
 }

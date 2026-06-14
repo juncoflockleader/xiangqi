@@ -4,9 +4,13 @@ import {
   SIDES,
   createEngine,
   createInitialPosition,
+  createUcciEngineBackend,
   parseFen,
+  reviewGameWithBackend,
   reviewGameWithEngine
 } from "../src/index.js";
+
+const MOCK_UCCI_PATH = new URL("../fixtures/mock-ucci.mjs", import.meta.url);
 
 test("engine reviews a short opening line with book matches", () => {
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });
@@ -37,6 +41,34 @@ test("game review highlights large mistakes as key moments", () => {
   assert.equal(review.keyMoments[0].bestMove, "e9-e2");
   assert.equal(review.keyMoments[0].mistakes.primary, "missed-material");
   assert.ok(review.keyMoments[0].centipawnLoss > 1000);
+});
+
+test("game review key moments preserve native score evidence", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    depth: 3,
+    timeLimitMs: 100,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockMateWdl: true
+    }
+  });
+
+  try {
+    const review = await reviewGameWithBackend(backend, ["h7-e7"], {
+      reviewOptions: { depth: 3, timeLimitMs: 100 }
+    });
+
+    assert.equal(review.keyMoments[0].notation, "h7-e7");
+    assert.equal(review.keyMoments[0].bestScoreDetail.text, "mate in 2");
+    assert.equal(review.keyMoments[0].bestScoreText, "mate in 2");
+    assert.equal(review.keyMoments[0].bestWdl.text, "98% win, 2% draw, 0% loss");
+  } finally {
+    await backend.close();
+  }
 });
 
 test("move review classifies tactical mistake patterns", () => {

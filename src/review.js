@@ -214,6 +214,10 @@ function selectKeyMoments(moves, limit) {
       classification: item.review.classification,
       centipawnLoss: item.review.centipawnLoss,
       bestMove: item.review.bestMove.notation,
+      bestScore: Math.round(item.review.bestScore ?? 0),
+      bestScoreDetail: scoreDetailFor(item.review.bestAnalysis),
+      bestScoreText: scoreTextFor(item.review.bestAnalysis ?? { score: item.review.bestScore }),
+      bestWdl: item.review.bestAnalysis?.wdl ?? null,
       mistakes: item.review.mistakes,
       book: item.book,
       summary: item.review.explanation.summary,
@@ -238,4 +242,18 @@ function countPositions(positions) {
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return counts;
+}
+
+function scoreDetailFor(entry) {
+  if (!entry) return null;
+  return entry.scoreDetail ?? entry.explanation?.search?.scoreDetail ?? null;
+}
+
+function scoreTextFor(entry) {
+  return scoreDetailFor(entry)?.text ?? formatCentipawns(entry?.score);
+}
+
+function formatCentipawns(value) {
+  const rounded = Math.round(value ?? 0);
+  return `${rounded >= 0 ? "+" : ""}${rounded} cp`;
 }

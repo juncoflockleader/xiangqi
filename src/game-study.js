@@ -153,6 +153,10 @@ function attachGameMoment(study, move) {
       classification: move.review.classification,
       centipawnLoss: move.review.centipawnLoss,
       bestMove: move.review.bestMove?.notation ?? null,
+      bestScore: Math.round(move.review.bestScore ?? 0),
+      bestScoreDetail: scoreDetailFor(move.review.bestAnalysis),
+      bestScoreText: scoreTextFor(move.review.bestAnalysis ?? { score: move.review.bestScore }),
+      bestWdl: move.review.bestAnalysis?.wdl ?? null,
       book: move.book
     }
   };
@@ -228,4 +232,18 @@ function worstSideByAverageLoss(bySide) {
 
 function capitalize(text) {
   return `${text.slice(0, 1).toUpperCase()}${text.slice(1)}`;
+}
+
+function scoreDetailFor(entry) {
+  if (!entry) return null;
+  return entry.scoreDetail ?? entry.explanation?.search?.scoreDetail ?? null;
+}
+
+function scoreTextFor(entry) {
+  return scoreDetailFor(entry)?.text ?? formatCentipawns(entry?.score);
+}
+
+function formatCentipawns(value) {
+  const rounded = Math.round(value ?? 0);
+  return `${rounded >= 0 ? "+" : ""}${rounded} cp`;
 }

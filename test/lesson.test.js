@@ -4,9 +4,13 @@ import {
   createEngine,
   createInitialPosition,
   createLessonPlanFromReview,
+  createLessonPlanWithBackend,
   createLessonPlanWithEngine,
+  createUcciEngineBackend,
   parseFen
 } from "../src/index.js";
+
+const MOCK_UCCI_PATH = new URL("../fixtures/mock-ucci.mjs", import.meta.url);
 
 test("lesson plan turns reviewed mistakes into correction cards", () => {
   const position = parseFen("4k4/9/4r4/9/9/9/9/9/9/3KR4 r");
@@ -43,6 +47,37 @@ test("lesson plan can be built from an existing game review", () => {
   assert.ok(plan.cards[0].tags.includes("book"));
   assert.ok(plan.cards[0].hints[0].text.length > 0);
   assert.equal(plan.cards[0].answer.move, plan.cards[0].playedMove);
+});
+
+test("lesson cards preserve native best-line score evidence", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    depth: 3,
+    timeLimitMs: 100,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockMateWdl: true
+    }
+  });
+
+  try {
+    const plan = await createLessonPlanWithBackend(backend, ["h7-e7"], {
+      reviewOptions: { depth: 3, timeLimitMs: 100 },
+      lessonOptions: { maxCards: 1 }
+    });
+    const card = plan.cards[0];
+
+    assert.equal(card.bestScoreDetail.text, "mate in 2");
+    assert.equal(card.bestScoreText, "mate in 2");
+    assert.equal(card.bestWdl.text, "98% win, 2% draw, 0% loss");
+    assert.equal(card.answer.bestScoreDetail.text, "mate in 2");
+    assert.equal(card.answer.bestWdl.text, "98% win, 2% draw, 0% loss");
+  } finally {
+    await backend.close();
+  }
 });
 
 test("book moves remain opening cards when shallow review scores are noisy", () => {
