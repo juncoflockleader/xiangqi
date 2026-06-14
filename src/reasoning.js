@@ -395,9 +395,16 @@ function lineMoveNotation(move) {
 }
 
 function explainAlternatives(candidates) {
+  const bestScore = candidates[0]?.score ?? 0;
+
   return candidates.slice(0, 5).map((candidate, index) => {
     const move = candidate.move;
     const tactical = [];
+    const centipawnLoss = Math.max(0, Math.round(bestScore - candidate.score));
+    const verdict = alternativeVerdict(index, centipawnLoss);
+    const contrast = alternativeContrast(index, centipawnLoss);
+    const principalVariation = (candidate.principalVariation ?? [])
+      .map((lineMove) => lineMove.notation ?? moveToNotation(lineMove));
 
     if (candidate.repetition) {
       tactical.push("repeats a known position for a draw-assumed score");
@@ -413,11 +420,29 @@ function explainAlternatives(candidates) {
       rank: index + 1,
       move: move.notation ?? moveToNotation(move),
       score: Math.round(candidate.score),
-      note: tactical.length > 0
+      centipawnLoss,
+      verdict,
+      principalVariation,
+      principalVariationText: principalVariation.join(" "),
+      note: `${contrast}; ${tactical.length > 0
         ? tactical.join(", ")
-        : `${PIECE_NAMES[move.piece.type]} move with search score ${formatScore(candidate.score)}`
+        : `${PIECE_NAMES[move.piece.type]} move with search score ${formatScore(candidate.score)}`}`
     };
   });
+}
+
+function alternativeVerdict(index, centipawnLoss) {
+  if (index === 0) return "best";
+  if (centipawnLoss <= 15) return "tied";
+  if (centipawnLoss <= 90) return "playable";
+  if (centipawnLoss <= 250) return "inferior";
+  return "poor";
+}
+
+function alternativeContrast(index, centipawnLoss) {
+  if (index === 0) return "top line";
+  if (centipawnLoss <= 15) return `roughly tied, trailing by ${centipawnLoss} centipawns`;
+  return `trails the top line by ${centipawnLoss} centipawns`;
 }
 
 function explainRepetition(repetition) {

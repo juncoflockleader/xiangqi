@@ -64,7 +64,9 @@ test("engine explains draw-assumed repetition candidates", () => {
 
   assert.equal(result.bestMove.notation, move.notation);
   assert.ok(result.explanation.reasons.some((reason) => reason.includes("draw-assumed repetition")));
-  assert.equal(result.explanation.alternatives[0].note, "repeats a known position for a draw-assumed score");
+  assert.equal(result.explanation.alternatives[0].verdict, "best");
+  assert.equal(result.explanation.alternatives[0].centipawnLoss, 0);
+  assert.ok(result.explanation.alternatives[0].note.includes("repeats a known position for a draw-assumed score"));
   assert.equal(analysis.lines[0].repetition.kind, "repeated-position");
   assert.ok(analysis.lines[0].explanation.reasons.some((reason) => reason.includes("draw-assumed repetition")));
 });

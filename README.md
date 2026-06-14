@@ -14,7 +14,7 @@ The current engine is dependency-free JavaScript and includes:
 - Static exchange analysis for distinguishing clean wins, tactically poisoned captures, and defended captures that remain sound after recaptures.
 - Immediate pressure/threat analysis for both sides.
 - Perft helpers for validating move generation while the engine grows.
-- Explainable move output for learning-app use cases, including structured confidence, depth-by-depth search trace, best-move stability, and draw-assumed repetition notes.
+- Explainable move output for learning-app use cases, including structured confidence, depth-by-depth search trace, best-move stability, alternative-line verdicts, and draw-assumed repetition notes.
 - Progressive coach hints that can reveal an idea, tactical clue, candidate focus, and full best-move reasoning.
 - Player-move review with centipawn loss, best-line comparison, and lesson-ready reasons.
 - Whole-game review with side summaries, opening-book matches, and key learning moments.

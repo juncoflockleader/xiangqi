@@ -32,6 +32,30 @@ test("standalone analyzePosition helper mirrors engine analysis", () => {
   assert.equal(analysis.explanation.linePlan.firstMove, analysis.bestMove.notation);
 });
 
+test("move explanations contrast root alternatives", () => {
+  const position = createInitialPosition();
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  const result = engine.chooseMove(position, {
+    useBook: false,
+    depth: 1,
+    timeLimitMs: 500
+  });
+  const alternatives = result.explanation.alternatives;
+
+  assert.ok(alternatives.length > 1);
+  assert.equal(alternatives[0].verdict, "best");
+  assert.equal(alternatives[0].centipawnLoss, 0);
+  assert.ok(alternatives[0].note.startsWith("top line"));
+  assert.ok(alternatives[0].principalVariationText.includes(alternatives[0].move));
+
+  for (const alternative of alternatives.slice(1)) {
+    assert.ok(alternative.centipawnLoss >= 0);
+    assert.ok(["tied", "playable", "inferior", "poor"].includes(alternative.verdict));
+    assert.match(alternative.note, /roughly tied|trails the top line/);
+    assert.ok(alternative.principalVariationText.includes(alternative.move));
+  }
+});
+
 test("analysis line count is clamped to a useful range", () => {
   const position = createInitialPosition();
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });
