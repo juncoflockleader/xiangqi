@@ -106,6 +106,85 @@ test("oracle opening artifacts round-trip into reusable books", async () => {
   }
 });
 
+test("oracle opening generator can explore bounded candidate branches", async () => {
+  const oracle = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    depth: 2,
+    timeLimitMs: 100,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const report = await generateOracleOpeningBookRecords(oracle, {
+      plies: 2,
+      lines: 2,
+      branches: 2,
+      source: "Mock Oracle",
+      searchOptions: {
+        depth: 2,
+        timeLimitMs: 100
+      }
+    });
+    const text = formatOracleOpeningBookReport(report);
+    const imported = createOpeningBookFromRecords(report.records, {
+      aggregateRecords: true
+    });
+    const alternativePosition = oracle.play(createInitialPosition(), "h7-e7");
+    const reply = lookupOpeningBook(alternativePosition, {
+      book: imported,
+      openingHeuristics: false
+    });
+
+    assert.equal(report.branchingFactor, 2);
+    assert.equal(report.exploredPositions, 3);
+    assert.equal(report.positions.length, 3);
+    assert.deepEqual(report.primaryLine, ["h9-g7", "h0-g2"]);
+    assert.equal(report.positions[2].incomingMove, "h7-e7");
+    assert.deepEqual(report.positions[2].path, ["h7-e7"]);
+    assert.equal(report.records.find((record) => record.path === "h7-e7")?.move, "h0-g2");
+    assert.equal(reply.move.notation, "h0-g2");
+    assert.ok(text.includes("branches=2"));
+    assert.ok(text.includes("after h7-e7"));
+  } finally {
+    await oracle.close();
+  }
+});
+
+test("oracle opening generator respects a branch position cap", async () => {
+  const oracle = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    depth: 2,
+    timeLimitMs: 100,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const report = await generateOracleOpeningBookRecords(oracle, {
+      plies: 3,
+      lines: 2,
+      branches: 2,
+      maxPositions: 2,
+      searchOptions: {
+        depth: 2,
+        timeLimitMs: 100
+      }
+    });
+
+    assert.equal(report.stopReason, "max-positions");
+    assert.equal(report.maxPositions, 2);
+    assert.equal(report.exploredPositions, 2);
+    assert.equal(report.positions.length, 2);
+  } finally {
+    await oracle.close();
+  }
+});
+
 test("oracle opening generator can omit the materialized book", async () => {
   const oracle = createUcciEngineBackend({
     command: process.execPath,

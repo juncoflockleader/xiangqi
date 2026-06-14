@@ -283,14 +283,19 @@ npm run book:oracle -- --preset pikafish \
   --option Hash=512 \
   --plies 16 \
   --lines 3 \
+  --branches 2 \
+  --max-positions 40 \
   --depth 8 \
   --time 3000 \
   --out ./oracle-opening-book.json
 ```
 
-The command follows the oracle's best line for the requested opening plies and
-records the top MultiPV alternatives at each visited position. The `--out`
-artifact is versioned and can be inspected, committed, or loaded later:
+By default the command follows the oracle's best line for the requested opening
+plies and records the top MultiPV alternatives at each visited position. Add
+`--branches N` to follow the top N candidates into a bounded opening tree, and
+use `--max-positions` as the safety cap when generating first-10-to-20-ply
+heuristics from a strong engine. The `--out` artifact is versioned and can be
+inspected, committed, or loaded later:
 
 ```js
 import { readFile } from "node:fs/promises";

@@ -63,6 +63,32 @@ test("oracle opening CLI applies the Pikafish preset", async () => {
   assert.equal(report.records[0].rank, 1);
 });
 
+test("oracle opening CLI can generate branching reports", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "examples/oracle-opening.mjs",
+    "--command", process.execPath,
+    "--arg", "fixtures/mock-ucci.mjs",
+    "--protocol", "uci",
+    "--plies", "2",
+    "--lines", "2",
+    "--branches", "2",
+    "--max-positions", "3",
+    "--depth", "2",
+    "--time", "100",
+    "--source", "Mock Oracle",
+    "--json"
+  ], {
+    cwd: root,
+    timeout: 5000
+  });
+  const report = JSON.parse(stdout);
+
+  assert.equal(report.branchingFactor, 2);
+  assert.equal(report.maxPositions, 3);
+  assert.equal(report.exploredPositions, 3);
+  assert.ok(report.records.some((record) => record.path === "h7-e7" && record.move === "h0-g2"));
+});
+
 test("oracle opening CLI writes reusable artifact files", async () => {
   const dir = await mkdtemp(join(tmpdir(), "xiangqi-oracle-book-"));
   const outFile = join(dir, "book.json");

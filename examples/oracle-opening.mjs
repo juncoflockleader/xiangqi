@@ -54,6 +54,8 @@ try {
   const report = await generateOracleOpeningBookRecords(oracle, {
     plies: options.plies,
     lines: options.lines,
+    branches: options.branches,
+    maxPositions: options.maxPositions,
     source: options.source,
     initialFen: options.initialFen,
     includeBook: false,
@@ -69,6 +71,8 @@ try {
         protocol: options.protocol,
         plies: options.plies,
         lines: options.lines,
+        branches: options.branches,
+        maxPositions: options.maxPositions,
         depth: options.depth,
         timeLimitMs: options.timeLimitMs,
         preset: options.preset ?? null,
@@ -109,6 +113,8 @@ function parseArgs(args) {
     sourceExplicit: Boolean(process.env.XIANGQI_ORACLE_SOURCE),
     plies: numberFromEnv(process.env.XIANGQI_ORACLE_OPENING_PLIES, 12),
     lines: numberFromEnv(process.env.XIANGQI_ORACLE_LINES, 3),
+    branches: numberFromEnv(process.env.XIANGQI_ORACLE_OPENING_BRANCHES, 1),
+    maxPositions: numberFromEnv(process.env.XIANGQI_ORACLE_OPENING_MAX_POSITIONS, null),
     depth: numberFromEnv(process.env.XIANGQI_ORACLE_DEPTH, 6),
     timeLimitMs: numberFromEnv(process.env.XIANGQI_ORACLE_TIME_MS, 2000),
     startupTimeoutMs: numberFromEnv(process.env.XIANGQI_ORACLE_STARTUP_TIMEOUT_MS, 5000),
@@ -176,6 +182,14 @@ function parseArgs(args) {
       options.lines = Number(args[++index]);
       continue;
     }
+    if (arg === "--branches") {
+      options.branches = Number(args[++index]);
+      continue;
+    }
+    if (arg === "--max-positions") {
+      options.maxPositions = Number(args[++index]);
+      continue;
+    }
     if (arg === "--depth") {
       options.depth = Number(args[++index]);
       continue;
@@ -210,6 +224,10 @@ function parseArgs(args) {
   assertProtocol(options.protocol);
   assertPositiveInteger(options.plies, "plies");
   assertPositiveInteger(options.lines, "lines");
+  assertPositiveInteger(options.branches, "branches");
+  if (options.maxPositions !== null) {
+    assertPositiveInteger(options.maxPositions, "max-positions");
+  }
   assertPositiveInteger(options.depth, "depth");
   assertPositiveInteger(options.timeLimitMs, "time");
   assertPositiveInteger(options.maxRecords, "max-records");
@@ -284,6 +302,8 @@ Options:
   --source NAME        Source label written into generated records
   --plies N            Main-line plies to follow (default: 12)
   --lines N            MultiPV candidates per position (default: 3)
+  --branches N         Follow top-N candidates into a bounded tree (default: 1)
+  --max-positions N    Maximum analyzed opening positions before stopping
   --depth N            Oracle search depth (default: 6)
   --time MS            Oracle movetime in ms (default: 2000)
   --fen FEN            Start from a custom FEN
@@ -296,6 +316,7 @@ Environment:
   XIANGQI_ORACLE_ENGINE_PROTOCOL, XIANGQI_ORACLE_ENGINE_PRESET,
   XIANGQI_ORACLE_ENGINE_EVAL_FILE, XIANGQI_ORACLE_ENGINE_OPTIONS,
   XIANGQI_ORACLE_OPENING_PLIES, XIANGQI_ORACLE_LINES,
+  XIANGQI_ORACLE_OPENING_BRANCHES, XIANGQI_ORACLE_OPENING_MAX_POSITIONS,
   XIANGQI_ORACLE_DEPTH, XIANGQI_ORACLE_TIME_MS,
   XIANGQI_ORACLE_OPENING_OUT
 `);

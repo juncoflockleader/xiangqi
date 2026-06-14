@@ -7,18 +7,52 @@ export const ORACLE_OPENING_BOOK_ARTIFACT_VERSION = 1;
 export async function generateOracleOpeningBookRecords(oracle, options = {}) {
   validateOracleBackend(oracle);
 
-  let position = resolveInitialPosition(options);
+  const initialPosition = resolveInitialPosition(options);
   const maxPlies = normalizePositiveInteger(options.plies ?? options.maxPlies ?? 12, "plies");
   const lineCount = normalizePositiveInteger(options.lines ?? 3, "lines");
+  const branchCount = Math.min(
+    lineCount,
+    normalizePositiveInteger(options.branches ?? options.branchingFactor ?? 1, "branches")
+  );
+  const maxPositions = normalizePositiveInteger(
+    options.maxPositions ?? defaultMaxPositions(maxPlies, branchCount),
+    "maxPositions"
+  );
   const source = options.source ?? oracle.name ?? oracle.id ?? "oracle";
   const records = [];
   const positions = [];
   const primaryLine = [];
+  const branchStops = [];
+  const queue = [{
+    id: "p1",
+    parentId: null,
+    position: initialPosition,
+    ply: 1,
+    path: [],
+    incomingMove: null,
+    incomingRank: null,
+    primary: true
+  }];
+  const seen = new Set();
+  let nextPositionId = 2;
+  let finalPrimaryPosition = initialPosition;
   let stopReason = "max-plies";
 
-  for (let ply = 1; ply <= maxPlies; ply += 1) {
-    const fen = toFen(position);
-    const analysis = await oracle.analyzePosition(position, {
+  while (queue.length > 0) {
+    if (positions.length >= maxPositions) {
+      stopReason = "max-positions";
+      break;
+    }
+
+    const node = queue.shift();
+    if (node.ply > maxPlies) continue;
+
+    const fen = toFen(node.position);
+    const seenKey = `${node.ply}:${fen}`;
+    if (seen.has(seenKey)) continue;
+    seen.add(seenKey);
+
+    const analysis = await oracle.analyzePosition(node.position, {
       useBook: false,
       lines: lineCount,
       ...(options.searchOptions ?? {})
@@ -26,46 +60,85 @@ export async function generateOracleOpeningBookRecords(oracle, options = {}) {
     const candidates = normalizeOracleCandidates(analysis, lineCount);
 
     if (candidates.length === 0) {
-      stopReason = "no-candidates";
-      break;
+      branchStops.push({
+        id: node.id,
+        ply: node.ply,
+        path: [...node.path],
+        reason: "no-candidates"
+      });
+      if (node.primary) {
+        stopReason = "no-candidates";
+        break;
+      }
+      continue;
     }
 
     positions.push({
-      ply,
+      id: node.id,
+      parentId: node.parentId,
+      ply: node.ply,
       fen,
-      side: position.turn,
+      side: node.position.turn,
       bestMove: candidates[0].move,
       candidateCount: candidates.length,
       depth: analysis.depth ?? candidates[0].depth ?? 0,
       nodes: analysis.nodes ?? 0,
-      score: Math.round(analysis.score ?? candidates[0].score ?? 0)
+      score: Math.round(analysis.score ?? candidates[0].score ?? 0),
+      path: [...node.path],
+      incomingMove: node.incomingMove,
+      incomingRank: node.incomingRank,
+      primary: node.primary
     });
 
     for (const candidate of candidates) {
       records.push(createOracleOpeningRecord({
         fen,
-        side: position.turn,
+        side: node.position.turn,
         source,
-        ply,
+        ply: node.ply,
         analysis,
-        candidate
+        candidate,
+        node
       }));
     }
 
-    const nextMove = candidates[0].move;
-    primaryLine.push(nextMove);
-    position = oracle.play(position, nextMove);
+    if (node.primary) {
+      const nextMove = candidates[0].move;
+      primaryLine.push(nextMove);
+      finalPrimaryPosition = oracle.play(node.position, nextMove);
+    }
+
+    if (node.ply >= maxPlies) continue;
+
+    for (const candidate of candidates.slice(0, branchCount)) {
+      queue.push({
+        id: `p${nextPositionId}`,
+        parentId: node.id,
+        position: oracle.play(node.position, candidate.move),
+        ply: node.ply + 1,
+        path: [...node.path, candidate.move],
+        incomingMove: candidate.move,
+        incomingRank: candidate.rank,
+        primary: node.primary && candidate.rank === 1
+      });
+      nextPositionId += 1;
+    }
   }
 
   return {
     source,
-    initialFen: toFen(resolveInitialPosition(options)),
-    finalFen: toFen(position),
+    initialFen: toFen(initialPosition),
+    finalFen: toFen(finalPrimaryPosition),
     plies: primaryLine.length,
     requestedPlies: maxPlies,
     candidateLines: lineCount,
     lines: lineCount,
+    branchingFactor: branchCount,
+    branches: branchCount,
+    maxPositions,
+    exploredPositions: positions.length,
     stopReason,
+    branchStops,
     primaryLine,
     positions,
     records,
@@ -88,7 +161,11 @@ export function createOracleOpeningBookArtifact(report, options = {}) {
     plies: report.plies ?? report.primaryLine?.length ?? 0,
     requestedPlies: report.requestedPlies,
     candidateLines: report.candidateLines ?? report.lines,
+    branchingFactor: report.branchingFactor ?? report.branches ?? 1,
+    maxPositions: report.maxPositions,
+    exploredPositions: report.exploredPositions ?? report.positions?.length ?? 0,
     stopReason: report.stopReason,
+    branchStops: report.branchStops ?? [],
     primaryLine: report.primaryLine ?? [],
     positions: report.positions ?? [],
     records: report.records,
@@ -140,11 +217,12 @@ export function formatOracleOpeningBookReport(report, options = {}) {
   const maxRecords = options.maxRecords ?? Math.min(12, report.records.length);
   const lines = [
     `Oracle opening: ${report.primaryLine.join(" ") || "no line"}`,
-    `Generated ${report.records.length} records from ${report.plies}/${report.requestedPlies} plies; stop=${report.stopReason}; source=${report.source}`
+    `Generated ${report.records.length} records from ${report.plies}/${report.requestedPlies} plies; branches=${report.branchingFactor ?? report.branches ?? 1}; positions=${report.exploredPositions ?? report.positions.length}/${report.maxPositions ?? report.positions.length}; stop=${report.stopReason}; source=${report.source}`
   ];
 
   for (const position of report.positions) {
-    lines.push(`${position.ply}. ${capitalize(position.side)} ${position.bestMove} (${position.candidateCount} candidate${position.candidateCount === 1 ? "" : "s"}, d${position.depth}, ${formatCentipawns(position.score)})`);
+    const path = position.path?.length ? ` after ${position.path.join(" ")}` : "";
+    lines.push(`${position.ply}. ${capitalize(position.side)} ${position.bestMove}${path} (${position.candidateCount} candidate${position.candidateCount === 1 ? "" : "s"}, d${position.depth}, ${formatCentipawns(position.score)})`);
   }
 
   if (report.records.length > 0) {
@@ -160,12 +238,13 @@ export function formatOracleOpeningBookReport(report, options = {}) {
   return lines.join("\n");
 }
 
-function createOracleOpeningRecord({ fen, side, source, ply, analysis, candidate }) {
+function createOracleOpeningRecord({ fen, side, source, ply, analysis, candidate, node }) {
   const score = Math.round(candidate.score ?? 0);
   const centipawnLoss = Math.max(0, Math.round(candidate.centipawnLoss ?? 0));
   const depth = candidate.depth ?? analysis.depth ?? 0;
   const pv = candidate.principalVariation ?? [];
   const moveLabel = candidate.rank === 1 ? "best" : `candidate ${candidate.rank}`;
+  const path = node?.path ?? [];
 
   return {
     fen,
@@ -181,6 +260,13 @@ function createOracleOpeningRecord({ fen, side, source, ply, analysis, candidate
     engineScore: score,
     centipawnLoss,
     depth,
+    positionId: node?.id,
+    parentPositionId: node?.parentId,
+    path: path.join(" "),
+    candidateLine: [...path, candidate.move].join(" "),
+    incomingMove: node?.incomingMove ?? null,
+    incomingRank: node?.incomingRank ?? null,
+    primary: Boolean(node?.primary),
     principalVariation: pv.join(" ")
   };
 }
@@ -274,6 +360,19 @@ function normalizePositiveInteger(value, name) {
     throw new Error(`${name} must be a positive integer.`);
   }
   return value;
+}
+
+function defaultMaxPositions(maxPlies, branchCount) {
+  if (branchCount <= 1) return maxPlies;
+
+  let total = 0;
+  let width = 1;
+  for (let ply = 1; ply <= maxPlies; ply += 1) {
+    total += width;
+    width *= branchCount;
+    if (total >= 64) return 64;
+  }
+  return Math.max(maxPlies, total);
 }
 
 function formatCentipawns(value) {
