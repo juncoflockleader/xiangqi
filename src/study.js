@@ -333,6 +333,7 @@ function summarizeReview(review) {
     bestScoreDetail: scoreDetailFor(review.bestAnalysis),
     bestScoreText: scoreTextFor(review.bestAnalysis ?? { score: review.bestScore }),
     bestWdl: review.bestAnalysis?.wdl ?? null,
+    playedLinePlan: summarizeLinePlanEvidence(review.playedLinePlan),
     bestLinePlan: summarizeLinePlanEvidence(review.bestLinePlan ?? review.bestExplanation?.linePlan ?? review.bestAnalysis?.explanation?.linePlan),
     bestComparison: summarizeComparisonEvidence(review.bestComparison ?? review.bestAnalysis?.explanation?.comparison),
     bestAlternatives: summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives),

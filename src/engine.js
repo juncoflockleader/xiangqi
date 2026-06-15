@@ -3,7 +3,7 @@ import { makeMove, moveToNotation, parseMoveNotation, sameMove } from "./board.j
 import { bookMoveToCandidate, lookupOpeningBook } from "./book.js";
 import { evaluatePosition } from "./evaluate.js";
 import { analyzePressure } from "./pressure.js";
-import { explainBookMove, explainCandidateMove, explainMove, explainReviewedMove } from "./reasoning.js";
+import { buildLinePlan, explainBookMove, explainCandidateMove, explainMove, explainReviewedMove } from "./reasoning.js";
 import { analyzeReviewMistakes } from "./mistakes.js";
 import { reviewGameWithEngine } from "./review.js";
 import { coachMoveWithEngine } from "./coach.js";
@@ -115,21 +115,28 @@ export function createEngine(defaultOptions = {}) {
       const isBestMove = sameMove(move, bestMove);
       const centipawnLoss = Math.max(0, search.score - candidate.score);
       const bestExplanation = explainMove(position, search);
+      const annotatedMove = annotateMove(position, move);
+      const playedPrincipalVariation = candidate.principalVariation?.length
+        ? candidate.principalVariation
+        : [annotatedMove];
       const reviewed = {
-        move: annotateMove(position, move),
+        move: annotatedMove,
         bestMove,
         bestScore: Math.round(search.score),
         playedScore: Math.round(candidate.score),
         centipawnLoss: Math.round(centipawnLoss),
         classification: isBestMove ? "best" : classifyMoveLoss(Math.max(16, centipawnLoss)),
         isBestMove,
-        principalVariation: candidate.principalVariation.map((pvMove) => pvMove.notation ?? moveToNotation(pvMove)),
+        principalVariation: playedPrincipalVariation.map((pvMove) => pvMove.notation ?? moveToNotation(pvMove)),
         bestAnalysis: {
           ...search,
           explanation: bestExplanation
         },
         bestExplanation,
         bestLinePlan: bestExplanation.linePlan ?? null,
+        playedLinePlan: buildLinePlan(position, playedPrincipalVariation, {
+          perspective: position.turn
+        }),
         depth: search.depth,
         nodes: search.nodes
       };

@@ -543,6 +543,9 @@ async function nativeReviewMove(client, position, moveOrNotation, options) {
         principalVariation: bestAnalysis.principalVariation
       }
     : await analyzePlayedNativeMove(client, position, move, options);
+  const playedPrincipalVariation = playedCandidate.principalVariation?.length
+    ? playedCandidate.principalVariation
+    : [annotateMove(position, move)];
   const centipawnLoss = Math.max(0, bestAnalysis.score - playedCandidate.score);
   const reviewed = {
     source: nativeSource(options.protocol),
@@ -553,10 +556,13 @@ async function nativeReviewMove(client, position, moveOrNotation, options) {
     centipawnLoss: Math.round(centipawnLoss),
     classification: isBestMove ? "best" : classifyMoveLoss(Math.max(16, centipawnLoss)),
     isBestMove,
-    principalVariation: playedCandidate.principalVariation.map((pvMove) => pvMove.notation ?? moveToNotation(pvMove)),
+    principalVariation: playedPrincipalVariation.map((pvMove) => pvMove.notation ?? moveToNotation(pvMove)),
     bestAnalysis,
     bestExplanation: bestAnalysis.explanation,
     bestLinePlan: bestAnalysis.explanation?.linePlan ?? null,
+    playedLinePlan: buildLinePlan(position, playedPrincipalVariation, {
+      perspective: position.turn
+    }),
     bestComparison: bestAnalysis.explanation?.comparison ?? null,
     bestAlternatives: bestAnalysis.explanation?.alternatives ?? [],
     depth: bestAnalysis.depth,

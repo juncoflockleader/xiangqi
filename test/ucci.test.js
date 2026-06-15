@@ -150,6 +150,7 @@ test("UCCI review summarizes loaded move history", () => {
 
   assert.ok(output.some((line) => line.includes("review moves 2")));
   assert.ok(output.some((line) => line.includes("book 2")));
+  assert.ok(output.some((line) => line.includes("moment 1 played plan: Start with")));
   assert.ok(output.some((line) => line.includes("moment 1 best plan: Start with")));
 });
 
@@ -169,6 +170,7 @@ test("UCCI lesson summarizes reviewed move history as cards", () => {
   assert.ok(output.some((line) => line.includes("lesson 1 opening")));
   assert.ok(output.some((line) => line.includes("prompt:")));
   assert.ok(output.some((line) => line.includes("hint 1")));
+  assert.ok(output.some((line) => line.includes("lesson 1 played plan: Start with")));
   assert.ok(output.some((line) => line.includes("lesson 1 best plan: Start with")));
   assert.ok(output.some((line) => line.includes("answer")));
 });

@@ -87,6 +87,7 @@ function createLessonCard(move, rank) {
     bestWdl: move.review.bestAnalysis?.wdl ?? null,
     bestComparison: comparisonFor(move.review),
     bestAlternatives: alternativesFor(move.review),
+    playedLinePlan: playedLinePlanFor(move.review),
     bestLinePlan: bestLinePlanFor(move.review),
     mistakes: move.review.mistakes,
     tags,
@@ -100,6 +101,7 @@ function createLessonCard(move, rank) {
       bestWdl: move.review.bestAnalysis?.wdl ?? null,
       bestComparison: comparisonFor(move.review),
       bestAlternatives: alternativesFor(move.review),
+      playedLinePlan: playedLinePlanFor(move.review),
       bestLinePlan: bestLinePlanFor(move.review),
       summary: move.review.explanation.summary,
       reasons: move.review.explanation.reasons,
@@ -255,6 +257,10 @@ function comparisonFor(review) {
 
 function alternativesFor(review) {
   return summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives);
+}
+
+function playedLinePlanFor(review) {
+  return summarizeLinePlanEvidence(review.playedLinePlan);
 }
 
 function bestLinePlanFor(review) {

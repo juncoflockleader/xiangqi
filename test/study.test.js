@@ -98,6 +98,7 @@ test("position study can include a played move review", () => {
   assert.equal(study.playedMoveReview.bestMove, "e9-e2");
   assert.equal(study.playedMoveReview.classification, "blunder");
   assert.ok(study.playedMoveReview.centipawnLoss > 1000);
+  assert.equal(study.playedMoveReview.playedLinePlan.firstMove, "e9-f9");
   assert.equal(study.nextSteps[0].kind, "correction");
   assert.equal(study.nextSteps[1].kind, "practice");
   assert.equal(study.practiceFocus.category, "missed-material");
@@ -320,6 +321,8 @@ test("backend position study preserves played-move review alternatives", async (
     assert.equal(study.playedMoveReview.bestAlternatives.length, 2);
     assert.equal(study.playedMoveReview.bestAlternatives[1].move, "h7-e7");
     assert.equal(study.playedMoveReview.bestAlternatives[1].verdict, "playable");
+    assert.equal(study.playedMoveReview.playedLinePlan.firstMove, "h7-e7");
+    assert.equal(study.playedMoveReview.playedLinePlan.expectedReply, "h0-g2");
     assert.equal(study.playedMoveReview.bestLinePlan.firstMove, "h9-g7");
     assert.equal(study.playedMoveReview.bestLinePlan.expectedReply, "h0-g2");
   } finally {

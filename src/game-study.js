@@ -40,6 +40,9 @@ export function formatGameStudy(study) {
     lines.push("Key moments:");
     for (const moment of study.keyMoments.slice(0, 5)) {
       lines.push(`  ${moment.ply}. ${capitalize(moment.side)} ${moment.notation}: ${moment.classification}, ${moment.centipawnLoss} cp loss`);
+      if (moment.playedLinePlan?.summary) {
+        lines.push(`     Played plan: ${moment.playedLinePlan.summary}`);
+      }
       if (moment.bestLinePlan?.summary) {
         lines.push(`     Best plan: ${moment.bestLinePlan.summary}`);
       }
@@ -174,6 +177,7 @@ function attachGameMoment(study, move) {
       bestWdl: move.review.bestAnalysis?.wdl ?? null,
       bestComparison: comparisonFor(move.review),
       bestAlternatives: alternativesFor(move.review),
+      playedLinePlan: playedLinePlanFor(move.review),
       bestLinePlan: bestLinePlanFor(move.review),
       book: move.book
     }
@@ -274,6 +278,10 @@ function comparisonFor(review) {
 
 function alternativesFor(review) {
   return summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives);
+}
+
+function playedLinePlanFor(review) {
+  return summarizeLinePlanEvidence(review.playedLinePlan);
 }
 
 function bestLinePlanFor(review) {

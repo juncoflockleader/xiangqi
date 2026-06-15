@@ -83,6 +83,8 @@ test("move review classifies tactical mistake patterns", () => {
   assert.ok(review.mistakes.tags.includes("tactics"));
   assert.ok(review.explanation.reasons.some((reason) => reason.includes("Mistake pattern")));
   assert.equal(review.explanation.mistakes.primary, "unsafe-capture");
+  assert.equal(review.playedLinePlan.firstMove, "e6-e5");
+  assert.match(review.playedLinePlan.summary, /Start with e6-e5/);
   assert.equal(review.bestLinePlan.firstMove, review.bestMove.notation);
   assert.match(review.bestLinePlan.summary, /Start with/);
 });
@@ -123,4 +125,5 @@ test("move review falls back when timeout prevents root candidate scoring", () =
   assert.equal(review.move.notation, "h7-e7");
   assert.ok(Number.isFinite(review.playedScore));
   assert.ok(review.principalVariation.includes("h7-e7"));
+  assert.equal(review.playedLinePlan.firstMove, "h7-e7");
 });

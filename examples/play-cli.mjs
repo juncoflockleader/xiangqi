@@ -378,6 +378,10 @@ function printReview(review) {
     console.log(`Review source: ${review.reviewBackend.name}.`);
   }
   console.log(review.explanation.summary);
+  printLinePlan(review.playedLinePlan, {
+    label: "Your plan",
+    includeSteps: false
+  });
   if (!review.isBestMove && review.bestMove) {
     console.log(`Engine preferred ${review.bestMove.notation}.`);
     printLinePlan(review.bestLinePlan ?? review.bestExplanation?.linePlan ?? review.explanation?.bestMove?.linePlan, {

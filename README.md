@@ -52,7 +52,8 @@ to experiment. Moves use coordinate notation such as `h9-g7` or `h9g7`, and the
 `hint`, `best`, and `why` commands show the learning-oriented explanation layer
 while you play. Engine turns print the principal-variation plan, and `best`/`why`
 expand it into per-ply score and motif steps. After your move is reviewed, the
-demo also prints the engine's preferred plan when it wanted a different move.
+demo prints your played plan and, when it wanted a different move, the engine's
+preferred plan.
 
 For a one-position learning report, run `npm run study`. It prints the best move,
 candidate lines, progressive hints, pressure, and an optional review of a move
@@ -165,6 +166,8 @@ console.log(study.hints.map((hint) => hint.text));
 console.log(study.openingCandidates.map((candidate) => candidate.move));
 console.log(study.candidateLines.map((line) => [line.move, line.scoreText]));
 console.log(study.decision.linePlan.summary);
+console.log(study.playedMoveReview?.playedLinePlan?.summary);
+console.log(study.playedMoveReview?.bestLinePlan?.summary);
 console.log(study.searchDisagreement?.summary);
 console.log(study.playedMoveReview?.classification);
 console.log(study.practiceFocus?.title);
@@ -193,6 +196,7 @@ const gameStudy = engine.gameStudy(["h7-e7", "h0-g2", "h9-g7"], {
 
 console.log(gameStudy.summary);
 console.log(gameStudy.lessonPlan.cards[0]?.prompt);
+console.log(gameStudy.keyMoments[0]?.playedLinePlan?.summary);
 console.log(gameStudy.keyMoments[0]?.bestLinePlan?.summary);
 console.log(gameStudy.positionStudies[0]?.summary);
 console.log(gameStudy.practiceFocus[0]?.title);
@@ -200,8 +204,9 @@ console.log(gameStudy.practiceFocus[0]?.title);
 
 `gameStudy` returns the full move review, compact key moments, lesson cards,
 position-study bundles for selected plies, aggregated practice focus, final FEN,
-preferred-line plans for key moments and lesson cards, and next-step prompts so
-a learning UI can move from game recap into focused practice.
+played-line and preferred-line plans for key moments and lesson cards, and
+next-step prompts so a learning UI can move from game recap into focused
+practice.
 
 You can also generate the same artifact from the command line, which is handy
 after online sparring or imported game records:
@@ -371,6 +376,8 @@ console.log(pureNativeResult.source);
 
 const nativeReview = await nativeBackend.reviewMove(position, "h7-e7");
 console.log(nativeReview.explanation.summary);
+console.log(nativeReview.playedLinePlan.summary);
+console.log(nativeReview.bestLinePlan.summary);
 
 const nativeGameReview = await nativeBackend.reviewGame(["h7-e7", "h0-g2"]);
 console.log(nativeGameReview.summary);
@@ -477,10 +484,13 @@ console.log(review.classification);
 console.log(review.centipawnLoss);
 console.log(review.mistakes.primary);
 console.log(review.explanation.summary);
+console.log(review.playedLinePlan.summary);
 console.log(review.bestLinePlan.summary);
 ```
 
 `reviewMove` compares the played move against the searched best line and returns a practical grade: `best`, `excellent`, `good`, `inaccuracy`, `mistake`, or `blunder`. It also returns `bestLinePlan` plus `mistakes`, a structured pattern summary for learning flows, such as missed material, unsafe capture, missed check, missed threat, allowed threat, or positional drift.
+`playedLinePlan` describes the continuation behind the move that was actually
+played, so a UI can compare "your idea" against the engine's preferred plan.
 
 Analyze several candidate lines:
 

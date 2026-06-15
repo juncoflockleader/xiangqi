@@ -221,6 +221,7 @@ function selectKeyMoments(moves, limit) {
       bestWdl: item.review.bestAnalysis?.wdl ?? null,
       bestComparison: comparisonFor(item.review),
       bestAlternatives: alternativesFor(item.review),
+      playedLinePlan: playedLinePlanFor(item.review),
       bestLinePlan: bestLinePlanFor(item.review),
       mistakes: item.review.mistakes,
       book: item.book,
@@ -263,6 +264,10 @@ function comparisonFor(review) {
 
 function alternativesFor(review) {
   return summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives);
+}
+
+function playedLinePlanFor(review) {
+  return summarizeLinePlanEvidence(review.playedLinePlan);
 }
 
 function bestLinePlanFor(review) {

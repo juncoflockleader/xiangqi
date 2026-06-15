@@ -285,6 +285,7 @@ export class UcciSession {
 
     for (const moment of result.keyMoments.slice(0, 3)) {
       outputs.push(`info string moment ${moment.ply} ${moment.side} ${moment.notation} ${moment.classification} loss ${moment.centipawnLoss} best ${stripMoveSeparator(moment.bestMove)}: ${moment.summary}`);
+      pushPlanInfo(outputs, `moment ${moment.ply} played`, moment.playedLinePlan);
       pushPlanInfo(outputs, `moment ${moment.ply} best`, moment.bestLinePlan);
     }
 
@@ -321,6 +322,7 @@ export class UcciSession {
       for (const hint of card.hints) {
         outputs.push(`info string lesson ${card.rank} hint ${hint.level} ${hint.kind}: ${hint.text}`);
       }
+      pushPlanInfo(outputs, `lesson ${card.rank} played`, card.playedLinePlan);
       pushPlanInfo(outputs, `lesson ${card.rank} best`, card.bestLinePlan);
       outputs.push(`info string lesson ${card.rank} answer ${stripMoveSeparator(card.answer.move)}: ${card.answer.summary}`);
     }
