@@ -138,8 +138,8 @@ function formatStudyReport(report) {
     formatPositionStudy(study, { locale })
   ];
 
-  if (study.decision?.reasons?.length) {
-    lines.push(locale === "zh" ? "理由：" : "Reasons:");
+  if (locale !== "zh" && study.decision?.reasons?.length) {
+    lines.push("Reasons:");
     for (const reason of study.decision.reasons.slice(0, 5)) {
       lines.push(`  - ${reason}`);
     }
@@ -155,8 +155,8 @@ function formatStudyReport(report) {
   if (study.pressure?.threats?.length) {
     lines.push(locale === "zh" ? "壓力：" : "Pressure:");
     for (const threat of study.pressure.threats.slice(0, 3)) {
-      const move = locale === "zh" && threat.zhMove ? `${threat.zhMove}: ` : "";
-      lines.push(`  - ${move}${threat.summary}`);
+      const text = locale === "zh" ? threat.zhSummary ?? threat.summary : threat.summary;
+      lines.push(`  - ${text}`);
     }
   }
 

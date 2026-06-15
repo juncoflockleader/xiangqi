@@ -52,7 +52,13 @@ test("study position CLI can print a Chinese localized report", async () => {
   assert.match(stdout, /局面研習：紅方走棋，最佳 炮二平五/);
   assert.match(stdout, /開局候選：/);
   assert.match(stdout, /候選著法：/);
+  assert.match(stdout, /理由：/);
+  assert.match(stdout, /開局庫優先推薦 炮二平五/);
+  assert.match(stdout, /開局方向: 先考慮 炮二平五/);
+  assert.match(stdout, /主題：製造威脅/);
   assert.match(stdout, /主線: 炮二平五/);
+  assert.doesNotMatch(stdout, /^Reasons:/m);
+  assert.doesNotMatch(stdout, /Opening Idea/);
   assert.match(stdout, /下一步：/);
 });
 

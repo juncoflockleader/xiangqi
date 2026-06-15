@@ -227,8 +227,9 @@ function formatPositionStudyZh(study) {
   }
 
   if (study.hints.length > 0) {
+    const hints = study.coach?.zhLevels ?? study.hints;
     lines.push("提示：");
-    for (const hint of study.hints.slice(0, 4)) {
+    for (const hint of hints.slice(0, 4)) {
       lines.push(`  ${hint.level}. ${hint.title}: ${hint.text}`);
     }
   }
@@ -242,6 +243,13 @@ function formatPositionStudyZh(study) {
 
   if (study.decision?.comparison?.reason) {
     lines.push(`比較：${study.decision.comparison.reason}`);
+  }
+
+  if (study.decision?.zhReasons?.length > 0) {
+    lines.push("理由：");
+    for (const reason of study.decision.zhReasons.slice(0, 5)) {
+      lines.push(`  - ${reason}`);
+    }
   }
 
   if (study.decision?.alternatives?.length > 0) {
@@ -311,7 +319,7 @@ function buildPositionStudy(position, parts) {
 
 function summarizeDecision(decision, position) {
   const principalVariation = (decision.principalVariation ?? []).map(notationFor).filter(Boolean);
-  return {
+  const summary = {
     source: decision.source ?? "search",
     bestMove: notationFor(decision.bestMove),
     ponderMove: notationFor(decision.ponderMove) ?? decision.explanation?.search?.ponderMove ?? null,
@@ -332,6 +340,10 @@ function summarizeDecision(decision, position) {
     zhPrincipalVariation: chineseLineFor(position, principalVariation),
     oracleReview: decision.oracleReview ?? decision.explanation?.oracleReview ?? null,
     backendFallback: decision.backendFallback ?? null
+  };
+  return {
+    ...summary,
+    zhReasons: summarizeDecisionReasonsZh(summary)
   };
 }
 
@@ -414,7 +426,7 @@ function summarizeSearchDisagreement(decision, candidateLines) {
 function summarizeCoach(coach, position) {
   if (!coach) return null;
   const principalVariation = [...(coach.principalVariation ?? [])];
-  return {
+  const summary = {
     source: coach.source ?? "search",
     bestMove: notationFor(coach.bestMove),
     zhBestMove: chineseNotationFor(position, coach.bestMove),
@@ -434,10 +446,14 @@ function summarizeCoach(coach, position) {
     principalVariation,
     zhPrincipalVariation: chineseLineFor(position, principalVariation)
   };
+  return {
+    ...summary,
+    zhLevels: summarizeCoachLevelsZh(summary)
+  };
 }
 
 function summarizeReview(review, position) {
-  return {
+  const summary = {
     move: notationFor(review.move),
     bestMove: notationFor(review.bestMove),
     zhMove: chineseNotationFor(position, review.move),
@@ -468,6 +484,10 @@ function summarizeReview(review, position) {
     zhPrincipalVariation: chineseLineFor(position, review.principalVariation ?? []),
     oracleReview: review.oracleReview ?? null,
     reviewBackend: review.reviewBackend ?? null
+  };
+  return {
+    ...summary,
+    zhReasons: summarizeReviewReasonsZh(summary)
   };
 }
 
@@ -501,14 +521,16 @@ function summarizePressure(pressure, position) {
 }
 
 function summarizeThreat(threat, position) {
+  const zhMove = chineseNotationFor(position, threat.notation);
   return {
     move: threat.notation,
-    zhMove: chineseNotationFor(position, threat.notation),
+    zhMove,
     score: threat.score,
     givesCheck: threat.givesCheck,
     isMate: threat.isMate,
     motifs: [...(threat.motifs ?? [])],
-    summary: threat.summary
+    summary: threat.summary,
+    zhSummary: summarizeThreatZh(threat, zhMove)
   };
 }
 
@@ -554,6 +576,90 @@ function summarizeStudyZh({ side, bestMove, zhBestMove, decision, playedMoveRevi
   return `${source}建議 ${best}${score}。`;
 }
 
+function summarizeDecisionReasonsZh(decision) {
+  const reasons = [];
+  const move = decision.zhBestMove ?? decision.bestMove;
+  if (!move) return reasons;
+
+  const source = decision.source?.startsWith("opening")
+    ? "開局庫"
+    : decision.source?.startsWith("native")
+      ? "原生引擎"
+      : "搜索";
+  if (decision.source?.startsWith("opening")) {
+    reasons.push(`${source}優先推薦 ${move}。`);
+  } else if (decision.depth > 0) {
+    reasons.push(`${source}在深度 ${decision.depth} 推薦 ${move}。`);
+  } else {
+    reasons.push(`${source}推薦 ${move}。`);
+  }
+
+  if (decision.scoreText) {
+    reasons.push(`局面評分為 ${decision.scoreText}。`);
+  }
+
+  if (decision.linePlan?.zhSummary) {
+    reasons.push(decision.linePlan.zhSummary);
+  }
+
+  const next = (decision.alternatives ?? []).find((alternative) => alternative.move !== decision.bestMove);
+  if (next) {
+    const gap = Number.isFinite(next.centipawnLoss)
+      ? next.centipawnLoss
+      : Math.max(0, Math.round((decision.score ?? 0) - (next.score ?? 0)));
+    const unit = decision.source?.startsWith("opening") ? "權重點" : "cp";
+    if (gap > 0) {
+      reasons.push(`相較 ${next.zhMove ?? next.move}，首選約領先 ${gap} ${unit}。`);
+    } else {
+      reasons.push(`${next.zhMove ?? next.move} 與首選接近，適合一起比較。`);
+    }
+  }
+
+  if (decision.oracleReview?.status === "reviewed" && !decision.oracleReview.isBestMove) {
+    reasons.push(`強引擎覆核建議再比較 ${decision.oracleReview.bestMove}。`);
+  }
+
+  return reasons;
+}
+
+function summarizeReviewReasonsZh(review) {
+  const reasons = [];
+  const move = review.zhMove ?? review.move;
+  const best = review.zhBestMove ?? review.bestMove;
+
+  if (review.isBestMove) {
+    reasons.push(`${move} 與引擎首選一致。`);
+  } else if (move && best) {
+    reasons.push(`${move} 損失約 ${review.centipawnLoss} cp，建議比較 ${best}。`);
+  }
+
+  if (review.playedScoreText) {
+    reasons.push(`實戰著法評分 ${review.playedScoreText}。`);
+  }
+  if (review.bestScoreText) {
+    reasons.push(`最佳著法評分 ${review.bestScoreText}。`);
+  }
+  if (review.playedLinePlan?.zhSummary) {
+    reasons.push(`實戰計畫：${review.playedLinePlan.zhSummary}`);
+  }
+  if (review.bestLinePlan?.zhSummary) {
+    reasons.push(`建議計畫：${review.bestLinePlan.zhSummary}`);
+  }
+
+  return reasons.slice(0, 6);
+}
+
+function summarizeThreatZh(threat, zhMove) {
+  const move = zhMove ?? threat.notation;
+  if (!move) return "";
+  if (threat.isMate) return `${move} 形成殺勢。`;
+  if (threat.givesCheck || threat.motifs?.includes("check")) return `${move} 將軍並迫使對方應對。`;
+  if (threat.motifs?.some((motif) => /^wins /.test(motif))) return `${move} 有得子威脅。`;
+  if (threat.motifs?.includes("safe capture")) return `${move} 是較安全的吃子手段。`;
+  if (threat.motifs?.includes("recapture risk")) return `${move} 有吃子後被反吃的風險。`;
+  return `${move} 對對方形成壓力。`;
+}
+
 function annotateAlternatives(position, alternatives = []) {
   return alternatives.map((alternative) => {
     const line = [alternative.move, alternative.expectedReply].filter(Boolean);
@@ -594,10 +700,51 @@ function annotateLinePlan(position, linePlan) {
 function summarizeLinePlanZh(linePlan, zhLine) {
   if (!linePlan || zhLine.length === 0) return "";
   const [first, reply, ...rest] = zhLine;
-  const motifs = linePlan.motifs?.length ? `；主題：${linePlan.motifs.join("、")}` : "";
+  const motifs = linePlan.motifs?.length ? `；主題：${linePlan.motifs.map(motifZh).join("、")}` : "";
   const replyText = reply ? `，預期應手 ${reply}` : "";
   const continuation = rest.length > 0 ? `，後續 ${rest.join(" ")}` : "";
   return `先走 ${first}${replyText}${continuation}${motifs}。`;
+}
+
+function summarizeCoachLevelsZh(coach) {
+  const move = coach.zhBestMove ?? coach.bestMove;
+  if (!move) {
+    return [{
+      level: 1,
+      kind: "status",
+      title: "狀態",
+      text: "此局面沒有可提示的合法著法。"
+    }];
+  }
+
+  const next = (coach.alternatives ?? []).find((alternative) => alternative.move !== coach.bestMove);
+  const levels = [{
+    level: 1,
+    kind: "concept",
+    title: coach.source?.startsWith("opening") ? "開局方向" : "局面方向",
+    text: coach.source?.startsWith("opening")
+      ? `先考慮 ${move}，用開局庫思路建立子力活躍度。`
+      : "先找能改善協調、限制對手或製造威脅的候選著法。"
+  }, {
+    level: 2,
+    kind: "tactic",
+    title: "戰術線索",
+    text: coach.scoreText ? `目前評分線索為 ${coach.scoreText}。` : "留意將軍、得子和直接威脅。"
+  }, {
+    level: 3,
+    kind: "candidate",
+    title: "候選比較",
+    text: next
+      ? `把 ${move} 與 ${next.zhMove ?? next.move} 放在一起比較。`
+      : `${move} 是目前候選列表中的首選。`
+  }, {
+    level: 4,
+    kind: "reveal",
+    title: "最佳著法",
+    text: `最佳著法是 ${move}。`
+  }];
+
+  return levels;
 }
 
 function nextStudyStepsZh({ decision, coach, playedMoveReview, pressure, practiceFocus, oracleDisagreement, searchDisagreement }) {
@@ -635,13 +782,13 @@ function nextStudyStepsZh({ decision, coach, playedMoveReview, pressure, practic
   if (coach?.levels?.[0]) {
     steps.push({
       kind: "hint",
-      text: coach.levels[0].text
+      text: coach.zhLevels?.[0]?.text ?? coach.levels[0].text
     });
   }
   if (pressure?.opponentThreats?.[0]) {
     steps.push({
       kind: "danger",
-      text: pressure.opponentThreats[0].summary
+      text: pressure.opponentThreats[0].zhSummary ?? pressure.opponentThreats[0].summary
     });
   }
   if (decision?.linePlan?.zhSummary) {
@@ -801,6 +948,16 @@ function verdictZh(verdict) {
     inferior: "較差",
     mistake: "錯著"
   })[verdict] ?? verdict ?? "候選";
+}
+
+function motifZh(motif) {
+  return ({
+    "creates threat": "製造威脅",
+    "safe capture": "安全吃子",
+    "recapture risk": "反吃風險",
+    "limits replies": "限制應手",
+    check: "將軍"
+  })[motif] ?? motif;
 }
 
 function normalizeLocale(locale) {
