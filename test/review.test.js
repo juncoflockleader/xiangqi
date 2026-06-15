@@ -83,6 +83,8 @@ test("move review classifies tactical mistake patterns", () => {
   assert.ok(review.mistakes.tags.includes("tactics"));
   assert.ok(review.explanation.reasons.some((reason) => reason.includes("Mistake pattern")));
   assert.equal(review.explanation.mistakes.primary, "unsafe-capture");
+  assert.equal(review.bestLinePlan.firstMove, review.bestMove.notation);
+  assert.match(review.bestLinePlan.summary, /Start with/);
 });
 
 test("standalone game review helper accepts an engine", () => {

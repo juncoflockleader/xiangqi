@@ -556,6 +556,7 @@ async function nativeReviewMove(client, position, moveOrNotation, options) {
     principalVariation: playedCandidate.principalVariation.map((pvMove) => pvMove.notation ?? moveToNotation(pvMove)),
     bestAnalysis,
     bestExplanation: bestAnalysis.explanation,
+    bestLinePlan: bestAnalysis.explanation?.linePlan ?? null,
     bestComparison: bestAnalysis.explanation?.comparison ?? null,
     bestAlternatives: bestAnalysis.explanation?.alternatives ?? [],
     depth: bestAnalysis.depth,

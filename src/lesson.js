@@ -258,7 +258,7 @@ function alternativesFor(review) {
 }
 
 function bestLinePlanFor(review) {
-  return summarizeLinePlanEvidence(review.bestExplanation?.linePlan ?? review.bestAnalysis?.explanation?.linePlan);
+  return summarizeLinePlanEvidence(review.bestLinePlan ?? review.bestExplanation?.linePlan ?? review.bestAnalysis?.explanation?.linePlan);
 }
 
 function formatCentipawns(value) {

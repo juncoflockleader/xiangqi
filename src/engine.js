@@ -129,6 +129,7 @@ export function createEngine(defaultOptions = {}) {
           explanation: bestExplanation
         },
         bestExplanation,
+        bestLinePlan: bestExplanation.linePlan ?? null,
         depth: search.depth,
         nodes: search.nodes
       };

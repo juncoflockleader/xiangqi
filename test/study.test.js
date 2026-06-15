@@ -320,6 +320,8 @@ test("backend position study preserves played-move review alternatives", async (
     assert.equal(study.playedMoveReview.bestAlternatives.length, 2);
     assert.equal(study.playedMoveReview.bestAlternatives[1].move, "h7-e7");
     assert.equal(study.playedMoveReview.bestAlternatives[1].verdict, "playable");
+    assert.equal(study.playedMoveReview.bestLinePlan.firstMove, "h9-g7");
+    assert.equal(study.playedMoveReview.bestLinePlan.expectedReply, "h0-g2");
   } finally {
     await backend.close();
   }

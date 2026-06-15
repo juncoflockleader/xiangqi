@@ -294,7 +294,8 @@ function printDecision(decision, options = {}) {
 
 function printLinePlan(linePlan, options = {}) {
   if (!linePlan?.summary || !linePlan.moves?.length) return;
-  console.log(`Plan: ${linePlan.summary}`);
+  const label = options.label ?? "Plan";
+  console.log(`${label}: ${linePlan.summary}`);
   if (!options.includeSteps) return;
 
   for (const step of linePlan.moves.slice(0, 5)) {
@@ -379,6 +380,10 @@ function printReview(review) {
   console.log(review.explanation.summary);
   if (!review.isBestMove && review.bestMove) {
     console.log(`Engine preferred ${review.bestMove.notation}.`);
+    printLinePlan(review.bestLinePlan ?? review.bestExplanation?.linePlan ?? review.explanation?.bestMove?.linePlan, {
+      label: "Best plan",
+      includeSteps: true
+    });
   }
 }
 

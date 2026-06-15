@@ -582,6 +582,8 @@ test("UCCI backend reviews moves with native search scores", async () => {
     assert.equal(review.bestComparison.nextMove, "h7-e7");
     assert.equal(review.bestAlternatives.length, 2);
     assert.equal(review.bestAlternatives[1].verdict, "playable");
+    assert.equal(review.bestLinePlan.firstMove, "h9-g7");
+    assert.equal(review.bestLinePlan.expectedReply, "h0-g2");
     assert.ok(review.bestExplanation.summary.includes("Native UCCI Engine"));
     assert.ok(review.explanation.reasons.some((reason) => reason.includes("h9-g7")));
   } finally {

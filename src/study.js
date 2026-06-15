@@ -1,5 +1,5 @@
 import { moveToNotation, toFen } from "./board.js";
-import { summarizeAlternativeEvidence, summarizeComparisonEvidence } from "./explanation-artifacts.js";
+import { summarizeAlternativeEvidence, summarizeComparisonEvidence, summarizeLinePlanEvidence } from "./explanation-artifacts.js";
 import { practiceFocusFromReview } from "./practice.js";
 
 const DEFAULT_STUDY_LINES = 3;
@@ -333,6 +333,7 @@ function summarizeReview(review) {
     bestScoreDetail: scoreDetailFor(review.bestAnalysis),
     bestScoreText: scoreTextFor(review.bestAnalysis ?? { score: review.bestScore }),
     bestWdl: review.bestAnalysis?.wdl ?? null,
+    bestLinePlan: summarizeLinePlanEvidence(review.bestLinePlan ?? review.bestExplanation?.linePlan ?? review.bestAnalysis?.explanation?.linePlan),
     bestComparison: summarizeComparisonEvidence(review.bestComparison ?? review.bestAnalysis?.explanation?.comparison),
     bestAlternatives: summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives),
     depth: review.depth ?? 0,

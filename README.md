@@ -51,7 +51,8 @@ red against the fast JavaScript engine; use `npm run play -- --side black`,
 to experiment. Moves use coordinate notation such as `h9-g7` or `h9g7`, and the
 `hint`, `best`, and `why` commands show the learning-oriented explanation layer
 while you play. Engine turns print the principal-variation plan, and `best`/`why`
-expand it into per-ply score and motif steps.
+expand it into per-ply score and motif steps. After your move is reviewed, the
+demo also prints the engine's preferred plan when it wanted a different move.
 
 For a one-position learning report, run `npm run study`. It prints the best move,
 candidate lines, progressive hints, pressure, and an optional review of a move
@@ -476,9 +477,10 @@ console.log(review.classification);
 console.log(review.centipawnLoss);
 console.log(review.mistakes.primary);
 console.log(review.explanation.summary);
+console.log(review.bestLinePlan.summary);
 ```
 
-`reviewMove` compares the played move against the searched best line and returns a practical grade: `best`, `excellent`, `good`, `inaccuracy`, `mistake`, or `blunder`. It also returns `mistakes`, a structured pattern summary for learning flows, such as missed material, unsafe capture, missed check, missed threat, allowed threat, or positional drift.
+`reviewMove` compares the played move against the searched best line and returns a practical grade: `best`, `excellent`, `good`, `inaccuracy`, `mistake`, or `blunder`. It also returns `bestLinePlan` plus `mistakes`, a structured pattern summary for learning flows, such as missed material, unsafe capture, missed check, missed threat, allowed threat, or positional drift.
 
 Analyze several candidate lines:
 

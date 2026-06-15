@@ -184,6 +184,8 @@ test("play CLI uses the oracle reviewer for player move feedback", async () => {
   assert.match(result.stdout, /Review source: Play Oracle\./);
   assert.match(result.stdout, /Review: good, 59 cp loss\./);
   assert.match(result.stdout, /Engine preferred h9-g7\./);
+  assert.match(result.stdout, /Best plan: Start with h9-g7; expect h0-g2; theme: creates threat\./);
+  assert.match(result.stdout, /1\. Red engine choice h9-g7: \+0\.00 -> \+0\.39 \(\+39 centipawns\) \[creates threat\]/);
 });
 
 function runPlayCli(args, input, env = {}) {
