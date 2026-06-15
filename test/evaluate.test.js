@@ -125,6 +125,29 @@ test("evaluation descriptions surface pressure on the general", () => {
   assert.ok(notes.some((note) => note.term === "kingAttack" && note.text.includes("pressure on the general")));
 });
 
+test("evaluation rewards horses on enemy-palace outposts", () => {
+  const outpost = parseFen("4k4/9/2H6/9/9/4P4/9/9/9/4K4 r");
+  const passive = parseFen("4k4/9/9/9/9/H3P4/9/9/9/4K4 r");
+  const outpostEval = evaluatePosition(outpost, SIDES.RED, { detailed: true });
+  const passiveEval = evaluatePosition(passive, SIDES.RED, { detailed: true });
+
+  assert.ok(outpostEval.terms.red.horsePressure - passiveEval.terms.red.horsePressure >= 45);
+  assert.ok(outpostEval.difference.horsePressure > passiveEval.difference.horsePressure);
+});
+
+test("evaluation descriptions surface horse outpost pressure", () => {
+  const position = parseFen("4k4/9/9/H8/9/4P4/9/9/9/4K4 r");
+  const next = applyLegalMove(position, {
+    from: coordToIndex("a3"),
+    to: coordToIndex("c2")
+  });
+  const delta = evaluateMoveDelta(position, next, SIDES.RED);
+  const notes = describeEvaluationTerms(delta.delta);
+
+  assert.ok(delta.delta.horsePressure >= 40);
+  assert.ok(notes.some((note) => note.term === "horsePressure" && note.text.includes("horse outpost pressure")));
+});
+
 test("evaluation penalizes enemy control of palace escape squares", () => {
   const exposed = parseFen("4k4/9/9/9/9/9/9/3r5/9/4K4 r");
   const safer = parseFen("4k4/9/9/9/r8/9/9/9/9/4K4 r");

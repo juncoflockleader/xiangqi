@@ -64,6 +64,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     terms[piece.side].coordination += coordinationValue(position, piece, square);
     terms[piece.side].linePressure += linePressureValue(position, piece, square);
     terms[piece.side].rookActivity += rookActivityValue(position, piece, square);
+    terms[piece.side].horsePressure += horsePressureValue(position, piece, square);
   }
 
   for (const side of [SIDES.RED, SIDES.BLACK]) {
@@ -142,7 +143,8 @@ function createTerms() {
     pieceSafety: 0,
     coordination: 0,
     linePressure: 0,
-    rookActivity: 0
+    rookActivity: 0,
+    horsePressure: 0
   };
 }
 
@@ -444,6 +446,41 @@ function rookRayActivity(position, file, rank, fileStep, rankStep) {
   }
 
   return { empty, blocker: null };
+}
+
+function horsePressureValue(position, piece, square) {
+  if (piece.type !== PIECES.HORSE) return 0;
+
+  const enemy = opponent(piece.side);
+  const enemyKingSquare = position.board.findIndex((candidate) => candidate?.side === enemy && candidate.type === PIECES.KING);
+  if (enemyKingSquare === -1) return 0;
+
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  const kingFile = fileOf(enemyKingSquare);
+  const kingRank = rankOf(enemyKingSquare);
+  const controls = horseControls(position, square);
+  const palaceControls = controls.filter((target) => palaceContains(enemy, fileOf(target), rankOf(target)));
+  const escapeControls = new Set(kingEscapeSquares(position, enemy, enemyKingSquare));
+  let score = 0;
+
+  score += palaceControls.length * 16;
+  score += controls.filter((target) => escapeControls.has(target)).length * 14;
+
+  if (controls.includes(enemyKingSquare)) score += 62;
+  if (hasCrossedRiver(piece.side, rank)) score += 10;
+
+  const kingDistance = Math.abs(file - kingFile) + Math.abs(rank - kingRank);
+  if (kingDistance <= 5) score += Math.max(0, 34 - kingDistance * 5);
+  if (isHorsePalaceOutpost(enemy, file, rank)) score += 28;
+
+  return score;
+}
+
+function isHorsePalaceOutpost(defendingSide, file, rank) {
+  const targetRank = defendingSide === SIDES.RED ? BOARD_RANKS - 3 : 2;
+  if (rank !== targetRank) return false;
+  return Math.abs(file - 4) === 1 || Math.abs(file - 4) === 2;
 }
 
 function countLineBlockers(position, from, to) {
@@ -935,7 +972,8 @@ function readableTerm(term) {
     pieceSafety: "piece safety",
     coordination: "piece coordination",
     linePressure: "rook and cannon line pressure",
-    rookActivity: "rook activity"
+    rookActivity: "rook activity",
+    horsePressure: "horse outpost pressure"
   };
 
   return labels[term] ?? term;
