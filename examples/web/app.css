@@ -141,22 +141,31 @@ h2 {
 }
 
 .board {
+  position: relative;
   width: 100%;
   height: 100%;
   display: grid;
   grid-template-columns: repeat(9, 1fr);
   grid-template-rows: repeat(10, 1fr);
+  background:
+    linear-gradient(to bottom, transparent 39.5%, rgba(255, 236, 165, 0.8) 39.5%, rgba(255, 236, 165, 0.8) 50.5%, transparent 50.5%);
+  overflow: hidden;
+}
+
+.board::before {
+  content: "";
+  position: absolute;
+  inset: calc(100% / 20) calc(100% / 18);
   border: 1px solid rgba(74, 44, 18, 0.72);
   background:
-    linear-gradient(to right, rgba(74, 44, 18, 0.62) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(74, 44, 18, 0.62) 1px, transparent 1px),
-    linear-gradient(to bottom, transparent 39.5%, rgba(255, 236, 165, 0.8) 39.5%, rgba(255, 236, 165, 0.8) 50.5%, transparent 50.5%);
-  background-size: calc(100% / 8) calc(100% / 9), calc(100% / 8) calc(100% / 9), 100% 100%;
-  background-position: 0 0;
+    repeating-linear-gradient(to right, rgba(74, 44, 18, 0.62) 0 1px, transparent 1px calc(100% / 8)),
+    repeating-linear-gradient(to bottom, rgba(74, 44, 18, 0.62) 0 1px, transparent 1px calc(100% / 9));
+  pointer-events: none;
 }
 
 .cell {
   position: relative;
+  z-index: 1;
   min-width: 0;
   min-height: 0;
   border: 0;
@@ -209,7 +218,7 @@ h2 {
   background: radial-gradient(circle at 35% 30%, #fff9e6 0%, #f6e0a9 62%, #d7af5b 100%);
   box-shadow: 0 4px 8px rgba(52, 34, 13, 0.22);
   font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
-  font-size: clamp(20px, 4.2vw, 34px);
+  font-size: clamp(16px, 3.2vw, 26px);
   font-weight: 800;
   line-height: 1;
 }
@@ -334,6 +343,6 @@ h2 {
 
   .piece {
     width: 78%;
-    font-size: clamp(17px, 7vw, 30px);
+    font-size: clamp(15px, 6vw, 24px);
   }
 }
