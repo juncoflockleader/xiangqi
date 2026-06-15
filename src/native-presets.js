@@ -2,6 +2,12 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 
 const DEFAULT_PIKAFISH_INSTALL_ROOT = ".engines/pikafish";
+const PIKAFISH_PLATFORM_DIRS = Object.freeze({
+  android: "Android",
+  darwin: "MacOS",
+  linux: "Linux",
+  win32: "Windows"
+});
 
 const PRESETS = Object.freeze({
   pikafish: Object.freeze({
@@ -71,6 +77,18 @@ function resolvePikafishPreset(preset, options) {
     env.XIANGQI_PIKAFISH_HOME,
     env.PIKAFISH_HOME
   );
+  const binary = firstText(
+    options.binary,
+    options.executable,
+    env.XIANGQI_PIKAFISH_BINARY,
+    env.PIKAFISH_BINARY
+  );
+  const variant = firstText(
+    options.variant,
+    options.binaryVariant,
+    env.XIANGQI_PIKAFISH_VARIANT,
+    env.PIKAFISH_VARIANT
+  );
   const home = firstText(
     configuredHome,
     explicitCommand ? null : discoverPikafishHome(options, env)
@@ -79,7 +97,7 @@ function resolvePikafishPreset(preset, options) {
     options.command,
     env.XIANGQI_PIKAFISH_COMMAND,
     env.PIKAFISH_COMMAND,
-    home ? inferPikafishCommand(home, options) : null,
+    home ? inferPikafishCommand(home, { ...options, binary, variant }) : null,
     env.XIANGQI_ENGINE_COMMAND
   );
   const evalFile = firstText(
@@ -254,17 +272,56 @@ function isFalseLike(value) {
 function inferPikafishCommand(home, options) {
   const platform = options.platform ?? defaultPlatform();
   const arch = options.arch ?? defaultArch();
+  const explicitBinary = firstText(options.binary, options.executable);
+  if (explicitBinary) return resolvePikafishBinary(home, platform, explicitBinary);
 
+  const variant = firstText(options.variant, options.binaryVariant);
+  if (variant) return resolvePikafishBinary(home, platform, variant);
+
+  const candidates = pikafishBinaryCandidates(platform, arch).map((binary) => resolvePikafishBinary(home, platform, binary));
+  const existing = candidates.find((candidate) => existsSync(candidate));
+  if (existing) return existing;
+
+  return candidates[0] ?? joinPath(home, "pikafish");
+}
+
+function resolvePikafishBinary(home, platform, binary) {
+  if (binary.includes("/") || binary.includes("\\")) {
+    return joinPath(home, binary);
+  }
+
+  const directory = PIKAFISH_PLATFORM_DIRS[platform];
+  const name = normalizePikafishBinaryName(binary, platform);
+  return directory ? joinPath(home, directory, name) : joinPath(home, name);
+}
+
+function normalizePikafishBinaryName(value, platform) {
+  let name = String(value).trim();
+  if (!name.startsWith("pikafish")) name = `pikafish-${name}`;
+  if (platform === "win32" && !name.toLowerCase().endsWith(".exe")) name = `${name}.exe`;
+  return name;
+}
+
+function pikafishBinaryCandidates(platform, arch) {
   if (platform === "darwin" && arch === "arm64") {
-    return joinPath(home, "MacOS", "pikafish-apple-silicon");
+    return ["pikafish-apple-silicon", "pikafish"];
   }
   if (platform === "darwin") {
-    return joinPath(home, "MacOS", "pikafish");
+    return ["pikafish", "pikafish-apple-silicon"];
+  }
+  if (platform === "linux" && (arch === "x64" || arch === "amd64")) {
+    return ["pikafish-avx2", "pikafish-bmi2", "pikafish-sse41-popcnt", "pikafish-avxvnni", "pikafish-vnni512", "pikafish-avx512", "pikafish-avx512icl", "pikafish"];
+  }
+  if (platform === "linux" && (arch === "arm64" || arch === "aarch64")) {
+    return ["pikafish-armv8-dotprod", "pikafish-armv8", "pikafish"];
   }
   if (platform === "win32") {
-    return joinPath(home, "Windows", "pikafish.exe");
+    return ["pikafish-avx2", "pikafish-bmi2", "pikafish-sse41-popcnt", "pikafish-avxvnni", "pikafish-vnni512", "pikafish-avx512", "pikafish-avx512icl", "pikafish"];
   }
-  return joinPath(home, "pikafish");
+  if (platform === "android") {
+    return ["pikafish-armv8-dotprod", "pikafish-armv8", "pikafish"];
+  }
+  return ["pikafish"];
 }
 
 function defaultPlatform() {

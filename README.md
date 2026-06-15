@@ -120,9 +120,11 @@ one, and extracts it under `.engines/pikafish/<tag>`. The `pikafish` preset
 auto-discovers the newest runnable bundle in `.engines/pikafish`, so the
 probe/play/sparring commands work without extra environment variables after the
 default install. If you unpack a Pikafish bundle locally, `PIKAFISH_HOME=/path/to/bundle`
-lets the preset infer the macOS Apple Silicon binary path and `pikafish.nnue`;
-use `PIKAFISH_COMMAND`, `XIANGQI_PIKAFISH_AUTO_DISCOVER=false`, or explicit
-`--command` when the bundle layout differs.
+lets the preset infer official macOS, Linux, Windows, or Android bundle binaries
+and `pikafish.nnue`; use `PIKAFISH_VARIANT=sse41-popcnt`,
+`PIKAFISH_BINARY=Linux/pikafish-bmi2`, `PIKAFISH_COMMAND`,
+`XIANGQI_PIKAFISH_AUTO_DISCOVER=false`, or explicit `--command` when the CPU or
+bundle layout needs a different executable.
 
 Use `--fen` with the play demo or native probe to start from a tactical training
 position. Player move reviews print the classification, score evidence, plan
@@ -436,6 +438,9 @@ await backend.close?.();
 auto-discovers the newest default `npm run install:pikafish` bundle under
 `.engines/pikafish`. If no native command resolves, the factory returns the
 JavaScript learning engine instead of failing app startup.
+Set `PIKAFISH_VARIANT` or `PIKAFISH_BINARY` when you want a specific executable
+from an official multi-binary bundle, such as `avx2`, `bmi2`, or
+`sse41-popcnt`.
 
 `engineOptions` are sent to the native process as `setoption` commands before
 the first `isready` check after handshake. Use an object for ordinary options

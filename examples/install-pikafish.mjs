@@ -56,6 +56,8 @@ async function buildInstallPlan(options) {
     home: installDir,
     platform: options.platform,
     arch: options.arch,
+    binary: options.binary,
+    variant: options.variant,
     env: {}
   });
 
@@ -319,6 +321,8 @@ function parseArgs(args) {
     dest: process.env.XIANGQI_PIKAFISH_INSTALL_DIR ?? DEFAULT_DEST,
     assetName: process.env.XIANGQI_PIKAFISH_ASSET,
     extractor: process.env.XIANGQI_ARCHIVE_EXTRACTOR,
+    binary: process.env.XIANGQI_PIKAFISH_BINARY ?? process.env.PIKAFISH_BINARY,
+    variant: process.env.XIANGQI_PIKAFISH_VARIANT ?? process.env.PIKAFISH_VARIANT,
     platform: process.platform,
     arch: process.arch,
     dryRun: false,
@@ -380,6 +384,16 @@ function parseArgs(args) {
       index += 1;
       continue;
     }
+    if (arg === "--binary") {
+      options.binary = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--variant") {
+      options.variant = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
     if (arg === "--platform") {
       options.platform = requireValue(args, index, arg);
       index += 1;
@@ -434,6 +448,8 @@ Options:
   --release-file FILE   Read release metadata JSON from a file
   --asset NAME          Pick a specific release asset
   --extractor CMD       Archive extractor to use: 7zz, 7z, unar, or bsdtar
+  --binary PATH         Use a specific bundle-relative executable path
+  --variant NAME        Use a named bundle variant, e.g. avx2 or sse41-popcnt
   --platform NAME       Platform for command inference (default: current)
   --arch NAME           CPU arch for command inference (default: current)
   --skip-extract        Download and verify only
@@ -444,6 +460,7 @@ Options:
 Environment:
   XIANGQI_PIKAFISH_RELEASE_URL, XIANGQI_PIKAFISH_RELEASE_FILE,
   XIANGQI_PIKAFISH_INSTALL_DIR, XIANGQI_PIKAFISH_ASSET,
-  XIANGQI_ARCHIVE_EXTRACTOR
+  XIANGQI_ARCHIVE_EXTRACTOR, XIANGQI_PIKAFISH_VARIANT,
+  XIANGQI_PIKAFISH_BINARY, PIKAFISH_VARIANT, PIKAFISH_BINARY
 `);
 }

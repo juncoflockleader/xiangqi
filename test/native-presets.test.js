@@ -52,6 +52,64 @@ test("Pikafish preset can infer local bundle paths from home", () => {
   ]);
 });
 
+test("Pikafish preset infers Linux binaries from the official bundle layout", () => {
+  const root = mkdtempSync(join(tmpdir(), "xiangqi-pikafish-linux-preset-"));
+
+  try {
+    const home = join(root, "Pikafish-2026-01-02");
+    const command = createPikafishBinary(home, "Linux", "pikafish-avx2");
+    createPikafishBinary(home, "Linux", "pikafish-sse41-popcnt");
+    const preset = resolveNativeEnginePreset("pikafish", {
+      env: { PIKAFISH_HOME: home },
+      platform: "linux",
+      arch: "x64"
+    });
+
+    assert.equal(preset.command, command);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Pikafish preset infers Windows binaries from the official bundle layout", () => {
+  const root = mkdtempSync(join(tmpdir(), "xiangqi-pikafish-windows-preset-"));
+
+  try {
+    const home = join(root, "Pikafish-2026-01-02");
+    const command = createPikafishBinary(home, "Windows", "pikafish-avx2.exe");
+    createPikafishBinary(home, "Windows", "pikafish-sse41-popcnt.exe");
+    const preset = resolveNativeEnginePreset("pikafish", {
+      env: { PIKAFISH_HOME: home },
+      platform: "win32",
+      arch: "x64"
+    });
+
+    assert.equal(preset.command, command);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Pikafish preset can select an explicit official bundle variant", () => {
+  const root = mkdtempSync(join(tmpdir(), "xiangqi-pikafish-variant-preset-"));
+
+  try {
+    const home = join(root, "Pikafish-2026-01-02");
+    createPikafishBinary(home, "Linux", "pikafish-avx2");
+    const command = createPikafishBinary(home, "Linux", "pikafish-sse41-popcnt");
+    const preset = resolveNativeEnginePreset("pikafish", {
+      env: { PIKAFISH_HOME: home },
+      platform: "linux",
+      arch: "x64",
+      variant: "sse41-popcnt"
+    });
+
+    assert.equal(preset.command, command);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("Pikafish preset discovers the latest local installer bundle", () => {
   const root = mkdtempSync(join(tmpdir(), "xiangqi-pikafish-preset-"));
 
@@ -127,11 +185,16 @@ test("native option merging deduplicates by option name", () => {
 
 function createPikafishBundle(root, tag) {
   const home = join(root, tag);
-  const command = join(home, "MacOS", "pikafish-apple-silicon");
+  const command = createPikafishBinary(home, "MacOS", "pikafish-apple-silicon");
   const evalFile = join(home, "pikafish.nnue");
-  mkdirSync(join(home, "MacOS"), { recursive: true });
-  writeFileSync(command, "#!/bin/sh\n", "utf8");
-  chmodSync(command, 0o755);
   writeFileSync(evalFile, "nnue", "utf8");
   return { home, command, evalFile };
+}
+
+function createPikafishBinary(home, directory, name) {
+  const command = join(home, directory, name);
+  mkdirSync(join(home, directory), { recursive: true });
+  writeFileSync(command, "#!/bin/sh\n", "utf8");
+  chmodSync(command, 0o755);
+  return command;
 }

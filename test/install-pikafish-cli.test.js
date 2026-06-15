@@ -74,6 +74,34 @@ test("Pikafish installer can select an explicit asset", async () => {
   }
 });
 
+test("Pikafish installer can plan an explicit binary variant", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "xiangqi-pikafish-install-"));
+  const releaseFile = join(dir, "release.json");
+  const dest = join(dir, "engines");
+
+  try {
+    await writeReleaseFixture(releaseFile);
+    const { stdout } = await execFileAsync(process.execPath, [
+      "examples/install-pikafish.mjs",
+      "--release-file", releaseFile,
+      "--dest", dest,
+      "--platform", "linux",
+      "--arch", "x64",
+      "--variant", "sse41-popcnt",
+      "--dry-run",
+      "--json"
+    ], {
+      cwd: root,
+      timeout: 5000
+    });
+    const plan = JSON.parse(stdout);
+
+    assert.equal(plan.command, join(dest, "Pikafish-2099-01-02", "Linux", "pikafish-sse41-popcnt"));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("Pikafish installer reports missing release assets", async () => {
   const dir = await mkdtemp(join(tmpdir(), "xiangqi-pikafish-install-"));
   const releaseFile = join(dir, "release.json");
