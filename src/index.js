@@ -1,6 +1,7 @@
 export * from "./constants.js";
 export * from "./board.js";
 export * from "./notation.js";
+export * from "./chinese-notation.js";
 export * from "./hash.js";
 export * from "./transposition.js";
 export * from "./time.js";

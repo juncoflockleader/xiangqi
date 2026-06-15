@@ -18,6 +18,9 @@ test("web server serves the browser game and starts a session", async () => {
     const created = await postJson(`${app.url}/api/new`, { side: "red" });
 
     assert.match(page, /<main class="app-shell"/);
+    assert.match(page, /楚河/);
+    assert.match(page, /漢界/);
+    assert.match(page, /id="localeSelect"/);
     assert.match(script, /function renderBoard/);
     assert.equal(created.ok, true);
     assert.equal(created.state.playerSide, "red");
@@ -25,6 +28,7 @@ test("web server serves the browser game and starts a session", async () => {
     assert.equal(created.state.board.length, 90);
     assert.equal(created.state.playerTurn, true);
     assert.ok(created.state.legalMoves.some((move) => move.notation === "h7-e7"));
+    assert.ok(created.state.legalMoves.some((move) => move.zhNotation === "炮二平五"));
     assert.equal(created.state.backend.kind, "javascript");
   } finally {
     await app.close();
@@ -51,14 +55,20 @@ test("web server plays a player move, engine reply, hints, best move, and undo",
 
     assert.equal(best.ok, true);
     assert.equal(typeof best.best.bestMove, "string");
+    assert.equal(typeof best.best.zhBestMove, "string");
     assert.ok(best.best.alternatives.length >= 1);
+    assert.equal(typeof best.best.alternatives[0].zhMove, "string");
     assert.equal(hint.ok, true);
     assert.ok(hint.hint.levels.length >= 1);
+    assert.equal(typeof hint.hint.zhBestMove, "string");
     assert.equal(moved.ok, true);
     assert.equal(moved.state.history[0].notation, "h7-e7");
+    assert.equal(moved.state.history[0].zhNotation, "炮二平五");
+    assert.equal(typeof moved.state.history[1].zhNotation, "string");
     assert.equal(moved.state.history.length, 2);
     assert.equal(moved.state.playerTurn, true);
     assert.equal(moved.state.lastPlayerReview.move, "h7-e7");
+    assert.equal(moved.state.lastPlayerReview.zhMove, "炮二平五");
     assert.equal(undone.ok, true);
     assert.equal(undone.state.history.length, 0);
     assert.equal(undone.state.playerTurn, true);

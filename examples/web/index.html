@@ -11,12 +11,34 @@
       <section class="board-section" aria-label="Xiangqi board">
         <div class="topbar">
           <div>
-            <h1>Xiangqi</h1>
+            <h1 data-i18n="appTitle">中國象棋</h1>
             <p id="gameStatus">Starting...</p>
           </div>
-          <div class="turn-pill" id="turnPill">Red</div>
+          <div class="turn-pill" id="turnPill">紅方</div>
         </div>
-        <div class="board-wrap">
+        <div class="board-wrap" id="boardWrap">
+          <div class="board-art" aria-hidden="true">
+            <div class="board-lines">
+              <span class="palace palace-north"></span>
+              <span class="palace palace-south"></span>
+              <span class="river-label river-left">楚河</span>
+              <span class="river-label river-right">漢界</span>
+              <span class="point-mark" style="--file: 1; --rank: 2"></span>
+              <span class="point-mark" style="--file: 7; --rank: 2"></span>
+              <span class="point-mark point-edge-left" style="--file: 0; --rank: 3"></span>
+              <span class="point-mark" style="--file: 2; --rank: 3"></span>
+              <span class="point-mark" style="--file: 4; --rank: 3"></span>
+              <span class="point-mark" style="--file: 6; --rank: 3"></span>
+              <span class="point-mark point-edge-right" style="--file: 8; --rank: 3"></span>
+              <span class="point-mark point-edge-left" style="--file: 0; --rank: 6"></span>
+              <span class="point-mark" style="--file: 2; --rank: 6"></span>
+              <span class="point-mark" style="--file: 4; --rank: 6"></span>
+              <span class="point-mark" style="--file: 6; --rank: 6"></span>
+              <span class="point-mark point-edge-right" style="--file: 8; --rank: 6"></span>
+              <span class="point-mark" style="--file: 1; --rank: 7"></span>
+              <span class="point-mark" style="--file: 7; --rank: 7"></span>
+            </div>
+          </div>
           <div class="board" id="board"></div>
         </div>
       </section>
@@ -24,39 +46,46 @@
       <aside class="side-panel">
         <section class="controls" aria-label="Game controls">
           <div class="control-row">
-            <label for="sideSelect">Side</label>
+            <label for="localeSelect" data-i18n="language">語言</label>
+            <select id="localeSelect">
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+          <div class="control-row">
+            <label for="sideSelect" data-i18n="side">方位</label>
             <select id="sideSelect">
-              <option value="red">Red</option>
-              <option value="black">Black</option>
+              <option value="red">紅方</option>
+              <option value="black">黑方</option>
             </select>
           </div>
           <div class="button-row">
-            <button id="newButton" type="button">New</button>
-            <button id="undoButton" type="button">Undo</button>
+            <button id="newButton" type="button" data-i18n="newGame">新局</button>
+            <button id="undoButton" type="button" data-i18n="undo">悔棋</button>
           </div>
           <div class="button-row">
-            <button id="hintButton" type="button">Hint</button>
-            <button id="bestButton" type="button">Best</button>
+            <button id="hintButton" type="button" data-i18n="hint">提示</button>
+            <button id="bestButton" type="button" data-i18n="best">最佳</button>
           </div>
         </section>
 
         <section class="panel-block">
-          <h2>Engine</h2>
+          <h2 data-i18n="engine">引擎</h2>
           <div id="engineInfo" class="meta-list"></div>
         </section>
 
         <section class="panel-block">
-          <h2>Last Move</h2>
-          <div id="lastMovePanel" class="stack muted">No moves yet.</div>
+          <h2 data-i18n="lastMove">上一手</h2>
+          <div id="lastMovePanel" class="stack muted">尚未走棋。</div>
         </section>
 
         <section class="panel-block">
-          <h2>Reasoning</h2>
-          <div id="reasoningPanel" class="stack muted">Ask for Best, Hint, or make a move.</div>
+          <h2 data-i18n="reasoning">思路</h2>
+          <div id="reasoningPanel" class="stack muted">可查看最佳、提示，或直接走棋。</div>
         </section>
 
         <section class="panel-block">
-          <h2>History</h2>
+          <h2 data-i18n="history">棋譜</h2>
           <ol id="historyList" class="history-list"></ol>
         </section>
       </aside>

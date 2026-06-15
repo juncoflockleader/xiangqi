@@ -58,7 +58,8 @@ when it wanted a different move, the engine's preferred plan.
 
 For a browser board, run `npm run web` and open `http://127.0.0.1:5175`. It uses
 the same learning backend as the CLI, prefers the local Pikafish preset when
-available, and falls back to the JavaScript engine.
+available, and falls back to the JavaScript engine. The browser UI includes
+Chinese localization and traditional move notation such as `炮二平五`.
 
 For a one-position learning report, run `npm run study`. It prints the best move,
 candidate lines, progressive hints, pressure, and an optional review of a move

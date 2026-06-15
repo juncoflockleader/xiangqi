@@ -14,7 +14,9 @@ import {
   gameStatus,
   historyKeys,
   indexToCoord,
+  lineToChineseNotation,
   moveToNotation,
+  moveToChineseNotation,
   opponent,
   parseFen,
   pieceLabel,
@@ -195,13 +197,21 @@ async function handleApiPost(context, url) {
       ...searchOptions(session),
       history: historyKeys(session.game)
     }));
-    return sendJson(context.response, 200, { ok: true, hint: summarizeCoach(hint), state: serializeState(session, context.engine) });
+    return sendJson(context.response, 200, {
+      ok: true,
+      hint: summarizeCoach(hint, session.game.position),
+      state: serializeState(session, context.engine)
+    });
   }
 
   if (url.pathname === "/api/best") {
     const session = requireSession(context.sessions, body.sessionId);
     const decision = await enqueueSession(session, () => chooseGameMoveAsync(session.game, context.engine, searchOptions(session)));
-    return sendJson(context.response, 200, { ok: true, best: summarizeDecision(decision), state: serializeState(session, context.engine) });
+    return sendJson(context.response, 200, {
+      ok: true,
+      best: summarizeDecision(decision, session.game.position),
+      state: serializeState(session, context.engine)
+    });
   }
 
   if (url.pathname === "/api/undo") {
@@ -280,10 +290,13 @@ function searchOptions(session) {
 
 function serializeState(session, engine) {
   const status = gameStatus(session.game);
-  const legalMoves = engine.legalMoves(session.game.position).map(summarizeMove);
+  const legalMoves = engine.legalMoves(session.game.position)
+    .map((move) => summarizeMove(move, session.game.position));
   const lastMove = session.game.moves.at(-1) ?? null;
   const lastPlayerMove = [...session.game.moves].reverse().find((move) => move.actor === "player") ?? null;
   const lastEngineMove = [...session.game.moves].reverse().find((move) => move.actor === "engine") ?? null;
+  const lastPlayerPosition = positionBeforeEntry(lastPlayerMove);
+  const lastEnginePosition = positionBeforeEntry(lastEngineMove);
 
   return {
     sessionId: session.id,
@@ -299,8 +312,8 @@ function serializeState(session, engine) {
     moveCount: session.game.moves.length,
     history: session.game.moves.map(summarizeHistoryMove),
     lastMove: lastMove ? summarizeHistoryMove(lastMove) : null,
-    lastPlayerReview: lastPlayerMove?.review ? summarizeReview(lastPlayerMove.review) : null,
-    lastEngineDecision: lastEngineMove?.decision ? summarizeDecision(lastEngineMove.decision) : null,
+    lastPlayerReview: lastPlayerMove?.review ? summarizeReview(lastPlayerMove.review, lastPlayerPosition) : null,
+    lastEngineDecision: lastEngineMove?.decision ? summarizeDecision(lastEngineMove.decision, lastEnginePosition) : null,
     backend: describeEngineBackend(engine)
   };
 }
@@ -318,22 +331,25 @@ function serializeBoard(position) {
 }
 
 function summarizeHistoryMove(entry) {
+  const position = positionBeforeEntry(entry);
   return {
     ply: entry.ply,
     moveNumber: entry.moveNumber,
     side: entry.side,
     actor: entry.actor,
     notation: entry.notation,
+    zhNotation: chineseNotationFor(position, entry.move ?? entry.notation),
     positionBefore: entry.positionBefore,
     positionAfter: entry.positionAfter,
-    review: entry.review ? summarizeReview(entry.review) : null,
-    decision: entry.decision ? summarizeDecision(entry.decision) : null
+    review: entry.review ? summarizeReview(entry.review, position) : null,
+    decision: entry.decision ? summarizeDecision(entry.decision, position) : null
   };
 }
 
-function summarizeMove(move) {
+function summarizeMove(move, position = null) {
   return {
     notation: move.notation ?? moveToNotation(move),
+    zhNotation: chineseNotationFor(position, move),
     from: move.from,
     to: move.to,
     fromCoord: indexToCoord(move.from),
@@ -352,12 +368,16 @@ function summarizeMove(move) {
   };
 }
 
-function summarizeDecision(decision) {
+function summarizeDecision(decision, position = null) {
   if (!decision) return null;
   const explanation = decision.explanation ?? {};
+  const principalVariation = (decision.principalVariation ?? explanation.principalVariation ?? [])
+    .map(notationFor)
+    .filter(Boolean);
   return {
     source: decision.source ?? "search",
     bestMove: notationFor(decision.bestMove),
+    zhBestMove: chineseNotationFor(position, decision.bestMove),
     score: Math.round(decision.score ?? 0),
     scoreDetail: decision.scoreDetail ?? explanation.search?.scoreDetail ?? null,
     wdl: decision.wdl ?? explanation.search?.wdl ?? null,
@@ -368,19 +388,20 @@ function summarizeDecision(decision) {
     confidence: explanation.confidence ?? null,
     linePlan: explanation.linePlan ?? null,
     comparison: explanation.comparison ?? null,
-    alternatives: explanation.alternatives ?? [],
-    principalVariation: (decision.principalVariation ?? explanation.principalVariation ?? [])
-      .map(notationFor)
-      .filter(Boolean),
+    alternatives: annotateAlternatives(position, explanation.alternatives),
+    principalVariation,
+    zhPrincipalVariation: chineseLineFor(position, principalVariation),
     oracleReview: decision.oracleReview ?? explanation.oracleReview ?? null,
     backendFallback: decision.backendFallback ?? null
   };
 }
 
-function summarizeReview(review) {
+function summarizeReview(review, position = null) {
   return {
     move: notationFor(review.move),
+    zhMove: chineseNotationFor(position, review.move),
     bestMove: notationFor(review.bestMove),
+    zhBestMove: chineseNotationFor(position, review.bestMove),
     classification: review.classification ?? null,
     centipawnLoss: Math.round(review.centipawnLoss ?? 0),
     isBestMove: Boolean(review.isBestMove),
@@ -397,20 +418,63 @@ function summarizeReview(review) {
     planComparison: review.planComparison ?? null,
     practiceFocus: review.practiceFocus ?? null,
     mistakes: review.mistakes ?? null,
-    bestAlternatives: review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives ?? []
+    bestAlternatives: annotateAlternatives(position, review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives)
   };
 }
 
-function summarizeCoach(coach) {
+function summarizeCoach(coach, position = null) {
+  const principalVariation = (coach.principalVariation ?? []).map(notationFor).filter(Boolean);
   return {
     source: coach.source ?? "search",
     bestMove: notationFor(coach.bestMove),
+    zhBestMove: chineseNotationFor(position, coach.bestMove),
     score: Math.round(coach.score ?? 0),
     summary: coach.summary ?? "",
     levels: (coach.levels ?? []).map((level) => ({ ...level })),
-    alternatives: coach.alternatives ?? [],
-    principalVariation: (coach.principalVariation ?? []).map(notationFor).filter(Boolean)
+    alternatives: annotateAlternatives(position, coach.alternatives),
+    principalVariation,
+    zhPrincipalVariation: chineseLineFor(position, principalVariation)
   };
+}
+
+function annotateAlternatives(position, alternatives = []) {
+  if (!Array.isArray(alternatives)) return [];
+  return alternatives.map((alternative) => {
+    const line = [alternative.move, alternative.expectedReply].filter(Boolean);
+    const zhLine = chineseLineFor(position, line);
+    return {
+      ...alternative,
+      zhMove: zhLine[0] ?? chineseNotationFor(position, alternative.move),
+      zhExpectedReply: zhLine[1] ?? null
+    };
+  });
+}
+
+function positionBeforeEntry(entry) {
+  if (!entry?.positionBefore) return null;
+  try {
+    return parseFen(entry.positionBefore);
+  } catch {
+    return null;
+  }
+}
+
+function chineseNotationFor(position, move) {
+  if (!position || !move) return null;
+  try {
+    return moveToChineseNotation(position, move);
+  } catch {
+    return null;
+  }
+}
+
+function chineseLineFor(position, moves) {
+  if (!position || !moves?.length) return [];
+  try {
+    return lineToChineseNotation(position, moves);
+  } catch {
+    return [];
+  }
 }
 
 function notationFor(move) {

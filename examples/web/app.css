@@ -130,37 +130,143 @@ h2 {
 }
 
 .board-wrap {
+  --board-padding: clamp(10px, 2vw, 18px);
+  --grid-line: rgba(74, 44, 18, 0.72);
   width: min(100%, 760px);
   margin: 0 auto;
   aspect-ratio: 9 / 10;
-  padding: clamp(10px, 2vw, 18px);
+  padding: var(--board-padding);
   border: 2px solid var(--board-dark);
   border-radius: 8px;
   background: linear-gradient(135deg, #e6bc65, var(--board));
   box-shadow: 0 22px 50px rgba(42, 32, 16, 0.18);
+  position: relative;
+}
+
+.board-art {
+  position: absolute;
+  inset: var(--board-padding);
+  pointer-events: none;
+  transition: transform 160ms ease;
+}
+
+.board-wrap.black-view .board-art {
+  transform: rotate(180deg);
+}
+
+.board-lines {
+  position: absolute;
+  inset: calc(100% / 20) calc(100% / 18);
+}
+
+.board-lines::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--grid-line);
+  background:
+    repeating-linear-gradient(to right, var(--grid-line) 0 1px, transparent 1px calc(100% / 8)),
+    repeating-linear-gradient(to bottom, var(--grid-line) 0 1px, transparent 1px calc(100% / 9));
+}
+
+.river-label {
+  position: absolute;
+  top: calc(400% / 9 + 1px);
+  height: calc(100% / 9 - 1px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e6bc65, var(--board));
+  color: rgba(68, 40, 16, 0.82);
+  font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
+  font-size: clamp(22px, 4vw, 38px);
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.river-left {
+  left: 1px;
+  width: calc(50% - 1px);
+}
+
+.river-right {
+  right: 1px;
+  width: calc(50% - 1px);
+}
+
+.palace {
+  position: absolute;
+  left: 37.5%;
+  width: 25%;
+  height: calc(200% / 9);
+}
+
+.palace-north {
+  top: 0;
+}
+
+.palace-south {
+  bottom: 0;
+}
+
+.palace::before,
+.palace::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.palace::before {
+  background: linear-gradient(to bottom right, transparent calc(50% - 0.75px), var(--grid-line) calc(50% - 0.75px) calc(50% + 0.75px), transparent calc(50% + 0.75px));
+}
+
+.palace::after {
+  background: linear-gradient(to bottom left, transparent calc(50% - 0.75px), var(--grid-line) calc(50% - 0.75px) calc(50% + 0.75px), transparent calc(50% + 0.75px));
+}
+
+.point-mark {
+  position: absolute;
+  left: calc(var(--file) * 100% / 8);
+  top: calc(var(--rank) * 100% / 9);
+  width: clamp(18px, 3.4vw, 28px);
+  height: clamp(18px, 3.4vw, 28px);
+  transform: translate(-50%, -50%);
+  background:
+    linear-gradient(var(--grid-line) 0 0) left 2px top 2px / 8px 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) left 2px top 2px / 1px 8px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) right 2px top 2px / 8px 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) right 2px top 2px / 1px 8px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) left 2px bottom 2px / 8px 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) left 2px bottom 2px / 1px 8px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) right 2px bottom 2px / 8px 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) right 2px bottom 2px / 1px 8px no-repeat;
+}
+
+.point-edge-left {
+  background:
+    linear-gradient(var(--grid-line) 0 0) right 2px top 2px / 8px 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) right 2px top 2px / 1px 8px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) right 2px bottom 2px / 8px 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) right 2px bottom 2px / 1px 8px no-repeat;
+}
+
+.point-edge-right {
+  background:
+    linear-gradient(var(--grid-line) 0 0) left 2px top 2px / 8px 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) left 2px top 2px / 1px 8px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) left 2px bottom 2px / 8px 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) left 2px bottom 2px / 1px 8px no-repeat;
 }
 
 .board {
   position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   display: grid;
   grid-template-columns: repeat(9, 1fr);
   grid-template-rows: repeat(10, 1fr);
-  background:
-    linear-gradient(to bottom, transparent 39.5%, rgba(255, 236, 165, 0.8) 39.5%, rgba(255, 236, 165, 0.8) 50.5%, transparent 50.5%);
   overflow: hidden;
-}
-
-.board::before {
-  content: "";
-  position: absolute;
-  inset: calc(100% / 20) calc(100% / 18);
-  border: 1px solid rgba(74, 44, 18, 0.72);
-  background:
-    repeating-linear-gradient(to right, rgba(74, 44, 18, 0.62) 0 1px, transparent 1px calc(100% / 8)),
-    repeating-linear-gradient(to bottom, rgba(74, 44, 18, 0.62) 0 1px, transparent 1px calc(100% / 9));
-  pointer-events: none;
 }
 
 .cell {
@@ -314,6 +420,18 @@ h2 {
   font-size: 13px;
 }
 
+.move-notation {
+  font-weight: 760;
+}
+
+.notation-secondary {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
 .status-error {
   color: var(--danger);
 }
@@ -338,7 +456,7 @@ h2 {
   }
 
   .board-wrap {
-    padding: 8px;
+    --board-padding: 8px;
   }
 
   .piece {

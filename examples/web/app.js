@@ -1,10 +1,109 @@
 const files = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
 const ranks = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
+const translations = {
+  zh: {
+    appTitle: "中國象棋",
+    language: "語言",
+    side: "方位",
+    red: "紅方",
+    black: "黑方",
+    newGame: "新局",
+    undo: "悔棋",
+    hint: "提示",
+    best: "最佳",
+    engine: "引擎",
+    lastMove: "上一手",
+    reasoning: "思路",
+    history: "棋譜",
+    starting: "啟動中...",
+    noMoves: "尚未走棋。",
+    askPrompt: "可查看最佳、提示，或直接走棋。",
+    redToMove: "紅方走棋",
+    blackToMove: "黑方走棋",
+    inCheck: "（被將軍）",
+    gameOver: "終局",
+    repetition: "重複局面和棋",
+    wins: "勝",
+    level: "級別",
+    depth: "深度",
+    time: "用時",
+    lines: "候選",
+    fallback: "備援",
+    confidence: "信心",
+    bestMove: "最佳",
+    whyNot: "為何不選",
+    noHint: "暫無提示。",
+    noDecision: "尚無決策。",
+    engineSelected: "引擎已選擇一手。",
+    moveReviewed: "已覆盤此手。",
+    candidate: "候選",
+    expectedReply: "預期",
+    loss: "損失",
+    scorePrefix: "評分",
+    bookSource: "開局庫",
+    searchSource: "搜索",
+    suggests: "建議",
+    bestAgreement: "與最佳著法一致",
+    bestAlternative: "最佳應為",
+    player: "你",
+    engineActor: "引擎"
+  },
+  en: {
+    appTitle: "Xiangqi",
+    language: "Language",
+    side: "Side",
+    red: "Red",
+    black: "Black",
+    newGame: "New",
+    undo: "Undo",
+    hint: "Hint",
+    best: "Best",
+    engine: "Engine",
+    lastMove: "Last Move",
+    reasoning: "Reasoning",
+    history: "History",
+    starting: "Starting...",
+    noMoves: "No moves yet.",
+    askPrompt: "Ask for Best, Hint, or make a move.",
+    redToMove: "Red to move",
+    blackToMove: "Black to move",
+    inCheck: " in check",
+    gameOver: "Game over",
+    repetition: "Repetition draw",
+    wins: "wins",
+    level: "Level",
+    depth: "Depth",
+    time: "Time",
+    lines: "Lines",
+    fallback: "Fallback",
+    confidence: "Confidence",
+    bestMove: "Best",
+    whyNot: "Why not",
+    noHint: "No hint available.",
+    noDecision: "No decision yet.",
+    engineSelected: "Engine selected a move.",
+    moveReviewed: "Move reviewed.",
+    candidate: "candidate",
+    expectedReply: "expects",
+    loss: "loss",
+    scorePrefix: "score",
+    bookSource: "opening book",
+    searchSource: "search",
+    suggests: "suggests",
+    bestAgreement: "matches the best move",
+    bestAlternative: "best was",
+    player: "player",
+    engineActor: "engine"
+  }
+};
+
 const elements = {
   board: document.querySelector("#board"),
+  boardWrap: document.querySelector("#boardWrap"),
   gameStatus: document.querySelector("#gameStatus"),
   turnPill: document.querySelector("#turnPill"),
+  localeSelect: document.querySelector("#localeSelect"),
   sideSelect: document.querySelector("#sideSelect"),
   newButton: document.querySelector("#newButton"),
   undoButton: document.querySelector("#undoButton"),
@@ -21,7 +120,8 @@ const state = {
   game: null,
   selected: null,
   pending: false,
-  panel: null
+  panel: null,
+  locale: loadLocale()
 };
 
 elements.newButton.addEventListener("click", () => newGame());
@@ -29,7 +129,14 @@ elements.undoButton.addEventListener("click", () => undoMove());
 elements.hintButton.addEventListener("click", () => requestHint());
 elements.bestButton.addEventListener("click", () => requestBest());
 elements.sideSelect.addEventListener("change", () => newGame());
+elements.localeSelect.addEventListener("change", () => {
+  state.locale = elements.localeSelect.value === "en" ? "en" : "zh";
+  saveLocale(state.locale);
+  applyLocale();
+});
 
+elements.localeSelect.value = state.locale;
+applyLocale();
 newGame();
 
 async function newGame() {
@@ -144,14 +251,13 @@ function renderStatus() {
   if (!game) return;
 
   const status = game.status;
-  const side = capitalize(game.turn);
-  const check = status.inCheck ? " in check" : "";
+  const check = status.inCheck ? t("inCheck") : "";
   const suffix = status.state === "playing"
-    ? `${side} to move${check}`
+    ? `${t(`${game.turn}ToMove`)}${check}`
     : gameOverText(status);
 
   elements.gameStatus.textContent = suffix;
-  elements.turnPill.textContent = status.state === "playing" ? side : "Game over";
+  elements.turnPill.textContent = status.state === "playing" ? sideName(game.turn) : t("gameOver");
   elements.turnPill.className = `turn-pill ${game.turn}`;
 }
 
@@ -165,6 +271,7 @@ function renderBoard() {
   const legalFrom = legalMovesFrom();
   const legalTargets = selectedTargets();
 
+  elements.boardWrap.classList.toggle("black-view", game.playerSide === "black");
   elements.board.innerHTML = "";
   for (const rank of viewRanks) {
     for (const file of viewFiles) {
@@ -201,11 +308,11 @@ function renderEngineInfo() {
   const settings = backend.settings ?? {};
   elements.engineInfo.innerHTML = [
     `<span><strong>${escapeHtml(backend.name)}</strong> (${escapeHtml(backend.kind)})</span>`,
-    settings.playLevel ? `<span>Level: ${escapeHtml(settings.playLevel)}</span>` : "",
-    Number.isFinite(settings.depth) ? `<span>Depth: ${settings.depth}</span>` : "",
-    Number.isFinite(settings.timeLimitMs) ? `<span>Time: ${settings.timeLimitMs} ms</span>` : "",
-    Number.isFinite(settings.lines) ? `<span>Lines: ${settings.lines}</span>` : "",
-    backend.status?.fallbackActive ? `<span class="status-error">Fallback: ${escapeHtml(backend.status.fallbackReason ?? "active")}</span>` : ""
+    settings.playLevel ? `<span>${t("level")}: ${escapeHtml(settings.playLevel)}</span>` : "",
+    Number.isFinite(settings.depth) ? `<span>${t("depth")}: ${settings.depth}</span>` : "",
+    Number.isFinite(settings.timeLimitMs) ? `<span>${t("time")}: ${settings.timeLimitMs} ms</span>` : "",
+    Number.isFinite(settings.lines) ? `<span>${t("lines")}: ${settings.lines}</span>` : "",
+    backend.status?.fallbackActive ? `<span class="status-error">${t("fallback")}: ${escapeHtml(backend.status.fallbackReason ?? "active")}</span>` : ""
   ].filter(Boolean).join("");
 }
 
@@ -213,16 +320,16 @@ function renderLastMove() {
   const last = state.game?.lastMove;
   if (!last) {
     elements.lastMovePanel.className = "stack muted";
-    elements.lastMovePanel.textContent = "No moves yet.";
+    elements.lastMovePanel.textContent = t("noMoves");
     return;
   }
 
   const review = state.game.lastPlayerReview;
   const decision = last.decision;
   const details = [];
-  details.push(`<div class="line"><strong>${escapeHtml(capitalize(last.side))}</strong> ${escapeHtml(last.notation)} <span class="score">${escapeHtml(last.actor)}</span></div>`);
-  if (decision?.summary) details.push(`<div>${escapeHtml(decision.summary)}</div>`);
-  if (review?.summary) details.push(`<div>${escapeHtml(review.summary)}</div>`);
+  details.push(`<div class="line"><strong>${escapeHtml(sideName(last.side))}</strong> ${formatMoveHtml(last.notation, last.zhNotation)} <span class="score">${escapeHtml(actorName(last.actor))}</span></div>`);
+  if (decision) details.push(`<div>${escapeHtml(localizedDecisionSummary(decision))}</div>`);
+  if (review) details.push(`<div>${escapeHtml(localizedReviewSummary(review))}</div>`);
   if (review?.practiceFocus) {
     details.push(`<div class="line"><strong>${escapeHtml(review.practiceFocus.title)}</strong><br>${escapeHtml(review.practiceFocus.text)}</div>`);
   }
@@ -256,22 +363,25 @@ function renderReasoning() {
   }
 
   elements.reasoningPanel.className = "stack muted";
-  elements.reasoningPanel.textContent = "Ask for Best, Hint, or make a move.";
+  elements.reasoningPanel.textContent = t("askPrompt");
 }
 
 function renderDecision(decision) {
   if (!decision) {
     elements.reasoningPanel.className = "stack muted";
-    elements.reasoningPanel.textContent = "No decision yet.";
+    elements.reasoningPanel.textContent = t("noDecision");
     return;
   }
 
   const parts = [];
-  parts.push(`<div>${escapeHtml(decision.summary ?? "Engine selected a move.")}</div>`);
+  if (decision.bestMove) {
+    parts.push(`<div class="line"><strong>${t("bestMove")}</strong> ${formatMoveHtml(decision.bestMove, decision.zhBestMove)}</div>`);
+  }
+  parts.push(`<div>${escapeHtml(localizedDecisionSummary(decision))}</div>`);
   if (decision.linePlan?.summary) parts.push(`<div class="line">${escapeHtml(decision.linePlan.summary)}</div>`);
   if (decision.comparison?.reason) parts.push(`<div class="line">${escapeHtml(decision.comparison.reason)}</div>`);
   if (decision.confidence?.label) {
-    parts.push(`<div class="score">Confidence: ${escapeHtml(decision.confidence.label)} (${Math.round(decision.confidence.score ?? 0)}/100)</div>`);
+    parts.push(`<div class="score">${t("confidence")}: ${escapeHtml(decision.confidence.label)} (${Math.round(decision.confidence.score ?? 0)}/100)</div>`);
   }
   if (decision.alternatives?.length) {
     parts.push(renderAlternatives(decision.alternatives));
@@ -286,8 +396,9 @@ function renderDecision(decision) {
 
 function renderReview(review) {
   const parts = [
-    `<div>${escapeHtml(review.summary ?? "Move reviewed.")}</div>`
+    `<div>${escapeHtml(localizedReviewSummary(review))}</div>`
   ];
+  if (review.move) parts.unshift(`<div class="line">${formatMoveHtml(review.move, review.zhMove)}</div>`);
   if (review.planComparison?.summary) parts.push(`<div class="line">${escapeHtml(review.planComparison.summary)}</div>`);
   if (review.practiceFocus) {
     parts.push(`<div class="line"><strong>${escapeHtml(review.practiceFocus.title)}</strong><br>${escapeHtml(review.practiceFocus.text)}</div>`);
@@ -301,21 +412,24 @@ function renderHint(hint) {
   const parts = levels.slice(0, 4).map((level) => (
     `<div class="line"><strong>${escapeHtml(level.title ?? `Hint ${level.level}`)}</strong><br>${escapeHtml(level.text ?? "")}</div>`
   ));
-  if (hint?.bestMove) parts.push(`<div class="score">Best: ${escapeHtml(hint.bestMove)}</div>`);
+  if (hint?.bestMove) parts.push(`<div class="score">${t("bestMove")}: ${formatMoveHtml(hint.bestMove, hint.zhBestMove)}</div>`);
 
   elements.reasoningPanel.className = "stack";
-  elements.reasoningPanel.innerHTML = parts.length ? parts.join("") : "No hint available.";
+  elements.reasoningPanel.innerHTML = parts.length ? parts.join("") : t("noHint");
 }
 
 function renderAlternatives(alternatives) {
   const rows = alternatives.slice(0, 4).map((alternative) => {
     const score = alternative.scoreDetail?.text ?? (Number.isFinite(alternative.score) ? formatCentipawns(alternative.score) : "unscored");
-    const loss = Number.isFinite(alternative.centipawnLoss) ? `, loss ${alternative.centipawnLoss} cp` : "";
-    const reply = alternative.expectedReply ? `, expects ${alternative.expectedReply}` : "";
+    const loss = Number.isFinite(alternative.centipawnLoss) ? `, ${t("loss")} ${alternative.centipawnLoss} cp` : "";
+    const reply = alternative.expectedReply ? `, ${t("expectedReply")} ${moveText(alternative.expectedReply, alternative.zhExpectedReply)}` : "";
     const why = alternative.planComparison?.summary
-      ? `<div class="score">Why not: ${escapeHtml(alternative.planComparison.summary)}</div>`
+      ? `<div class="score">${t("whyNot")}: ${escapeHtml(alternative.planComparison.summary)}</div>`
       : "";
-    return `<li><strong>${escapeHtml(alternative.move)}</strong> <span class="score">${escapeHtml(alternative.verdict ?? "candidate")}, ${escapeHtml(score)}${escapeHtml(loss)}${escapeHtml(reply)}</span>${why}</li>`;
+    const verdict = state.locale === "zh" && (!alternative.verdict || alternative.verdict === "candidate")
+      ? t("candidate")
+      : alternative.verdict ?? t("candidate");
+    return `<li><strong>${formatMoveHtml(alternative.move, alternative.zhMove)}</strong> <span class="score">${escapeHtml(verdict)}, ${escapeHtml(score)}${escapeHtml(loss)}${escapeHtml(reply)}</span>${why}</li>`;
   });
   return `<ol class="alternative-list">${rows.join("")}</ol>`;
 }
@@ -323,7 +437,7 @@ function renderAlternatives(alternatives) {
 function renderHistory() {
   const history = state.game?.history ?? [];
   elements.historyList.innerHTML = history.slice(-12).map((move) => (
-    `<li><strong>${move.ply}.</strong> ${escapeHtml(move.notation)} <span class="score">${escapeHtml(move.actor)}</span></li>`
+    `<li><strong>${move.ply}.</strong> ${formatMoveHtml(move.notation, move.zhNotation)} <span class="score">${escapeHtml(actorName(move.actor))}</span></li>`
   )).join("");
 }
 
@@ -386,12 +500,106 @@ function updateDisabled() {
   elements.hintButton.disabled = disabled || state.game?.status?.state !== "playing";
   elements.bestButton.disabled = disabled || state.game?.status?.state !== "playing";
   elements.sideSelect.disabled = state.pending;
+  elements.localeSelect.disabled = state.pending;
+}
+
+function applyLocale() {
+  document.documentElement.lang = state.locale === "zh" ? "zh-Hant" : "en";
+  document.querySelectorAll("[data-i18n]").forEach((element) => {
+    const key = element.dataset.i18n;
+    element.textContent = t(key);
+  });
+  setOptionText(elements.sideSelect, "red", sideName("red"));
+  setOptionText(elements.sideSelect, "black", sideName("black"));
+
+  if (state.game) {
+    render();
+    return;
+  }
+
+  elements.gameStatus.textContent = t("starting");
+  elements.turnPill.textContent = sideName("red");
+  elements.lastMovePanel.textContent = t("noMoves");
+  elements.reasoningPanel.textContent = t("askPrompt");
 }
 
 function gameOverText(status) {
-  if (status.state === "repetition") return "Repetition draw";
-  if (status.winner) return `${capitalize(status.state)}. ${capitalize(status.winner)} wins`;
+  if (status.state === "repetition") return t("repetition");
+  if (status.winner) {
+    return state.locale === "zh"
+      ? `${sideName(status.winner)}${t("wins")}`
+      : `${capitalize(status.state)}. ${capitalize(status.winner)} ${t("wins")}`;
+  }
   return capitalize(status.state);
+}
+
+function t(key) {
+  return translations[state.locale]?.[key] ?? translations.en[key] ?? key;
+}
+
+function setOptionText(select, value, text) {
+  const option = Array.from(select.options).find((candidate) => candidate.value === value);
+  if (option) option.textContent = text;
+}
+
+function sideName(side) {
+  return side === "black" ? t("black") : t("red");
+}
+
+function actorName(actor) {
+  if (actor === "engine") return t("engineActor");
+  if (actor === "player") return t("player");
+  return actor ?? "";
+}
+
+function localizedDecisionSummary(decision) {
+  if (state.locale !== "zh") return decision.summary ?? t("engineSelected");
+  const move = moveText(decision.bestMove, decision.zhBestMove);
+  const source = decision.source === "book" || /book move|opening book/i.test(decision.summary ?? "")
+    ? t("bookSource")
+    : t("searchSource");
+  const score = Number.isFinite(decision.score) ? `，${t("scorePrefix")} ${formatCentipawns(decision.score)}` : "";
+  return move ? `${source}${t("suggests")} ${move}${score}。` : t("engineSelected");
+}
+
+function localizedReviewSummary(review) {
+  if (state.locale !== "zh") return review.summary ?? t("moveReviewed");
+  const move = moveText(review.move, review.zhMove);
+  if (review.isBestMove) return move ? `${move}${t("bestAgreement")}。` : t("moveReviewed");
+  const best = moveText(review.bestMove, review.zhBestMove);
+  const loss = Number.isFinite(review.centipawnLoss) ? `，${t("loss")}約 ${review.centipawnLoss} cp` : "";
+  return move && best ? `${move}：${t("bestAlternative")} ${best}${loss}。` : t("moveReviewed");
+}
+
+function moveText(notation, zhNotation) {
+  if (state.locale === "zh" && zhNotation) return zhNotation;
+  return notation ?? zhNotation ?? "";
+}
+
+function formatMoveHtml(notation, zhNotation) {
+  const primary = moveText(notation, zhNotation);
+  const secondary = state.locale === "zh" ? notation : zhNotation;
+  if (!primary) return "";
+  const secondaryHtml = secondary && secondary !== primary
+    ? `<span class="notation-secondary">${escapeHtml(secondary)}</span>`
+    : "";
+  return `<span class="move-notation">${escapeHtml(primary)}</span>${secondaryHtml}`;
+}
+
+function loadLocale() {
+  try {
+    return localStorage.getItem("xiangqi.locale") === "en" ? "en" : "zh";
+  } catch {
+    return "zh";
+  }
+}
+
+function saveLocale(locale) {
+  try {
+    localStorage.setItem("xiangqi.locale", locale);
+  } catch {
+    // Local storage can be unavailable in strict browser contexts.
+  }
 }
 
 function formatCentipawns(value) {
