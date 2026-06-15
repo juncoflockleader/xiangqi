@@ -415,6 +415,9 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.ttHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.ttHits, "transposition-table hit"));
   }
+  if ((stats.qttHits ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.qttHits, "quiescence-table hit"));
+  }
   if ((stats.captureHistoryHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.captureHistoryHits, "capture-history hit"));
   }
@@ -432,7 +435,7 @@ function searchTechniqueReasons(stats = {}) {
   }
 
   if (orderingParts.length > 0) {
-    reasons.push(`Move ordering evidence included ${formatList(orderingParts)}, helping the search focus depth on promising replies.`);
+    reasons.push(`Search reuse and ordering evidence included ${formatList(orderingParts)}, helping the search focus depth on promising replies.`);
   }
 
   return reasons.slice(0, 2);
@@ -452,6 +455,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   const supports = [];
 
   if ((stats.ttHits ?? 0) > 0) supports.push("transposition-table reuse");
+  if ((stats.qttHits ?? 0) > 0) supports.push("quiescence-table reuse");
   if ((stats.captureHistoryHits ?? 0) > 0) supports.push("capture-history ordering");
   if ((stats.iidMoveHits ?? 0) > 0) supports.push("internal iterative deepening");
   if ((stats.continuationHistoryHits ?? 0) > 0) supports.push("continuation-history ordering");

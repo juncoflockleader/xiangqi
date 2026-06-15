@@ -480,6 +480,32 @@ test("quiescence can delta-prune hopeless captures", () => {
   assert.ok(withPruning.stats.qnodes < withoutPruning.stats.qnodes);
 });
 
+test("quiescence reuses tactical leaf bounds from its transposition table", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const result = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  });
+  const disabled = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    useQuiescenceTable: false
+  });
+
+  assert.equal(result.depth, 3);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.equal(Math.round(result.score), Math.round(disabled.score));
+  assert.ok(result.stats.qttStores > 0);
+  assert.ok(result.stats.qttHits > 0);
+  assert.equal(disabled.stats.qttStores, 0);
+  assert.equal(disabled.stats.qttHits, 0);
+  assert.ok(result.stats.qnodes < disabled.stats.qnodes);
+});
+
 test("search prunes shallow quiet moves with futility margins", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const withPruning = searchBestMove(position, {

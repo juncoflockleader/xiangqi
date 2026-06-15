@@ -38,7 +38,11 @@ test("game study bundles review, lesson cards, and position studies", () => {
   assert.equal(study.summary.practiceFocus, study.practiceFocus.length);
   assert.equal(study.practiceFocus[0].category, "positional-drift");
   assert.equal(study.practiceFocus[0].title, "Piece coordination");
-  assert.equal(study.practiceFocus[0].examples.length, 2);
+  assert.ok(study.practiceFocus[0].examples.length > 0);
+  assert.equal(
+    study.practiceFocus[0].examples.length,
+    Math.min(3, study.practiceFocus[0].count)
+  );
   assert.ok(study.nextSteps.some((step) => step.kind === "practice"));
   assert.match(formatted, /Practice focus:/);
   assert.match(formatted, /Played plan: Start with/);

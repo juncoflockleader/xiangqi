@@ -34,6 +34,7 @@ const DEFAULT_MAX_PLY = 80;
 const DEFAULT_ASPIRATION_WINDOW = 45;
 const DEFAULT_QCHECK_DEPTH = 1;
 const DEFAULT_DELTA_MARGIN = 160;
+const DEFAULT_QUIESCENCE_TABLE_ENTRIES = 16_384;
 const FUTILITY_BASE_MARGIN = 90;
 const FUTILITY_DEPTH_MARGIN = 70;
 const REVERSE_FUTILITY_BASE_MARGIN = 100;
@@ -78,6 +79,14 @@ export function searchBestMove(position, options = {}) {
     replacementSample: options.transpositionReplacementSample
   });
   table.nextGeneration?.();
+  const quiescenceTable = options.quiescenceTable ?? createTranspositionTable({
+    maxEntries: options.maxQuiescenceTranspositionEntries
+      ?? options.qttSize
+      ?? DEFAULT_QUIESCENCE_TABLE_ENTRIES,
+    replacementSample: options.quiescenceReplacementSample
+      ?? options.transpositionReplacementSample
+  });
+  quiescenceTable.nextGeneration?.();
   const history = new Map();
   const killers = new Map();
   const countermoves = new Map();
@@ -126,6 +135,7 @@ export function searchBestMove(position, options = {}) {
       startedAt,
       deadline,
       table,
+      quiescenceTable,
       history,
       killers,
       countermoves,
@@ -155,6 +165,7 @@ export function searchBestMove(position, options = {}) {
       useFutilityPruning: options.useFutilityPruning !== false,
       useDeltaPruning: options.useDeltaPruning !== false,
       useQuiescenceChecks: options.useQuiescenceChecks !== false,
+      useQuiescenceTable: options.useQuiescenceTable !== false,
       useRecaptureExtensions: options.useRecaptureExtensions !== false,
       useSeePruning: options.useSeePruning !== false,
       useCaptureHistory: options.useCaptureHistory !== false,
@@ -841,16 +852,36 @@ function quiescence(position, alpha, beta, ply, context, qChecksRemaining) {
   beta = mateWindow.beta;
 
   const inCheck = isInCheck(position, position.turn);
+  const alphaOriginal = alpha;
+  const transpositionKey = quiescenceTranspositionKey(position, qChecksRemaining);
+  const tt = probeQuiescenceTransposition(context, transpositionKey, alpha, beta, ply);
+  if (tt.hit) return tt.score;
+
   let moves;
+  let bestScore = -INFINITY_SCORE;
 
   if (inCheck) {
     moves = orderMoves(position, generateLegalMoves(position, position.turn), null, context, ply);
-    if (moves.length === 0) return -MATE_SCORE + ply;
+    if (moves.length === 0) {
+      const mateScore = -MATE_SCORE + ply;
+      storeQuiescenceTransposition(context, transpositionKey, {
+        score: scoreToTransposition(mateScore, ply),
+        flag: EXACT,
+        depth: qChecksRemaining
+      });
+      return mateScore;
+    }
   } else {
     const standPat = evaluatePosition(position, position.turn).score;
+    bestScore = standPat;
 
     if (standPat >= beta) {
       context.stats.cutoffs += 1;
+      storeQuiescenceTransposition(context, transpositionKey, {
+        score: scoreToTransposition(standPat, ply),
+        flag: LOWER,
+        depth: qChecksRemaining
+      });
       return beta;
     }
     if (standPat > alpha) alpha = standPat;
@@ -877,14 +908,69 @@ function quiescence(position, alpha, beta, ply, context, qChecksRemaining) {
     const next = makeMove(position, move);
     const nextQChecks = move.captured ? qChecksRemaining : Math.max(0, qChecksRemaining - 1);
     const score = normalizeScore(-quiescence(next, -beta, -alpha, ply + 1, context, nextQChecks));
+    if (context.timedOut) return score;
+    if (score > bestScore) bestScore = score;
     if (score >= beta) {
       context.stats.cutoffs += 1;
+      storeQuiescenceTransposition(context, transpositionKey, {
+        score: scoreToTransposition(score, ply),
+        flag: LOWER,
+        depth: qChecksRemaining
+      });
       return beta;
     }
     if (score > alpha) alpha = score;
   }
 
+  if (context.timedOut) return alpha;
+
+  storeQuiescenceTransposition(context, transpositionKey, {
+    score: scoreToTransposition(bestScore, ply),
+    flag: bestScore <= alphaOriginal ? UPPER : EXACT,
+    depth: qChecksRemaining
+  });
   return alpha;
+}
+
+function probeQuiescenceTransposition(context, key, alpha, beta, ply) {
+  if (!context.useQuiescenceTable) return { hit: false, score: null };
+
+  const tt = context.quiescenceTable.get(key);
+  if (!tt) return { hit: false, score: null };
+
+  const ttScore = scoreFromTransposition(tt.score, ply);
+  if (tt.flag === EXACT) {
+    context.stats.qttHits += 1;
+    return { hit: true, score: ttScore };
+  }
+  if (tt.flag === LOWER && ttScore >= beta) {
+    context.stats.qttHits += 1;
+    return { hit: true, score: ttScore };
+  }
+  if (tt.flag === UPPER && ttScore <= alpha) {
+    context.stats.qttHits += 1;
+    return { hit: true, score: ttScore };
+  }
+  return { hit: false, score: null };
+}
+
+function storeQuiescenceTransposition(context, key, entry) {
+  if (!context.useQuiescenceTable) return;
+  const result = context.quiescenceTable.set(key, entry);
+
+  if (!result || typeof result !== "object" || !("stored" in result)) {
+    context.stats.qttStores += 1;
+    return;
+  }
+
+  if (result.stored) context.stats.qttStores += 1;
+  if (result.replaced) context.stats.qttReplacements += 1;
+  if (result.evicted) context.stats.qttEvictions += 1;
+  if (!result.stored) context.stats.qttSkips += 1;
+}
+
+function quiescenceTranspositionKey(position, qChecksRemaining) {
+  return `${hashPosition(position)}:q:${qChecksRemaining}`;
 }
 
 function quietCheckingMoves(position, context, qChecksRemaining, ply) {
@@ -1671,6 +1757,11 @@ function createSearchStats() {
     nodes: 0,
     qnodes: 0,
     qchecks: 0,
+    qttHits: 0,
+    qttStores: 0,
+    qttReplacements: 0,
+    qttEvictions: 0,
+    qttSkips: 0,
     ttHits: 0,
     ttStores: 0,
     ttReplacements: 0,
@@ -1726,6 +1817,11 @@ function mergeSearchStats(total, next) {
     nodes: total.nodes + next.nodes,
     qnodes: total.qnodes + next.qnodes,
     qchecks: total.qchecks + next.qchecks,
+    qttHits: total.qttHits + next.qttHits,
+    qttStores: total.qttStores + next.qttStores,
+    qttReplacements: total.qttReplacements + next.qttReplacements,
+    qttEvictions: total.qttEvictions + next.qttEvictions,
+    qttSkips: total.qttSkips + next.qttSkips,
     ttHits: total.ttHits + next.ttHits,
     ttStores: total.ttStores + next.ttStores,
     ttReplacements: total.ttReplacements + next.ttReplacements,
