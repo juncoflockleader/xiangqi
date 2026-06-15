@@ -79,6 +79,29 @@ test("evaluation descriptions surface cannon screen creation as line pressure", 
   assert.ok(notes.some((note) => note.term === "linePressure" && note.text.includes("line pressure")));
 });
 
+test("evaluation rewards rooks with open activity", () => {
+  const trapped = parseFen("4k4/9/9/9/9/9/9/9/P8/RH2K4 r");
+  const active = parseFen("4k4/9/9/9/9/R8/9/9/7P1/1H2K4 r");
+  const trappedEval = evaluatePosition(trapped, SIDES.RED, { detailed: true });
+  const activeEval = evaluatePosition(active, SIDES.RED, { detailed: true });
+
+  assert.ok(activeEval.terms.red.rookActivity > trappedEval.terms.red.rookActivity);
+  assert.ok(activeEval.difference.rookActivity > trappedEval.difference.rookActivity);
+});
+
+test("evaluation descriptions surface rook lifts as activity", () => {
+  const position = parseFen("4k4/9/9/9/9/4P4/9/9/9/RH2K4 r");
+  const next = applyLegalMove(position, {
+    from: coordToIndex("a9"),
+    to: coordToIndex("a4")
+  });
+  const delta = evaluateMoveDelta(position, next, SIDES.RED);
+  const notes = describeEvaluationTerms(delta.delta);
+
+  assert.ok(delta.delta.rookActivity > 0);
+  assert.ok(notes.some((note) => note.term === "rookActivity" && note.text.includes("rook activity")));
+});
+
 test("evaluation rewards attacks into the enemy palace", () => {
   const attacking = parseFen("4k4/9/4H4/9/9/4P4/9/9/9/4K4 r");
   const passive = parseFen("4k4/9/9/9/9/H3P4/9/9/9/4K4 r");

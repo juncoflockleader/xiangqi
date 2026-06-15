@@ -63,6 +63,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     terms[piece.side].kingSafety += localDefenseValue(position, piece, square);
     terms[piece.side].coordination += coordinationValue(position, piece, square);
     terms[piece.side].linePressure += linePressureValue(position, piece, square);
+    terms[piece.side].rookActivity += rookActivityValue(position, piece, square);
   }
 
   for (const side of [SIDES.RED, SIDES.BLACK]) {
@@ -119,7 +120,7 @@ export function describeEvaluationTerms(delta) {
   return Object.entries(delta)
     .filter(([, value]) => Math.abs(value) >= 8)
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
-    .slice(0, 4)
+    .slice(0, 5)
     .map(([term, value]) => ({
       term,
       value,
@@ -138,7 +139,8 @@ function createTerms() {
     kingAttack: 0,
     pieceSafety: 0,
     coordination: 0,
-    linePressure: 0
+    linePressure: 0,
+    rookActivity: 0
   };
 }
 
@@ -317,6 +319,58 @@ function linePressureValue(position, piece, square) {
   if (blockers === 0) return 22;
   if (blockers === 2) return 14;
   return 0;
+}
+
+function rookActivityValue(position, piece, square) {
+  if (piece.type !== PIECES.ROOK) return 0;
+
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  const forward = forwardDelta(piece.side);
+  const forwardRay = rookRayActivity(position, file, rank, 0, forward);
+  const backRay = rookRayActivity(position, file, rank, 0, -forward);
+  const leftRay = rookRayActivity(position, file, rank, -1, 0);
+  const rightRay = rookRayActivity(position, file, rank, 1, 0);
+  const quietReach = forwardRay.empty + backRay.empty + leftRay.empty + rightRay.empty;
+  let score = 0;
+
+  score += Math.min(36, quietReach * 3);
+  score += Math.min(24, forwardRay.empty * 5);
+
+  if (!forwardRay.blocker) {
+    score += 16;
+  } else if (forwardRay.blocker.side !== piece.side) {
+    score += Math.min(22, Math.round((PIECE_VALUES[forwardRay.blocker.type] ?? 0) * 0.03));
+  } else {
+    score -= 10;
+  }
+
+  if (hasCrossedRiver(piece.side, rank)) score += 10;
+  if (quietReach <= 3) score -= 30;
+  else if (quietReach <= 5) score -= 12;
+
+  const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  if (rank === homeRank && forwardRay.empty <= 1) score -= 10;
+
+  return score;
+}
+
+function rookRayActivity(position, file, rank, fileStep, rankStep) {
+  let targetFile = file + fileStep;
+  let targetRank = rank + rankStep;
+  let empty = 0;
+
+  while (isInside(targetFile, targetRank)) {
+    const occupant = position.board[indexOf(targetFile, targetRank)];
+    if (occupant) {
+      return { empty, blocker: occupant };
+    }
+    empty += 1;
+    targetFile += fileStep;
+    targetRank += rankStep;
+  }
+
+  return { empty, blocker: null };
 }
 
 function countLineBlockers(position, from, to) {
@@ -802,7 +856,8 @@ function readableTerm(term) {
     kingAttack: "pressure on the general",
     pieceSafety: "piece safety",
     coordination: "piece coordination",
-    linePressure: "rook and cannon line pressure"
+    linePressure: "rook and cannon line pressure",
+    rookActivity: "rook activity"
   };
 
   return labels[term] ?? term;
