@@ -1678,6 +1678,8 @@ function createEmptyStats() {
     nullMovePrunes: 0,
     nullMoveVerifications: 0,
     nullMoveVerificationFailures: 0,
+    killerStores: 0,
+    killerHits: 0,
     captureHistoryStores: 0,
     captureHistoryHits: 0,
     captureHistoryMaluses: 0,

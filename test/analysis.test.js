@@ -106,6 +106,7 @@ test("move explanations surface selective-search diagnostics", () => {
     result.stats.ttHits +
     result.stats.qttHits +
     result.stats.evalCacheHits +
+    result.stats.killerHits +
     result.stats.nullMovePrunes +
     result.stats.probCutPrunes +
     result.stats.seePrunes +
@@ -126,6 +127,7 @@ test("move explanations surface selective-search diagnostics", () => {
   assert.match(selectivityFactor.text, /Selective search/);
   assert.match(selectivityFactor.text, /quiescence-table reuse/);
   assert.match(selectivityFactor.text, /evaluation-cache reuse/);
+  assert.match(selectivityFactor.text, /killer-move ordering/);
 });
 
 test("move explanations surface check-evasion ordering diagnostics", () => {

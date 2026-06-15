@@ -424,6 +424,9 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.captureHistoryHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.captureHistoryHits, "capture-history hit"));
   }
+  if ((stats.killerHits ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.killerHits, "killer-move hit"));
+  }
   if ((stats.iidMoveHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.iidMoveHits, "internal-iterative-deepening move hint"));
   }
@@ -464,6 +467,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   if ((stats.qttHits ?? 0) > 0) supports.push("quiescence-table reuse");
   if ((stats.evalCacheHits ?? 0) > 0) supports.push("evaluation-cache reuse");
   if ((stats.captureHistoryHits ?? 0) > 0) supports.push("capture-history ordering");
+  if ((stats.killerHits ?? 0) > 0) supports.push("killer-move ordering");
   if ((stats.iidMoveHits ?? 0) > 0) supports.push("internal iterative deepening");
   if ((stats.continuationHistoryHits ?? 0) > 0) supports.push("continuation-history ordering");
   if ((stats.checkEvasionOrderHits ?? 0) > 0) supports.push("check-evasion ordering");

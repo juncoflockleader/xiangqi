@@ -702,6 +702,33 @@ test("search can order replies with the countermove heuristic", () => {
   assert.equal(disabled.stats.countermoveHits, 0);
 });
 
+test("search orders quiet beta cutoffs with killer moves", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const result = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    exactRootScores: true
+  });
+  const disabled = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    useKillerMoves: false,
+    exactRootScores: true
+  });
+
+  assert.equal(result.depth, 3);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.equal(Math.round(result.score), Math.round(disabled.score));
+  assert.ok(result.stats.killerStores > 0);
+  assert.ok(result.stats.killerHits > 0);
+  assert.equal(disabled.stats.killerStores, 0);
+  assert.equal(disabled.stats.killerHits, 0);
+});
+
 test("search learns capture history for capture ordering", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const result = searchBestMove(position, {

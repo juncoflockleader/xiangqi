@@ -163,6 +163,7 @@ export function searchBestMove(position, options = {}) {
       useNullMove: options.useNullMove !== false,
       useNullMoveVerification: options.useNullMoveVerification !== false,
       usePvs: options.usePvs !== false,
+      useKillerMoves: options.useKillerMoves !== false,
       useCountermoves: options.useCountermoves !== false,
       useContinuationHistory: options.useContinuationHistory !== false,
       useCheckEvasionOrdering: options.useCheckEvasionOrdering !== false,
@@ -815,7 +816,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
         bumpCaptureHistory(context, move, depth * depth * 16);
       } else {
         penalizeFailedQuietMoves(context, searchedQuietMoves, depth * depth, previousMove);
-        rememberKiller(context.killers, ply, move);
+        rememberKiller(context, ply, move);
         rememberCountermove(context, previousMove, move);
         bumpHistory(context.history, move, depth * depth);
         bumpContinuationHistory(context, previousMove, move, depth * depth);
@@ -1033,7 +1034,7 @@ function moveOrderingScore(position, move, principalMove, context, ply, previous
   const next = makeMove(position, move);
   if (isInCheck(next, opponent(position.turn))) score += 40_000;
 
-  if (isKiller(context.killers, ply, move)) score += 25_000;
+  if (killerMoveHit(context, ply, move)) score += 25_000;
   score += context.history.get(moveKey(move)) ?? 0;
 
   return score;
@@ -1385,7 +1386,7 @@ function lateMoveReduction({ depth, index, move, inCheck, givesCheck, extension,
   const historyScore = context.history.get(moveKey(move)) ?? 0;
   if (historyScore > depth * depth) reduction -= 1;
   if (historyScore < -depth * depth) reduction += 1;
-  if (isKiller(context.killers, ply, move)) reduction -= 1;
+  if (isStoredKiller(context, ply, move)) reduction -= 1;
   if (isStoredCountermove(context, previousMove, move)) reduction -= 1;
 
   const maxReduction = Math.max(1, depth - 2);
@@ -1454,7 +1455,7 @@ function shouldPruneLateMove({
   if (inCheck || givesCheck || extension > 0) return false;
   if (move.captured) return false;
   if (alpha <= -MATE_SCORE + 1000 || beta >= MATE_SCORE - 1000) return false;
-  if (isKiller(context.killers, ply, move)) return false;
+  if (isStoredKiller(context, ply, move)) return false;
   if (isStoredCountermove(context, previousMove, move)) return false;
   if ((context.history.get(moveKey(move)) ?? 0) > depth * depth) return false;
   if (continuationHistoryValue(context, previousMove, move) > depth * depth) return false;
@@ -1769,14 +1770,24 @@ function hasNullMoveMaterial(position, side) {
   ));
 }
 
-function rememberKiller(killers, ply, move) {
-  const existing = killers.get(ply) ?? [];
+function rememberKiller(context, ply, move) {
+  if (!context.useKillerMoves) return;
+
+  const existing = context.killers.get(ply) ?? [];
   if (existing.some((candidate) => sameMove(candidate, move))) return;
-  killers.set(ply, [move, ...existing].slice(0, 2));
+  context.killers.set(ply, [move, ...existing].slice(0, 2));
+  context.stats.killerStores += 1;
 }
 
-function isKiller(killers, ply, move) {
-  return (killers.get(ply) ?? []).some((candidate) => sameMove(candidate, move));
+function killerMoveHit(context, ply, move) {
+  if (!isStoredKiller(context, ply, move)) return false;
+  context.stats.killerHits += 1;
+  return true;
+}
+
+function isStoredKiller(context, ply, move) {
+  if (!context.useKillerMoves) return false;
+  return (context.killers.get(ply) ?? []).some((candidate) => sameMove(candidate, move));
 }
 
 function rememberCountermove(context, previousMove, reply) {
@@ -1963,6 +1974,8 @@ function createSearchStats() {
     nullMovePrunes: 0,
     nullMoveVerifications: 0,
     nullMoveVerificationFailures: 0,
+    killerStores: 0,
+    killerHits: 0,
     captureHistoryStores: 0,
     captureHistoryHits: 0,
     captureHistoryMaluses: 0,
@@ -2029,6 +2042,8 @@ function mergeSearchStats(total, next) {
     nullMovePrunes: total.nullMovePrunes + next.nullMovePrunes,
     nullMoveVerifications: total.nullMoveVerifications + next.nullMoveVerifications,
     nullMoveVerificationFailures: total.nullMoveVerificationFailures + next.nullMoveVerificationFailures,
+    killerStores: total.killerStores + next.killerStores,
+    killerHits: total.killerHits + next.killerHits,
     captureHistoryStores: total.captureHistoryStores + next.captureHistoryStores,
     captureHistoryHits: total.captureHistoryHits + next.captureHistoryHits,
     captureHistoryMaluses: total.captureHistoryMaluses + next.captureHistoryMaluses,
