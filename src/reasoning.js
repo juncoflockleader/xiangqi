@@ -442,6 +442,10 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.continuationHistoryHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.continuationHistoryHits, "continuation-history hit"));
   }
+  const continuationReductionAdjustments = (stats.continuationReductionBoosts ?? 0) + (stats.continuationReductionMaluses ?? 0);
+  if (continuationReductionAdjustments > 0) {
+    orderingParts.push(formatCount(continuationReductionAdjustments, "continuation-history LMR adjustment"));
+  }
   if ((stats.checkEvasionOrderHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.checkEvasionOrderHits, "check-evasion ordering hint"));
   }
@@ -478,6 +482,9 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   if ((stats.killerHits ?? 0) > 0) supports.push("killer-move ordering");
   if ((stats.iidMoveHits ?? 0) > 0) supports.push("internal iterative deepening");
   if ((stats.continuationHistoryHits ?? 0) > 0) supports.push("continuation-history ordering");
+  if ((stats.continuationReductionBoosts ?? 0) > 0 || (stats.continuationReductionMaluses ?? 0) > 0) {
+    supports.push("continuation-history reduction tuning");
+  }
   if ((stats.checkEvasionOrderHits ?? 0) > 0) supports.push("check-evasion ordering");
   if ((stats.deepReductions ?? 0) > 0) supports.push("adaptive late-move reductions");
   if ((stats.singularExtensions ?? 0) > 0) supports.push("singular extensions");

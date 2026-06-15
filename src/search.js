@@ -1403,6 +1403,15 @@ function lateMoveReduction({ depth, index, move, inCheck, givesCheck, extension,
   const historyScore = context.history.get(moveKey(move)) ?? 0;
   if (historyScore > depth * depth) reduction -= 1;
   if (historyScore < -depth * depth) reduction += 1;
+  const continuationScore = continuationHistoryValue(context, previousMove, move);
+  if (continuationScore > depth * depth) {
+    reduction -= 1;
+    context.stats.continuationReductionBoosts += 1;
+  }
+  if (continuationScore < -depth * depth) {
+    reduction += 1;
+    context.stats.continuationReductionMaluses += 1;
+  }
   if (isStoredKiller(context, ply, move)) reduction -= 1;
   if (isStoredCountermove(context, previousMove, move)) reduction -= 1;
 
@@ -2025,6 +2034,8 @@ function createSearchStats() {
     countermoveHits: 0,
     continuationHistoryStores: 0,
     continuationHistoryHits: 0,
+    continuationReductionBoosts: 0,
+    continuationReductionMaluses: 0,
     checkEvasionOrderHits: 0,
     checkEvasionCaptures: 0,
     checkEvasionBlocks: 0,
@@ -2098,6 +2109,8 @@ function mergeSearchStats(total, next) {
     countermoveHits: total.countermoveHits + next.countermoveHits,
     continuationHistoryStores: total.continuationHistoryStores + next.continuationHistoryStores,
     continuationHistoryHits: total.continuationHistoryHits + next.continuationHistoryHits,
+    continuationReductionBoosts: total.continuationReductionBoosts + next.continuationReductionBoosts,
+    continuationReductionMaluses: total.continuationReductionMaluses + next.continuationReductionMaluses,
     checkEvasionOrderHits: total.checkEvasionOrderHits + next.checkEvasionOrderHits,
     checkEvasionCaptures: total.checkEvasionCaptures + next.checkEvasionCaptures,
     checkEvasionBlocks: total.checkEvasionBlocks + next.checkEvasionBlocks,

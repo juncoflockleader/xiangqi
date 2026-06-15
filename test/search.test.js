@@ -393,7 +393,7 @@ test("search extends hash moves when alternatives fail singular verification", (
   ]);
   const result = searchBestMove(position, {
     depth: 5,
-    timeLimitMs: 1000,
+    timeLimitMs: 3000,
     transpositionTable: createSeededTable(),
     useAspiration: false,
     useSoftTimeManagement: false,
@@ -402,7 +402,7 @@ test("search extends hash moves when alternatives fail singular verification", (
   });
   const disabled = searchBestMove(position, {
     depth: 5,
-    timeLimitMs: 1000,
+    timeLimitMs: 3000,
     transpositionTable: createSeededTable(),
     useAspiration: false,
     useSoftTimeManagement: false,
@@ -827,6 +827,32 @@ test("search orders quiet replies with continuation history", () => {
   assert.ok(result.stats.continuationHistoryHits > 0);
   assert.equal(disabled.stats.continuationHistoryStores, 0);
   assert.equal(disabled.stats.continuationHistoryHits, 0);
+});
+
+test("search tunes late-move reductions with continuation history", () => {
+  const position = parseFen("4k4/9/9/9/9/9/4P4/9/9/3KR4 r");
+  const result = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    exactRootScores: true
+  });
+  const disabled = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    useContinuationHistory: false,
+    exactRootScores: true
+  });
+
+  assert.equal(result.depth, 6);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.equal(Math.round(result.score), Math.round(disabled.score));
+  assert.ok(result.stats.continuationReductionMaluses > 0);
+  assert.equal(disabled.stats.continuationReductionBoosts, 0);
+  assert.equal(disabled.stats.continuationReductionMaluses, 0);
 });
 
 test("search penalizes failed quiet moves in history ordering", () => {

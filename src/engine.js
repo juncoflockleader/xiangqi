@@ -376,6 +376,8 @@ function maybeBookResult(position, options, tableSize) {
       countermoveHits: 0,
       continuationHistoryStores: 0,
       continuationHistoryHits: 0,
+      continuationReductionBoosts: 0,
+      continuationReductionMaluses: 0,
       checkEvasionOrderHits: 0,
       checkEvasionCaptures: 0,
       checkEvasionBlocks: 0,
