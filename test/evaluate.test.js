@@ -101,3 +101,26 @@ test("evaluation descriptions surface improved piece safety", () => {
   assert.ok(delta.delta.pieceSafety > 0);
   assert.ok(notes.some((note) => note.term === "pieceSafety" && note.text.includes("piece safety")));
 });
+
+test("evaluation rewards connected advanced pawns as pawn structure", () => {
+  const connected = parseFen("4k4/9/9/9/2PP5/4P4/9/9/9/4K4 r");
+  const separated = parseFen("4k4/9/9/9/2P1P4/4P4/9/9/9/4K4 r");
+  const connectedEval = evaluatePosition(connected, SIDES.RED, { detailed: true });
+  const separatedEval = evaluatePosition(separated, SIDES.RED, { detailed: true });
+
+  assert.ok(connectedEval.terms.red.pawnStructure > separatedEval.terms.red.pawnStructure);
+  assert.ok(connectedEval.difference.pawnStructure > separatedEval.difference.pawnStructure);
+});
+
+test("evaluation descriptions surface connected pawn support", () => {
+  const position = parseFen("4k4/9/9/9/2P6/3PP4/9/9/9/4K4 r");
+  const next = applyLegalMove(position, {
+    from: coordToIndex("d5"),
+    to: coordToIndex("d4")
+  });
+  const delta = evaluateMoveDelta(position, next, SIDES.RED);
+  const notes = describeEvaluationTerms(delta.delta);
+
+  assert.ok(delta.delta.pawnStructure > 0);
+  assert.ok(notes.some((note) => note.term === "pawnStructure" && note.text.includes("pawn progress and support")));
+});

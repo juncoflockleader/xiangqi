@@ -59,7 +59,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
 
     terms[piece.side].material += materialValue(piece, square);
     terms[piece.side].placement += placementValue(piece, square);
-    terms[piece.side].pawnStructure += pawnValue(piece, square);
+    terms[piece.side].pawnStructure += pawnValue(position, piece, square);
     terms[piece.side].kingSafety += localDefenseValue(position, piece, square);
     terms[piece.side].coordination += coordinationValue(position, piece, square);
     terms[piece.side].linePressure += linePressureValue(position, piece, square);
@@ -192,15 +192,40 @@ function placementValue(piece, square) {
   }
 }
 
-function pawnValue(piece, square) {
+function pawnValue(position, piece, square) {
   if (piece.type !== PIECES.PAWN) return 0;
 
   const rank = rankOf(square);
   const file = fileOf(square);
   const riverBonus = hasCrossedRiver(piece.side, rank) ? 35 : 0;
   const centralPassedBonus = Math.max(0, 3 - Math.abs(file - 4)) * 8;
+  const supportBonus = pawnSupportValue(position, piece, file, rank);
   const lastRankPenalty = (piece.side === SIDES.RED ? rank === 0 : rank === BOARD_RANKS - 1) ? -18 : 0;
-  return riverBonus + centralPassedBonus + lastRankPenalty;
+  return riverBonus + centralPassedBonus + supportBonus + lastRankPenalty;
+}
+
+function pawnSupportValue(position, piece, file, rank) {
+  let score = 0;
+
+  if (hasCrossedRiver(piece.side, rank)) {
+    for (const neighborFile of [file - 1, file + 1]) {
+      if (!isFriendlyPawn(position, piece.side, neighborFile, rank)) continue;
+      score += 18;
+    }
+  }
+
+  const supportRank = rank - forwardDelta(piece.side);
+  if (isFriendlyPawn(position, piece.side, file, supportRank)) {
+    score += hasCrossedRiver(piece.side, rank) ? 14 : 8;
+  }
+
+  return score;
+}
+
+function isFriendlyPawn(position, side, file, rank) {
+  if (!isInside(file, rank)) return false;
+  const piece = position.board[indexOf(file, rank)];
+  return piece?.side === side && piece.type === PIECES.PAWN;
 }
 
 function coordinationValue(position, piece, square) {
@@ -612,7 +637,7 @@ function readableTerm(term) {
     placement: "piece placement",
     mobility: "mobility",
     threats: "tactical pressure",
-    pawnStructure: "pawn progress",
+    pawnStructure: "pawn progress and support",
     kingSafety: "king safety",
     kingAttack: "pressure on the general",
     pieceSafety: "piece safety",
