@@ -363,6 +363,8 @@ function maybeBookResult(position, options, tableSize) {
       reductionPlies: 0,
       deepReductions: 0,
       lmrResearches: 0,
+      pvReductionGuards: 0,
+      cutNodeReductionBoosts: 0,
       improvingNodes: 0,
       nonImprovingNodes: 0,
       stableEvalTrendNodes: 0,

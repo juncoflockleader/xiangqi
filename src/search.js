@@ -203,6 +203,7 @@ export function searchBestMove(position, options = {}) {
       useLateMovePruning: options.useLateMovePruning !== false,
       useLateMoveReductions: options.useLateMoveReductions !== false,
       useAdaptiveLmr: options.useAdaptiveLmr !== false,
+      useNodeTypeReductions: options.useNodeTypeReductions !== false,
       useImprovingHeuristics: options.useImprovingHeuristics !== false,
       useProbCut: options.useProbCut !== false,
       useInternalIterativeDeepening: options.useInternalIterativeDeepening !== false,
@@ -781,6 +782,8 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       context,
       ply,
       previousMove,
+      alpha,
+      beta,
       staticTrend
     });
     if (reduction > 0) {
@@ -1589,6 +1592,8 @@ function lateMoveReduction({
   context,
   ply,
   previousMove,
+  alpha,
+  beta,
   staticTrend
 }) {
   if (!context.useLateMoveReductions) return 0;
@@ -1617,6 +1622,16 @@ function lateMoveReduction({
   }
   if (isStoredKiller(context, ply, move)) reduction -= 1;
   if (isStoredCountermove(context, previousMove, move)) reduction -= 1;
+
+  if (context.useNodeTypeReductions) {
+    if (beta - alpha > 1 && reduction > 0) {
+      reduction -= 1;
+      context.stats.pvReductionGuards += 1;
+    } else if (beta - alpha === 1 && depth >= 4 && index >= LMR_BASE_MOVE_INDEX + 4 && !isImprovingTrend(staticTrend)) {
+      reduction += 1;
+      context.stats.cutNodeReductionBoosts += 1;
+    }
+  }
 
   if (isImprovingTrend(staticTrend) && reduction > 0) {
     reduction -= 1;
@@ -2319,6 +2334,8 @@ function createSearchStats() {
     reductionPlies: 0,
     deepReductions: 0,
     lmrResearches: 0,
+    pvReductionGuards: 0,
+    cutNodeReductionBoosts: 0,
     improvingNodes: 0,
     nonImprovingNodes: 0,
     stableEvalTrendNodes: 0,
@@ -2409,6 +2426,8 @@ function mergeSearchStats(total, next) {
     reductionPlies: total.reductionPlies + next.reductionPlies,
     deepReductions: total.deepReductions + next.deepReductions,
     lmrResearches: total.lmrResearches + next.lmrResearches,
+    pvReductionGuards: total.pvReductionGuards + next.pvReductionGuards,
+    cutNodeReductionBoosts: total.cutNodeReductionBoosts + next.cutNodeReductionBoosts,
     improvingNodes: total.improvingNodes + next.improvingNodes,
     nonImprovingNodes: total.nonImprovingNodes + next.nonImprovingNodes,
     stableEvalTrendNodes: total.stableEvalTrendNodes + next.stableEvalTrendNodes,

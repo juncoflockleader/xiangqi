@@ -232,6 +232,7 @@ test("move explanations surface continuation-history reduction tuning", () => {
     useAspiration: false,
     useSoftTimeManagement: false,
     useRootScoreOrdering: false,
+    useNodeTypeReductions: false,
     exactRootScores: true
   });
   const selectivityFactor = result.explanation.confidence.factors
@@ -265,6 +266,25 @@ test("move explanations surface improving-position search tuning", () => {
   assert.ok(result.explanation.reasons.some((reason) => reason.includes("improving-position")));
   assert.ok(selectivityFactor);
   assert.match(selectivityFactor.text, /improving-position search tuning/);
+});
+
+test("move explanations surface node-type LMR tuning", () => {
+  const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
+  const engine = createEngine({ depth: 4, timeLimitMs: 5000 });
+  const result = engine.chooseMove(position, {
+    useBook: false,
+    depth: 4,
+    timeLimitMs: 5000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  });
+  const selectivityFactor = result.explanation.confidence.factors
+    .find((factor) => factor.kind === "selectivity");
+
+  assert.ok(result.stats.pvReductionGuards > 0);
+  assert.ok(result.explanation.reasons.some((reason) => reason.includes("node-type LMR")));
+  assert.ok(selectivityFactor);
+  assert.match(selectivityFactor.text, /node-type LMR tuning/);
 });
 
 test("move explanations surface bad-history pruning diagnostics", () => {

@@ -461,6 +461,10 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.deepReductions ?? 0) > 0) {
     orderingParts.push(formatCount(stats.deepReductions, "deeper adaptive late-move reduction"));
   }
+  const nodeTypeReductionAdjustments = (stats.pvReductionGuards ?? 0) + (stats.cutNodeReductionBoosts ?? 0);
+  if (nodeTypeReductionAdjustments > 0) {
+    orderingParts.push(formatCount(nodeTypeReductionAdjustments, "node-type LMR adjustment"));
+  }
   const improvingAdjustments = (
     (stats.improvingReductionGuards ?? 0) +
     (stats.nonImprovingReductionBoosts ?? 0) +
@@ -522,6 +526,9 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   }
   if ((stats.checkEvasionOrderHits ?? 0) > 0) supports.push("check-evasion ordering");
   if ((stats.deepReductions ?? 0) > 0) supports.push("adaptive late-move reductions");
+  if ((stats.pvReductionGuards ?? 0) > 0 || (stats.cutNodeReductionBoosts ?? 0) > 0) {
+    supports.push("node-type LMR tuning");
+  }
   if (
     (stats.improvingReductionGuards ?? 0) > 0 ||
     (stats.nonImprovingReductionBoosts ?? 0) > 0 ||
