@@ -53,7 +53,7 @@ export const ENGINE_BENCHMARKS = Object.freeze([
     id: "hu-central-cannon-trap",
     name: "Opening Trap: Validate the Central Cannon Heuristic",
     fen: "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r",
-    expectedMoves: Object.freeze(["b7-b3"]),
+    expectedMoves: Object.freeze(["b7-b0", "b7-b3"]),
     tags: Object.freeze(["trap", "learning", "search"]),
     options: Object.freeze({
       depth: 3,

@@ -13,6 +13,7 @@ import {
   indexOf,
   isInside,
   opponent,
+  palaceContains,
   rankOf
 } from "./board.js";
 import { generatePseudoMoves, isInCheck } from "./movegen.js";
@@ -25,6 +26,16 @@ const MOBILITY_WEIGHTS = Object.freeze({
   [PIECES.ROOK]: 5,
   [PIECES.CANNON]: 4,
   [PIECES.PAWN]: 2
+});
+
+const KING_ATTACK_WEIGHTS = Object.freeze({
+  [PIECES.KING]: 0,
+  [PIECES.ADVISOR]: 0,
+  [PIECES.ELEPHANT]: 0,
+  [PIECES.HORSE]: 16,
+  [PIECES.ROOK]: 22,
+  [PIECES.CANNON]: 18,
+  [PIECES.PAWN]: 14
 });
 
 export function evaluatePosition(position, perspective = position.turn, options = {}) {
@@ -49,6 +60,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     const pseudoMoves = generatePseudoMoves(position, side);
     terms[side].mobility += mobilityValue(pseudoMoves);
     terms[side].threats += threatValue(pseudoMoves);
+    terms[side].kingAttack += kingAttackValue(position, side, pseudoMoves);
     terms[side].kingSafety += globalKingSafety(position, side);
 
     if (isInCheck(position, opponent(side))) {
@@ -113,6 +125,7 @@ function createTerms() {
     threats: 0,
     pawnStructure: 0,
     kingSafety: 0,
+    kingAttack: 0,
     coordination: 0,
     linePressure: 0
   };
@@ -289,6 +302,46 @@ function threatValue(moves) {
   return score;
 }
 
+function kingAttackValue(position, side, pseudoMoves) {
+  const enemy = opponent(side);
+  const enemyKingSquare = position.board.findIndex((piece) => piece?.side === enemy && piece.type === PIECES.KING);
+  if (enemyKingSquare === -1) return 0;
+
+  const kingFile = fileOf(enemyKingSquare);
+  const kingRank = rankOf(enemyKingSquare);
+  const attackedPalaceSquares = new Set();
+  const attackers = new Set();
+  let score = 0;
+
+  for (const move of pseudoMoves) {
+    const targetFile = fileOf(move.to);
+    const targetRank = rankOf(move.to);
+    if (!palaceContains(enemy, targetFile, targetRank)) continue;
+
+    const pieceWeight = KING_ATTACK_WEIGHTS[move.piece.type] ?? 0;
+    if (pieceWeight <= 0) continue;
+
+    const distance = Math.abs(targetFile - kingFile) + Math.abs(targetRank - kingRank);
+    const proximity = Math.max(0, 10 - distance * 3);
+
+    score += pieceWeight + proximity;
+    attackedPalaceSquares.add(move.to);
+    attackers.add(move.from);
+
+    if (move.to === enemyKingSquare) score += 60;
+    if (move.captured) {
+      score += Math.min(40, PIECE_VALUES[move.captured.type] * 0.05);
+    }
+  }
+
+  if (score === 0) return 0;
+
+  score += Math.max(0, attackedPalaceSquares.size - 1) * 5;
+  score += Math.max(0, attackers.size - 1) * 10;
+  score += Math.max(0, 4 - countGuards(position, enemy)) * 5;
+  return score;
+}
+
 function globalKingSafety(position, side) {
   const kingSquare = position.board.findIndex((piece) => piece?.side === side && piece.type === PIECES.KING);
   if (kingSquare === -1) return -20000;
@@ -349,6 +402,7 @@ function readableTerm(term) {
     threats: "tactical pressure",
     pawnStructure: "pawn progress",
     kingSafety: "king safety",
+    kingAttack: "pressure on the general",
     coordination: "piece coordination",
     linePressure: "rook and cannon line pressure"
   };

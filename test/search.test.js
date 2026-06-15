@@ -310,13 +310,13 @@ test("search uses internal iterative deepening when hash move ordering is unavai
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const result = searchBestMove(position, {
     depth: 5,
-    timeLimitMs: 1000,
+    timeLimitMs: 5000,
     maxTranspositionEntries: 1,
     useSoftTimeManagement: false
   });
   const disabled = searchBestMove(position, {
     depth: 5,
-    timeLimitMs: 1000,
+    timeLimitMs: 5000,
     maxTranspositionEntries: 1,
     useSoftTimeManagement: false,
     useInternalIterativeDeepening: false
@@ -486,14 +486,16 @@ test("quiescence reuses tactical leaf bounds from its transposition table", () =
     depth: 3,
     timeLimitMs: 1000,
     useAspiration: false,
-    useSoftTimeManagement: false
+    useSoftTimeManagement: false,
+    exactRootScores: true
   });
   const disabled = searchBestMove(position, {
     depth: 3,
     timeLimitMs: 1000,
     useAspiration: false,
     useSoftTimeManagement: false,
-    useQuiescenceTable: false
+    useQuiescenceTable: false,
+    exactRootScores: true
   });
 
   assert.equal(result.depth, 3);

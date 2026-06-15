@@ -55,3 +55,26 @@ test("evaluation descriptions surface cannon screen creation as line pressure", 
   assert.ok(delta.delta.linePressure > 0);
   assert.ok(notes.some((note) => note.term === "linePressure" && note.text.includes("line pressure")));
 });
+
+test("evaluation rewards attacks into the enemy palace", () => {
+  const attacking = parseFen("4k4/9/4H4/9/9/4P4/9/9/9/4K4 r");
+  const passive = parseFen("4k4/9/9/9/9/H3P4/9/9/9/4K4 r");
+  const attackingEval = evaluatePosition(attacking, SIDES.RED, { detailed: true });
+  const passiveEval = evaluatePosition(passive, SIDES.RED, { detailed: true });
+
+  assert.ok(attackingEval.terms.red.kingAttack > passiveEval.terms.red.kingAttack);
+  assert.ok(attackingEval.difference.kingAttack > passiveEval.difference.kingAttack);
+});
+
+test("evaluation descriptions surface pressure on the general", () => {
+  const position = parseFen("4k4/9/9/H8/9/4P4/9/9/9/4K4 r");
+  const next = applyLegalMove(position, {
+    from: coordToIndex("a3"),
+    to: coordToIndex("c2")
+  });
+  const delta = evaluateMoveDelta(position, next, SIDES.RED);
+  const notes = describeEvaluationTerms(delta.delta);
+
+  assert.ok(delta.delta.kingAttack > 0);
+  assert.ok(notes.some((note) => note.term === "kingAttack" && note.text.includes("pressure on the general")));
+});
