@@ -1,4 +1,5 @@
 import { moveToNotation, toFen } from "./board.js";
+import { lineToChineseNotation, moveToChineseNotation } from "./chinese-notation.js";
 import { summarizeAlternativeEvidence, summarizeComparisonEvidence, summarizeLinePlanEvidence } from "./explanation-artifacts.js";
 import { summarizePlanComparisonEvidence } from "./plan-comparison.js";
 import { practiceFocusFromReview } from "./practice.js";
@@ -99,7 +100,9 @@ export async function studyPositionWithBackend(backend, position, options = {}) 
   });
 }
 
-export function formatPositionStudy(study) {
+export function formatPositionStudy(study, options = {}) {
+  if (normalizeLocale(options.locale) === "zh") return formatPositionStudyZh(study);
+
   const lines = [
     `Position study: ${capitalize(study.side)} to move${study.bestMove ? `, best ${study.bestMove}` : ""}`,
     study.summary
@@ -176,14 +179,96 @@ export function formatPositionStudy(study) {
   return lines.join("\n");
 }
 
+function formatPositionStudyZh(study) {
+  const best = study.zhBestMove ?? study.bestMove;
+  const lines = [
+    `局面研習：${sideNameZh(study.side)}走棋${best ? `，最佳 ${best}` : ""}`,
+    study.zhSummary ?? study.summary
+  ];
+
+  if (study.playedMoveReview) {
+    const review = study.playedMoveReview;
+    lines.push(`覆盤：${review.zhMove ?? review.move} 為 ${classificationZh(review.classification)}，損失 ${review.centipawnLoss} cp；最佳 ${review.zhBestMove ?? review.bestMove}。`);
+    if (review.planComparison?.summary) {
+      lines.push(`計畫比較：${review.planComparison.summary}`);
+    }
+  }
+
+  if (study.practiceFocus) {
+    lines.push(`練習：${study.practiceFocus.title} - ${study.practiceFocus.text}`);
+  }
+
+  if (study.oracleReview) {
+    lines.push(`強引擎覆核：${study.oracleReview.verdict}`);
+  }
+
+  if (study.oracleDisagreement) {
+    const move = study.oracleDisagreement.zhMove ?? study.oracleDisagreement.move;
+    const bestMove = study.oracleDisagreement.zhBestMove ?? study.oracleDisagreement.bestMove;
+    lines.push(`強引擎修正：${move} 落後 ${bestMove} ${study.oracleDisagreement.centipawnLoss} cp（${classificationZh(study.oracleDisagreement.classification)}）。`);
+  }
+
+  if (study.searchDisagreement) {
+    lines.push(`搜索校驗：${study.searchDisagreement.zhSearchMove ?? study.searchDisagreement.searchMove} 是淺層搜索首選，${study.searchDisagreement.zhOpeningMove ?? study.searchDisagreement.openingMove} 是開局庫選擇。`);
+  }
+
+  if (study.decision?.linePlan?.zhSummary) {
+    lines.push(`計畫：${study.decision.linePlan.zhSummary}`);
+  } else if (study.decision?.linePlan?.summary) {
+    lines.push(`計畫：${study.decision.linePlan.summary}`);
+  }
+
+  const openingCandidates = study.openingCandidates ?? [];
+  if (openingCandidates.length > 0) {
+    lines.push("開局候選：");
+    for (const candidate of openingCandidates.slice(0, 5)) {
+      lines.push(`  ${candidate.rank}. ${candidate.zhMove ?? candidate.move} (${candidate.scoreText}) - ${candidate.name}`);
+    }
+  }
+
+  if (study.hints.length > 0) {
+    lines.push("提示：");
+    for (const hint of study.hints.slice(0, 4)) {
+      lines.push(`  ${hint.level}. ${hint.title}: ${hint.text}`);
+    }
+  }
+
+  if (study.candidateLines.length > 0) {
+    lines.push("候選著法：");
+    for (const line of study.candidateLines.slice(0, 5)) {
+      lines.push(`  ${line.rank}. ${line.zhMove ?? line.move} (${line.scoreText}，損失 ${line.centipawnLoss} cp)`);
+    }
+  }
+
+  if (study.decision?.comparison?.reason) {
+    lines.push(`比較：${study.decision.comparison.reason}`);
+  }
+
+  if (study.decision?.alternatives?.length > 0) {
+    lines.push("決策候選：");
+    for (const alternative of study.decision.alternatives.slice(0, 5)) {
+      const verdict = verdictZh(alternative.verdict);
+      const loss = Number.isFinite(alternative.centipawnLoss)
+        ? `，損失 ${alternative.centipawnLoss} cp`
+        : "";
+      lines.push(`  ${alternative.rank}. ${alternative.zhMove ?? alternative.move} (${alternative.scoreText}，${verdict}${loss})`);
+      if (alternative.planComparison?.summary) {
+        lines.push(`     為何不選：${alternative.planComparison.summary}`);
+      }
+    }
+  }
+
+  return lines.join("\n");
+}
+
 function buildPositionStudy(position, parts) {
-  const decision = parts.decision ? summarizeDecision(parts.decision) : null;
-  const candidateLines = summarizeCandidateLines(parts.analysis);
-  const coach = summarizeCoach(parts.coach);
-  const openingCandidates = summarizeOpeningCandidates(decision, coach);
+  const decision = parts.decision ? summarizeDecision(parts.decision, position) : null;
+  const candidateLines = summarizeCandidateLines(parts.analysis, position);
+  const coach = summarizeCoach(parts.coach, position);
+  const openingCandidates = summarizeOpeningCandidates(decision, coach, position);
   const searchDisagreement = summarizeSearchDisagreement(decision, candidateLines);
-  const playedMoveReview = parts.review ? summarizeReview(parts.review) : null;
-  const pressure = parts.pressure ? summarizePressure(parts.pressure) : null;
+  const playedMoveReview = parts.review ? summarizeReview(parts.review, position) : null;
+  const pressure = parts.pressure ? summarizePressure(parts.pressure, position) : null;
   const practiceFocus = playedMoveReview
     ? playedMoveReview.practiceFocus ?? practiceFocusFromReview(playedMoveReview)
     : null;
@@ -191,15 +276,23 @@ function buildPositionStudy(position, parts) {
     ?? candidateLines[0]?.move
     ?? coach?.bestMove
     ?? null;
+  const zhBestMove = decision?.zhBestMove
+    ?? candidateLines[0]?.zhMove
+    ?? coach?.zhBestMove
+    ?? chineseNotationFor(position, bestMove);
   const oracleReview = decision?.oracleReview ?? playedMoveReview?.oracleReview ?? null;
-  const oracleDisagreement = summarizeOracleDisagreement(oracleReview);
+  const oracleDisagreement = summarizeOracleDisagreement(oracleReview, position);
+  const summary = summarizeStudy({ side: position.turn, bestMove, decision, playedMoveReview, oracleReview });
+  const zhSummary = summarizeStudyZh({ side: position.turn, bestMove, zhBestMove, decision, playedMoveReview, oracleReview });
 
   return {
     type: "position-study",
     side: position.turn,
     fen: toFen(position),
     bestMove,
-    summary: summarizeStudy({ side: position.turn, bestMove, decision, playedMoveReview, oracleReview }),
+    zhBestMove,
+    summary,
+    zhSummary,
     decision,
     candidateLines,
     openingCandidates,
@@ -211,15 +304,18 @@ function buildPositionStudy(position, parts) {
     practiceFocus,
     oracleReview,
     oracleDisagreement,
-    nextSteps: nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceFocus, oracleDisagreement, searchDisagreement })
+    nextSteps: nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceFocus, oracleDisagreement, searchDisagreement }),
+    zhNextSteps: nextStudyStepsZh({ decision, coach, playedMoveReview, pressure, practiceFocus, oracleDisagreement, searchDisagreement })
   };
 }
 
-function summarizeDecision(decision) {
+function summarizeDecision(decision, position) {
+  const principalVariation = (decision.principalVariation ?? []).map(notationFor).filter(Boolean);
   return {
     source: decision.source ?? "search",
     bestMove: notationFor(decision.bestMove),
     ponderMove: notationFor(decision.ponderMove) ?? decision.explanation?.search?.ponderMove ?? null,
+    zhBestMove: chineseNotationFor(position, decision.bestMove),
     score: Math.round(decision.score ?? 0),
     scoreDetail: scoreDetailFor(decision),
     scoreText: scoreTextFor(decision),
@@ -229,36 +325,40 @@ function summarizeDecision(decision) {
     summary: decision.explanation?.summary ?? "",
     reasons: [...(decision.explanation?.reasons ?? [])],
     confidence: decision.explanation?.confidence ?? null,
-    linePlan: decision.explanation?.linePlan ?? null,
+    linePlan: annotateLinePlan(position, decision.explanation?.linePlan),
     comparison: summarizeComparisonEvidence(decision.explanation?.comparison),
-    alternatives: summarizeAlternativeEvidence(decision.explanation?.alternatives),
-    principalVariation: (decision.principalVariation ?? []).map(notationFor).filter(Boolean),
+    alternatives: annotateAlternatives(position, summarizeAlternativeEvidence(decision.explanation?.alternatives)),
+    principalVariation,
+    zhPrincipalVariation: chineseLineFor(position, principalVariation),
     oracleReview: decision.oracleReview ?? decision.explanation?.oracleReview ?? null,
     backendFallback: decision.backendFallback ?? null
   };
 }
 
-function summarizeCandidateLines(analysis) {
+function summarizeCandidateLines(analysis, position) {
   return (analysis?.lines ?? []).map((line) => ({
     rank: line.rank,
     move: notationFor(line.move),
+    zhMove: chineseNotationFor(position, line.move),
     score: Math.round(line.score ?? 0),
     scoreDetail: scoreDetailFor(line),
     scoreText: scoreTextFor(line),
     wdl: line.wdl ?? null,
     centipawnLoss: Math.round(line.centipawnLoss ?? 0),
     principalVariation: [...(line.principalVariation ?? [])],
+    zhPrincipalVariation: chineseLineFor(position, line.principalVariation ?? []),
     summary: line.explanation?.summary ?? "",
     reasons: [...(line.explanation?.reasons ?? [])],
-    linePlan: line.explanation?.linePlan ?? null
+    linePlan: annotateLinePlan(position, line.explanation?.linePlan)
   }));
 }
 
-function summarizeOpeningCandidates(decision, coach) {
+function summarizeOpeningCandidates(decision, coach, position) {
   if (coach?.source?.startsWith("opening") && coach.alternatives?.length > 0) {
     return coach.alternatives.map((alternative) => ({
       rank: alternative.rank,
       move: alternative.move,
+      zhMove: alternative.zhMove ?? chineseNotationFor(position, alternative.move),
       score: Math.round(alternative.score ?? 0),
       scoreDetail: alternative.scoreDetail ?? null,
       scoreText: alternative.scoreText ?? scoreTextFor(alternative),
@@ -276,6 +376,7 @@ function summarizeOpeningCandidates(decision, coach) {
   return (decision.alternatives ?? []).map((alternative) => ({
     rank: alternative.rank,
     move: alternative.move,
+    zhMove: alternative.zhMove ?? chineseNotationFor(position, alternative.move),
     score: Math.round(alternative.score ?? 0),
     scoreDetail: alternative.scoreDetail ?? null,
     scoreText: alternative.scoreText ?? scoreTextFor(alternative),
@@ -297,10 +398,12 @@ function summarizeSearchDisagreement(decision, candidateLines) {
   return {
     kind: "opening-vs-search",
     openingMove: decision.bestMove,
+    zhOpeningMove: decision.zhBestMove ?? null,
     openingSource: decision.source,
     openingScore: decision.score,
     openingScoreText: decision.scoreText,
     searchMove: topSearch.move,
+    zhSearchMove: topSearch.zhMove ?? null,
     searchScore: topSearch.score,
     searchScoreText: topSearch.scoreText,
     searchSummary: topSearch.summary,
@@ -308,32 +411,37 @@ function summarizeSearchDisagreement(decision, candidateLines) {
   };
 }
 
-function summarizeCoach(coach) {
+function summarizeCoach(coach, position) {
   if (!coach) return null;
+  const principalVariation = [...(coach.principalVariation ?? [])];
   return {
     source: coach.source ?? "search",
     bestMove: notationFor(coach.bestMove),
+    zhBestMove: chineseNotationFor(position, coach.bestMove),
     score: Math.round(coach.score ?? 0),
     scoreDetail: scoreDetailFor(coach),
     scoreText: scoreTextFor(coach),
     wdl: coach.wdl ?? null,
     summary: coach.summary,
     levels: (coach.levels ?? []).map((level) => ({ ...level })),
-    alternatives: (coach.alternatives ?? []).map((alternative) => ({
+    alternatives: annotateAlternatives(position, (coach.alternatives ?? []).map((alternative) => ({
       ...alternative,
       move: notationFor(alternative.move),
       scoreDetail: scoreDetailFor(alternative),
       scoreText: scoreTextFor(alternative),
       wdl: alternative.wdl ?? alternative.native?.wdl ?? null
-    })),
-    principalVariation: [...(coach.principalVariation ?? [])]
+    }))),
+    principalVariation,
+    zhPrincipalVariation: chineseLineFor(position, principalVariation)
   };
 }
 
-function summarizeReview(review) {
+function summarizeReview(review, position) {
   return {
     move: notationFor(review.move),
     bestMove: notationFor(review.bestMove),
+    zhMove: chineseNotationFor(position, review.move),
+    zhBestMove: chineseNotationFor(position, review.bestMove),
     classification: review.classification,
     centipawnLoss: Math.round(review.centipawnLoss ?? 0),
     isBestMove: Boolean(review.isBestMove),
@@ -345,11 +453,11 @@ function summarizeReview(review) {
     bestScoreDetail: scoreDetailFor(review.bestAnalysis),
     bestScoreText: scoreTextFor(review.bestAnalysis ?? { score: review.bestScore }),
     bestWdl: review.bestAnalysis?.wdl ?? null,
-    playedLinePlan: summarizeLinePlanEvidence(review.playedLinePlan),
-    bestLinePlan: summarizeLinePlanEvidence(review.bestLinePlan ?? review.bestExplanation?.linePlan ?? review.bestAnalysis?.explanation?.linePlan),
+    playedLinePlan: annotateLinePlan(position, review.playedLinePlan),
+    bestLinePlan: annotateLinePlan(position, review.bestLinePlan ?? review.bestExplanation?.linePlan ?? review.bestAnalysis?.explanation?.linePlan),
     planComparison: summarizePlanComparisonEvidence(review.planComparison),
     bestComparison: summarizeComparisonEvidence(review.bestComparison ?? review.bestAnalysis?.explanation?.comparison),
-    bestAlternatives: summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives),
+    bestAlternatives: annotateAlternatives(position, summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives)),
     depth: review.depth ?? 0,
     nodes: review.nodes ?? 0,
     summary: review.explanation?.summary ?? "",
@@ -357,12 +465,13 @@ function summarizeReview(review) {
     mistakes: review.mistakes ?? null,
     practiceFocus: review.practiceFocus ?? null,
     principalVariation: [...(review.principalVariation ?? [])],
+    zhPrincipalVariation: chineseLineFor(position, review.principalVariation ?? []),
     oracleReview: review.oracleReview ?? null,
     reviewBackend: review.reviewBackend ?? null
   };
 }
 
-function summarizeOracleDisagreement(oracleReview) {
+function summarizeOracleDisagreement(oracleReview, position) {
   if (oracleReview?.status !== "reviewed" || oracleReview.isBestMove) return null;
   if (!oracleReview.move || !oracleReview.bestMove) return null;
 
@@ -370,6 +479,8 @@ function summarizeOracleDisagreement(oracleReview) {
     kind: "oracle-disagreement",
     move: oracleReview.move,
     bestMove: oracleReview.bestMove,
+    zhMove: chineseNotationFor(position, oracleReview.move),
+    zhBestMove: chineseNotationFor(position, oracleReview.bestMove),
     classification: oracleReview.classification ?? "review",
     centipawnLoss: Math.round(oracleReview.centipawnLoss ?? 0),
     backend: oracleReview.backend ?? null,
@@ -380,18 +491,19 @@ function summarizeOracleDisagreement(oracleReview) {
   };
 }
 
-function summarizePressure(pressure) {
+function summarizePressure(pressure, position) {
   return {
     side: pressure.side,
     inCheck: Boolean(pressure.inCheck),
-    threats: pressure.threats.map(summarizeThreat),
-    opponentThreats: pressure.opponentThreats.map(summarizeThreat)
+    threats: pressure.threats.map((threat) => summarizeThreat(threat, position)),
+    opponentThreats: pressure.opponentThreats.map((threat) => summarizeThreat(threat, position))
   };
 }
 
-function summarizeThreat(threat) {
+function summarizeThreat(threat, position) {
   return {
     move: threat.notation,
+    zhMove: chineseNotationFor(position, threat.notation),
     score: threat.score,
     givesCheck: threat.givesCheck,
     isMate: threat.isMate,
@@ -416,6 +528,135 @@ function summarizeStudy({ side, bestMove, decision, playedMoveReview, oracleRevi
     return `${bestMove} is the candidate move, but the oracle prefers ${oracleReview.bestMove}${loss}.`;
   }
   return decision?.summary ?? `${bestMove} is the recommended move for ${side}.`;
+}
+
+function summarizeStudyZh({ side, bestMove, zhBestMove, decision, playedMoveReview, oracleReview }) {
+  const best = zhBestMove ?? bestMove;
+  if (playedMoveReview) {
+    const played = playedMoveReview.zhMove ?? playedMoveReview.move;
+    if (playedMoveReview.isBestMove) {
+      return `${played} 是${sideNameZh(side)}的最佳著法；本局面仍建議 ${best}。`;
+    }
+    return `${played} 為 ${classificationZh(playedMoveReview.classification)}；建議改走 ${best}。`;
+  }
+
+  if (!bestMove) return `${sideNameZh(side)}無合法著法。`;
+  if (oracleReview?.status === "reviewed" && !oracleReview.isBestMove) {
+    const loss = Number.isFinite(oracleReview.centipawnLoss)
+      ? ` ${Math.round(oracleReview.centipawnLoss)} cp`
+      : "";
+    const oracleBest = decision?.oracleReview?.zhBestMove ?? oracleReview.bestMove;
+    return `${best} 是候選著法，但強引擎更偏好 ${oracleBest}${loss ? `，差距${loss}` : ""}。`;
+  }
+
+  const source = decision?.source?.startsWith("opening") ? "開局庫" : "搜索";
+  const score = Number.isFinite(decision?.score) ? `，評分 ${decision.scoreText ?? formatCentipawns(decision.score)}` : "";
+  return `${source}建議 ${best}${score}。`;
+}
+
+function annotateAlternatives(position, alternatives = []) {
+  return alternatives.map((alternative) => {
+    const line = [alternative.move, alternative.expectedReply].filter(Boolean);
+    const zhLine = chineseLineFor(position, line);
+    return {
+      ...alternative,
+      zhMove: zhLine[0] ?? chineseNotationFor(position, alternative.move),
+      zhExpectedReply: zhLine[1] ?? null,
+      zhPrincipalVariation: chineseLineFor(position, alternative.principalVariation ?? [])
+    };
+  });
+}
+
+function annotateLinePlan(position, linePlan) {
+  const summary = summarizeLinePlanEvidence(linePlan);
+  if (!summary) return null;
+
+  const line = [
+    summary.firstMove,
+    summary.expectedReply,
+    ...(summary.continuation ?? [])
+  ].filter(Boolean);
+  const zhLine = chineseLineFor(position, line);
+
+  return {
+    ...summary,
+    zhFirstMove: zhLine[0] ?? null,
+    zhExpectedReply: zhLine[1] ?? null,
+    zhContinuation: zhLine.slice(2),
+    zhMoves: (summary.moves ?? []).map((move, index) => ({
+      ...move,
+      zhNotation: zhLine[index] ?? null
+    })),
+    zhSummary: summarizeLinePlanZh(summary, zhLine)
+  };
+}
+
+function summarizeLinePlanZh(linePlan, zhLine) {
+  if (!linePlan || zhLine.length === 0) return "";
+  const [first, reply, ...rest] = zhLine;
+  const motifs = linePlan.motifs?.length ? `；主題：${linePlan.motifs.join("、")}` : "";
+  const replyText = reply ? `，預期應手 ${reply}` : "";
+  const continuation = rest.length > 0 ? `，後續 ${rest.join(" ")}` : "";
+  return `先走 ${first}${replyText}${continuation}${motifs}。`;
+}
+
+function nextStudyStepsZh({ decision, coach, playedMoveReview, pressure, practiceFocus, oracleDisagreement, searchDisagreement }) {
+  const steps = [];
+  if (playedMoveReview && !playedMoveReview.isBestMove) {
+    steps.push({
+      kind: "correction",
+      text: `比較 ${playedMoveReview.zhMove ?? playedMoveReview.move} 與 ${playedMoveReview.zhBestMove ?? playedMoveReview.bestMove}。`
+    });
+  }
+  if (practiceFocus) {
+    steps.push({
+      kind: "practice",
+      text: practiceFocus.text,
+      focus: practiceFocus
+    });
+  }
+  if (oracleDisagreement && !playedMoveReview) {
+    const backend = oracleDisagreement.backend?.name ?? "Oracle";
+    steps.push({
+      kind: "oracle-disagreement",
+      text: `${backend} 較偏好 ${oracleDisagreement.zhBestMove ?? oracleDisagreement.bestMove}，而不是 ${oracleDisagreement.zhMove ?? oracleDisagreement.move}（${oracleDisagreement.centipawnLoss} cp，${classificationZh(oracleDisagreement.classification)}）。`,
+      ref: "oracle-review",
+      oracleDisagreement
+    });
+  }
+  if (searchDisagreement && !playedMoveReview) {
+    steps.push({
+      kind: "opening-search-check",
+      text: `比較開局庫 ${searchDisagreement.zhOpeningMove ?? searchDisagreement.openingMove} 與搜索候選 ${searchDisagreement.zhSearchMove ?? searchDisagreement.searchMove}。`,
+      ref: "search-disagreement",
+      searchDisagreement
+    });
+  }
+  if (coach?.levels?.[0]) {
+    steps.push({
+      kind: "hint",
+      text: coach.levels[0].text
+    });
+  }
+  if (pressure?.opponentThreats?.[0]) {
+    steps.push({
+      kind: "danger",
+      text: pressure.opponentThreats[0].summary
+    });
+  }
+  if (decision?.linePlan?.zhSummary) {
+    steps.push({
+      kind: "line",
+      text: decision.linePlan.zhSummary
+    });
+  }
+  if (decision?.comparison?.reason) {
+    steps.push({
+      kind: "comparison",
+      text: decision.comparison.reason
+    });
+  }
+  return steps.slice(0, 4);
 }
 
 function nextStudySteps({ decision, coach, playedMoveReview, pressure, practiceFocus, oracleDisagreement, searchDisagreement }) {
@@ -516,6 +757,54 @@ function scoreDetailFor(entry) {
 
 function scoreTextFor(entry) {
   return scoreDetailFor(entry)?.text ?? formatCentipawns(entry?.score);
+}
+
+function chineseNotationFor(position, move) {
+  if (!position || !move) return null;
+  try {
+    return moveToChineseNotation(position, move);
+  } catch {
+    return null;
+  }
+}
+
+function chineseLineFor(position, moves) {
+  if (!position || !moves?.length) return [];
+  try {
+    return lineToChineseNotation(position, moves);
+  } catch {
+    return [];
+  }
+}
+
+function sideNameZh(side) {
+  return side === "black" ? "黑方" : "紅方";
+}
+
+function classificationZh(classification) {
+  return ({
+    best: "最佳",
+    excellent: "佳著",
+    good: "好棋",
+    inaccuracy: "緩手",
+    mistake: "錯著",
+    blunder: "敗著",
+    review: "待覆盤"
+  })[classification] ?? classification ?? "待覆盤";
+}
+
+function verdictZh(verdict) {
+  return ({
+    best: "最佳",
+    playable: "可行",
+    candidate: "候選",
+    inferior: "較差",
+    mistake: "錯著"
+  })[verdict] ?? verdict ?? "候選";
+}
+
+function normalizeLocale(locale) {
+  return String(locale ?? "").toLowerCase().startsWith("zh") ? "zh" : "en";
 }
 
 function capitalize(text) {

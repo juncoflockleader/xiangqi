@@ -40,6 +40,22 @@ test("study position CLI reviews a played move", async () => {
   assert.match(stdout, /Compare e9-f9 with e9-e2/);
 });
 
+test("study position CLI can print a Chinese localized report", async () => {
+  const { stdout } = await runStudyCli([
+    "--locale", "zh",
+    "--depth", "1",
+    "--time", "100",
+    "--lines", "2"
+  ]);
+
+  assert.match(stdout, /研習引擎：JavaScript Reference Engine \(javascript\)/);
+  assert.match(stdout, /局面研習：紅方走棋，最佳 炮二平五/);
+  assert.match(stdout, /開局候選：/);
+  assert.match(stdout, /候選著法：/);
+  assert.match(stdout, /主線: 炮二平五/);
+  assert.match(stdout, /下一步：/);
+});
+
 test("study position CLI emits machine-readable native backend study", async () => {
   const { stdout } = await runStudyCli([
     "--engine-command", process.execPath,
@@ -200,7 +216,8 @@ function runStudyCli(args) {
       XIANGQI_OPENING_BOOK_FORMAT: "",
       XIANGQI_PIKAFISH_AUTO_DISCOVER: "false",
       XIANGQI_STUDY_FEN: "",
-      XIANGQI_STUDY_MOVE: ""
+      XIANGQI_STUDY_MOVE: "",
+      XIANGQI_STUDY_LOCALE: ""
     }
   });
 }

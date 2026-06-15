@@ -36,6 +36,30 @@ test("engine position study bundles decision, hints, candidates, and pressure", 
   assert.match(text, /Position study: Red to move, best h7-e7/);
 });
 
+test("position study exposes Chinese learning notation and formatted report", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  const study = engine.studyPosition(createInitialPosition(), {
+    lines: 2,
+    depth: 1,
+    timeLimitMs: 500
+  });
+  const text = formatPositionStudy(study, { locale: "zh" });
+
+  assert.equal(study.zhBestMove, "炮二平五");
+  assert.equal(study.decision.zhBestMove, "炮二平五");
+  assert.deepEqual(study.decision.zhPrincipalVariation, ["炮二平五"]);
+  assert.equal(study.decision.linePlan.zhFirstMove, "炮二平五");
+  assert.ok(study.decision.linePlan.zhSummary.includes("炮二平五"));
+  assert.equal(typeof study.candidateLines[0].zhMove, "string");
+  assert.equal(study.coach.zhBestMove, "炮二平五");
+  assert.equal(study.openingCandidates[0].zhMove, "炮二平五");
+  assert.ok(study.zhSummary.includes("炮二平五"));
+  assert.ok(study.zhNextSteps.some((step) => step.text.includes("炮二平五")));
+  assert.match(text, /局面研習：紅方走棋，最佳 炮二平五/);
+  assert.match(text, /開局候選：/);
+  assert.match(text, /候選著法：/);
+});
+
 test("position study separates opening candidates from search candidates", () => {
   const book = createOpeningBookFromRecords([
     {

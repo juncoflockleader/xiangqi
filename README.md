@@ -73,8 +73,9 @@ npm run study -- --fen "4k4/9/4r4/9/9/9/9/9/9/3KR4 r" \
 ```
 
 Use `--json` to get the same study bundle as machine-readable data for a UI
-prototype, and pass the same native/oracle flags as the play demo when you want
-stronger analysis:
+prototype. Use `--locale zh` for a Chinese learning report with traditional
+move notation such as `炮二平五`, and pass the same native/oracle flags as the
+play demo when you want stronger analysis:
 
 ```sh
 npm run study -- \

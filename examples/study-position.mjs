@@ -129,33 +129,41 @@ function createStudyBackend(options, openingBook) {
 
 function formatStudyReport(report) {
   const { backend, study } = report;
+  const locale = normalizeLocale(report.options.locale);
   const lines = [
-    `Study backend: ${backend.name} (${backend.kind})`,
+    locale === "zh"
+      ? `研習引擎：${backend.name} (${backend.kind})`
+      : `Study backend: ${backend.name} (${backend.kind})`,
     `FEN: ${study.fen}`,
-    formatPositionStudy(study)
+    formatPositionStudy(study, { locale })
   ];
 
   if (study.decision?.reasons?.length) {
-    lines.push("Reasons:");
+    lines.push(locale === "zh" ? "理由：" : "Reasons:");
     for (const reason of study.decision.reasons.slice(0, 5)) {
       lines.push(`  - ${reason}`);
     }
   }
 
-  if (study.decision?.principalVariation?.length) {
-    lines.push(`Line: ${study.decision.principalVariation.join(" ")}`);
+  const principalVariation = locale === "zh" && study.decision?.zhPrincipalVariation?.length
+    ? study.decision.zhPrincipalVariation
+    : study.decision?.principalVariation;
+  if (principalVariation?.length) {
+    lines.push(`${locale === "zh" ? "主線" : "Line"}: ${principalVariation.join(" ")}`);
   }
 
   if (study.pressure?.threats?.length) {
-    lines.push("Pressure:");
+    lines.push(locale === "zh" ? "壓力：" : "Pressure:");
     for (const threat of study.pressure.threats.slice(0, 3)) {
-      lines.push(`  - ${threat.summary}`);
+      const move = locale === "zh" && threat.zhMove ? `${threat.zhMove}: ` : "";
+      lines.push(`  - ${move}${threat.summary}`);
     }
   }
 
-  if (study.nextSteps.length > 0) {
-    lines.push("Next steps:");
-    for (const step of study.nextSteps.slice(0, 4)) {
+  const nextSteps = locale === "zh" ? study.zhNextSteps ?? study.nextSteps : study.nextSteps;
+  if (nextSteps.length > 0) {
+    lines.push(locale === "zh" ? "下一步：" : "Next steps:");
+    for (const step of nextSteps.slice(0, 4)) {
       lines.push(`  - ${step.text}`);
     }
   }
@@ -173,6 +181,7 @@ function parseArgs(args) {
     bookFormat: process.env.XIANGQI_OPENING_BOOK_FORMAT ?? "auto",
     fen: process.env.XIANGQI_STUDY_FEN,
     playedMove: process.env.XIANGQI_STUDY_MOVE,
+    locale: process.env.XIANGQI_STUDY_LOCALE ?? "en",
     engineCommand: process.env.XIANGQI_ENGINE_COMMAND,
     engineArgs: splitEnvArgs(process.env.XIANGQI_ENGINE_ARGS),
     engineProtocol: process.env.XIANGQI_ENGINE_PROTOCOL ?? "uci",
@@ -209,6 +218,11 @@ function parseArgs(args) {
     }
     if (arg === "--json") {
       parsed.json = true;
+      continue;
+    }
+    if (arg === "--locale" || arg === "--lang" || arg === "--language") {
+      parsed.locale = parseLocale(requireValue(args, index, arg), arg);
+      index += 1;
       continue;
     }
     if (arg === "--no-book") {
@@ -355,6 +369,7 @@ function parseArgs(args) {
 
   parsed.engineProtocol = parseProtocol(parsed.engineProtocol, "XIANGQI_ENGINE_PROTOCOL");
   parsed.oracleProtocol = parseProtocol(parsed.oracleProtocol, "XIANGQI_ORACLE_ENGINE_PROTOCOL");
+  parsed.locale = parseLocale(parsed.locale, "XIANGQI_STUDY_LOCALE");
   resolveBookFormat(parsed.bookPath ?? "", parsed.bookFormat);
   parsed.depth = assertPositiveInteger(parsed.depth, "depth");
   parsed.timeLimitMs = assertPositiveInteger(parsed.timeLimitMs, "time");
@@ -419,6 +434,7 @@ function reportOptions(options) {
     bookFormat: options.bookPath ? resolveBookFormat(options.bookPath, options.bookFormat) : null,
     fen: options.fen ?? null,
     playedMove: options.playedMove ?? null,
+    locale: options.locale,
     enginePreset: options.enginePreset ?? null,
     engineCommand: options.engineCommand ?? null,
     engineProtocol: options.engineProtocol,
@@ -448,6 +464,7 @@ Options:
   --move move           Review a played move from the studied position.
   --played-move move    Alias for --move.
   --review move         Alias for --move.
+  --locale en|zh        Report language. Default: en.
   --engine-command cmd  Use a native UCI/UCCI engine, with JS fallback.
   --engine-arg value    Append one native engine argument.
   --engine-args values  Append whitespace-separated native engine arguments.
@@ -497,6 +514,19 @@ function parseProtocol(value, source) {
   const protocol = String(value).toLowerCase();
   if (protocol === "uci" || protocol === "ucci") return protocol;
   throw new Error(`${source} must be uci or ucci.`);
+}
+
+function parseLocale(value, source) {
+  const locale = normalizeLocale(value);
+  if (locale === "en" || locale === "zh") return locale;
+  throw new Error(`${source} must be en or zh.`);
+}
+
+function normalizeLocale(value) {
+  const locale = String(value || "en").toLowerCase();
+  if (locale === "en" || locale.startsWith("en-")) return "en";
+  if (locale === "zh" || locale.startsWith("zh-") || locale === "cn") return "zh";
+  return locale;
 }
 
 function numberFromEnv(value, fallback) {
