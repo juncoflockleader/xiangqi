@@ -76,6 +76,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     terms[side].kingAttack += kingAttackValue(position, side, sideMoves);
     terms[side].kingSafety += globalKingSafety(position, side, control[opponent(side)]);
     terms[side].palaceShape += palaceShapeValue(position, side);
+    terms[side].batteryPressure += batteryPressureValue(position, side);
 
     if (isInCheck(position, opponent(side))) {
       terms[side].threats += 45;
@@ -145,6 +146,7 @@ function createTerms() {
     coordination: 0,
     linePressure: 0,
     pinPressure: 0,
+    batteryPressure: 0,
     rookActivity: 0,
     horsePressure: 0
   };
@@ -433,6 +435,70 @@ function pinnedTargetValue(target, enemy) {
   if (target.piece.type === PIECES.ADVISOR || target.piece.type === PIECES.ELEPHANT) score += 12;
 
   return score;
+}
+
+function batteryPressureValue(position, side) {
+  const enemy = opponent(side);
+  const enemyKingSquare = position.board.findIndex((piece) => piece?.side === enemy && piece.type === PIECES.KING);
+  if (enemyKingSquare === -1) return 0;
+
+  let score = 0;
+  for (const ray of raysFromSquare(position, enemyKingSquare)) {
+    const ownLinePieces = ray
+      .map((entry, index) => ({ ...entry, index }))
+      .filter((entry) => entry.piece.side === side && isLineAttacker(entry.piece));
+    if (ownLinePieces.length < 2) continue;
+
+    const [lead, support] = ownLinePieces;
+    const blockersBeforeLead = lead.index;
+    if (blockersBeforeLead > 2) continue;
+
+    score += 30;
+    score += Math.max(0, 2 - blockersBeforeLead) * 16;
+    score += lineBatteryPieceBonus(lead.piece) + lineBatteryPieceBonus(support.piece);
+    if (fileOf(lead.square) === fileOf(enemyKingSquare)) score += 10;
+    if (ownLinePieces.length > 2) score += 16;
+
+    const pinnedGuards = ray
+      .slice(0, lead.index)
+      .filter((entry) => entry.piece.side === enemy && (entry.piece.type === PIECES.ADVISOR || entry.piece.type === PIECES.ELEPHANT))
+      .length;
+    score += pinnedGuards * 10;
+  }
+
+  return score;
+}
+
+function raysFromSquare(position, square) {
+  const rays = [];
+  const file = fileOf(square);
+  const rank = rankOf(square);
+
+  for (const [fileStep, rankStep] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+    const ray = [];
+    let targetFile = file + fileStep;
+    let targetRank = rank + rankStep;
+
+    while (isInside(targetFile, targetRank)) {
+      const target = indexOf(targetFile, targetRank);
+      const piece = position.board[target];
+      if (piece) ray.push({ square: target, piece });
+      targetFile += fileStep;
+      targetRank += rankStep;
+    }
+
+    rays.push(ray);
+  }
+
+  return rays;
+}
+
+function isLineAttacker(piece) {
+  return piece.type === PIECES.ROOK || piece.type === PIECES.CANNON;
+}
+
+function lineBatteryPieceBonus(piece) {
+  return piece.type === PIECES.ROOK ? 18 : 14;
 }
 
 function rookActivityValue(position, piece, square) {
@@ -1034,6 +1100,7 @@ function readableTerm(term) {
     coordination: "piece coordination",
     linePressure: "rook and cannon line pressure",
     pinPressure: "palace pin pressure",
+    batteryPressure: "rook-cannon battery pressure",
     rookActivity: "rook activity",
     horsePressure: "horse outpost pressure"
   };

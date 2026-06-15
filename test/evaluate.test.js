@@ -102,6 +102,29 @@ test("evaluation descriptions surface cannon-screen pins", () => {
   assert.ok(notes.some((note) => note.term === "pinPressure" && note.text.includes("palace pin pressure")));
 });
 
+test("evaluation rewards rook-cannon batteries on the general file", () => {
+  const battery = parseFen("4k4/9/4a4/9/4R4/9/4C4/9/9/4K4 r");
+  const singleFilePressure = parseFen("4k4/9/4a4/9/4R4/9/C8/9/9/4K4 r");
+  const batteryEval = evaluatePosition(battery, SIDES.RED, { detailed: true });
+  const singleEval = evaluatePosition(singleFilePressure, SIDES.RED, { detailed: true });
+
+  assert.ok(batteryEval.terms.red.batteryPressure - singleEval.terms.red.batteryPressure >= 85);
+  assert.ok(batteryEval.difference.batteryPressure > singleEval.difference.batteryPressure);
+});
+
+test("evaluation descriptions surface rook-cannon battery pressure", () => {
+  const position = parseFen("4k4/9/4a4/9/4R4/9/2C6/9/9/4K4 r");
+  const next = applyLegalMove(position, {
+    from: coordToIndex("c6"),
+    to: coordToIndex("e6")
+  });
+  const delta = evaluateMoveDelta(position, next, SIDES.RED);
+  const notes = describeEvaluationTerms(delta.delta);
+
+  assert.ok(delta.delta.batteryPressure >= 85);
+  assert.ok(notes.some((note) => note.term === "batteryPressure" && note.text.includes("battery pressure")));
+});
+
 test("evaluation rewards rooks with open activity", () => {
   const trapped = parseFen("4k4/9/9/9/9/9/9/9/P8/RH2K4 r");
   const active = parseFen("4k4/9/9/9/9/R8/9/9/7P1/1H2K4 r");
