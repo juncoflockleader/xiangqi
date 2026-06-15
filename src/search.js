@@ -36,6 +36,9 @@ const DEFAULT_QCHECK_DEPTH = 1;
 const DEFAULT_DELTA_MARGIN = 160;
 const FUTILITY_BASE_MARGIN = 90;
 const FUTILITY_DEPTH_MARGIN = 70;
+const REVERSE_FUTILITY_BASE_MARGIN = 100;
+const REVERSE_FUTILITY_DEPTH_MARGIN = 80;
+const REVERSE_FUTILITY_MAX_DEPTH = 3;
 const RAZOR_BASE_MARGIN = 180;
 const RAZOR_DEPTH_MARGIN = 120;
 const NULL_MOVE_MIN_DEPTH = 3;
@@ -142,6 +145,7 @@ export function searchBestMove(position, options = {}) {
       useContinuationHistory: options.useContinuationHistory !== false,
       useRootScoreOrdering: options.useRootScoreOrdering !== false,
       useMateDistancePruning: options.useMateDistancePruning !== false,
+      useReverseFutilityPruning: options.useReverseFutilityPruning !== false,
       useRazoring: options.useRazoring !== false,
       useFutilityPruning: options.useFutilityPruning !== false,
       useDeltaPruning: options.useDeltaPruning !== false,
@@ -157,6 +161,9 @@ export function searchBestMove(position, options = {}) {
       nullMoveVerificationMinDepth: Math.max(3, Math.floor(numberOption(options.nullMoveVerificationMinDepth, NULL_MOVE_VERIFICATION_MIN_DEPTH))),
       seePruneMargin: Math.max(0, numberOption(options.seePruneMargin, DEFAULT_SEE_PRUNE_MARGIN)),
       probCutMargin: Math.max(0, numberOption(options.probCutMargin, DEFAULT_PROBCUT_MARGIN)),
+      reverseFutilityMaxDepth: Math.max(1, Math.floor(numberOption(options.reverseFutilityMaxDepth, REVERSE_FUTILITY_MAX_DEPTH))),
+      reverseFutilityBaseMargin: Math.max(0, numberOption(options.reverseFutilityBaseMargin, REVERSE_FUTILITY_BASE_MARGIN)),
+      reverseFutilityDepthMargin: Math.max(0, numberOption(options.reverseFutilityDepthMargin, REVERSE_FUTILITY_DEPTH_MARGIN)),
       iidMinDepth: Math.max(2, Math.floor(numberOption(options.iidMinDepth, IID_MIN_DEPTH))),
       iidReduction: Math.max(1, Math.floor(numberOption(options.iidReduction, IID_REDUCTION))),
       iidMoveLimit: Math.max(1, Math.floor(numberOption(options.iidMoveLimit, IID_MOVE_LIMIT))),
@@ -533,6 +540,13 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     return inCheck ? -MATE_SCORE + ply : -MATE_SCORE + ply;
   }
 
+  const staticScore = inCheck ? null : evaluatePosition(position, position.turn).score;
+  if (shouldPruneReverseFutility({ depth, inCheck, alpha, beta, staticScore, context })) {
+    context.stats.reverseFutilityPrunes += 1;
+    leavePosition(context, repetitionKey);
+    return beta;
+  }
+
   let bestScore = -INFINITY_SCORE;
   let bestMove = null;
   let bestChildLine = [];
@@ -557,7 +571,6 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     }
   }
   const ordered = orderMoves(position, legalMoves, principalMove, context, ply, previousMove);
-  const staticScore = inCheck ? null : evaluatePosition(position, position.turn).score;
   const searchedQuietMoves = [];
 
   if (shouldRazor({ depth, inCheck, alpha, beta, staticScore, context })) {
@@ -1120,6 +1133,20 @@ function shouldPruneFutility({
   return staticScore + futilityMargin(depth) <= alpha;
 }
 
+function shouldPruneReverseFutility({ depth, inCheck, alpha, beta, staticScore, context }) {
+  if (!context.useReverseFutilityPruning) return false;
+  if (inCheck || staticScore === null) return false;
+  if (depth < 1 || depth > context.reverseFutilityMaxDepth) return false;
+  if (beta - alpha !== 1) return false;
+  if (alpha <= -MATE_SCORE + 1000 || beta >= MATE_SCORE - 1000) return false;
+
+  return staticScore - reverseFutilityMargin(depth, context) >= beta;
+}
+
+function reverseFutilityMargin(depth, context) {
+  return context.reverseFutilityBaseMargin + context.reverseFutilityDepthMargin * depth;
+}
+
 function shouldPruneSee({
   depth,
   index,
@@ -1564,6 +1591,7 @@ function createSearchStats() {
     singularExtensionRejects: 0,
     softStops: 0,
     seePrunes: 0,
+    reverseFutilityPrunes: 0,
     mateDistancePrunes: 0,
     mateDistanceWindows: 0,
     razorPrunes: 0,
@@ -1614,6 +1642,7 @@ function mergeSearchStats(total, next) {
     singularExtensionRejects: total.singularExtensionRejects + next.singularExtensionRejects,
     softStops: total.softStops + next.softStops,
     seePrunes: total.seePrunes + next.seePrunes,
+    reverseFutilityPrunes: total.reverseFutilityPrunes + next.reverseFutilityPrunes,
     mateDistancePrunes: total.mateDistancePrunes + next.mateDistancePrunes,
     mateDistanceWindows: total.mateDistanceWindows + next.mateDistanceWindows,
     razorPrunes: total.razorPrunes + next.razorPrunes,

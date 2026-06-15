@@ -438,12 +438,14 @@ test("quiescence can delta-prune hopeless captures", () => {
   const withPruning = searchBestMove(position, {
     depth: 2,
     timeLimitMs: 1000,
-    useAspiration: false
+    useAspiration: false,
+    useReverseFutilityPruning: false
   });
   const withoutPruning = searchBestMove(position, {
     depth: 2,
     timeLimitMs: 1000,
     useAspiration: false,
+    useReverseFutilityPruning: false,
     useDeltaPruning: false
   });
 
@@ -470,6 +472,28 @@ test("search prunes shallow quiet moves with futility margins", () => {
   assert.equal(withPruning.bestMove.notation, withoutPruning.bestMove.notation);
   assert.ok(withPruning.stats.futilityPrunes > 0);
   assert.equal(withoutPruning.stats.futilityPrunes, 0);
+  assert.ok(withPruning.nodes < withoutPruning.nodes);
+});
+
+test("search prunes shallow fail-high nodes with reverse futility margins", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const withPruning = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false
+  });
+  const withoutPruning = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useReverseFutilityPruning: false
+  });
+
+  assert.equal(withPruning.depth, 3);
+  assert.equal(withPruning.bestMove.notation, withoutPruning.bestMove.notation);
+  assert.equal(Math.round(withPruning.score), Math.round(withoutPruning.score));
+  assert.ok(withPruning.stats.reverseFutilityPrunes > 0);
+  assert.equal(withoutPruning.stats.reverseFutilityPrunes, 0);
   assert.ok(withPruning.nodes < withoutPruning.nodes);
 });
 

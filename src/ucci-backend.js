@@ -1653,6 +1653,7 @@ function createEmptyStats() {
     singularExtensionRejects: 0,
     softStops: 0,
     seePrunes: 0,
+    reverseFutilityPrunes: 0,
     mateDistancePrunes: 0,
     mateDistanceWindows: 0,
     razorPrunes: 0,
