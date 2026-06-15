@@ -71,7 +71,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     terms[side].threats += threatValue(sideMoves);
     terms[side].pieceSafety += pieceSafetyValue(position, side, control[side], control[opponent(side)]);
     terms[side].kingAttack += kingAttackValue(position, side, sideMoves);
-    terms[side].kingSafety += globalKingSafety(position, side);
+    terms[side].kingSafety += globalKingSafety(position, side, control[opponent(side)]);
 
     if (isInCheck(position, opponent(side))) {
       terms[side].threats += 45;
@@ -609,7 +609,7 @@ function kingAttackValue(position, side, pseudoMoves) {
   return score;
 }
 
-function globalKingSafety(position, side) {
+function globalKingSafety(position, side, enemyControl) {
   const kingSquare = position.board.findIndex((piece) => piece?.side === side && piece.type === PIECES.KING);
   if (kingSquare === -1) return -20000;
 
@@ -638,7 +638,62 @@ function globalKingSafety(position, side) {
     if (frontal?.side === enemy && frontal.type === PIECES.PAWN) score -= 45;
   }
 
+  score += palaceControlSafety(position, side, kingSquare, enemyControl);
+
   return score;
+}
+
+function palaceControlSafety(position, side, kingSquare, enemyControl) {
+  if (!enemyControl) return 0;
+
+  const kingFile = fileOf(kingSquare);
+  const kingRank = rankOf(kingSquare);
+  let penalty = 0;
+
+  for (let rank = 0; rank < BOARD_RANKS; rank += 1) {
+    for (let file = 3; file <= 5; file += 1) {
+      if (!palaceContains(side, file, rank)) continue;
+
+      const square = indexOf(file, rank);
+      const enemy = enemyControl.get(square);
+      if (!enemy) continue;
+
+      const distance = Math.abs(file - kingFile) + Math.abs(rank - kingRank);
+      if (square === kingSquare) {
+        penalty += 80 + enemy.count * 18;
+      } else if (distance === 1) {
+        penalty += 22 + enemy.count * 7;
+      } else {
+        penalty += 8 + enemy.count * 4;
+      }
+    }
+  }
+
+  const safeEscapes = kingEscapeSquares(position, side, kingSquare)
+    .filter((square) => !enemyControl.has(square)).length;
+  if (safeEscapes === 0) penalty += 30;
+  else if (safeEscapes === 1) penalty += 12;
+
+  return -penalty;
+}
+
+function kingEscapeSquares(position, side, kingSquare) {
+  const file = fileOf(kingSquare);
+  const rank = rankOf(kingSquare);
+  const squares = [];
+
+  for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+    const targetFile = file + dx;
+    const targetRank = rank + dy;
+    if (!palaceContains(side, targetFile, targetRank)) continue;
+
+    const target = indexOf(targetFile, targetRank);
+    const occupant = position.board[target];
+    if (occupant?.side === side) continue;
+    squares.push(target);
+  }
+
+  return squares;
 }
 
 function countGuards(position, side) {

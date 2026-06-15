@@ -10,7 +10,7 @@ The current engine is dependency-free JavaScript and includes:
 - Iterative-deepening negamax search with alpha-beta and principal variation search.
 - Zobrist hashing, bounded depth-preferred transposition table, bounded quiescence transposition table, cached static evaluation and static-exchange analysis, aspiration windows, quiescence search with bounded quiet-check search and delta pruning, killer/capture-history/check-history/positive and negative history/countermove/continuation-history/root-score/internal-iterative-deepening/check-evasion move ordering, mate-distance pruning, bounded check, recapture, and singular extensions, static-exchange pruning, ProbCut capture pruning, shallow razoring, guarded and verified null-move pruning, shallow forward and reverse futility pruning, late-move pruning, and history/continuation-history-tuned adaptive late-move reductions, repetition diagnostics, and root candidate analysis.
 - Explainable opening-book support with a curated early repertoire, heuristic fallback for off-book opening positions, deterministic selection, and pure-search opt-out.
-- Evaluation terms for material, piece-square placement, mobility, threats, pawn progress/support, king safety, pressure on the general, piece safety, blocked horse/elephant coordination, and rook/cannon line pressure.
+- Evaluation terms for material, piece-square placement, mobility, threats, pawn progress/support, king safety with palace-control awareness, pressure on the general, piece safety, blocked horse/elephant coordination, and rook/cannon line pressure.
 - Static exchange analysis for distinguishing clean wins, tactically poisoned captures, and defended captures that remain sound after recaptures.
 - Immediate pressure/threat analysis for both sides.
 - Perft helpers for validating move generation while the engine grows.
@@ -59,8 +59,10 @@ when it wanted a different move, the engine's preferred plan.
 For a browser board, run `npm run web` and open `http://127.0.0.1:5175`. It uses
 the same learning backend as the CLI, prefers the local Pikafish preset when
 available, and falls back to the JavaScript engine. The browser UI includes
-Chinese board text, red/black file labels, and traditional move notation on
-legal targets and move history, such as `炮二平五` or `炮七平五`.
+reference-board details such as palace diagonals, river text, cannon/soldier
+point marks, red/black file labels, one-character Chinese piece glyphs, and
+localized move notation on legal targets and move history, such as `炮二平五`
+or `炮七平五`.
 
 For a one-position learning report, run `npm run study`. It prints the best move,
 candidate lines, progressive hints, pressure, and an optional review of a move

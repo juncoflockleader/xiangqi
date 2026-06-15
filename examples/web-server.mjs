@@ -448,7 +448,7 @@ function summarizeReview(review, position = null) {
     bestWdl: review.bestAnalysis?.wdl ?? null,
     playedLinePlan: annotateLinePlan(position, review.playedLinePlan),
     bestLinePlan: annotateLinePlan(position, review.bestLinePlan),
-    planComparison: review.planComparison ?? null,
+    planComparison: annotatePlanComparison(position, review.planComparison),
     practiceFocus: review.practiceFocus ?? null,
     mistakes: review.mistakes ?? null,
     bestAlternatives: annotateAlternatives(position, review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives)
@@ -487,7 +487,8 @@ function annotateAlternatives(position, alternatives = []) {
     return {
       ...alternative,
       zhMove: zhLine[0] ?? chineseNotationFor(position, alternative.move),
-      zhExpectedReply: zhLine[1] ?? null
+      zhExpectedReply: zhLine[1] ?? null,
+      planComparison: annotatePlanComparison(position, alternative.planComparison)
     };
   });
 }
@@ -510,6 +511,14 @@ function annotateLinePlan(position, linePlan) {
       ...move,
       zhNotation: zhLine[index] ?? null
     }))
+  };
+}
+
+function annotatePlanComparison(position, comparison) {
+  if (!comparison) return null;
+  return {
+    ...comparison,
+    zhSummary: summarizePlanComparisonZh(position, comparison)
   };
 }
 
@@ -557,6 +566,24 @@ function summarizeLinePlanZh(linePlan, zhLine) {
   const continuation = rest.length > 0 ? `，後續 ${rest.join(" ")}` : "";
   const motifs = linePlan.motifs?.length ? `；主題：${linePlan.motifs.map(motifZh).join("、")}` : "";
   return `先走 ${first}${replyText}${continuation}${motifs}。`;
+}
+
+function summarizePlanComparisonZh(position, comparison) {
+  if (!comparison) return "";
+  const playedMove = chineseNotationFor(position, comparison.playedMove) ?? comparison.playedMove;
+  const bestMove = chineseNotationFor(position, comparison.bestMove) ?? comparison.bestMove;
+  const gap = Number.isFinite(comparison.centipawnLoss) && comparison.centipawnLoss > 0
+    ? `，差距約 ${Math.round(comparison.centipawnLoss)} cp`
+    : "";
+
+  if (comparison.sameFirstMove && bestMove) {
+    return `實戰計畫與引擎首選 ${bestMove} 一致。`;
+  }
+  if (playedMove && bestMove) {
+    return `實戰計畫從 ${playedMove} 開始；引擎更建議 ${bestMove}${gap}。`;
+  }
+  if (bestMove) return `引擎更建議 ${bestMove}${gap}。`;
+  return comparison.summary ?? "";
 }
 
 function summarizeDecisionReasonsZh(decision) {

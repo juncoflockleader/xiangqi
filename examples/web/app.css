@@ -135,7 +135,7 @@ h2 {
   --grid-inset-x: calc(100% / 18);
   --grid-inset-y: calc(100% / 20);
   --point-size: clamp(32px, 8.2%, 56px);
-  --piece-size: clamp(24px, 78%, 44px);
+  --piece-size: clamp(24px, 76%, 42px);
   width: min(100%, 760px);
   margin: 0 auto;
   aspect-ratio: 9 / 10;
@@ -340,9 +340,11 @@ h2 {
   background: radial-gradient(circle at 35% 30%, #fff9e6 0%, #f6e0a9 62%, #d7af5b 100%);
   box-shadow: 0 4px 8px rgba(52, 34, 13, 0.22);
   font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
-  font-size: clamp(10px, 2vw, 15px);
+  font-size: clamp(11px, 1.45vw, 14px);
   font-weight: 800;
-  line-height: 0.92;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .piece.red {

@@ -28,9 +28,12 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(page, /id="localeSelect"/);
     assert.match(script, /function renderBoard/);
     assert.match(script, /function intersectionPercent/);
+    assert.match(script, /const glyphLocale = isChineseLocale\(\) \? state\.locale : "zh-TW"/);
+    assert.match(script, /function localizedChineseText/);
     assert.match(script, /move-label/);
     assert.match(stylesheet, /\.file-labels/);
     assert.match(stylesheet, /\.move-label/);
+    assert.match(stylesheet, /font-size: clamp\(11px, 1\.45vw, 14px\)/);
     assert.match(stylesheet, /min-height: 0/);
     assert.doesNotMatch(stylesheet, /rotate\(180deg\)/);
     assert.equal(created.ok, true);
@@ -84,6 +87,9 @@ test("web server plays a player move, engine reply, hints, best move, and undo",
     assert.equal(moved.state.playerTurn, true);
     assert.equal(moved.state.lastPlayerReview.move, "h7-e7");
     assert.equal(moved.state.lastPlayerReview.zhMove, "炮二平五");
+    if (moved.state.lastPlayerReview.planComparison) {
+      assert.equal(typeof moved.state.lastPlayerReview.planComparison.zhSummary, "string");
+    }
     assert.equal(undone.ok, true);
     assert.equal(undone.state.history.length, 0);
     assert.equal(undone.state.playerTurn, true);

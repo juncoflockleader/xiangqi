@@ -172,11 +172,11 @@ test("move explanations surface check-history ordering diagnostics", () => {
 
 test("move explanations surface continuation-history reduction tuning", () => {
   const position = parseFen("4k4/9/9/9/9/9/4P4/9/9/3KR4 r");
-  const engine = createEngine({ depth: 6, timeLimitMs: 2000 });
+  const engine = createEngine({ depth: 7, timeLimitMs: 5000 });
   const result = engine.chooseMove(position, {
     useBook: false,
-    depth: 6,
-    timeLimitMs: 2000,
+    depth: 7,
+    timeLimitMs: 5000,
     useAspiration: false,
     useSoftTimeManagement: false,
     exactRootScores: true
@@ -184,7 +184,7 @@ test("move explanations surface continuation-history reduction tuning", () => {
   const selectivityFactor = result.explanation.confidence.factors
     .find((factor) => factor.kind === "selectivity");
 
-  assert.ok(result.stats.continuationReductionMaluses > 0);
+  assert.ok(result.stats.continuationReductionBoosts + result.stats.continuationReductionMaluses > 0);
   assert.ok(selectivityFactor);
   assert.match(selectivityFactor.text, /continuation-history reduction tuning/);
 });

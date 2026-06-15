@@ -102,6 +102,29 @@ test("evaluation descriptions surface pressure on the general", () => {
   assert.ok(notes.some((note) => note.term === "kingAttack" && note.text.includes("pressure on the general")));
 });
 
+test("evaluation penalizes enemy control of palace escape squares", () => {
+  const exposed = parseFen("4k4/9/9/9/9/9/9/3r5/9/4K4 r");
+  const safer = parseFen("4k4/9/9/9/r8/9/9/9/9/4K4 r");
+  const exposedEval = evaluatePosition(exposed, SIDES.RED, { detailed: true });
+  const saferEval = evaluatePosition(safer, SIDES.RED, { detailed: true });
+
+  assert.ok(saferEval.terms.red.kingSafety > exposedEval.terms.red.kingSafety);
+  assert.ok(saferEval.difference.kingSafety > exposedEval.difference.kingSafety);
+});
+
+test("evaluation descriptions surface clearing palace pressure as king safety", () => {
+  const position = parseFen("4k4/9/9/9/9/4P4/9/3rR4/9/4K4 r");
+  const next = applyLegalMove(position, {
+    from: coordToIndex("e7"),
+    to: coordToIndex("d7")
+  });
+  const delta = evaluateMoveDelta(position, next, SIDES.RED);
+  const notes = describeEvaluationTerms(delta.delta);
+
+  assert.ok(delta.delta.kingSafety > 0);
+  assert.ok(notes.some((note) => note.term === "kingSafety" && note.text.includes("king safety")));
+});
+
 test("evaluation penalizes loose attacked pieces", () => {
   const loose = parseFen("4k4/9/9/4r4/9/4R4/P8/9/9/4K4 r");
   const defended = parseFen("4k4/9/9/4r4/9/4R4/4P4/9/9/4K4 r");

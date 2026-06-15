@@ -97,19 +97,108 @@ const localeMeta = {
   }
 };
 
+const simplifiedChineseMap = Object.freeze({
+  "與": "与",
+  "帥": "帅",
+  "將": "将",
+  "傌": "马",
+  "馬": "马",
+  "俥": "车",
+  "車": "车",
+  "砲": "炮",
+  "進": "进",
+  "後": "后",
+  "著": "着",
+  "紅": "红",
+  "漢": "汉",
+  "語": "语",
+  "體": "体",
+  "啟": "启",
+  "動": "动",
+  "級": "级",
+  "備": "备",
+  "暫": "暂",
+  "無": "无",
+  "選": "选",
+  "擇": "择",
+  "覆": "复",
+  "損": "损",
+  "開": "开",
+  "庫": "库",
+  "預": "预",
+  "應": "应",
+  "續": "续",
+  "題": "题",
+  "薦": "荐",
+  "評": "评",
+  "為": "为",
+  "戰": "战",
+  "術": "术",
+  "狀": "状",
+  "態": "态",
+  "沒": "没",
+  "壓": "压",
+  "線": "线",
+  "點": "点",
+  "權": "权",
+  "較": "较",
+  "領": "领",
+  "計": "计",
+  "畫": "画",
+  "實": "实",
+  "議": "议",
+  "慮": "虑",
+  "強": "强",
+  "協": "协",
+  "調": "调",
+  "關": "关",
+  "係": "系",
+  "製": "制",
+  "威": "威",
+  "脅": "胁",
+  "靜": "静",
+  "勢": "势",
+  "護": "护",
+  "躍": "跃",
+  "練": "练",
+  "掃": "扫",
+  "麼": "么",
+  "雙": "双",
+  "對": "对"
+});
+
+const practiceFocusTranslations = Object.freeze({
+  "zh-CN": {
+    "missed-material": ["子力战术", "练习在走安静棋前先扫描强制吃子。"],
+    "unsafe-capture": ["吃子安全", "练习吃子前检查反吃和保护关系。"],
+    "missed-check": ["强制将军", "练习优先看将军，特别是对方将帅暴露时。"],
+    "missed-threat": ["建立先手", "练习寻找能制造直接威胁的着法。"],
+    "allowed-threat": ["防守威胁", "练习每步之后先问对手威胁什么。"],
+    "positional-drift": ["子力协调", "练习从活跃度、保护和长期压力比较安静候选。"]
+  },
+  "zh-TW": {
+    "missed-material": ["子力戰術", "練習在走安靜棋前先掃描強制吃子。"],
+    "unsafe-capture": ["吃子安全", "練習吃子前檢查反吃和保護關係。"],
+    "missed-check": ["強制將軍", "練習優先看將軍，特別是對方將帥暴露時。"],
+    "missed-threat": ["建立先手", "練習尋找能製造直接威脅的著法。"],
+    "allowed-threat": ["防守威脅", "練習每步之後先問對手威脅什麼。"],
+    "positional-drift": ["子力協調", "練習從活躍度、保護和長期壓力比較安靜候選。"]
+  }
+});
+
 const zhTwTranslations = {
   appTitle: "中國象棋",
   language: "語言",
   localeSimplified: "中文（簡體）",
   localeTraditional: "中文（繁體）",
   localeEnglish: "English",
-  side: "方位",
+  side: "執方",
   red: "紅方",
   black: "黑方",
   newGame: "新局",
   undo: "悔棋",
   hint: "提示",
-  best: "最佳",
+  best: "最佳著法",
   engine: "引擎",
   lastMove: "上一手",
   reasoning: "思路",
@@ -129,7 +218,7 @@ const zhTwTranslations = {
   lines: "候選",
   fallback: "備援",
   confidence: "信心",
-  bestMove: "最佳",
+  bestMove: "最佳著法",
   whyNot: "為何不選",
   noHint: "暫無提示。",
   noDecision: "尚無決策。",
@@ -155,6 +244,7 @@ const zhCnTranslations = {
   language: "语言",
   localeSimplified: "中文（简体）",
   localeTraditional: "中文（繁体）",
+  side: "执方",
   red: "红方",
   black: "黑方",
   history: "棋谱",
@@ -167,6 +257,8 @@ const zhCnTranslations = {
   level: "级别",
   time: "用时",
   fallback: "备用",
+  best: "最佳着法",
+  bestMove: "最佳着法",
   whyNot: "为何不选",
   noHint: "暂无提示。",
   noDecision: "尚无决策。",
@@ -481,10 +573,11 @@ function renderLastMove() {
   if (decision) details.push(`<div>${escapeHtml(localizedDecisionSummary(decision))}</div>`);
   if (review) details.push(`<div>${escapeHtml(localizedReviewSummary(review))}</div>`);
   if (review?.practiceFocus) {
-    details.push(`<div class="line"><strong>${escapeHtml(review.practiceFocus.title)}</strong><br>${escapeHtml(review.practiceFocus.text)}</div>`);
+    const focus = localizedPracticeFocus(review.practiceFocus);
+    details.push(`<div class="line"><strong>${escapeHtml(focus.title)}</strong><br>${escapeHtml(focus.text)}</div>`);
   }
   if (review?.planComparison?.summary) {
-    details.push(`<div class="line">${escapeHtml(review.planComparison.summary)}</div>`);
+    details.push(`<div class="line">${escapeHtml(localizedPlanComparisonSummary(review.planComparison))}</div>`);
   }
 
   elements.lastMovePanel.className = "stack";
@@ -530,7 +623,7 @@ function renderDecision(decision) {
   parts.push(`<div>${escapeHtml(localizedDecisionSummary(decision))}</div>`);
   const linePlanSummary = localizedLinePlanSummary(decision.linePlan);
   if (linePlanSummary) parts.push(`<div class="line">${escapeHtml(linePlanSummary)}</div>`);
-  if (decision.comparison?.reason) parts.push(`<div class="line">${escapeHtml(decision.comparison.reason)}</div>`);
+  if (decision.comparison?.reason && !isChineseLocale()) parts.push(`<div class="line">${escapeHtml(decision.comparison.reason)}</div>`);
   if (decision.confidence?.label) {
     parts.push(`<div class="score">${t("confidence")}: ${escapeHtml(confidenceLabel(decision.confidence))} (${Math.round(decision.confidence.score ?? 0)}/100)</div>`);
   }
@@ -551,9 +644,10 @@ function renderReview(review) {
     `<div>${escapeHtml(localizedReviewSummary(review))}</div>`
   ];
   if (review.move) parts.unshift(`<div class="line">${formatMoveHtml(review.move, review.zhMove)}</div>`);
-  if (review.planComparison?.summary) parts.push(`<div class="line">${escapeHtml(review.planComparison.summary)}</div>`);
+  if (review.planComparison?.summary) parts.push(`<div class="line">${escapeHtml(localizedPlanComparisonSummary(review.planComparison))}</div>`);
   if (review.practiceFocus) {
-    parts.push(`<div class="line"><strong>${escapeHtml(review.practiceFocus.title)}</strong><br>${escapeHtml(review.practiceFocus.text)}</div>`);
+    const focus = localizedPracticeFocus(review.practiceFocus);
+    parts.push(`<div class="line"><strong>${escapeHtml(focus.title)}</strong><br>${escapeHtml(focus.text)}</div>`);
   }
   elements.reasoningPanel.className = "stack";
   elements.reasoningPanel.innerHTML = parts.join("");
@@ -562,7 +656,7 @@ function renderReview(review) {
 function renderHint(hint) {
   const levels = isChineseLocale() && hint?.zhLevels?.length ? hint.zhLevels : hint?.levels ?? [];
   const parts = levels.slice(0, 4).map((level) => (
-    `<div class="line"><strong>${escapeHtml(level.title ?? `Hint ${level.level}`)}</strong><br>${escapeHtml(level.text ?? "")}</div>`
+    `<div class="line"><strong>${escapeHtml(localizedChineseText(level.title ?? `Hint ${level.level}`))}</strong><br>${escapeHtml(localizedChineseText(level.text ?? ""))}</div>`
   ));
   if (hint?.bestMove) parts.push(`<div class="score">${t("bestMove")}: ${formatMoveHtml(hint.bestMove, hint.zhBestMove)}</div>`);
 
@@ -576,7 +670,7 @@ function renderAlternatives(alternatives) {
     const loss = Number.isFinite(alternative.centipawnLoss) ? `, ${t("loss")} ${alternative.centipawnLoss} cp` : "";
     const reply = alternative.expectedReply ? `, ${t("expectedReply")} ${moveText(alternative.expectedReply, alternative.zhExpectedReply)}` : "";
     const why = alternative.planComparison?.summary
-      ? `<div class="score">${t("whyNot")}: ${escapeHtml(alternative.planComparison.summary)}</div>`
+      ? `<div class="score">${t("whyNot")}: ${escapeHtml(localizedPlanComparisonSummary(alternative.planComparison))}</div>`
       : "";
     const verdict = isChineseLocale() && (!alternative.verdict || alternative.verdict === "candidate")
       ? t("candidate")
@@ -761,7 +855,8 @@ function pieceName(piece) {
 }
 
 function pieceSymbol(piece) {
-  return pieceNames[state.locale]?.[piece.side]?.[piece.type]
+  const glyphLocale = isChineseLocale() ? state.locale : "zh-TW";
+  return pieceNames[glyphLocale]?.[piece.side]?.[piece.type]
     ?? pieceNames["zh-TW"]?.[piece.side]?.[piece.type]
     ?? piece.symbol
     ?? "";
@@ -810,25 +905,40 @@ function moveText(notation, zhNotation) {
 }
 
 function localizedChineseNotation(text) {
-  if (state.locale !== "zh-CN") return text;
-  return String(text ?? "")
-    .replace(/[帥]/g, "帅")
-    .replace(/[將]/g, "将")
-    .replace(/[傌馬]/g, "马")
-    .replace(/[俥車]/g, "车")
-    .replace(/[砲]/g, "炮")
-    .replace(/[進]/g, "进")
-    .replace(/[後]/g, "后");
+  return localizedChineseText(text);
 }
 
 function localizedLinePlanSummary(linePlan) {
   if (!linePlan) return "";
-  return isChineseLocale() ? linePlan.zhSummary ?? linePlan.summary ?? "" : linePlan.summary ?? linePlan.zhSummary ?? "";
+  const text = isChineseLocale() ? linePlan.zhSummary ?? linePlan.summary ?? "" : linePlan.summary ?? linePlan.zhSummary ?? "";
+  return localizedChineseText(text);
 }
 
 function localizedReasons(decision) {
-  if (isChineseLocale() && decision.zhReasons?.length) return decision.zhReasons;
+  if (isChineseLocale() && decision.zhReasons?.length) return decision.zhReasons.map(localizedChineseText);
   return decision.reasons ?? [];
+}
+
+function localizedPlanComparisonSummary(comparison) {
+  if (!comparison) return "";
+  const text = isChineseLocale() ? comparison.zhSummary ?? comparison.summary ?? "" : comparison.summary ?? comparison.zhSummary ?? "";
+  return localizedChineseText(text);
+}
+
+function localizedPracticeFocus(focus) {
+  if (!focus || !isChineseLocale()) return focus;
+  const [title, text] = practiceFocusTranslations[state.locale]?.[focus.category] ?? [];
+  return {
+    ...focus,
+    title: title ?? localizedChineseText(focus.title ?? ""),
+    text: text ?? localizedChineseText(focus.text ?? "")
+  };
+}
+
+function localizedChineseText(text) {
+  const value = String(text ?? "");
+  if (state.locale !== "zh-CN") return value;
+  return value.replace(/[\u3400-\u9fff]/g, (char) => simplifiedChineseMap[char] ?? char);
 }
 
 function confidenceLabel(confidence) {
