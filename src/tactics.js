@@ -1,6 +1,6 @@
-import { PIECE_NAMES, PIECE_VALUES } from "./constants.js";
-import { makeMove, moveToNotation, positionKey } from "./board.js";
-import { generateLegalMoves } from "./movegen.js";
+import { PIECES, PIECE_NAMES, PIECE_VALUES } from "./constants.js";
+import { indexToCoord, makeMove, moveToNotation, opponent, positionKey } from "./board.js";
+import { generateLegalMoves, isInCheck } from "./movegen.js";
 
 const DEFAULT_MAX_EXCHANGE_PLIES = 12;
 
@@ -44,6 +44,51 @@ export function captureExchangeScore(position, move) {
   return analyzeCapture(position, move)?.exchangeScore ?? 0;
 }
 
+export function analyzeFork(position, move, options = {}) {
+  if (!move) return null;
+
+  const side = move.piece?.side ?? position.turn;
+  const after = makeMove(position, move);
+  const movedPiece = after.board[move.to];
+  if (!movedPiece || movedPiece.side !== side) return null;
+
+  const minTargetValue = options.minTargetValue ?? PIECE_VALUES[PIECES.PAWN];
+  const targets = new Map();
+  const enemy = opponent(side);
+
+  for (const attack of generateLegalMoves(after, side)) {
+    if (attack.from !== move.to || !attack.captured) continue;
+    if (attack.captured.type !== PIECES.KING && PIECE_VALUES[attack.captured.type] < minTargetValue) continue;
+    targets.set(attack.to, forkTarget(attack.to, attack.captured, attack));
+  }
+
+  if (isInCheck(after, enemy)) {
+    const kingSquare = after.board.findIndex((piece) => piece?.side === enemy && piece.type === PIECES.KING);
+    if (kingSquare !== -1) {
+      targets.set(kingSquare, forkTarget(kingSquare, after.board[kingSquare], null));
+    }
+  }
+
+  const orderedTargets = [...targets.values()]
+    .sort((a, b) => b.value - a.value || a.square - b.square);
+  if (orderedTargets.length < 2) return null;
+
+  const score = orderedTargets.reduce((sum, target) => (
+    sum + (target.type === PIECES.KING ? 1200 : Math.min(900, target.value))
+  ), 0);
+
+  return {
+    move,
+    notation: moveToNotation(move),
+    piece: movedPiece,
+    pieceName: PIECE_NAMES[movedPiece.type],
+    targetCount: orderedTargets.length,
+    targets: orderedTargets,
+    score,
+    summary: summarizeFork(move, movedPiece, orderedTargets)
+  };
+}
+
 export function analyzeStaticExchange(position, move, options = {}) {
   if (!move.captured) {
     return {
@@ -68,6 +113,26 @@ export function analyzeStaticExchange(position, move, options = {}) {
 
 export function staticExchangeScore(position, move, options = {}) {
   return analyzeStaticExchange(position, move, options).score;
+}
+
+function forkTarget(square, piece, attack) {
+  return {
+    square,
+    coord: indexToCoord(square),
+    type: piece.type,
+    piece,
+    pieceName: PIECE_NAMES[piece.type],
+    value: PIECE_VALUES[piece.type],
+    notation: attack ? moveToNotation(attack) : null
+  };
+}
+
+function summarizeFork(move, piece, targets) {
+  const targetText = targets
+    .slice(0, 3)
+    .map((target) => `${target.pieceName} on ${target.coord}`)
+    .join(" and ");
+  return `The ${PIECE_NAMES[piece.type]} ${moveToNotation(move)} creates a fork on ${targetText}.`;
 }
 
 function summarizeCapture(move, exchangeScore, cheapestRecapture) {

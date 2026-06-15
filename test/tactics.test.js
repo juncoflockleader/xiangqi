@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  analyzeFork,
   analyzeCapture,
   createEngine,
   generateLegalMoves,
@@ -40,6 +41,27 @@ test("capture analysis follows multi-ply static exchange sequences", () => {
     "e9-e5"
   ]);
   assert.equal(analysis.summary.includes("full exchange remains acceptable"), true);
+});
+
+test("fork analysis detects double attacks by the moved piece", () => {
+  const position = parseFen("4k4/9/9/9/9/r8/4R4/4P4/9/4K4 r");
+  const move = generateLegalMoves(position).find((candidate) => candidate.notation === "e6-e5");
+  const fork = analyzeFork(position, move);
+
+  assert.equal(fork.notation, "e6-e5");
+  assert.equal(fork.pieceName, "rook");
+  assert.deepEqual(fork.targets.map((target) => target.coord), ["e0", "a5"]);
+  assert.deepEqual(fork.targets.map((target) => target.pieceName), ["general", "rook"]);
+  assert.ok(fork.summary.includes("creates a fork"));
+});
+
+test("move explanations name fork tactics", () => {
+  const position = parseFen("4k4/9/9/9/9/r8/4R4/4P4/9/4K4 r");
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  const review = engine.reviewMove(position, "e6-e5", { depth: 1, timeLimitMs: 500 });
+
+  assert.ok(review.explanation.move.reasons.some((reason) => reason.includes("creates a fork")));
+  assert.ok(review.playedLinePlan.motifs.includes("fork"));
 });
 
 test("move explanations mention recapture risk for unsafe captures", () => {
