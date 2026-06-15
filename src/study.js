@@ -957,6 +957,7 @@ function motifZh(motif) {
     "recapture risk": "反吃風險",
     "limits replies": "限制應手",
     "discovered check": "閃擊將軍",
+    skewer: "串打",
     pin: "牽制",
     check: "將軍"
   })[motif] ?? motif;

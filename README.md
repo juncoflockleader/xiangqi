@@ -13,7 +13,7 @@ The current engine is dependency-free JavaScript and includes:
 - Evaluation terms for material, piece-square placement, mobility, threats, pawn progress/support, king safety with palace-control and advisor-elephant fortress awareness, pressure on the general, piece safety, blocked horse/elephant coordination, and rook/cannon line pressure.
 - Static exchange analysis for distinguishing clean wins, tactically poisoned captures, and defended captures that remain sound after recaptures.
 - Immediate pressure/threat analysis for both sides.
-- Fork, pin, discovered-check, and double-attack motif analysis for explaining tactical move choices.
+- Fork, pin, skewer, discovered-check, and double-attack motif analysis for explaining tactical move choices.
 - Perft helpers for validating move generation while the engine grows.
 - Explainable move output for learning-app use cases, including structured confidence, depth-by-depth search trace, best-move stability, alternative-line verdicts, expected replies, why-not reasons, and draw-assumed repetition notes.
 - Progressive coach hints that can reveal an idea, tactical clue, candidate focus, and full best-move reasoning.

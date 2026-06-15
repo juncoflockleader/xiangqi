@@ -60,3 +60,12 @@ test("pressure labels discovered checks as a tactical motif", () => {
   assert.ok(threat.motifs.includes("discovered check"));
   assert.ok(threat.summary.includes("uncovers a rook check"));
 });
+
+test("pressure labels skewers as a tactical motif", () => {
+  const position = parseFen("4r4/9/4k4/9/3R5/9/4P4/9/9/4K4 r");
+  const threat = topThreat(position);
+
+  assert.equal(threat.notation, "d4-e4");
+  assert.ok(threat.motifs.includes("skewer"));
+  assert.ok(threat.summary.includes("skewers the general"));
+});

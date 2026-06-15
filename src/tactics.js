@@ -128,6 +128,36 @@ export function analyzePins(position, move) {
   };
 }
 
+export function analyzeSkewer(position, move) {
+  if (!move) return null;
+
+  const side = move.piece?.side ?? position.turn;
+  const after = makeMove(position, move);
+  const skeweringPiece = after.board[move.to];
+  if (!skeweringPiece || skeweringPiece.side !== side) return null;
+  if (!canSkewerAlongLine(skeweringPiece.type)) return null;
+
+  const enemy = opponent(side);
+  const skewers = [];
+  for (const direction of ORTHOGONAL_DIRECTIONS) {
+    const skewer = skewerInDirection(after, move, skeweringPiece, enemy, direction);
+    if (skewer) skewers.push(skewer);
+  }
+
+  if (skewers.length === 0) return null;
+  skewers.sort((a, b) => b.score - a.score || b.backValue - a.backValue || a.frontSquare - b.frontSquare);
+
+  return {
+    move,
+    notation: moveToNotation(move),
+    piece: skeweringPiece,
+    pieceName: PIECE_NAMES[skeweringPiece.type],
+    skewers,
+    score: Math.min(1400, skewers[0].score),
+    summary: summarizeSkewers(move, skeweringPiece, skewers)
+  };
+}
+
 export function analyzeDiscoveredCheck(position, move) {
   if (!move) return null;
 
@@ -215,6 +245,17 @@ function canPinAlongLine(type) {
   return type === PIECES.ROOK || type === PIECES.CANNON || type === PIECES.KING;
 }
 
+function canSkewerAlongLine(type) {
+  return type === PIECES.ROOK || type === PIECES.CANNON || type === PIECES.KING;
+}
+
+const ORTHOGONAL_DIRECTIONS = Object.freeze([
+  [0, -1],
+  [1, 0],
+  [0, 1],
+  [-1, 0]
+]);
+
 function lineAligned(first, second) {
   return fileOf(first) === fileOf(second) || rankOf(first) === rankOf(second);
 }
@@ -280,6 +321,95 @@ function summarizePins(move, piece, pins) {
   const pin = pins[0];
   const screenText = pin.screen ? ` using the ${pin.screen.pieceName} on ${pin.screen.coord} as a screen` : "";
   return `The ${PIECE_NAMES[piece.type]} ${moveToNotation(move)} pins the ${pin.targetName} on ${pin.targetCoord} to the general${screenText}.`;
+}
+
+function skewerInDirection(position, move, skeweringPiece, enemy, [fileStep, rankStep]) {
+  const occupants = rayOccupants(position, move.to, fileStep, rankStep);
+  if (skeweringPiece.type === PIECES.CANNON) {
+    return cannonSkewerFromOccupants(move, occupants, enemy);
+  }
+
+  return directSkewerFromOccupants(move, skeweringPiece, occupants, enemy);
+}
+
+function directSkewerFromOccupants(move, skeweringPiece, occupants, enemy) {
+  if (occupants.length < 2) return null;
+  const [front, back] = occupants;
+  if (!isSkewerTargetPair(front, back, enemy)) return null;
+  return skewerEntry(front, back, {
+    method: skeweringPiece.type === PIECES.KING ? "flying-general" : "line",
+    notation: moveToNotation(move),
+    screen: null
+  });
+}
+
+function cannonSkewerFromOccupants(move, occupants, enemy) {
+  if (occupants.length < 3) return null;
+  const [screen, front, back] = occupants;
+  if (!isSkewerTargetPair(front, back, enemy)) return null;
+  return skewerEntry(front, back, {
+    method: "cannon-screen",
+    notation: moveToNotation(move),
+    screen
+  });
+}
+
+function isSkewerTargetPair(front, back, enemy) {
+  if (front.piece.side !== enemy || back.piece.side !== enemy) return false;
+  if (front.piece.type === PIECES.KING) return true;
+  return front.value > back.value && back.value >= PIECE_VALUES[PIECES.ADVISOR];
+}
+
+function rayOccupants(position, from, fileStep, rankStep) {
+  const occupants = [];
+  let file = fileOf(from) + fileStep;
+  let rank = rankOf(from) + rankStep;
+
+  while (isInside(file, rank)) {
+    const square = indexOf(file, rank);
+    const piece = position.board[square];
+    if (piece) {
+      occupants.push({
+        square,
+        coord: indexToCoord(square),
+        piece,
+        pieceName: PIECE_NAMES[piece.type],
+        value: PIECE_VALUES[piece.type]
+      });
+    }
+    file += fileStep;
+    rank += rankStep;
+  }
+
+  return occupants;
+}
+
+function skewerEntry(front, back, details) {
+  const score = front.piece.type === PIECES.KING
+    ? 1000 + Math.min(500, back.value)
+    : 220 + Math.max(0, front.value - back.value) + Math.min(500, back.value);
+
+  return {
+    frontSquare: front.square,
+    frontCoord: front.coord,
+    frontPiece: front.piece,
+    frontName: front.pieceName,
+    frontValue: front.value,
+    backSquare: back.square,
+    backCoord: back.coord,
+    backPiece: back.piece,
+    backName: back.pieceName,
+    backValue: back.value,
+    score,
+    ...details
+  };
+}
+
+function summarizeSkewers(move, piece, skewers) {
+  const skewer = skewers[0];
+  const frontText = skewer.frontPiece.type === PIECES.KING ? "general" : skewer.frontName;
+  const screenText = skewer.screen ? ` using the ${skewer.screen.pieceName} on ${skewer.screen.coord} as a screen` : "";
+  return `The ${PIECE_NAMES[piece.type]} ${moveToNotation(move)} skewers the ${frontText} on ${skewer.frontCoord} against the ${skewer.backName} on ${skewer.backCoord}${screenText}.`;
 }
 
 function checkingAttackers(position, side, enemyKingSquare) {

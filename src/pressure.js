@@ -6,7 +6,7 @@ import {
   pieceLabel
 } from "./board.js";
 import { generateLegalMoves, isInCheck } from "./movegen.js";
-import { analyzeCapture, analyzeDiscoveredCheck } from "./tactics.js";
+import { analyzeCapture, analyzeDiscoveredCheck, analyzeSkewer } from "./tactics.js";
 
 export function analyzeThreats(position, side = position.turn, options = {}) {
   const limit = options.limit ?? 5;
@@ -41,12 +41,14 @@ function describeThreat(position, move) {
   const isMate = givesCheck && replies.length === 0;
   const capture = analyzeCapture(position, move);
   const discoveredCheck = analyzeDiscoveredCheck(position, move);
-  const score = scoreThreat({ move, capture, discoveredCheck, givesCheck, isMate });
+  const skewer = analyzeSkewer(position, move);
+  const score = scoreThreat({ move, capture, discoveredCheck, skewer, givesCheck, isMate });
   const motifs = [];
 
   if (isMate || move.captured?.type === PIECES.KING) motifs.push("decisive general threat");
   else if (givesCheck) motifs.push("check");
   if (discoveredCheck) motifs.push("discovered check");
+  if (skewer) motifs.push("skewer");
   if (move.captured && move.captured.type !== PIECES.KING) motifs.push(`wins ${PIECE_NAMES[move.captured.type]}`);
   if (capture?.isSafe) motifs.push("safe capture");
   if (capture && capture.exchangeScore < 0) motifs.push("recapture risk");
@@ -61,18 +63,20 @@ function describeThreat(position, move) {
     isMate,
     capture,
     discoveredCheck,
+    skewer,
     motifs,
-    summary: summarizeThreat(move, { capture, discoveredCheck, givesCheck, isMate })
+    summary: summarizeThreat(move, { capture, discoveredCheck, skewer, givesCheck, isMate })
   };
 }
 
-function scoreThreat({ move, capture, discoveredCheck, givesCheck, isMate }) {
+function scoreThreat({ move, capture, discoveredCheck, skewer, givesCheck, isMate }) {
   if (isMate) return MATE_SCORE;
   if (move.captured?.type === PIECES.KING) return MATE_SCORE - 1;
 
   let score = 0;
   if (givesCheck) score += 250;
   if (discoveredCheck) score += 140;
+  if (skewer) score += 130;
   if (move.captured) {
     score += PIECE_VALUES[move.captured.type];
     score += Math.max(-200, Math.min(400, capture.exchangeScore));
@@ -82,13 +86,14 @@ function scoreThreat({ move, capture, discoveredCheck, givesCheck, isMate }) {
   return score;
 }
 
-function summarizeThreat(move, { capture, discoveredCheck, givesCheck, isMate }) {
+function summarizeThreat(move, { capture, discoveredCheck, skewer, givesCheck, isMate }) {
   const actor = pieceLabel(move.piece);
   const notation = moveToNotation(move);
 
   if (move.captured?.type === PIECES.KING) return `${actor} ${notation} threatens the opposing general.`;
   if (isMate) return `${actor} ${notation} threatens checkmate.`;
   if (discoveredCheck) return discoveredCheck.summary;
+  if (skewer) return skewer.summary;
   if (capture?.isSafe) {
     return `${actor} ${notation} wins a ${PIECE_NAMES[move.captured.type]} cleanly.`;
   }

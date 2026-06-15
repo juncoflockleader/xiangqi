@@ -4,6 +4,7 @@ import {
   analyzeDiscoveredCheck,
   analyzeFork,
   analyzePins,
+  analyzeSkewer,
   analyzeCapture,
   createEngine,
   generateLegalMoves,
@@ -98,6 +99,43 @@ test("move explanations name pin tactics", () => {
 
   assert.ok(review.explanation.move.reasons.some((reason) => reason.includes("pins the rook on e3")));
   assert.ok(review.playedLinePlan.motifs.includes("pin"));
+});
+
+test("skewer analysis detects direct line skewers", () => {
+  const position = parseFen("4r4/9/4k4/9/3R5/9/4P4/9/9/4K4 r");
+  const move = generateLegalMoves(position).find((candidate) => candidate.notation === "d4-e4");
+  const skewer = analyzeSkewer(position, move);
+
+  assert.equal(skewer.notation, "d4-e4");
+  assert.equal(skewer.pieceName, "rook");
+  assert.equal(skewer.skewers[0].frontCoord, "e2");
+  assert.equal(skewer.skewers[0].frontName, "general");
+  assert.equal(skewer.skewers[0].backCoord, "e0");
+  assert.equal(skewer.skewers[0].backName, "rook");
+  assert.equal(skewer.skewers[0].method, "line");
+  assert.ok(skewer.summary.includes("skewers the general on e2 against the rook on e0"));
+});
+
+test("skewer analysis detects cannon-screen skewers", () => {
+  const position = parseFen("4r4/9/4k4/4P4/2C6/9/9/9/9/4K4 r");
+  const move = generateLegalMoves(position).find((candidate) => candidate.notation === "c4-e4");
+  const skewer = analyzeSkewer(position, move);
+
+  assert.equal(skewer.pieceName, "cannon");
+  assert.equal(skewer.skewers[0].frontCoord, "e2");
+  assert.equal(skewer.skewers[0].backCoord, "e0");
+  assert.equal(skewer.skewers[0].screen.coord, "e3");
+  assert.equal(skewer.skewers[0].method, "cannon-screen");
+  assert.ok(skewer.summary.includes("using the pawn on e3 as a screen"));
+});
+
+test("move explanations name skewer tactics", () => {
+  const position = parseFen("4r4/9/4k4/9/3R5/9/4P4/9/9/4K4 r");
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  const review = engine.reviewMove(position, "d4-e4", { depth: 1, timeLimitMs: 500 });
+
+  assert.ok(review.explanation.move.reasons.some((reason) => reason.includes("skewers the general on e2")));
+  assert.ok(review.playedLinePlan.motifs.includes("skewer"));
 });
 
 test("discovered-check analysis detects opened rook lines", () => {

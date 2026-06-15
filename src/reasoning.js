@@ -16,7 +16,7 @@ import {
 import { generateLegalMoves, isInCheck } from "./movegen.js";
 import { analyzeThreats, topThreat } from "./pressure.js";
 import { formatPrincipalVariation } from "./search.js";
-import { analyzeCapture, analyzeDiscoveredCheck, analyzeFork, analyzePins } from "./tactics.js";
+import { analyzeCapture, analyzeDiscoveredCheck, analyzeFork, analyzePins, analyzeSkewer } from "./tactics.js";
 import { compareLinePlans, summarizePlanComparisonEvidence } from "./plan-comparison.js";
 
 export function explainMove(position, searchResult) {
@@ -156,6 +156,7 @@ export function explainMoveFeatures(position, move) {
   const captureAnalysis = analyzeCapture(position, move);
   const fork = analyzeFork(position, move);
   const pins = analyzePins(position, move);
+  const skewer = analyzeSkewer(position, move);
   const discoveredCheck = analyzeDiscoveredCheck(position, move);
 
   if (captureAnalysis && captureAnalysis.exchangeScore < 0) {
@@ -173,6 +174,7 @@ export function explainMoveFeatures(position, move) {
   if (move.givesCheck || isInCheck(next, opponent(position.turn))) reasons.push("It gives check and forces the opponent to answer immediately.");
   if (fork) reasons.push(capitalize(fork.summary));
   if (pins) reasons.push(capitalize(pins.summary));
+  if (skewer) reasons.push(capitalize(skewer.summary));
   if (discoveredCheck) reasons.push(capitalize(discoveredCheck.summary));
   if (isInCheck(position, position.turn)) reasons.push("It resolves the current check while keeping active play.");
   if (legalReplyCount <= 3) reasons.push(`It sharply limits the opponent to ${legalReplyCount} legal replies.`);
@@ -749,6 +751,9 @@ function lineMoveMotifs(position, move) {
 
   const pins = analyzePins(position, move);
   if (pins) motifs.push("pin");
+
+  const skewer = analyzeSkewer(position, move);
+  if (skewer) motifs.push("skewer");
 
   const discoveredCheck = analyzeDiscoveredCheck(position, move);
   if (discoveredCheck) motifs.push("discovered check");
