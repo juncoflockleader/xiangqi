@@ -21,6 +21,45 @@ test("search reports tactical extensions in checking lines", () => {
   assert.ok(result.stats.nodes >= result.nodes);
 });
 
+test("search orders quiet tactical motifs before generic quiet moves", () => {
+  const position = parseFen("4r4/9/4k4/9/3R5/9/4P4/9/9/4K4 r");
+  const result = searchBestMove(position, {
+    depth: 1,
+    timeLimitMs: 1000,
+    useBook: false,
+    candidateLimit: Number.POSITIVE_INFINITY
+  });
+  const disabled = searchBestMove(position, {
+    depth: 1,
+    timeLimitMs: 1000,
+    useBook: false,
+    useTacticalMoveOrdering: false,
+    candidateLimit: Number.POSITIVE_INFINITY
+  });
+
+  assert.ok(result.stats.tacticalMoveOrderHits > 0);
+  assert.ok(result.stats.tacticalMoveOrderCacheStores > 0);
+  assert.equal(disabled.stats.tacticalMoveOrderHits, 0);
+  assert.equal(disabled.stats.tacticalMoveOrderCacheStores, 0);
+});
+
+test("engine explanations surface tactical-motif ordering diagnostics", () => {
+  const position = parseFen("4r4/9/4k4/9/3R5/9/4P4/9/9/4K4 r");
+  const engine = createEngine({ depth: 1, timeLimitMs: 1000 });
+  const result = engine.chooseMove(position, {
+    useBook: false,
+    depth: 1,
+    timeLimitMs: 1000,
+    candidateLimit: Number.POSITIVE_INFINITY
+  });
+  const selectivityFactor = result.explanation.confidence.factors
+    .find((factor) => factor.kind === "selectivity");
+
+  assert.ok(result.stats.tacticalMoveOrderHits > 0);
+  assert.ok(selectivityFactor);
+  assert.match(selectivityFactor.text, /tactical-motif ordering/);
+});
+
 test("search treats repeated child positions as draw candidates", () => {
   const position = parseFen("4k4/9/9/9/9/9/9/9/9/3KR4 r");
   const move = generateLegalMoves(position).find((candidate) => candidate.notation === "e9-e8");

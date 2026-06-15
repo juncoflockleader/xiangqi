@@ -33,10 +33,13 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function renderSelectedMoves/);
     assert.match(script, /function localizedChineseText/);
     assert.match(script, /move-label/);
+    assert.match(script, /legalMovesSuffix/);
     assert.match(stylesheet, /\.file-labels/);
     assert.match(stylesheet, /\.selected-moves/);
     assert.match(stylesheet, /\.move-label/);
-    assert.match(stylesheet, /font-size: clamp\(11px, 3\.3cqw, 15px\)/);
+    assert.match(stylesheet, /width: var\(--board-play-width\)/);
+    assert.match(stylesheet, /--piece-font-size: clamp\(10px, 2\.35cqw, 14px\)/);
+    assert.match(stylesheet, /\.move-chip \.move-notation/);
     assert.match(stylesheet, /min-height: 0/);
     assert.doesNotMatch(stylesheet, /rotate\(180deg\)/);
     assert.equal(created.ok, true);

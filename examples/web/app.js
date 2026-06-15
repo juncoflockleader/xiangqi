@@ -225,6 +225,7 @@ const zhTwTranslations = {
   engineSelected: "引擎已選擇一手。",
   moveReviewed: "已覆盤此手。",
   legalMoves: "合法著法",
+  legalMovesSuffix: "的合法著法",
   candidate: "候選",
   expectedReply: "預期",
   loss: "損失",
@@ -315,6 +316,7 @@ const translations = {
     engineSelected: "Engine selected a move.",
     moveReviewed: "Move reviewed.",
     legalMoves: "Legal moves",
+    legalMovesSuffix: " legal moves",
     candidate: "candidate",
     expectedReply: "expects",
     loss: "loss",
@@ -757,11 +759,12 @@ function renderSelectedMoves() {
 
   panel.hidden = false;
   const selectedName = pieceName(selectedCell.piece);
+  const selectedHeading = `${selectedName}${t("legalMovesSuffix")}`;
   const chips = moves.map((move) => (
     `<button class="move-chip" type="button" data-move="${escapeHtml(move.notation)}">${formatMoveHtml(move.notation, move.zhNotation)}</button>`
   ));
   panel.innerHTML = [
-    `<div class="selected-moves-heading">${escapeHtml(selectedName)} ${escapeHtml(t("legalMoves"))}</div>`,
+    `<div class="selected-moves-heading">${escapeHtml(selectedHeading)}</div>`,
     `<div class="selected-moves-grid">${chips.join("")}</div>`
   ].join("");
   panel.querySelectorAll("[data-move]").forEach((button) => {

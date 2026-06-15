@@ -29,7 +29,14 @@ import {
   isInCheck
 } from "./movegen.js";
 import { evaluatePosition } from "./evaluate.js";
-import { analyzeCapture, captureExchangeScore } from "./tactics.js";
+import {
+  analyzeCapture,
+  analyzeDiscoveredCheck,
+  analyzeFork,
+  analyzePins,
+  analyzeSkewer,
+  captureExchangeScore
+} from "./tactics.js";
 
 const EXACT = "exact";
 const LOWER = "lower";
@@ -56,6 +63,7 @@ const DEFAULT_SOFT_STABLE_DEPTHS = 1;
 const DEFAULT_SOFT_SCORE_GAP = 80;
 const DEFAULT_SEE_PRUNE_MARGIN = 120;
 const DEFAULT_PROBCUT_MARGIN = 170;
+const DEFAULT_TACTICAL_MOVE_ORDERING_MAX_PLY = 0;
 const PROBCUT_MIN_DEPTH = 4;
 const PROBCUT_REDUCTION = 2;
 const PROBCUT_CAPTURE_LIMIT = 6;
@@ -191,6 +199,11 @@ export function searchBestMove(position, options = {}) {
       useProbCut: options.useProbCut !== false,
       useInternalIterativeDeepening: options.useInternalIterativeDeepening !== false,
       useSingularExtensions: options.useSingularExtensions !== false,
+      useTacticalMoveOrdering: options.useTacticalMoveOrdering !== false,
+      tacticalMoveOrderingMaxPly: Math.max(0, Math.floor(numberOption(
+        options.tacticalMoveOrderingMaxPly,
+        DEFAULT_TACTICAL_MOVE_ORDERING_MAX_PLY
+      ))),
       nullMoveVerificationMinDepth: Math.max(3, Math.floor(numberOption(options.nullMoveVerificationMinDepth, NULL_MOVE_VERIFICATION_MIN_DEPTH))),
       seePruneMargin: Math.max(0, numberOption(options.seePruneMargin, DEFAULT_SEE_PRUNE_MARGIN)),
       probCutMargin: Math.max(0, numberOption(options.probCutMargin, DEFAULT_PROBCUT_MARGIN)),
@@ -1046,6 +1059,10 @@ function moveOrderingScore(position, move, principalMove, context, ply, previous
     score += checkHistoryScore(context, move);
   }
 
+  if (!move.captured && ply <= context.tacticalMoveOrderingMaxPly) {
+    score += tacticalMoveOrderingScore(position, move, context);
+  }
+
   if (killerMoveHit(context, ply, move)) score += 25_000;
   score += context.history.get(moveKey(move)) ?? 0;
 
@@ -1207,6 +1224,57 @@ function getCaptureAnalysis(position, move, context) {
   context.tacticalCache.set(key, analysis);
   context.stats.tacticalCacheStores += 1;
   return analysis;
+}
+
+function tacticalMoveOrderingScore(position, move, context) {
+  if (!context?.useTacticalMoveOrdering) return 0;
+
+  const compute = () => computeTacticalMoveOrderingScore(position, move);
+  const score = context.useTacticalCache
+    ? cachedTacticalMoveOrderingScore(position, move, context, compute)
+    : compute();
+
+  if (score > 0) context.stats.tacticalMoveOrderHits += 1;
+  return score;
+}
+
+function cachedTacticalMoveOrderingScore(position, move, context, compute) {
+  const key = `order:${hashPosition(position)}:${moveKey(move)}`;
+  if (context.tacticalCache.has(key)) {
+    context.stats.tacticalMoveOrderCacheHits += 1;
+    return context.tacticalCache.get(key);
+  }
+
+  const score = compute();
+  context.tacticalCache.set(key, score);
+  context.stats.tacticalMoveOrderCacheStores += 1;
+  return score;
+}
+
+function computeTacticalMoveOrderingScore(position, move) {
+  let score = 0;
+
+  const discoveredCheck = analyzeDiscoveredCheck(position, move);
+  if (discoveredCheck) {
+    score += 32_000 + Math.min(12_000, discoveredCheck.score * 4);
+  }
+
+  const skewer = analyzeSkewer(position, move);
+  if (skewer) {
+    score += 28_000 + Math.min(12_000, skewer.score * 4);
+  }
+
+  const fork = analyzeFork(position, move);
+  if (fork) {
+    score += 24_000 + Math.min(12_000, fork.score * 5);
+  }
+
+  const pins = analyzePins(position, move);
+  if (pins) {
+    score += 18_000 + Math.min(10_000, pins.score * 6);
+  }
+
+  return score;
 }
 
 function evaluateStatic(position, perspective, context) {
@@ -1988,6 +2056,9 @@ function createSearchStats() {
     evalCacheStores: 0,
     tacticalCacheHits: 0,
     tacticalCacheStores: 0,
+    tacticalMoveOrderHits: 0,
+    tacticalMoveOrderCacheHits: 0,
+    tacticalMoveOrderCacheStores: 0,
     ttHits: 0,
     ttStores: 0,
     ttReplacements: 0,
@@ -2063,6 +2134,9 @@ function mergeSearchStats(total, next) {
     evalCacheStores: total.evalCacheStores + next.evalCacheStores,
     tacticalCacheHits: total.tacticalCacheHits + next.tacticalCacheHits,
     tacticalCacheStores: total.tacticalCacheStores + next.tacticalCacheStores,
+    tacticalMoveOrderHits: total.tacticalMoveOrderHits + next.tacticalMoveOrderHits,
+    tacticalMoveOrderCacheHits: total.tacticalMoveOrderCacheHits + next.tacticalMoveOrderCacheHits,
+    tacticalMoveOrderCacheStores: total.tacticalMoveOrderCacheStores + next.tacticalMoveOrderCacheStores,
     ttHits: total.ttHits + next.ttHits,
     ttStores: total.ttStores + next.ttStores,
     ttReplacements: total.ttReplacements + next.ttReplacements,

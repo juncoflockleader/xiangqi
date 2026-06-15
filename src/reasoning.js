@@ -58,7 +58,7 @@ export function explainMove(position, searchResult) {
   if (stability) reasons.push(stability);
 
   if (searchResult.fallback === "static-root") {
-    reasons.push(searchResult.timedOut
+    reasons.unshift(searchResult.timedOut
       ? "Search reached the time limit before completing depth 1, so this move comes from a static one-ply fallback."
       : "No full search depth was completed, so this move comes from a static one-ply fallback.");
   }
@@ -432,6 +432,9 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.tacticalCacheHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.tacticalCacheHits, "static-exchange cache hit"));
   }
+  if ((stats.tacticalMoveOrderHits ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.tacticalMoveOrderHits, "tactical-motif ordering hint"));
+  }
   if ((stats.captureHistoryHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.captureHistoryHits, "capture-history hit"));
   }
@@ -485,6 +488,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   if ((stats.qttHits ?? 0) > 0) supports.push("quiescence-table reuse");
   if ((stats.evalCacheHits ?? 0) > 0) supports.push("evaluation-cache reuse");
   if ((stats.tacticalCacheHits ?? 0) > 0) supports.push("static-exchange cache reuse");
+  if ((stats.tacticalMoveOrderHits ?? 0) > 0) supports.push("tactical-motif ordering");
   if ((stats.captureHistoryHits ?? 0) > 0) supports.push("capture-history ordering");
   if ((stats.checkHistoryHits ?? 0) > 0) supports.push("check-history ordering");
   if ((stats.killerHits ?? 0) > 0) supports.push("killer-move ordering");
