@@ -356,6 +356,7 @@ function serializeBoard(position) {
 
 function summarizeHistoryMove(entry) {
   const position = positionBeforeEntry(entry);
+  const after = positionAfterEntry(entry);
   return {
     ply: entry.ply,
     moveNumber: entry.moveNumber,
@@ -365,6 +366,8 @@ function summarizeHistoryMove(entry) {
     zhNotation: chineseNotationFor(position, entry.move ?? entry.notation),
     positionBefore: entry.positionBefore,
     positionAfter: entry.positionAfter,
+    boardBefore: position ? serializeBoard(position) : null,
+    boardAfter: after ? serializeBoard(after) : null,
     review: entry.review ? summarizeReview(entry.review, position) : null,
     decision: entry.decision ? summarizeDecision(entry.decision, position) : null
   };
@@ -526,6 +529,15 @@ function positionBeforeEntry(entry) {
   if (!entry?.positionBefore) return null;
   try {
     return parseFen(entry.positionBefore);
+  } catch {
+    return null;
+  }
+}
+
+function positionAfterEntry(entry) {
+  if (!entry?.positionAfter) return null;
+  try {
+    return parseFen(entry.positionAfter);
   } catch {
     return null;
   }

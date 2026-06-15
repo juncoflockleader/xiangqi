@@ -205,8 +205,17 @@ const zhTwTranslations = {
   lastMove: "上一手",
   reasoning: "思路",
   history: "棋譜",
+  moveTree: "變化樹",
   starting: "啟動中...",
   noMoves: "尚未走棋。",
+  treeEmpty: "尚未形成棋樹。",
+  mainLine: "主線",
+  alternativeLine: "變化",
+  branchPoint: "分岔點",
+  currentPosition: "當前",
+  expand: "展開",
+  fold: "收合",
+  selectedNode: "已選",
   askPrompt: "可查看最佳、提示，或直接走棋。",
   redToMove: "紅方走棋",
   blackToMove: "黑方走棋",
@@ -255,8 +264,15 @@ const zhCnTranslations = {
   black: "黑方",
   best: "最佳着法",
   history: "棋谱",
+  moveTree: "变化树",
   starting: "启动中...",
   noMoves: "尚未走棋。",
+  treeEmpty: "尚未形成棋树。",
+  mainLine: "主线",
+  alternativeLine: "变化",
+  branchPoint: "分岔点",
+  currentPosition: "当前",
+  expand: "展开",
   askPrompt: "可查看最佳着法、提示，或直接走棋。",
   redToMove: "红方走棋",
   blackToMove: "黑方走棋",
@@ -313,8 +329,17 @@ const translations = {
     lastMove: "Last Move",
     reasoning: "Reasoning",
     history: "History",
+    moveTree: "Move Tree",
     starting: "Starting...",
     noMoves: "No moves yet.",
+    treeEmpty: "No tree yet.",
+    mainLine: "main",
+    alternativeLine: "variation",
+    branchPoint: "branch point",
+    currentPosition: "current",
+    expand: "Expand",
+    fold: "Collapse",
+    selectedNode: "selected",
     askPrompt: "Ask for Best, Hint, or make a move.",
     redToMove: "Red to move",
     blackToMove: "Black to move",
@@ -375,6 +400,8 @@ const state = {
   selected: null,
   pending: false,
   panel: null,
+  treeCollapsed: new Set(),
+  treeSelectedId: null,
   locale: loadLocale()
 };
 
@@ -396,6 +423,8 @@ newGame();
 async function newGame() {
   state.selected = null;
   state.panel = null;
+  state.treeCollapsed.clear();
+  state.treeSelectedId = null;
   await runRequest(async () => {
     const result = await api("/api/new", {
       side: elements.sideSelect.value
@@ -410,6 +439,7 @@ async function playMove(notation) {
       sessionId: state.sessionId,
       move: notation
     });
+    state.treeSelectedId = latestMainlineNodeId(result.state);
     state.panel = panelFromMove(result.state);
     setGame(result.state);
   });
@@ -420,6 +450,7 @@ async function undoMove() {
     const result = await api("/api/undo", {
       sessionId: state.sessionId
     });
+    state.treeSelectedId = latestMainlineNodeId(result.state);
     state.panel = null;
     setGame(result.state);
   });
@@ -484,8 +515,9 @@ async function api(path, payload) {
 function setGame(game) {
   state.game = game;
   state.sessionId = game.sessionId;
+  syncTreeSelection();
   if (!state.panel) {
-    state.panel = panelFromMove(game);
+    state.panel = panelFromTreeSelection() ?? panelFromMove(game);
   }
   render();
 }
@@ -520,12 +552,15 @@ function renderBoard() {
   const game = state.game;
   if (!game) return;
 
-  const cellsByCoord = new Map(game.board.map((cell) => [cell.coord, cell]));
-  const legalFrom = legalMovesFrom();
-  const legalTargetMoves = selectedTargetMoves();
+  const boardView = boardCellsForTreeSelection();
+  const previewing = isTreeBoardPreview();
+  const cellsByCoord = new Map(boardView.map((cell) => [cell.coord, cell]));
+  const legalFrom = previewing ? new Set() : legalMovesFrom();
+  const legalTargetMoves = previewing ? new Map() : selectedTargetMoves();
   const legalTargets = new Set(legalTargetMoves.keys());
 
   elements.boardWrap.classList.toggle("black-view", game.playerSide === "black");
+  elements.boardWrap.classList.toggle("tree-preview", previewing);
   renderBoardLabels(game.playerSide);
   elements.board.innerHTML = "";
 
@@ -541,7 +576,7 @@ function renderBoard() {
       button.dataset.coord = coord;
       button.style.left = intersectionPercent(point.file, pointCount.files);
       button.style.top = intersectionPercent(point.rank, pointCount.ranks);
-      button.disabled = state.pending || !game.playerTurn;
+      button.disabled = state.pending || previewing || !game.playerTurn;
       button.title = cellTitle(cell, coord, targetMove);
       button.setAttribute("aria-label", cellTitle(cell, coord, targetMove));
       if (state.selected === coord) button.classList.add("selected");
@@ -585,14 +620,20 @@ function renderEngineInfo() {
 }
 
 function renderLastMove() {
-  const last = state.game?.lastMove;
+  const treeNode = selectedTreeNode();
+  if (treeNode?.kind === "alternative") {
+    renderAlternativeSummary(treeNode);
+    return;
+  }
+
+  const last = treeNode?.kind === "main" ? treeNode.move : state.game?.lastMove;
   if (!last) {
     elements.lastMovePanel.className = "stack muted";
     elements.lastMovePanel.textContent = t("noMoves");
     return;
   }
 
-  const review = state.game.lastPlayerReview;
+  const review = last.review;
   const decision = last.decision;
   const details = [];
   details.push(`<div class="line"><strong>${escapeHtml(sideName(last.side))}</strong> ${formatMoveHtml(last.notation, last.zhNotation)} <span class="score">${escapeHtml(actorName(last.actor))}</span></div>`);
@@ -605,6 +646,26 @@ function renderLastMove() {
   if (review?.planComparison?.summary) {
     details.push(`<div class="line">${escapeHtml(localizedPlanComparisonSummary(review.planComparison))}</div>`);
   }
+
+  elements.lastMovePanel.className = "stack";
+  elements.lastMovePanel.innerHTML = details.join("");
+}
+
+function renderAlternativeSummary(node) {
+  const alternative = node.alternative;
+  const details = [
+    `<div class="line"><strong>${escapeHtml(t("alternativeLine"))}</strong> ${formatMoveHtml(alternative.move, alternative.zhMove)} <span class="score">${escapeHtml(t("branchPoint"))}: ${formatMoveHtml(node.parentMove.notation, node.parentMove.zhNotation)}</span></div>`
+  ];
+  const reply = alternative.expectedReply
+    ? `<div class="score">${escapeHtml(t("expectedReply"))}: ${formatMoveHtml(alternative.expectedReply, alternative.zhExpectedReply)}</div>`
+    : "";
+  const loss = Number.isFinite(alternative.centipawnLoss)
+    ? `<div class="score">${escapeHtml(t("loss"))}: ${Math.round(alternative.centipawnLoss)} cp</div>`
+    : "";
+  const score = alternative.scoreDetail?.text ?? (Number.isFinite(alternative.score) ? formatCentipawns(alternative.score) : "");
+  if (score) details.push(`<div class="score">${escapeHtml(t("scorePrefix"))}: ${escapeHtml(score)}</div>`);
+  if (reply) details.push(reply);
+  if (loss) details.push(loss);
 
   elements.lastMovePanel.className = "stack";
   elements.lastMovePanel.innerHTML = details.join("");
@@ -630,9 +691,36 @@ function renderReasoning() {
     renderReview(panel.review);
     return;
   }
+  if (panel.kind === "treeAlternative") {
+    renderAlternativeReasoning(panel.node);
+    return;
+  }
 
   elements.reasoningPanel.className = "stack muted";
   elements.reasoningPanel.textContent = t("askPrompt");
+}
+
+function renderAlternativeReasoning(node) {
+  const alternative = node?.alternative;
+  if (!alternative) {
+    elements.reasoningPanel.className = "stack muted";
+    elements.reasoningPanel.textContent = t("noDecision");
+    return;
+  }
+
+  const parts = [
+    `<div>${formatMoveHtml(alternative.move, alternative.zhMove)} <span class="score">${escapeHtml(alternativeSummaryText(alternative))}</span></div>`
+  ];
+  const comparisonSummary = localizedPlanComparisonSummary(alternative.planComparison);
+  if (comparisonSummary) {
+    parts.push(`<div class="line">${escapeHtml(comparisonSummary)}</div>`);
+  }
+  if (alternative.expectedReply) {
+    parts.push(`<div class="line"><strong>${escapeHtml(t("expectedReply"))}</strong> ${formatMoveHtml(alternative.expectedReply, alternative.zhExpectedReply)}</div>`);
+  }
+
+  elements.reasoningPanel.className = "stack";
+  elements.reasoningPanel.innerHTML = parts.join("");
 }
 
 function renderDecision(decision) {
@@ -707,10 +795,202 @@ function renderAlternatives(alternatives) {
 }
 
 function renderHistory() {
-  const history = state.game?.history ?? [];
-  elements.historyList.innerHTML = history.slice(-12).map((move) => (
-    `<li><strong>${move.ply}.</strong> ${formatMoveHtml(move.notation, move.zhNotation)} <span class="score">${escapeHtml(actorName(move.actor))}</span></li>`
-  )).join("");
+  const tree = buildMoveTree();
+  if (!tree.length) {
+    elements.historyList.className = "move-tree-list muted";
+    elements.historyList.innerHTML = `<li class="move-tree-empty">${escapeHtml(t("treeEmpty"))}</li>`;
+    return;
+  }
+
+  elements.historyList.className = "move-tree-list";
+  elements.historyList.innerHTML = tree.map(renderMainlineTreeNode).join("");
+  elements.historyList.querySelectorAll("[data-tree-node]").forEach((button) => {
+    button.addEventListener("click", () => selectTreeNode(button.dataset.treeNode));
+  });
+  elements.historyList.querySelectorAll("[data-tree-toggle]").forEach((button) => {
+    button.addEventListener("click", () => toggleTreeNode(button.dataset.treeToggle));
+  });
+}
+
+function buildMoveTree() {
+  return (state.game?.history ?? []).map((move) => {
+    const node = {
+      id: mainlineNodeId(move.ply),
+      kind: "main",
+      move,
+      alternatives: []
+    };
+    node.alternatives = treeAlternativesForMove(move, node.id);
+    return node;
+  });
+}
+
+function treeAlternativesForMove(move, parentId) {
+  const sources = [{
+    kind: "decision",
+    alternatives: move.decision?.alternatives ?? []
+  }, {
+    kind: "review",
+    alternatives: move.review?.bestAlternatives ?? []
+  }];
+  const seen = new Set([move.notation]);
+  const alternatives = [];
+
+  for (const source of sources) {
+    source.alternatives.forEach((alternative, index) => {
+      if (!alternative?.move || seen.has(alternative.move)) return;
+      seen.add(alternative.move);
+      alternatives.push({
+        id: `alt-${move.ply}-${source.kind}-${index}`,
+        kind: "alternative",
+        parentId,
+        parentMove: move,
+        source: source.kind,
+        alternative
+      });
+    });
+  }
+
+  return alternatives.slice(0, 4);
+}
+
+function renderMainlineTreeNode(node) {
+  const selected = state.treeSelectedId === node.id;
+  const current = node.id === latestMainlineNodeId();
+  const hasAlternatives = node.alternatives.length > 0;
+  const expanded = !state.treeCollapsed.has(node.id);
+  const rowClasses = [
+    "move-tree-item",
+    selected ? "selected" : "",
+    current ? "current" : ""
+  ].filter(Boolean).join(" ");
+  const toggle = hasAlternatives
+    ? `<button class="move-tree-toggle" type="button" data-tree-toggle="${escapeHtml(node.id)}" aria-label="${escapeHtml(expanded ? t("fold") : t("expand"))}">${expanded ? "−" : "+"}</button>`
+    : `<span class="move-tree-toggle-spacer" aria-hidden="true"></span>`;
+  const branches = hasAlternatives && expanded
+    ? `<ol class="move-tree-branches">${node.alternatives.map(renderAlternativeTreeNode).join("")}</ol>`
+    : "";
+
+  return `<li class="${rowClasses}">${[
+    `<div class="move-tree-row">${toggle}${renderMainlineTreeButton(node, selected, current, hasAlternatives, expanded)}</div>`,
+    branches
+  ].join("")}</li>`;
+}
+
+function renderMainlineTreeButton(node, selected, current, hasAlternatives, expanded) {
+  const move = node.move;
+  const plyText = move.side === "black" ? `${move.moveNumber}...` : `${move.moveNumber}.`;
+  const ariaExpanded = hasAlternatives ? ` aria-expanded="${expanded ? "true" : "false"}"` : "";
+  const tags = [
+    `<span class="move-tree-tag">${escapeHtml(t("mainLine"))}</span>`,
+    current ? `<span class="move-tree-tag current">${escapeHtml(t("currentPosition"))}</span>` : "",
+    selected ? `<span class="move-tree-tag selected">${escapeHtml(t("selectedNode"))}</span>` : ""
+  ].filter(Boolean).join("");
+
+  return `<button class="move-tree-node mainline" type="button" data-tree-node="${escapeHtml(node.id)}"${ariaExpanded}>${[
+    `<span class="move-tree-ply">${escapeHtml(plyText)}</span>`,
+    `<span class="move-tree-move">${formatMoveHtml(move.notation, move.zhNotation)}</span>`,
+    `<span class="move-tree-meta">${escapeHtml(actorName(move.actor))}${tags}</span>`
+  ].join("")}</button>`;
+}
+
+function renderAlternativeTreeNode(node) {
+  const selected = state.treeSelectedId === node.id;
+  const alternative = node.alternative;
+  const classes = ["move-tree-branch", selected ? "selected" : ""].filter(Boolean).join(" ");
+
+  return `<li class="${classes}"><button class="move-tree-node alternative" type="button" data-tree-node="${escapeHtml(node.id)}">${[
+    `<span class="move-tree-ply">${escapeHtml(t("alternativeLine"))}</span>`,
+    `<span class="move-tree-move">${formatMoveHtml(alternative.move, alternative.zhMove)}</span>`,
+    `<span class="move-tree-meta">${escapeHtml(alternativeSummaryText(alternative))}</span>`
+  ].join("")}</button></li>`;
+}
+
+function alternativeSummaryText(alternative) {
+  const parts = [];
+  if (alternative.expectedReply) {
+    parts.push(`${t("expectedReply")} ${moveText(alternative.expectedReply, alternative.zhExpectedReply)}`);
+  }
+  if (Number.isFinite(alternative.centipawnLoss)) {
+    parts.push(`${t("loss")} ${Math.round(alternative.centipawnLoss)} cp`);
+  } else if (Number.isFinite(alternative.score)) {
+    parts.push(`${t("scorePrefix")} ${formatCentipawns(alternative.score)}`);
+  }
+  if (!parts.length && alternative.verdict) parts.push(localizedChineseText(alternative.verdict));
+  return parts.join(" · ");
+}
+
+function selectTreeNode(id) {
+  if (!id) return;
+  state.treeSelectedId = id;
+  state.selected = null;
+  state.panel = panelFromTreeSelection() ?? panelFromMove(state.game);
+  render();
+}
+
+function toggleTreeNode(id) {
+  if (!id) return;
+  if (state.treeCollapsed.has(id)) state.treeCollapsed.delete(id);
+  else state.treeCollapsed.add(id);
+  renderHistory();
+}
+
+function syncTreeSelection() {
+  const tree = buildMoveTree();
+  const ids = new Set();
+  for (const node of tree) {
+    ids.add(node.id);
+    node.alternatives.forEach((alternative) => ids.add(alternative.id));
+  }
+  if (!state.treeSelectedId || !ids.has(state.treeSelectedId)) {
+    state.treeSelectedId = latestMainlineNodeId();
+  }
+}
+
+function latestMainlineNodeId(game = state.game) {
+  const last = game?.history?.at(-1);
+  return last ? mainlineNodeId(last.ply) : null;
+}
+
+function mainlineNodeId(ply) {
+  return `main-${ply}`;
+}
+
+function selectedTreeNode() {
+  if (!state.treeSelectedId) return null;
+  return findTreeNode(state.treeSelectedId);
+}
+
+function findTreeNode(id) {
+  for (const node of buildMoveTree()) {
+    if (node.id === id) return node;
+    const alternative = node.alternatives.find((candidate) => candidate.id === id);
+    if (alternative) return alternative;
+  }
+  return null;
+}
+
+function panelFromTreeSelection() {
+  const node = selectedTreeNode();
+  if (!node) return null;
+  if (node.kind === "alternative") return { kind: "treeAlternative", node };
+  if (node.move?.decision) return { kind: "move", decision: node.move.decision };
+  if (node.move?.review) return { kind: "move", review: node.move.review };
+  return null;
+}
+
+function boardCellsForTreeSelection() {
+  const node = selectedTreeNode();
+  if (node?.kind === "alternative") return node.parentMove.boardBefore ?? state.game?.board ?? [];
+  if (node?.kind === "main" && node.id !== latestMainlineNodeId()) return node.move.boardAfter ?? state.game?.board ?? [];
+  return state.game?.board ?? [];
+}
+
+function isTreeBoardPreview() {
+  const node = selectedTreeNode();
+  if (!node) return false;
+  if (node.kind === "alternative") return true;
+  return node.id !== latestMainlineNodeId();
 }
 
 function renderError(message) {
@@ -988,8 +1268,14 @@ function localizedReasons(decision) {
 
 function localizedPlanComparisonSummary(comparison) {
   if (!comparison) return "";
-  const text = isChineseLocale() ? comparison.zhSummary ?? comparison.summary ?? "" : comparison.summary ?? comparison.zhSummary ?? "";
+  const text = isChineseLocale()
+    ? comparison.zhSummary ?? (hasChineseText(comparison.summary) ? comparison.summary : "")
+    : comparison.summary ?? comparison.zhSummary ?? "";
   return localizedChineseText(text);
+}
+
+function hasChineseText(text) {
+  return /[\u3400-\u9fff]/.test(String(text ?? ""));
 }
 
 function localizedPracticeFocus(focus) {
