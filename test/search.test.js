@@ -962,27 +962,24 @@ test("search orders quiet replies with continuation history", () => {
 });
 
 test("search tunes late-move reductions with continuation history", () => {
-  const position = parseFen("2bakab2/9/4c4/9/4p4/4P4/9/4C4/9/2BAKAB2 r");
+  const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
   const result = searchBestMove(position, {
-    depth: 4,
+    depth: 5,
     timeLimitMs: 5000,
     useAspiration: false,
     useSoftTimeManagement: false,
-    useRootScoreOrdering: false,
-    useNodeTypeReductions: false,
     exactRootScores: true
   });
   const disabled = searchBestMove(position, {
-    depth: 4,
+    depth: 5,
     timeLimitMs: 5000,
     useAspiration: false,
     useSoftTimeManagement: false,
-    useNodeTypeReductions: false,
     useContinuationHistory: false,
     exactRootScores: true
   });
 
-  assert.equal(result.depth, 4);
+  assert.equal(result.depth, 5);
   assert.equal(result.bestMove.notation, disabled.bestMove.notation);
   assert.ok(Math.abs(Math.round(result.score) - Math.round(disabled.score)) <= 1);
   assert.ok(result.stats.continuationReductionBoosts + result.stats.continuationReductionMaluses > 0);

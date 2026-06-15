@@ -77,6 +77,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     terms[side].mobility += mobilityValue(sideMoves);
     terms[side].threats += threatValue(sideMoves);
     terms[side].pieceSafety += pieceSafetyValue(position, side, control[side], control[opponent(side)]);
+    terms[side].guardPressure += palaceGuardPressureValue(position, side, control[side], control[opponent(side)]);
     terms[side].kingAttack += kingAttackValue(position, side, sideMoves);
     terms[side].kingSafety += globalKingSafety(position, side, control[opponent(side)]);
     terms[side].palaceShape += palaceShapeValue(position, side);
@@ -148,6 +149,7 @@ function createTerms() {
     palaceShape: 0,
     kingAttack: 0,
     pieceSafety: 0,
+    guardPressure: 0,
     coordination: 0,
     linkedHorse: 0,
     linePressure: 0,
@@ -922,6 +924,54 @@ function pieceSafetyValue(position, side, ownControl, enemyControl) {
   return score;
 }
 
+function palaceGuardPressureValue(position, side, ownControl, enemyControl) {
+  const enemy = opponent(side);
+  const enemyKingSquare = position.board.findIndex((piece) => piece?.side === enemy && piece.type === PIECES.KING);
+  if (enemyKingSquare === -1) return 0;
+
+  const weakenedFortress = Math.max(0, 4 - countGuards(position, enemy));
+  let score = 0;
+
+  for (let square = 0; square < position.board.length; square += 1) {
+    const guard = position.board[square];
+    if (!isPalaceGuard(guard, enemy)) continue;
+
+    const attackers = ownControl.get(square);
+    if (!attackers) continue;
+
+    const defenders = enemyControl.get(square);
+    score += palaceGuardTargetValue(position, guard, square, enemyKingSquare);
+    score += Math.min(3, attackers.count) * 8;
+    score += Math.max(0, attackers.count - (defenders?.count ?? 0)) * 10;
+    score += weakenedFortress * 4;
+    if (attackers.minAttackerValue <= PIECE_VALUES[guard.type]) score += 8;
+  }
+
+  return score;
+}
+
+function isPalaceGuard(piece, side) {
+  return piece?.side === side && (piece.type === PIECES.ADVISOR || piece.type === PIECES.ELEPHANT);
+}
+
+function palaceGuardTargetValue(position, guard, square, enemyKingSquare) {
+  const enemy = guard.side;
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  const kingDistance = Math.abs(file - fileOf(enemyKingSquare)) + Math.abs(rank - rankOf(enemyKingSquare));
+  let score = guard.type === PIECES.ADVISOR ? 28 : 22;
+
+  if (palaceContains(enemy, file, rank)) score += 18;
+  if (file === 4) score += 8;
+  if (kingDistance <= 1) score += 14;
+  else if (kingDistance <= 2) score += 8;
+  if (lineAligned(square, enemyKingSquare) && countLineBlockers(position, square, enemyKingSquare) === 0) {
+    score += 8;
+  }
+
+  return score;
+}
+
 function createControlMap(position, side) {
   const control = new Map();
 
@@ -1325,6 +1375,7 @@ function readableTerm(term) {
     palaceShape: "palace shape and congestion",
     kingAttack: "pressure on the general",
     pieceSafety: "piece safety",
+    guardPressure: "palace guard pressure",
     coordination: "piece coordination",
     linkedHorse: "linked horse coordination",
     linePressure: "rook and cannon line pressure",
