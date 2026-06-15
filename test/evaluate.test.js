@@ -125,6 +125,29 @@ test("evaluation descriptions surface rook-cannon battery pressure", () => {
   assert.ok(notes.some((note) => note.term === "batteryPressure" && note.text.includes("battery pressure")));
 });
 
+test("evaluation rewards rook control from the river rank", () => {
+  const riverRook = parseFen("4k4/9/9/9/9/R3P4/9/9/9/4K4 r");
+  const backRook = parseFen("4k4/9/9/9/9/4P4/9/9/9/R3K4 r");
+  const riverEval = evaluatePosition(riverRook, SIDES.RED, { detailed: true });
+  const backEval = evaluatePosition(backRook, SIDES.RED, { detailed: true });
+
+  assert.ok(riverEval.terms.red.riverControl - backEval.terms.red.riverControl >= 25);
+  assert.ok(riverEval.difference.riverControl > backEval.difference.riverControl);
+});
+
+test("evaluation descriptions surface river-rank control", () => {
+  const position = parseFen("4k4/9/9/9/9/4P4/9/9/9/R3K4 r");
+  const next = applyLegalMove(position, {
+    from: coordToIndex("a9"),
+    to: coordToIndex("a5")
+  });
+  const delta = evaluateMoveDelta(position, next, SIDES.RED);
+  const notes = describeEvaluationTerms(delta.delta);
+
+  assert.ok(delta.delta.riverControl >= 25);
+  assert.ok(notes.some((note) => note.term === "riverControl" && note.text.includes("river-rank control")));
+});
+
 test("evaluation rewards rooks with open activity", () => {
   const trapped = parseFen("4k4/9/9/9/9/9/9/9/P8/RH2K4 r");
   const active = parseFen("4k4/9/9/9/9/R8/9/9/7P1/1H2K4 r");

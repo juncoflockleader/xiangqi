@@ -223,7 +223,7 @@ test("move explanations surface quiescence hash-move ordering diagnostics", () =
 });
 
 test("move explanations surface transposition hash-move ordering diagnostics", () => {
-  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const position = parseFen("3ak4/9/4c4/4p4/9/4P4/4C4/9/9/3AKA3 r");
   const engine = createEngine({ depth: 2, timeLimitMs: 1000 });
   engine.chooseMove(position, {
     useBook: false,

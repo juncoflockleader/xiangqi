@@ -65,6 +65,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     terms[piece.side].linePressure += linePressureValue(position, piece, square);
     terms[piece.side].pinPressure += pinPressureValue(position, piece, square);
     terms[piece.side].rookActivity += rookActivityValue(position, piece, square);
+    terms[piece.side].riverControl += riverControlValue(position, piece, square);
     terms[piece.side].horsePressure += horsePressureValue(position, piece, square);
   }
 
@@ -148,6 +149,7 @@ function createTerms() {
     pinPressure: 0,
     batteryPressure: 0,
     rookActivity: 0,
+    riverControl: 0,
     horsePressure: 0
   };
 }
@@ -499,6 +501,43 @@ function isLineAttacker(piece) {
 
 function lineBatteryPieceBonus(piece) {
   return piece.type === PIECES.ROOK ? 18 : 14;
+}
+
+function riverControlValue(position, piece, square) {
+  if (piece.type !== PIECES.ROOK && piece.type !== PIECES.CANNON) return 0;
+
+  const rank = rankOf(square);
+  if (!riverRanks(piece.side).includes(rank)) return 0;
+
+  const file = fileOf(square);
+  const left = rookRayActivity(position, file, rank, -1, 0);
+  const right = rookRayActivity(position, file, rank, 1, 0);
+  const forward = rookRayActivity(position, file, rank, 0, forwardDelta(piece.side));
+  const horizontalReach = left.empty + right.empty;
+  let score = piece.type === PIECES.ROOK ? 14 : 10;
+
+  score += Math.min(14, horizontalReach * 2);
+  score += Math.max(0, 4 - Math.abs(file - 4)) * 3;
+  if (rank === enemyRiverBank(piece.side)) score += 6;
+
+  if (!forward.blocker) {
+    score += 7;
+  } else if (forward.blocker.side !== piece.side) {
+    score += Math.min(10, Math.round((PIECE_VALUES[forward.blocker.type] ?? 0) * 0.014));
+  } else {
+    score -= 5;
+  }
+
+  if (horizontalReach <= 2) score -= 10;
+  return score;
+}
+
+function riverRanks(side) {
+  return side === SIDES.RED ? [5, 4] : [4, 5];
+}
+
+function enemyRiverBank(side) {
+  return side === SIDES.RED ? 4 : 5;
 }
 
 function rookActivityValue(position, piece, square) {
@@ -1102,6 +1141,7 @@ function readableTerm(term) {
     pinPressure: "palace pin pressure",
     batteryPressure: "rook-cannon battery pressure",
     rookActivity: "rook activity",
+    riverControl: "river-rank control",
     horsePressure: "horse outpost pressure"
   };
 

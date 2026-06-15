@@ -423,7 +423,7 @@ test("search orders transposition-table hash moves before generic replies", () =
 });
 
 test("search adapts late-move reductions by depth and move order", () => {
-  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const position = parseFen("3ak4/9/4r4/9/9/9/9/9/9/3KR4 r");
   const adaptive = searchBestMove(position, {
     depth: 6,
     timeLimitMs: 5000,
@@ -737,24 +737,24 @@ test("search prunes shallow fail-high nodes with reverse futility margins", () =
 });
 
 test("search prunes clearly losing shallow captures with static exchange", () => {
-  const position = parseFen("2bakab2/9/9/4c4/4p4/4P4/4C4/9/9/2BAKAB2 r");
+  const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3AKR3 r");
   const withPruning = searchBestMove(position, {
-    depth: 4,
-    timeLimitMs: 3000,
+    depth: 5,
+    timeLimitMs: 5000,
     useAspiration: false,
     useSoftTimeManagement: false,
     useImprovingHeuristics: false
   });
   const withoutPruning = searchBestMove(position, {
-    depth: 4,
-    timeLimitMs: 3000,
+    depth: 5,
+    timeLimitMs: 5000,
     useAspiration: false,
     useSoftTimeManagement: false,
     useImprovingHeuristics: false,
     useSeePruning: false
   });
 
-  assert.equal(withPruning.depth, 4);
+  assert.equal(withPruning.depth, 5);
   assert.equal(withPruning.bestMove.notation, withoutPruning.bestMove.notation);
   assert.equal(Math.round(withPruning.score), Math.round(withoutPruning.score));
   assert.ok(withPruning.stats.seePrunes > 0);
@@ -785,7 +785,7 @@ test("search razors shallow quiet branches after quiescence verification", () =>
 });
 
 test("search can probcut promising captures at deeper non-PV nodes", () => {
-  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
   const withProbCut = searchBestMove(position, {
     depth: 6,
     timeLimitMs: 5000,
