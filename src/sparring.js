@@ -299,6 +299,8 @@ function summarizeRefereeMove(move) {
     bestMove: notationFor(review.bestMove),
     bestScore: review.bestScore,
     playedScore: review.playedScore,
+    playedScoreDetail: review.playedScoreDetail ?? null,
+    playedWdl: review.playedWdl ?? null,
     bestScoreDetail: review.bestAnalysis?.scoreDetail ?? null,
     bestWdl: review.bestAnalysis?.wdl ?? null,
     depth: review.depth,

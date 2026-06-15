@@ -63,6 +63,9 @@ test("game review key moments preserve native score evidence", async () => {
     });
 
     assert.equal(review.keyMoments[0].notation, "h7-e7");
+    assert.equal(review.keyMoments[0].playedScoreDetail.text, "getting mated in 2");
+    assert.equal(review.keyMoments[0].playedScoreText, "getting mated in 2");
+    assert.equal(review.keyMoments[0].playedWdl.text, "0% win, 2% draw, 98% loss");
     assert.equal(review.keyMoments[0].bestScoreDetail.text, "mate in 2");
     assert.equal(review.keyMoments[0].bestScoreText, "mate in 2");
     assert.equal(review.keyMoments[0].bestWdl.text, "98% win, 2% draw, 0% loss");
@@ -83,6 +86,7 @@ test("move review classifies tactical mistake patterns", () => {
   assert.ok(review.mistakes.tags.includes("tactics"));
   assert.ok(review.explanation.reasons.some((reason) => reason.includes("Mistake pattern")));
   assert.equal(review.explanation.mistakes.primary, "unsafe-capture");
+  assert.equal(review.playedScoreDetail.kind, "cp");
   assert.equal(review.playedLinePlan.firstMove, "e6-e5");
   assert.match(review.playedLinePlan.summary, /Start with e6-e5/);
   assert.equal(review.bestLinePlan.firstMove, review.bestMove.notation);

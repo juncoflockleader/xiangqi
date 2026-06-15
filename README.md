@@ -166,6 +166,7 @@ console.log(study.hints.map((hint) => hint.text));
 console.log(study.openingCandidates.map((candidate) => candidate.move));
 console.log(study.candidateLines.map((line) => [line.move, line.scoreText]));
 console.log(study.decision.linePlan.summary);
+console.log(study.playedMoveReview?.playedScoreText);
 console.log(study.playedMoveReview?.playedLinePlan?.summary);
 console.log(study.playedMoveReview?.bestLinePlan?.summary);
 console.log(study.playedMoveReview?.planComparison?.summary);
@@ -197,6 +198,7 @@ const gameStudy = engine.gameStudy(["h7-e7", "h0-g2", "h9-g7"], {
 
 console.log(gameStudy.summary);
 console.log(gameStudy.lessonPlan.cards[0]?.prompt);
+console.log(gameStudy.keyMoments[0]?.playedScoreText);
 console.log(gameStudy.keyMoments[0]?.playedLinePlan?.summary);
 console.log(gameStudy.keyMoments[0]?.bestLinePlan?.summary);
 console.log(gameStudy.keyMoments[0]?.planComparison?.summary);
@@ -378,6 +380,8 @@ console.log(pureNativeResult.source);
 
 const nativeReview = await nativeBackend.reviewMove(position, "h7-e7");
 console.log(nativeReview.explanation.summary);
+console.log(nativeReview.playedScoreDetail.text);
+console.log(nativeReview.playedWdl?.text);
 console.log(nativeReview.playedLinePlan.summary);
 console.log(nativeReview.bestLinePlan.summary);
 console.log(nativeReview.planComparison.summary);
@@ -487,6 +491,7 @@ console.log(review.classification);
 console.log(review.centipawnLoss);
 console.log(review.mistakes.primary);
 console.log(review.explanation.summary);
+console.log(review.playedScoreDetail.text);
 console.log(review.playedLinePlan.summary);
 console.log(review.bestLinePlan.summary);
 console.log(review.planComparison.summary);
@@ -498,6 +503,9 @@ played, so a UI can compare "your idea" against the engine's preferred plan.
 `planComparison` packages that contrast into a learner-ready summary plus
 structured fields for first-move match, expected-reply match, motifs, and the
 centipawn gap.
+Native reviews also preserve `playedScoreDetail` and `playedWdl` from the
+searched played line, with opponent-perspective reply scores flipped back to the
+player's perspective.
 
 Analyze several candidate lines:
 

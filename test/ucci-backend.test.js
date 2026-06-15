@@ -574,6 +574,9 @@ test("UCCI backend reviews moves with native search scores", async () => {
     assert.equal(review.bestMove.notation, "h9-g7");
     assert.equal(review.bestScore, 42);
     assert.equal(review.playedScore, -17);
+    assert.equal(review.playedScoreDetail.kind, "cp");
+    assert.equal(review.playedScoreDetail.text, "-0.17");
+    assert.equal(review.playedWdl, null);
     assert.equal(review.centipawnLoss, 59);
     assert.equal(review.classification, "good");
     assert.equal(review.mistakes.primary, "none");

@@ -382,6 +382,7 @@ function printReview(review) {
   if (review.reviewBackend?.name) {
     console.log(`Review source: ${review.reviewBackend.name}.`);
   }
+  printReviewScoreEvidence(review);
   console.log(review.explanation.summary);
   printLinePlan(review.playedLinePlan, {
     label: "Your plan",
@@ -395,6 +396,19 @@ function printReview(review) {
     });
   }
   printPlanComparison(review.planComparison);
+}
+
+function printReviewScoreEvidence(review) {
+  const playedScore = review.playedScoreDetail?.text
+    ?? (Number.isFinite(review.playedScore) ? formatCentipawns(review.playedScore) : null);
+  const bestScore = review.bestAnalysis?.scoreDetail?.text
+    ?? (Number.isFinite(review.bestScore) ? formatCentipawns(review.bestScore) : null);
+  if (playedScore || bestScore) {
+    console.log(`Score: played ${playedScore ?? "unknown"}; best ${bestScore ?? "unknown"}.`);
+  }
+  if (review.playedWdl?.text || review.bestAnalysis?.wdl?.text) {
+    console.log(`WDL: played ${review.playedWdl?.text ?? "unknown"}; best ${review.bestAnalysis?.wdl?.text ?? "unknown"}.`);
+  }
 }
 
 function printGameOver(status) {

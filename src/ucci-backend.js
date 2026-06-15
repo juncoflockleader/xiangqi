@@ -541,6 +541,8 @@ async function nativeReviewMove(client, position, moveOrNotation, options) {
   const playedCandidate = isBestMove
     ? {
         score: bestAnalysis.score,
+        scoreDetail: bestAnalysis.scoreDetail ?? null,
+        wdl: bestAnalysis.wdl ?? null,
         principalVariation: bestAnalysis.principalVariation
       }
     : await analyzePlayedNativeMove(client, position, move, options);
@@ -559,6 +561,8 @@ async function nativeReviewMove(client, position, moveOrNotation, options) {
     bestMove,
     bestScore: Math.round(bestAnalysis.score),
     playedScore: Math.round(playedCandidate.score),
+    playedScoreDetail: playedCandidate.scoreDetail ?? null,
+    playedWdl: playedCandidate.wdl ?? null,
     centipawnLoss: Math.round(centipawnLoss),
     classification,
     isBestMove,
@@ -591,11 +595,71 @@ async function analyzePlayedNativeMove(client, position, move, options) {
 
   return {
     score: normalizeScore(-reply.score),
+    scoreDetail: invertScoreDetail(reply.scoreDetail, normalizeScore(-reply.score)),
+    wdl: invertWdl(reply.wdl),
     nodes: reply.nodes,
     principalVariation: [
       annotated,
       ...reply.principalVariation
     ]
+  };
+}
+
+function invertScoreDetail(scoreDetail, normalizedScore) {
+  if (!scoreDetail) return null;
+
+  if (scoreDetail.kind === "mate") {
+    const value = Number.isFinite(scoreDetail.value) ? -scoreDetail.value : null;
+    return {
+      kind: "mate",
+      value,
+      normalizedScore,
+      text: formatNativeScoreDetail({
+        scoreKind: "mate",
+        mate: value,
+        scoreValue: value,
+        score: normalizedScore
+      })
+    };
+  }
+
+  if (scoreDetail.kind === "cp") {
+    const value = Number.isFinite(scoreDetail.value)
+      ? normalizeScore(-scoreDetail.value)
+      : normalizedScore;
+    return {
+      kind: "cp",
+      value,
+      normalizedScore,
+      text: formatScore(normalizedScore)
+    };
+  }
+
+  return {
+    kind: scoreDetail.kind ?? "unknown",
+    value: null,
+    normalizedScore,
+    text: formatScore(normalizedScore)
+  };
+}
+
+function invertWdl(wdl) {
+  if (!wdl) return null;
+  const inverted = {
+    win: wdl.loss,
+    draw: wdl.draw,
+    loss: wdl.win,
+    total: wdl.total
+  };
+  const safeTotal = inverted.total > 0
+    ? inverted.total
+    : inverted.win + inverted.draw + inverted.loss;
+
+  return {
+    ...inverted,
+    total: safeTotal,
+    expectation: safeTotal > 0 ? (inverted.win + inverted.draw / 2) / safeTotal : null,
+    text: formatNativeWdl(inverted)
   };
 }
 

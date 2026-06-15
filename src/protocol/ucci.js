@@ -285,6 +285,7 @@ export class UcciSession {
 
     for (const moment of result.keyMoments.slice(0, 3)) {
       outputs.push(`info string moment ${moment.ply} ${moment.side} ${moment.notation} ${moment.classification} loss ${moment.centipawnLoss} best ${stripMoveSeparator(moment.bestMove)}: ${moment.summary}`);
+      pushReviewScoreInfo(outputs, `moment ${moment.ply}`, moment);
       pushPlanInfo(outputs, `moment ${moment.ply} played`, moment.playedLinePlan);
       pushPlanInfo(outputs, `moment ${moment.ply} best`, moment.bestLinePlan);
       pushPlanComparisonInfo(outputs, `moment ${moment.ply}`, moment.planComparison);
@@ -323,6 +324,7 @@ export class UcciSession {
       for (const hint of card.hints) {
         outputs.push(`info string lesson ${card.rank} hint ${hint.level} ${hint.kind}: ${hint.text}`);
       }
+      pushReviewScoreInfo(outputs, `lesson ${card.rank}`, card);
       pushPlanInfo(outputs, `lesson ${card.rank} played`, card.playedLinePlan);
       pushPlanInfo(outputs, `lesson ${card.rank} best`, card.bestLinePlan);
       pushPlanComparisonInfo(outputs, `lesson ${card.rank}`, card.planComparison);
@@ -412,6 +414,15 @@ function pushPlanInfo(outputs, prefix, linePlan, options = {}) {
   for (const step of (linePlan.moves ?? []).slice(0, 5)) {
     const motifs = step.motifs?.length ? ` motifs ${step.motifs.join(",")}` : "";
     outputs.push(`info string ${prefix} plan step ${step.ply} ${step.side} ${step.role} ${stripMoveSeparator(step.move)} ${step.scoreBeforeText}->${step.scoreAfterText} ${step.scoreDeltaText}${motifs}`);
+  }
+}
+
+function pushReviewScoreInfo(outputs, prefix, review) {
+  if (review?.playedScoreText || review?.bestScoreText) {
+    outputs.push(`info string ${prefix} score played ${review.playedScoreText ?? "unknown"} best ${review.bestScoreText ?? "unknown"}`);
+  }
+  if (review?.playedWdl?.text || review?.bestWdl?.text) {
+    outputs.push(`info string ${prefix} wdl played ${review.playedWdl?.text ?? "unknown"} best ${review.bestWdl?.text ?? "unknown"}`);
   }
 }
 

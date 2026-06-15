@@ -3,7 +3,7 @@ import { makeMove, moveToNotation, parseMoveNotation, sameMove } from "./board.j
 import { bookMoveToCandidate, lookupOpeningBook } from "./book.js";
 import { evaluatePosition } from "./evaluate.js";
 import { analyzePressure } from "./pressure.js";
-import { buildLinePlan, explainBookMove, explainCandidateMove, explainMove, explainReviewedMove } from "./reasoning.js";
+import { buildLinePlan, explainBookMove, explainCandidateMove, explainMove, explainReviewedMove, formatScore } from "./reasoning.js";
 import { compareLinePlans } from "./plan-comparison.js";
 import { analyzeReviewMistakes } from "./mistakes.js";
 import { reviewGameWithEngine } from "./review.js";
@@ -130,6 +130,8 @@ export function createEngine(defaultOptions = {}) {
         bestMove,
         bestScore: Math.round(search.score),
         playedScore: Math.round(candidate.score),
+        playedScoreDetail: scoreDetailForSearchScore(candidate.score),
+        playedWdl: null,
         centipawnLoss: Math.round(centipawnLoss),
         classification,
         isBestMove,
@@ -255,6 +257,16 @@ export function classifyMoveLoss(centipawnLoss) {
   if (centipawnLoss <= 160) return "inaccuracy";
   if (centipawnLoss <= 320) return "mistake";
   return "blunder";
+}
+
+function scoreDetailForSearchScore(score) {
+  const rounded = Math.round(score ?? 0);
+  return {
+    kind: "cp",
+    value: rounded,
+    normalizedScore: rounded,
+    text: formatScore(rounded)
+  };
 }
 
 function resolveLegalMove(position, moveOrNotation) {

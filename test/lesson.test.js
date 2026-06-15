@@ -70,6 +70,9 @@ test("lesson cards preserve native best-line score evidence", async () => {
     });
     const card = plan.cards[0];
 
+    assert.equal(card.playedScoreDetail.text, "getting mated in 2");
+    assert.equal(card.playedScoreText, "getting mated in 2");
+    assert.equal(card.playedWdl.text, "0% win, 2% draw, 98% loss");
     assert.equal(card.bestScoreDetail.text, "mate in 2");
     assert.equal(card.bestScoreText, "mate in 2");
     assert.equal(card.bestWdl.text, "98% win, 2% draw, 0% loss");
@@ -79,6 +82,8 @@ test("lesson cards preserve native best-line score evidence", async () => {
     assert.equal(card.bestLinePlan.expectedReply, "h0-g2");
     assert.equal(card.planComparison.summary, "Your plan starts with h7-e7; the engine prefers h9-g7, a blunder forced-score gap. Both lines expect h0-g2.");
     assert.equal(card.answer.bestScoreDetail.text, "mate in 2");
+    assert.equal(card.answer.playedScoreDetail.text, "getting mated in 2");
+    assert.equal(card.answer.playedWdl.text, "0% win, 2% draw, 98% loss");
     assert.equal(card.answer.bestWdl.text, "98% win, 2% draw, 0% loss");
     assert.equal(card.answer.playedLinePlan.summary, card.playedLinePlan.summary);
     assert.equal(card.answer.bestLinePlan.summary, card.bestLinePlan.summary);
