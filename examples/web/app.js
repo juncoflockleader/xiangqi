@@ -1,5 +1,6 @@
 const files = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
 const ranks = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+const chineseNumerals = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
 
 const pieceNames = {
   zh: {
@@ -330,8 +331,8 @@ function renderBoard() {
       button.type = "button";
       button.className = "cell";
       button.dataset.coord = coord;
-      button.style.left = pointPercent(point.file, files.length);
-      button.style.top = pointPercent(point.rank, ranks.length);
+      button.style.left = intersectionPercent(point.file, files.length);
+      button.style.top = intersectionPercent(point.rank, ranks.length);
       button.disabled = state.pending || !game.playerTurn;
       button.title = cellTitle(cell, coord);
       button.setAttribute("aria-label", cellTitle(cell, coord));
@@ -606,13 +607,17 @@ function visualPoint(coord, playerSide) {
   };
 }
 
-function pointPercent(index, count) {
-  return `${((index * 2 + 1) / (count * 2)) * 100}%`;
+function intersectionPercent(index, count) {
+  if (count <= 1) return "50%";
+  const edgeInset = 50 / count;
+  const span = 100 - edgeInset * 2;
+  return `${edgeInset + (index * span) / (count - 1)}%`;
 }
 
 function cellTitle(cell, coord) {
-  if (!cell?.piece) return `${t("emptyPoint")} ${coord}`;
-  return `${pieceName(cell.piece)} ${coord}`;
+  const point = localizedPoint(coord);
+  if (!cell?.piece) return `${t("emptyPoint")} ${point}`;
+  return `${pieceName(cell.piece)} ${point}`;
 }
 
 function pieceName(piece) {
@@ -630,6 +635,13 @@ function actorName(actor) {
   if (actor === "engine") return t("engineActor");
   if (actor === "player") return t("player");
   return actor ?? "";
+}
+
+function localizedPoint(coord) {
+  if (state.locale !== "zh") return coord;
+  const file = files.indexOf(coord[0]);
+  if (file === -1) return coord;
+  return `${coord}（紅${chineseNumerals[files.length - 1 - file]}路／黑${file + 1}路）`;
 }
 
 function localizedDecisionSummary(decision) {

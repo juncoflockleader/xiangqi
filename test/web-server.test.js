@@ -15,13 +15,19 @@ test("web server serves the browser game and starts a session", async () => {
   try {
     const page = await fetchText(`${app.url}/`);
     const script = await fetchText(`${app.url}/app.js`);
+    const stylesheet = await fetchText(`${app.url}/app.css`);
     const created = await postJson(`${app.url}/api/new`, { side: "red" });
 
     assert.match(page, /<main class="app-shell"/);
     assert.match(page, /楚河/);
     assert.match(page, /漢界/);
+    assert.match(page, /file-labels-north/);
+    assert.match(page, />九</);
     assert.match(page, /id="localeSelect"/);
     assert.match(script, /function renderBoard/);
+    assert.match(script, /function intersectionPercent/);
+    assert.match(stylesheet, /\.file-labels/);
+    assert.match(stylesheet, /min-height: 0/);
     assert.equal(created.ok, true);
     assert.equal(created.state.playerSide, "red");
     assert.equal(created.state.engineSide, "black");
