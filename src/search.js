@@ -58,6 +58,9 @@ const IID_REDUCTION = 2;
 const IID_MOVE_LIMIT = 8;
 const LMR_MIN_DEPTH = 3;
 const LMR_BASE_MOVE_INDEX = 4;
+const LATE_MOVE_PRUNING_MAX_DEPTH = 3;
+const LATE_MOVE_PRUNING_BASE = 4;
+const LATE_MOVE_PRUNING_DEPTH_FACTOR = 3;
 const SINGULAR_EXTENSION_MIN_DEPTH = 5;
 const SINGULAR_EXTENSION_REDUCTION = 2;
 const DEFAULT_SINGULAR_EXTENSION_MARGIN = 90;
@@ -153,6 +156,7 @@ export function searchBestMove(position, options = {}) {
       useRecaptureExtensions: options.useRecaptureExtensions !== false,
       useSeePruning: options.useSeePruning !== false,
       useHistoryMalus: options.useHistoryMalus !== false,
+      useLateMovePruning: options.useLateMovePruning !== false,
       useLateMoveReductions: options.useLateMoveReductions !== false,
       useAdaptiveLmr: options.useAdaptiveLmr !== false,
       useProbCut: options.useProbCut !== false,
@@ -164,6 +168,9 @@ export function searchBestMove(position, options = {}) {
       reverseFutilityMaxDepth: Math.max(1, Math.floor(numberOption(options.reverseFutilityMaxDepth, REVERSE_FUTILITY_MAX_DEPTH))),
       reverseFutilityBaseMargin: Math.max(0, numberOption(options.reverseFutilityBaseMargin, REVERSE_FUTILITY_BASE_MARGIN)),
       reverseFutilityDepthMargin: Math.max(0, numberOption(options.reverseFutilityDepthMargin, REVERSE_FUTILITY_DEPTH_MARGIN)),
+      lateMovePruningMaxDepth: Math.max(1, Math.floor(numberOption(options.lateMovePruningMaxDepth, LATE_MOVE_PRUNING_MAX_DEPTH))),
+      lateMovePruningBase: Math.max(1, Math.floor(numberOption(options.lateMovePruningBase, LATE_MOVE_PRUNING_BASE))),
+      lateMovePruningDepthFactor: Math.max(0, Math.floor(numberOption(options.lateMovePruningDepthFactor, LATE_MOVE_PRUNING_DEPTH_FACTOR))),
       iidMinDepth: Math.max(2, Math.floor(numberOption(options.iidMinDepth, IID_MIN_DEPTH))),
       iidReduction: Math.max(1, Math.floor(numberOption(options.iidReduction, IID_REDUCTION))),
       iidMoveLimit: Math.max(1, Math.floor(numberOption(options.iidMoveLimit, IID_MOVE_LIMIT))),
@@ -672,6 +679,23 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       continue;
     }
 
+    if (shouldPruneLateMove({
+      depth,
+      index,
+      move,
+      inCheck,
+      givesCheck,
+      extension,
+      alpha,
+      beta,
+      context,
+      ply,
+      previousMove
+    })) {
+      context.stats.lateMovePrunes += 1;
+      continue;
+    }
+
     let reduction = lateMoveReduction({ depth, index, move, inCheck, givesCheck, extension, context, ply, previousMove });
     if (reduction > 0) {
       context.stats.reductions += 1;
@@ -1147,6 +1171,37 @@ function reverseFutilityMargin(depth, context) {
   return context.reverseFutilityBaseMargin + context.reverseFutilityDepthMargin * depth;
 }
 
+function shouldPruneLateMove({
+  depth,
+  index,
+  move,
+  inCheck,
+  givesCheck,
+  extension,
+  alpha,
+  beta,
+  context,
+  ply,
+  previousMove
+}) {
+  if (!context.useLateMovePruning) return false;
+  if (depth < 1 || depth > context.lateMovePruningMaxDepth) return false;
+  if (index < lateMovePruningThreshold(depth, context)) return false;
+  if (beta - alpha !== 1) return false;
+  if (inCheck || givesCheck || extension > 0) return false;
+  if (move.captured) return false;
+  if (alpha <= -MATE_SCORE + 1000 || beta >= MATE_SCORE - 1000) return false;
+  if (isKiller(context.killers, ply, move)) return false;
+  if (isStoredCountermove(context, previousMove, move)) return false;
+  if ((context.history.get(moveKey(move)) ?? 0) > depth * depth) return false;
+  if (continuationHistoryValue(context, previousMove, move) > depth * depth) return false;
+  return true;
+}
+
+function lateMovePruningThreshold(depth, context) {
+  return context.lateMovePruningBase + depth * context.lateMovePruningDepthFactor;
+}
+
 function shouldPruneSee({
   depth,
   index,
@@ -1477,11 +1532,16 @@ function isCountermove(context, previousMove, move) {
 
 function continuationHistoryScore(context, previousMove, move) {
   if (!context.useContinuationHistory || !previousMove) return 0;
-  const previous = context.continuationHistory.get(moveKey(previousMove));
-  if (!previous) return 0;
-  const score = previous.get(moveKey(move)) ?? 0;
+  const score = continuationHistoryValue(context, previousMove, move);
   if (score !== 0) context.stats.continuationHistoryHits += 1;
   return score;
+}
+
+function continuationHistoryValue(context, previousMove, move) {
+  if (!context.useContinuationHistory || !previousMove) return 0;
+  const previous = context.continuationHistory.get(moveKey(previousMove));
+  if (!previous) return 0;
+  return previous.get(moveKey(move)) ?? 0;
 }
 
 function bumpHistory(history, move, amount) {
@@ -1599,6 +1659,7 @@ function createSearchStats() {
     probCutPrunes: 0,
     probCutSearches: 0,
     futilityPrunes: 0,
+    lateMovePrunes: 0,
     deltaPrunes: 0,
     reductions: 0,
     reductionPlies: 0,
@@ -1650,6 +1711,7 @@ function mergeSearchStats(total, next) {
     probCutPrunes: total.probCutPrunes + next.probCutPrunes,
     probCutSearches: total.probCutSearches + next.probCutSearches,
     futilityPrunes: total.futilityPrunes + next.futilityPrunes,
+    lateMovePrunes: total.lateMovePrunes + next.lateMovePrunes,
     deltaPrunes: total.deltaPrunes + next.deltaPrunes,
     reductions: total.reductions + next.reductions,
     reductionPlies: total.reductionPlies + next.reductionPlies,

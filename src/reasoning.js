@@ -383,6 +383,7 @@ function searchTechniqueReasons(stats = {}) {
     (stats.seePrunes ?? 0) +
     (stats.reverseFutilityPrunes ?? 0) +
     (stats.futilityPrunes ?? 0) +
+    (stats.lateMovePrunes ?? 0) +
     (stats.razorPrunes ?? 0) +
     (stats.deltaPrunes ?? 0)
   );
@@ -398,7 +399,7 @@ function searchTechniqueReasons(stats = {}) {
     pruneParts.push(formatCount(stats.probCutPrunes, "ProbCut capture prune"));
   }
   if (staticPrunes > 0) {
-    pruneParts.push(`${staticPrunes} SEE/reverse-futility/futility/razor/delta prune${staticPrunes === 1 ? "" : "s"}`);
+    pruneParts.push(`${staticPrunes} SEE/reverse-futility/futility/late-move/razor/delta prune${staticPrunes === 1 ? "" : "s"}`);
   }
 
   if (pruneParts.length > 0) {
@@ -441,6 +442,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
     (stats.seePrunes ?? 0) +
     (stats.reverseFutilityPrunes ?? 0) +
     (stats.futilityPrunes ?? 0) +
+    (stats.lateMovePrunes ?? 0) +
     (stats.razorPrunes ?? 0) +
     (stats.deltaPrunes ?? 0)
   );

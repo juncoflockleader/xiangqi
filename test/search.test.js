@@ -354,6 +354,30 @@ test("search adapts late-move reductions by depth and move order", () => {
   assert.equal(fixed.stats.reductionPlies, fixed.stats.reductions);
 });
 
+test("search prunes late quiet moves after ordered candidates", () => {
+  const position = parseFen("3ak4/9/4r4/9/9/9/9/9/9/3KR4 r");
+  const withPruning = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 3000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  });
+  const withoutPruning = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 3000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    useLateMovePruning: false
+  });
+
+  assert.equal(withPruning.depth, 4);
+  assert.equal(withPruning.bestMove.notation, withoutPruning.bestMove.notation);
+  assert.equal(Math.round(withPruning.score), Math.round(withoutPruning.score));
+  assert.ok(withPruning.stats.lateMovePrunes > 0);
+  assert.equal(withoutPruning.stats.lateMovePrunes, 0);
+  assert.ok(withPruning.nodes < withoutPruning.nodes);
+});
+
 test("search extends hash moves when alternatives fail singular verification", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const rootMove = generateLegalMoves(position)[0];
@@ -549,13 +573,15 @@ test("search can probcut promising captures at deeper non-PV nodes", () => {
     depth: 6,
     timeLimitMs: 5000,
     useAspiration: false,
-    useSoftTimeManagement: false
+    useSoftTimeManagement: false,
+    useLateMovePruning: false
   });
   const withoutProbCut = searchBestMove(position, {
     depth: 6,
     timeLimitMs: 5000,
     useAspiration: false,
     useSoftTimeManagement: false,
+    useLateMovePruning: false,
     useProbCut: false
   });
 
