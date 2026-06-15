@@ -60,6 +60,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     terms[piece.side].material += materialValue(piece, square);
     terms[piece.side].placement += placementValue(piece, square);
     terms[piece.side].pawnStructure += pawnValue(position, piece, square);
+    terms[piece.side].passedSoldier += passedSoldierValue(position, piece, square);
     terms[piece.side].kingSafety += localDefenseValue(position, piece, square);
     terms[piece.side].coordination += coordinationValue(position, piece, square);
     terms[piece.side].linePressure += linePressureValue(position, piece, square);
@@ -140,6 +141,7 @@ function createTerms() {
     mobility: 0,
     threats: 0,
     pawnStructure: 0,
+    passedSoldier: 0,
     kingSafety: 0,
     palaceShape: 0,
     kingAttack: 0,
@@ -272,6 +274,77 @@ function pawnInvasionValue(position, piece, square, file, rank) {
   }
 
   return score;
+}
+
+function passedSoldierValue(position, piece, square) {
+  if (piece.type !== PIECES.PAWN) return 0;
+
+  const rank = rankOf(square);
+  if (!hasCrossedRiver(piece.side, rank)) return 0;
+
+  const file = fileOf(square);
+  const enemy = opponent(piece.side);
+  const progress = piece.side === SIDES.RED ? BOARD_RANKS - 1 - rank : rank;
+  const centrality = Math.max(0, 4 - Math.abs(file - 4));
+  const forward = forwardDelta(piece.side);
+  const lane = forwardLaneStatus(position, piece.side, file, rank);
+  let score = Math.max(0, progress - 4) * 9;
+
+  score += centrality * 4;
+  if (file >= 3 && file <= 5) score += 10;
+
+  if (!lane.blocker) {
+    score += 16;
+  } else if (lane.blocker.side === piece.side) {
+    score -= 12;
+  } else {
+    score += Math.min(18, Math.round((PIECE_VALUES[lane.blocker.type] ?? 0) * 0.025));
+  }
+
+  if (!enemyPawnCanContest(position, enemy, square) && !lane.enemyPawnAhead) {
+    score += 12;
+  }
+
+  const targetRank = rank + forward;
+  if (isInside(file, targetRank) && palaceContains(enemy, file, targetRank)) {
+    score += 14;
+  }
+  if (palaceContains(enemy, file, rank)) {
+    score += 18;
+  }
+
+  return score;
+}
+
+function forwardLaneStatus(position, side, file, rank) {
+  const forward = forwardDelta(side);
+  let targetRank = rank + forward;
+
+  while (isInside(file, targetRank)) {
+    const blocker = position.board[indexOf(file, targetRank)];
+    if (blocker) {
+      return {
+        blocker,
+        enemyPawnAhead: blocker.side !== side && blocker.type === PIECES.PAWN
+      };
+    }
+    targetRank += forward;
+  }
+
+  return {
+    blocker: null,
+    enemyPawnAhead: false
+  };
+}
+
+function enemyPawnCanContest(position, enemy, square) {
+  for (let candidate = 0; candidate < position.board.length; candidate += 1) {
+    const piece = position.board[candidate];
+    if (piece?.side !== enemy || piece.type !== PIECES.PAWN) continue;
+    if (pawnControls(candidate, piece).includes(square)) return true;
+  }
+
+  return false;
 }
 
 function isPawnInFrontOfEnemyKing(side, pawnRank, kingRank) {
@@ -1132,6 +1205,7 @@ function readableTerm(term) {
     mobility: "mobility",
     threats: "tactical pressure",
     pawnStructure: "pawn progress, support, and palace invasion",
+    passedSoldier: "passed soldier pressure",
     kingSafety: "king safety",
     palaceShape: "palace shape and congestion",
     kingAttack: "pressure on the general",

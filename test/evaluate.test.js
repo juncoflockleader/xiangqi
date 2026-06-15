@@ -329,6 +329,32 @@ test("evaluation rewards soldiers that invade the enemy palace", () => {
   assert.ok(invadingEval.difference.pawnStructure > flankEval.difference.pawnStructure);
 });
 
+test("evaluation rewards clear passed soldiers near the enemy palace", () => {
+  const runner = parseFen("4k4/9/9/4P4/9/9/9/9/9/4K4 r");
+  const flank = parseFen("4k4/9/9/P8/9/9/9/9/9/4K4 r");
+  const blocked = parseFen("4k4/9/4h4/4P4/9/9/9/9/9/4K4 r");
+  const runnerEval = evaluatePosition(runner, SIDES.RED, { detailed: true });
+  const flankEval = evaluatePosition(flank, SIDES.RED, { detailed: true });
+  const blockedEval = evaluatePosition(blocked, SIDES.RED, { detailed: true });
+
+  assert.ok(runnerEval.terms.red.passedSoldier - flankEval.terms.red.passedSoldier >= 25);
+  assert.ok(runnerEval.terms.red.passedSoldier > blockedEval.terms.red.passedSoldier);
+  assert.ok(runnerEval.difference.passedSoldier > flankEval.difference.passedSoldier);
+});
+
+test("evaluation descriptions surface passed soldier pressure", () => {
+  const position = parseFen("4k4/9/9/9/4P4/9/9/9/9/4K4 r");
+  const next = applyLegalMove(position, {
+    from: coordToIndex("e4"),
+    to: coordToIndex("e3")
+  });
+  const delta = evaluateMoveDelta(position, next, SIDES.RED);
+  const notes = describeEvaluationTerms(delta.delta);
+
+  assert.ok(delta.delta.passedSoldier >= 10);
+  assert.ok(notes.some((note) => note.term === "passedSoldier" && note.text.includes("passed soldier pressure")));
+});
+
 test("evaluation descriptions surface connected pawn support", () => {
   const position = parseFen("4k4/9/9/9/2P6/3PP4/9/9/9/4K4 r");
   const next = applyLegalMove(position, {
