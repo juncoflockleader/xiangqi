@@ -224,6 +224,7 @@ const zhTwTranslations = {
   noDecision: "尚無決策。",
   engineSelected: "引擎已選擇一手。",
   moveReviewed: "已覆盤此手。",
+  legalMoves: "合法著法",
   candidate: "候選",
   expectedReply: "預期",
   loss: "損失",
@@ -264,6 +265,7 @@ const zhCnTranslations = {
   noDecision: "尚无决策。",
   engineSelected: "引擎已选择一手。",
   moveReviewed: "已复盘此手。",
+  legalMoves: "合法着法",
   loss: "损失",
   scorePrefix: "评分",
   bookSource: "开局库",
@@ -312,6 +314,7 @@ const translations = {
     noDecision: "No decision yet.",
     engineSelected: "Engine selected a move.",
     moveReviewed: "Move reviewed.",
+    legalMoves: "Legal moves",
     candidate: "candidate",
     expectedReply: "expects",
     loss: "loss",
@@ -330,6 +333,7 @@ const translations = {
 const elements = {
   board: document.querySelector("#board"),
   boardWrap: document.querySelector("#boardWrap"),
+  selectedMoves: document.querySelector("#selectedMoves"),
   gameStatus: document.querySelector("#gameStatus"),
   turnPill: document.querySelector("#turnPill"),
   localeSelect: document.querySelector("#localeSelect"),
@@ -468,6 +472,7 @@ function setGame(game) {
 function render() {
   renderStatus();
   renderBoard();
+  renderSelectedMoves();
   renderEngineInfo();
   renderLastMove();
   renderReasoning();
@@ -704,17 +709,20 @@ function handleCellClick(coord) {
     playMove(`${state.selected}-${coord}`);
     state.selected = null;
     renderBoard();
+    renderSelectedMoves();
     return;
   }
 
   if (cell?.piece?.side === game.playerSide && legalFrom.has(coord)) {
     state.selected = coord;
     renderBoard();
+    renderSelectedMoves();
     return;
   }
 
   state.selected = null;
   renderBoard();
+  renderSelectedMoves();
 }
 
 function legalMovesFrom() {
@@ -732,6 +740,39 @@ function selectedTargetMoves() {
       .filter((move) => move.fromCoord === state.selected)
       .map((move) => [move.toCoord, move])
   );
+}
+
+function renderSelectedMoves() {
+  const panel = elements.selectedMoves;
+  if (!panel) return;
+
+  const game = state.game;
+  const moves = [...selectedTargetMoves().values()];
+  const selectedCell = game?.board.find((item) => item.coord === state.selected);
+  if (!game || !state.selected || moves.length === 0 || !selectedCell?.piece) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+    return;
+  }
+
+  panel.hidden = false;
+  const selectedName = pieceName(selectedCell.piece);
+  const chips = moves.map((move) => (
+    `<button class="move-chip" type="button" data-move="${escapeHtml(move.notation)}">${formatMoveHtml(move.notation, move.zhNotation)}</button>`
+  ));
+  panel.innerHTML = [
+    `<div class="selected-moves-heading">${escapeHtml(selectedName)} ${escapeHtml(t("legalMoves"))}</div>`,
+    `<div class="selected-moves-grid">${chips.join("")}</div>`
+  ].join("");
+  panel.querySelectorAll("[data-move]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const notation = button.dataset.move;
+      state.selected = null;
+      renderBoard();
+      renderSelectedMoves();
+      playMove(notation);
+    });
+  });
 }
 
 function panelFromMove(game) {

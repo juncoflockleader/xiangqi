@@ -131,6 +131,7 @@ h2 {
 
 .board-wrap {
   --board-padding: clamp(10px, 2vw, 18px);
+  --board-play-width: calc(100% - var(--board-padding) - var(--board-padding));
   --grid-line: rgba(74, 44, 18, 0.72);
   --grid-inset-x: calc(100% / 18);
   --grid-inset-y: calc(100% / 20);
@@ -149,9 +150,13 @@ h2 {
 
 .board-art {
   position: absolute;
-  inset: var(--board-padding);
+  left: 50%;
+  top: 50%;
+  width: var(--board-play-width);
+  aspect-ratio: 9 / 10;
   pointer-events: none;
   transition: transform 160ms ease;
+  transform: translate(-50%, -50%);
 }
 
 .board-lines {
@@ -286,9 +291,14 @@ h2 {
 
 .board {
   position: absolute;
-  inset: var(--board-padding);
+  left: 50%;
+  top: 50%;
+  width: var(--board-play-width);
+  aspect-ratio: 9 / 10;
+  transform: translate(-50%, -50%);
   z-index: 1;
   overflow: visible;
+  container-type: inline-size;
 }
 
 .cell {
@@ -340,8 +350,10 @@ h2 {
   background: radial-gradient(circle at 35% 30%, #fff9e6 0%, #f6e0a9 62%, #d7af5b 100%);
   box-shadow: 0 4px 8px rgba(52, 34, 13, 0.22);
   font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
-  font-size: clamp(11px, 1.45vw, 14px);
+  font-size: clamp(11px, 1.25vw, 15px);
+  font-size: clamp(11px, 3.3cqw, 15px);
   font-weight: 800;
+  font-variant-east-asian: traditional;
   line-height: 1;
   text-align: center;
   white-space: nowrap;
@@ -359,7 +371,7 @@ h2 {
   position: absolute;
   z-index: 3;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(2px) scale(0.96);
   max-width: 72px;
   overflow: hidden;
   padding: 2px 6px;
@@ -375,6 +387,14 @@ h2 {
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+  opacity: 0;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.cell.target:hover .move-label,
+.cell.target:focus-visible .move-label {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
 }
 
 .move-label-high {
@@ -389,6 +409,45 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.selected-moves {
+  width: min(100%, 760px);
+  margin: 12px auto 0;
+  display: grid;
+  gap: 8px;
+}
+
+.selected-moves[hidden] {
+  display: none;
+}
+
+.selected-moves-heading {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.selected-moves-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.move-chip {
+  min-height: 34px;
+  border-color: rgba(42, 122, 191, 0.34);
+  background: rgba(255, 249, 231, 0.94);
+  color: var(--target);
+  padding: 5px 9px;
+  font-weight: 780;
+}
+
+.move-chip:hover:not(:disabled),
+.move-chip:focus-visible {
+  border-color: var(--target);
+  outline: 2px solid rgba(42, 122, 191, 0.22);
+  outline-offset: 1px;
 }
 
 .controls,
@@ -505,5 +564,9 @@ h2 {
 
   .board-wrap {
     --board-padding: 8px;
+  }
+
+  .move-label {
+    display: none;
   }
 }

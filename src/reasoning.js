@@ -16,7 +16,7 @@ import {
 import { generateLegalMoves, isInCheck } from "./movegen.js";
 import { analyzeThreats, topThreat } from "./pressure.js";
 import { formatPrincipalVariation } from "./search.js";
-import { analyzeCapture, analyzeFork } from "./tactics.js";
+import { analyzeCapture, analyzeFork, analyzePins } from "./tactics.js";
 import { compareLinePlans, summarizePlanComparisonEvidence } from "./plan-comparison.js";
 
 export function explainMove(position, searchResult) {
@@ -155,6 +155,7 @@ export function explainMoveFeatures(position, move) {
   const capture = describeCapture(move);
   const captureAnalysis = analyzeCapture(position, move);
   const fork = analyzeFork(position, move);
+  const pins = analyzePins(position, move);
 
   if (captureAnalysis && captureAnalysis.exchangeScore < 0) {
     reasons.push(capitalize(captureAnalysis.summary));
@@ -170,6 +171,7 @@ export function explainMoveFeatures(position, move) {
   }
   if (move.givesCheck || isInCheck(next, opponent(position.turn))) reasons.push("It gives check and forces the opponent to answer immediately.");
   if (fork) reasons.push(capitalize(fork.summary));
+  if (pins) reasons.push(capitalize(pins.summary));
   if (isInCheck(position, position.turn)) reasons.push("It resolves the current check while keeping active play.");
   if (legalReplyCount <= 3) reasons.push(`It sharply limits the opponent to ${legalReplyCount} legal replies.`);
   if (createdThreat && createdThreat.score >= 400) {
@@ -742,6 +744,9 @@ function lineMoveMotifs(position, move) {
 
   const fork = analyzeFork(position, move);
   if (fork) motifs.push("fork");
+
+  const pins = analyzePins(position, move);
+  if (pins) motifs.push("pin");
 
   const threat = analyzeThreats(next, position.turn, { limit: 1 })[0];
   if (threat && threat.score >= 400) motifs.push("creates threat");

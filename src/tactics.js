@@ -1,5 +1,15 @@
 import { PIECES, PIECE_NAMES, PIECE_VALUES } from "./constants.js";
-import { indexToCoord, makeMove, moveToNotation, opponent, positionKey } from "./board.js";
+import {
+  fileOf,
+  indexOf,
+  indexToCoord,
+  isInside,
+  makeMove,
+  moveToNotation,
+  opponent,
+  positionKey,
+  rankOf
+} from "./board.js";
 import { generateLegalMoves, isInCheck } from "./movegen.js";
 
 const DEFAULT_MAX_EXCHANGE_PLIES = 12;
@@ -89,6 +99,35 @@ export function analyzeFork(position, move, options = {}) {
   };
 }
 
+export function analyzePins(position, move) {
+  if (!move) return null;
+
+  const side = move.piece?.side ?? position.turn;
+  const after = makeMove(position, move);
+  const pinningPiece = after.board[move.to];
+  if (!pinningPiece || pinningPiece.side !== side) return null;
+  if (!canPinAlongLine(pinningPiece.type)) return null;
+
+  const enemy = opponent(side);
+  const enemyKingSquare = after.board.findIndex((piece) => piece?.side === enemy && piece.type === PIECES.KING);
+  if (enemyKingSquare === -1 || !lineAligned(move.to, enemyKingSquare)) return null;
+  if (pinningPiece.type === PIECES.KING && fileOf(move.to) !== fileOf(enemyKingSquare)) return null;
+
+  const blockers = occupiedBetween(after, move.to, enemyKingSquare);
+  const pin = pinFromBlockers({ move, pinningPiece, blockers, enemy });
+  if (!pin) return null;
+
+  return {
+    move,
+    notation: moveToNotation(move),
+    piece: pinningPiece,
+    pieceName: PIECE_NAMES[pinningPiece.type],
+    pins: [pin],
+    score: Math.min(1200, pin.value + (pin.screen ? 80 : 0)),
+    summary: summarizePins(move, pinningPiece, [pin])
+  };
+}
+
 export function analyzeStaticExchange(position, move, options = {}) {
   if (!move.captured) {
     return {
@@ -133,6 +172,77 @@ function summarizeFork(move, piece, targets) {
     .map((target) => `${target.pieceName} on ${target.coord}`)
     .join(" and ");
   return `The ${PIECE_NAMES[piece.type]} ${moveToNotation(move)} creates a fork on ${targetText}.`;
+}
+
+function canPinAlongLine(type) {
+  return type === PIECES.ROOK || type === PIECES.CANNON || type === PIECES.KING;
+}
+
+function lineAligned(first, second) {
+  return fileOf(first) === fileOf(second) || rankOf(first) === rankOf(second);
+}
+
+function occupiedBetween(position, from, to) {
+  const fromFile = fileOf(from);
+  const fromRank = rankOf(from);
+  const toFile = fileOf(to);
+  const toRank = rankOf(to);
+  const fileStep = Math.sign(toFile - fromFile);
+  const rankStep = Math.sign(toRank - fromRank);
+  const blockers = [];
+  let file = fromFile + fileStep;
+  let rank = fromRank + rankStep;
+
+  while (isInside(file, rank) && (file !== toFile || rank !== toRank)) {
+    const square = indexOf(file, rank);
+    const piece = position.board[square];
+    if (piece) {
+      blockers.push({
+        square,
+        coord: indexToCoord(square),
+        piece,
+        pieceName: PIECE_NAMES[piece.type],
+        value: PIECE_VALUES[piece.type]
+      });
+    }
+    file += fileStep;
+    rank += rankStep;
+  }
+
+  return blockers;
+}
+
+function pinFromBlockers({ move, pinningPiece, blockers, enemy }) {
+  if (pinningPiece.type === PIECES.CANNON) {
+    if (blockers.length !== 2) return null;
+    const [screen, target] = blockers;
+    if (target.piece.side !== enemy || target.piece.type === PIECES.KING) return null;
+    return pinEntry(target, { screen, method: "cannon-screen", move });
+  }
+
+  if (blockers.length !== 1) return null;
+  const [target] = blockers;
+  if (target.piece.side !== enemy || target.piece.type === PIECES.KING) return null;
+  return pinEntry(target, { screen: null, method: pinningPiece.type === PIECES.KING ? "flying-general" : "line", move });
+}
+
+function pinEntry(target, { screen, method, move }) {
+  return {
+    targetSquare: target.square,
+    targetCoord: target.coord,
+    targetPiece: target.piece,
+    targetName: target.pieceName,
+    value: target.value,
+    screen,
+    method,
+    notation: moveToNotation(move)
+  };
+}
+
+function summarizePins(move, piece, pins) {
+  const pin = pins[0];
+  const screenText = pin.screen ? ` using the ${pin.screen.pieceName} on ${pin.screen.coord} as a screen` : "";
+  return `The ${PIECE_NAMES[piece.type]} ${moveToNotation(move)} pins the ${pin.targetName} on ${pin.targetCoord} to the general${screenText}.`;
 }
 
 function summarizeCapture(move, exchangeScore, cheapestRecapture) {
