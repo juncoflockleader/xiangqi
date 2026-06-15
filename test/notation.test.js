@@ -43,6 +43,18 @@ test("game move text imports Xiangqi.com western notation", () => {
   assert.deepEqual(parseGameMoveText(text), HU_GAME_COORDINATES);
 });
 
+test("game move text imports Chinese notation", () => {
+  const text = "1. 炮二平五 馬8進7 2. 傌二進三 卒7進1";
+
+  assert.deepEqual(parseGameMoveText(text), ["h7-e7", "h0-g2", "h9-g7", "g3-g4"]);
+});
+
+test("game move text imports compressed Chinese notation", () => {
+  const text = "1.炮二平五馬8進72.傌二進三卒7進1";
+
+  assert.deepEqual(parseGameMoveText(text), ["h7-e7", "h0-g2", "h9-g7", "g3-g4"]);
+});
+
 test("game move text imports compressed Xiangqi.com move lists", () => {
   const text = "1.C2=5n8+72.N2+3p7+13.N8+7r9=84.C8=9n2+35.R9=8r1=26.R1=2p3+17.R8+4b7+58.P7+1p3+19.R8=7n3+410.P5+1c8+2";
 

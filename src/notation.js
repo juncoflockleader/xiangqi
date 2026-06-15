@@ -11,10 +11,12 @@ import {
   toFen
 } from "./board.js";
 import { generateLegalMoves } from "./movegen.js";
+import { parseChineseMoveNotation } from "./chinese-notation.js";
 
 const COORDINATE_MOVE_PATTERN = /^[a-i][0-9]-?[a-i][0-9]$/i;
 const WESTERN_MOVE_PATTERN = /^[KGAEBNRHCPkgaebnrhcp][1-9][=+\-][1-9]$/;
-const MOVE_TOKEN_PATTERN = /[a-i][0-9]-?[a-i][0-9]|[KGAEBNRHCPkgaebnrhcp][1-9][=+\-][1-9]/g;
+const CHINESE_MOVE_PATTERN = /^[帥帅將将仕士相象傌馬马俥車车炮砲兵卒][一二三四五六七八九１２３４５６７８９1-9前中後后][平進进退][一二三四五六七八九１２３４５６７８９1-9]$|^[前中後后][帥帅將将仕士相象傌馬马俥車车炮砲兵卒][平進进退][一二三四五六七八九１２３４５６７８９1-9]$/;
+const MOVE_TOKEN_PATTERN = /[a-i][0-9]-?[a-i][0-9]|[KGAEBNRHCPkgaebnrhcp][1-9][=+\-][1-9]|[帥帅將将仕士相象傌馬马俥車车炮砲兵卒][一二三四五六七八九１２３４５６７８９1-9前中後后][平進进退][一二三四五六七八九１２３４５６７８９1-9]|[前中後后][帥帅將将仕士相象傌馬马俥車车炮砲兵卒][平進进退][一二三四五六七八九１２３４５６７８９1-9]/g;
 const HEADER_PATTERN = /^\s*\[([A-Za-z][\w-]*)\s+"([^"]*)"\]\s*$/;
 const COLON_HEADER_PATTERN = /^\s*([A-Za-z][\w -]{1,40})\s*:\s*(\S.*)$/;
 
@@ -85,6 +87,9 @@ export function parsePortableMoveNotation(position, text) {
   }
   if (WESTERN_MOVE_PATTERN.test(token)) {
     return parseWesternMoveNotation(position, token);
+  }
+  if (CHINESE_MOVE_PATTERN.test(token)) {
+    return parseChineseMoveNotation(position, token);
   }
   throw new Error(`Unsupported move notation: ${text}`);
 }

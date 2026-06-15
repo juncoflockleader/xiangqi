@@ -289,6 +289,7 @@ import {
 const imported = createOpeningBookFromText(`
   h9g7 h0g2 | games=120 | name=Horse Opening | tags=database,horse
   h7e7 h0g2 | games=80 | name=Central Cannon | tags=database,cannon
+  炮二平五 馬8進7 | games=75 | name=Chinese Central Cannon | tags=database,zh
 `);
 
 const book = mergeOpeningBooks(DEFAULT_OPENING_BOOK, imported);
@@ -317,12 +318,13 @@ const gameDatabaseBook = createOpeningBookFromGames({
   games: [
     { moves: ["h9-g7", "h0-g2", "b9-c7"], result: "1-0" },
     { moves: "h9-g7 h0-g2", result: "1/2-1/2" },
+    { moves: "炮二平五馬8進7", result: "1-0" },
     { moves: ["h7-e7", "b0-c2"], result: "0-1" }
   ]
 });
 ```
 
-The text importer accepts move lines plus optional `weight`, `count`, `frequency`, or `games` metadata. The structured-record importer also accepts common database priors such as `games`, `redWinRate`, `drawRate`, `blackWinRate`, `engineScore`, `source`, and `year`; the CSV/TSV importer recognizes common headers such as `moves`, `red_win_rate`, `draw_rate`, `black_win_rate`, `cp`, `source`, `name`, and `tags`. `createOpeningBookFromGames` accepts raw game records, aggregates the first `maxPly` plies by position, and derives frequency plus red/draw/black result priors from results like `1-0`, `0-1`, and `1/2-1/2`; use `minGames` to filter rare continuations. Imported records weight each continuation for the side to move and carry a database summary into the explanation. Repeated lines aggregate their weights, which makes it suitable for converting a larger opening database into engine heuristics.
+The text importer accepts move lines plus optional `weight`, `count`, `frequency`, or `games` metadata. Coordinate notation, western notation such as `C2=5`, and Chinese notation such as `炮二平五` or compressed `炮二平五馬8進7` are accepted in game/text imports. The structured-record importer also accepts common database priors such as `games`, `redWinRate`, `drawRate`, `blackWinRate`, `engineScore`, `source`, and `year`; the CSV/TSV importer recognizes common headers such as `moves`, `red_win_rate`, `draw_rate`, `black_win_rate`, `cp`, `source`, `name`, and `tags`. `createOpeningBookFromGames` accepts raw game records, aggregates the first `maxPly` plies by position, and derives frequency plus red/draw/black result priors from results like `1-0`, `0-1`, and `1/2-1/2`; use `minGames` to filter rare continuations. Imported records weight each continuation for the side to move and carry a database summary into the explanation. Repeated lines aggregate their weights, which makes it suitable for converting a larger opening database into engine heuristics.
 
 Generate opening records from a native oracle when no curated opening database is
 available yet:

@@ -12,6 +12,7 @@ import {
   sameMove
 } from "./board.js";
 import { generateLegalMoves, annotateMove } from "./movegen.js";
+import { extractMoveTokens, parsePortableMoveNotation } from "./notation.js";
 
 const AFTER_RED_CENTRAL_CANNON =
   "rheakaehr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR b";
@@ -326,7 +327,7 @@ export function bookMoveToCandidate(entry) {
 }
 
 function resolveBookEntry(position, entry, legalMoves) {
-  const parsed = parseMoveNotation(entry.move);
+  const parsed = parsePortableMoveNotation(position, entry.move);
   const legalMove = legalMoves.find((move) => sameMove(move, parsed));
   if (!legalMove) return null;
 
@@ -337,11 +338,11 @@ function resolveBookEntry(position, entry, legalMoves) {
   };
 }
 
-function freezeBookEntry(entry) {
+function freezeBookEntry(entry, options = {}) {
   const database = freezeDatabaseMetadata(entry.database);
   return Object.freeze({
     ...entry,
-    move: canonicalMoveNotation(entry.move),
+    move: canonicalMoveNotation(entry.move, options.position),
     name: entry.name ?? "Imported Opening Continuation",
     weight: normalizeWeight(entry.weight),
     idea: entry.idea ?? "This continuation comes from imported opening data and is weighted by its source frequency.",
@@ -370,8 +371,9 @@ function addOpeningLine(positions, line, options = {}) {
   let position = options.initialPosition ?? createInitialPosition();
 
   for (const entry of line) {
-    addEntries(positions, positionKey(position), [entry], { aggregate: options.aggregate });
-    position = applyBookMove(position, entry.move);
+    const normalized = freezeBookEntry(entry, { position });
+    addEntries(positions, positionKey(position), [normalized], { aggregate: options.aggregate });
+    position = applyBookMove(position, normalized.move);
   }
 }
 
@@ -492,11 +494,11 @@ function aggregateOpeningGameRecords(games, options = {}) {
 
 function normalizeGameMoves(game) {
   if (Array.isArray(game)) return game;
-  if (typeof game === "string") return game.trim().split(/\s+/).filter(Boolean);
+  if (typeof game === "string") return extractMoveTokens(game);
 
   const moves = game?.moves ?? game?.line ?? game?.pv;
   if (Array.isArray(moves)) return moves;
-  if (typeof moves === "string") return moves.trim().split(/\s+/).filter(Boolean);
+  if (typeof moves === "string") return extractMoveTokens(moves);
 
   throw new Error("Opening game record requires moves.");
 }
@@ -523,7 +525,7 @@ function gameMoveText(move, gameIndex, ply) {
 }
 
 function resolveGameBookMove(position, notation, gameIndex, ply) {
-  const parsed = parseMoveNotation(notation);
+  const parsed = parsePortableMoveNotation(position, notation);
   const legalMove = generateLegalMoves(position, position.turn)
     .find((move) => sameMove(move, parsed));
 
@@ -575,7 +577,7 @@ function addOpeningRecord(positions, record, options = {}) {
 
   const position = normalizeInitialPosition(record.key ?? record.fen ?? options.initialPosition);
   const key = record.key ?? record.fen ?? positionKey(position);
-  const entry = normalizeDatabaseMove(record, record.move, position.turn, 0, options.defaults);
+  const entry = normalizeDatabaseMove(record, record.move, position.turn, 0, options.defaults, position);
   addEntries(positions, key, [entry], { aggregate: options.aggregate });
 }
 
@@ -586,7 +588,7 @@ function addOpeningLineRecord(positions, record, options = {}) {
   for (let index = 0; index < moves.length; index += 1) {
     const moveSpec = moves[index];
     const move = typeof moveSpec === "string" ? moveSpec : moveSpec.move ?? moveSpec.notation;
-    const entry = normalizeDatabaseMove(record, moveSpec, position.turn, index, options.defaults);
+    const entry = normalizeDatabaseMove(record, moveSpec, position.turn, index, options.defaults, position);
     addEntries(positions, positionKey(position), [entry], { aggregate: options.aggregate });
     position = applyBookMove(position, move ?? entry.move);
   }
@@ -605,11 +607,11 @@ function isOpeningLineRecord(record) {
 
 function normalizeRecordMoves(record) {
   if (Array.isArray(record)) return record;
-  if (typeof record === "string") return record.trim().split(/\s+/).filter(Boolean);
+  if (typeof record === "string") return extractMoveTokens(record);
 
   const moves = record.moves ?? record.line ?? record.pv;
   if (Array.isArray(moves)) return moves;
-  if (typeof moves === "string") return moves.trim().split(/\s+/).filter(Boolean);
+  if (typeof moves === "string") return extractMoveTokens(moves);
 
   throw new Error("Opening database line record requires moves.");
 }
@@ -622,7 +624,7 @@ function normalizeRecordInitialPosition(record, options) {
   return normalizeInitialPosition(explicit ?? options.initialPosition);
 }
 
-function normalizeDatabaseMove(record, moveSpec, side, index, defaults = {}) {
+function normalizeDatabaseMove(record, moveSpec, side, index, defaults = {}, position = null) {
   const moveRecord = typeof moveSpec === "string"
     ? { move: moveSpec }
     : moveSpec;
@@ -659,7 +661,7 @@ function normalizeDatabaseMove(record, moveSpec, side, index, defaults = {}) {
     tags,
     weight: recordWeight(metadata, database),
     database
-  });
+  }, { position });
 }
 
 function normalizeDatabaseMetadata(record, side) {
@@ -762,7 +764,7 @@ function normalizeOpeningLine(line, defaults = {}) {
   }
 
   if (typeof line === "string") {
-    return normalizeOpeningLine({ moves: line.trim().split(/\s+/).filter(Boolean) }, defaults);
+    return normalizeOpeningLine({ moves: extractMoveTokens(line) }, defaults);
   }
 
   if (!line || !Array.isArray(line.moves)) {
@@ -782,20 +784,20 @@ function normalizeOpeningLine(line, defaults = {}) {
 
 function normalizeLineMove(entry, defaults, index) {
   if (typeof entry === "string") {
-    return freezeBookEntry({
+    return {
       move: entry,
       name: defaults.name ?? `Imported Opening Continuation ${index + 1}`,
       idea: defaults.idea,
       weight: defaults.weight,
       tags: defaults.tags
-    });
+    };
   }
 
-  return freezeBookEntry({
+  return {
     ...defaults,
     ...entry,
     tags: uniqueTags([...normalizeTags(defaults.tags), ...normalizeTags(entry.tags)])
-  });
+  };
 }
 
 function parseOpeningBookLine(line, lineNumber) {
@@ -803,7 +805,7 @@ function parseOpeningBookLine(line, lineNumber) {
   if (!trimmed) return null;
 
   const [movePart, ...metadataParts] = trimmed.split("|").map((part) => part.trim()).filter(Boolean);
-  const moves = movePart.split(/\s+/).filter(Boolean);
+  const moves = extractMoveTokens(movePart);
   if (moves.length === 0) {
     throw new Error(`Opening book line ${lineNumber} has no moves.`);
   }
@@ -982,10 +984,12 @@ function normalizeInitialPosition(value) {
   return value;
 }
 
-function canonicalMoveNotation(move) {
-  return typeof move === "string"
-    ? moveToNotation(parseMoveNotation(move))
-    : moveToNotation(move);
+function canonicalMoveNotation(move, position = null) {
+  if (typeof move !== "string") return moveToNotation(move);
+  const parsed = position
+    ? parsePortableMoveNotation(position, move)
+    : parseMoveNotation(move);
+  return moveToNotation(parsed);
 }
 
 function normalizeWeight(value) {
@@ -1081,7 +1085,7 @@ function uniqueTags(tags) {
 }
 
 function applyBookMove(position, notation) {
-  const parsed = parseMoveNotation(notation);
+  const parsed = parsePortableMoveNotation(position, notation);
   const legalMove = generateLegalMoves(position, position.turn)
     .find((move) => sameMove(move, parsed));
 

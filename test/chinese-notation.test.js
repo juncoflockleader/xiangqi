@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   createInitialPosition,
   lineToChineseNotation,
-  moveToChineseNotation
+  moveToChineseNotation,
+  parseChineseMoveNotation,
+  parsePortableMoveNotation
 } from "../src/index.js";
 
 test("Chinese notation formats opening moves from each side's perspective", () => {
@@ -23,4 +25,13 @@ test("Chinese notation can follow a principal variation", () => {
     lineToChineseNotation(position, ["h7-e7", "h0-g2"]),
     ["炮二平五", "馬8進7"]
   );
+});
+
+test("Chinese notation resolves legal moves from traditional and simplified text", () => {
+  const position = createInitialPosition();
+  const red = parseChineseMoveNotation(position, "炮二平五");
+  const simplified = parsePortableMoveNotation(position, "马２进３");
+
+  assert.equal(red.notation, "h7-e7");
+  assert.equal(simplified.notation, "h9-g7");
 });

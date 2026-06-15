@@ -155,6 +155,22 @@ test("opening book can be imported from weighted text lines", () => {
   assert.equal(reply.entries[1].weight, 2);
 });
 
+test("opening book imports Chinese notation lines", () => {
+  const imported = createOpeningBookFromText(`
+    炮二平五 馬8進7 | weight=4 | name=Chinese Central Cannon | tags=database,zh
+    傌二進三 馬8進7 | weight=7 | name=Chinese Horse Opening | tags=database,zh
+  `);
+  const engine = createEngine({ book: imported, openingHeuristics: false, depth: 1, timeLimitMs: 500 });
+  const result = engine.chooseMove(createInitialPosition());
+  const reply = engine.openingBook(engine.play(createInitialPosition(), "h9-g7"));
+
+  assert.equal(result.source, "opening-book");
+  assert.equal(result.bestMove.notation, "h9-g7");
+  assert.equal(result.book.name, "Chinese Horse Opening");
+  assert.ok(result.book.tags.includes("zh"));
+  assert.equal(reply.move.notation, "h0-g2");
+});
+
 test("imported opening data can merge with the curated default book", () => {
   const imported = createOpeningBookFromText(`
     b9-c7 | games=45 | name=Imported Left Horse Popularity | tags=database
@@ -205,6 +221,28 @@ test("structured opening records preserve database priors for explanations", () 
   assert.ok(result.book.tags.includes("master"));
 });
 
+test("raw game records aggregate Chinese notation openings", () => {
+  const book = createOpeningBookFromGames({
+    source: "sample-zh-db",
+    maxPly: 2,
+    games: [
+      { moves: "炮二平五馬8進7", result: "1-0" },
+      { moves: "炮二平五 馬8進7", result: "1/2-1/2" },
+      { moves: "傌二進三 馬8進7", result: "0-1" }
+    ]
+  });
+  const engine = createEngine({ book, openingHeuristics: false, depth: 1, timeLimitMs: 500 });
+  const root = engine.openingBook(createInitialPosition());
+  const afterCentral = engine.openingBook(engine.play(createInitialPosition(), "h7-e7"));
+
+  assert.equal(root.move.notation, "h7-e7");
+  assert.equal(root.entry.database.games, 2);
+  assert.equal(Math.round(root.entry.database.expectedScore * 100), 75);
+  assert.equal(root.entry.database.source, "sample-zh-db");
+  assert.equal(afterCentral.move.notation, "h0-g2");
+  assert.equal(afterCentral.entry.database.side, "black");
+});
+
 test("structured opening lines weight replies for the side to move", () => {
   const imported = createOpeningBookFromRecords([
     {
@@ -232,6 +270,34 @@ test("structured opening lines weight replies for the side to move", () => {
   assert.equal(reply.entry.name, "Central Cannon Black-Resilient Line");
   assert.equal(Math.round(reply.entry.database.expectedScore * 100), 60);
   assert.ok(reply.entry.weight > reply.entries.find((entry) => entry.notation === "h0-g2").weight);
+});
+
+test("structured opening records accept Chinese notation", () => {
+  const imported = createOpeningBookFromRecords([
+    {
+      moves: "炮二平五 馬8進7",
+      games: 100,
+      redWinRate: 0.62,
+      drawRate: 0.18,
+      blackWinRate: 0.2,
+      name: "Chinese Central Cannon Line"
+    },
+    {
+      moves: "炮二平五 馬2進3",
+      games: 90,
+      redWinRate: 0.3,
+      drawRate: 0.2,
+      blackWinRate: 0.5,
+      name: "Chinese Left Screen Horse"
+    }
+  ]);
+  const engine = createEngine({ book: imported, openingHeuristics: false, depth: 1, timeLimitMs: 500 });
+  const afterCentralCannon = engine.play(createInitialPosition(), "h7-e7");
+  const reply = engine.openingBook(afterCentralCannon);
+
+  assert.equal(reply.move.notation, "b0-c2");
+  assert.equal(reply.entry.name, "Chinese Left Screen Horse");
+  assert.equal(Math.round(reply.entry.database.expectedScore * 100), 60);
 });
 
 test("structured opening records can target a specific FEN position", () => {
