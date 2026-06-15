@@ -156,6 +156,31 @@ test("UCCI review summarizes loaded move history", () => {
   assert.ok(output.some((line) => line.includes("moment 1 plan comparison:")));
 });
 
+test("UCCI reviewmove reviews a candidate in the current position", () => {
+  const session = new UcciSession({ depth: 2, timeLimitMs: 1000 });
+  session.handleLine("position fen 4k4/9/4r4/9/9/9/9/9/9/3KR4 r");
+  const output = session.handleLine("reviewmove e9f9 depth 2 movetime 1000");
+
+  assert.ok(output.some((line) => line.includes("reviewmove played e9f9")));
+  assert.ok(output.some((line) => line.includes("blunder")));
+  assert.ok(output.some((line) => line.includes("best e9e2")));
+  assert.ok(output.some((line) => line.includes("reviewmove score played")));
+  assert.ok(output.some((line) => line.includes("reviewmove played plan: Start with e9-f9")));
+  assert.ok(output.some((line) => line.includes("reviewmove best plan: Start with e9-e2")));
+  assert.ok(output.some((line) => line.includes("reviewmove plan comparison: Your plan starts with e9-f9")));
+  assert.ok(output.some((line) => line.includes("reviewmove reason:")));
+  assert.ok(output.includes("bestmove e9e2"));
+});
+
+test("UCCI reviewmove accepts an explicit move token", () => {
+  const session = new UcciSession({ depth: 1, timeLimitMs: 500 });
+  session.handleLine("position fen 4k4/9/4r4/9/9/9/9/9/9/3KR4 r");
+  const output = session.handleLine("reviewmove depth 1 move e9f9 movetime 500");
+
+  assert.ok(output.some((line) => line.includes("reviewmove played e9f9")));
+  assert.ok(output.includes("bestmove e9e2"));
+});
+
 test("UCCI review reports no moves when history is empty", () => {
   const session = new UcciSession();
   session.handleLine("position startpos");

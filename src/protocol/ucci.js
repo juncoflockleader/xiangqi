@@ -55,6 +55,9 @@ export class UcciSession {
           return this.probe(trimmed);
         case "pressure":
           return this.pressure(trimmed);
+        case "reviewmove":
+        case "review-move":
+          return this.reviewMove(trimmed);
         case "review":
           return this.review(trimmed);
         case "lesson":
@@ -294,6 +297,33 @@ export class UcciSession {
     return outputs;
   }
 
+  reviewMove(line) {
+    const tokens = line.split(/\s+/);
+    const moveText = readReviewMoveText(tokens);
+    if (!moveText) return ["info string reviewmove missing move"];
+
+    const options = parseGoOptions(line.replace(/^review-?move/i, "go"), this.options, this.position.turn, this.position);
+    const review = this.engine.reviewMove(this.position, moveText, {
+      ...options,
+      useBook: this.options.useBook
+    });
+    const outputs = [
+      `info string reviewmove played ${stripMoveSeparator(review.move.notation)} ${review.classification} loss ${review.centipawnLoss} best ${protocolMove(review.bestMove)}: ${review.explanation.summary}`
+    ];
+
+    pushReviewScoreInfo(outputs, "reviewmove", review);
+    pushPlanInfo(outputs, "reviewmove played", review.playedLinePlan);
+    pushPlanInfo(outputs, "reviewmove best", review.bestLinePlan);
+    pushPlanComparisonInfo(outputs, "reviewmove", review.planComparison);
+
+    for (const reason of review.explanation.reasons.slice(0, 3)) {
+      outputs.push(`info string reviewmove reason: ${reason}`);
+    }
+
+    outputs.push(`bestmove ${protocolMove(review.bestMove)}`);
+    return outputs;
+  }
+
   lesson(line) {
     if (this.moveHistory.length === 0) return ["info string lesson no moves"];
 
@@ -418,12 +448,30 @@ function pushPlanInfo(outputs, prefix, linePlan, options = {}) {
 }
 
 function pushReviewScoreInfo(outputs, prefix, review) {
-  if (review?.playedScoreText || review?.bestScoreText) {
-    outputs.push(`info string ${prefix} score played ${review.playedScoreText ?? "unknown"} best ${review.bestScoreText ?? "unknown"}`);
+  const playedScoreText = reviewScoreText(review, "played");
+  const bestScoreText = reviewScoreText(review, "best");
+  const playedWdl = review?.playedWdl ?? null;
+  const bestWdl = review?.bestWdl ?? review?.bestAnalysis?.wdl ?? null;
+  if (playedScoreText || bestScoreText) {
+    outputs.push(`info string ${prefix} score played ${playedScoreText ?? "unknown"} best ${bestScoreText ?? "unknown"}`);
   }
-  if (review?.playedWdl?.text || review?.bestWdl?.text) {
-    outputs.push(`info string ${prefix} wdl played ${review.playedWdl?.text ?? "unknown"} best ${review.bestWdl?.text ?? "unknown"}`);
+  if (playedWdl?.text || bestWdl?.text) {
+    outputs.push(`info string ${prefix} wdl played ${playedWdl?.text ?? "unknown"} best ${bestWdl?.text ?? "unknown"}`);
   }
+}
+
+function reviewScoreText(review, side) {
+  if (!review) return null;
+  if (side === "played") {
+    return review.playedScoreText
+      ?? review.playedScoreDetail?.text
+      ?? (Number.isFinite(review.playedScore) ? formatScore(review.playedScore) : null);
+  }
+
+  return review.bestScoreText
+    ?? review.bestScoreDetail?.text
+    ?? review.bestAnalysis?.scoreDetail?.text
+    ?? (Number.isFinite(review.bestScore) ? formatScore(review.bestScore) : null);
 }
 
 function pushPlanComparisonInfo(outputs, prefix, comparison) {
@@ -470,6 +518,33 @@ function readTokenBoolean(tokens, name, fallback) {
   const index = tokens.findIndex((token) => token.toLowerCase() === name);
   if (index === -1 || index + 1 >= tokens.length) return fallback;
   return parseBoolean(tokens[index + 1], fallback);
+}
+
+function readReviewMoveText(tokens) {
+  const optionNames = new Set([
+    "depth",
+    "movetime",
+    "time",
+    "wtime",
+    "btime",
+    "winc",
+    "binc",
+    "movestogo",
+    "move"
+  ]);
+
+  for (let index = 1; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    const normalized = token.toLowerCase();
+    if (normalized === "move") return tokens[index + 1] ?? null;
+    if (optionNames.has(normalized)) {
+      index += 1;
+      continue;
+    }
+    return token;
+  }
+
+  return null;
 }
 
 function readSetOptionField(line, field, untilField = null) {
