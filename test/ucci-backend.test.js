@@ -545,6 +545,62 @@ test("native backend preserves mate and WDL score details", async () => {
   }
 });
 
+test("native backend preserves lower and upper bound score details", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    depth: 3,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockScoreBounds: true
+    }
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), {
+      useBook: false,
+      lines: 2
+    });
+
+    assert.equal(result.bestMove.notation, "h9-g7");
+    assert.equal(result.score, 80);
+    assert.equal(result.scoreDetail.kind, "cp");
+    assert.equal(result.scoreDetail.value, 80);
+    assert.equal(result.scoreDetail.bound, "lower");
+    assert.equal(result.scoreDetail.text, "at least +0.80");
+    assert.equal(result.candidates[0].scoreDetail.bound, "lower");
+    assert.equal(result.candidates[1].scoreDetail.bound, "upper");
+    assert.equal(result.candidates[1].scoreDetail.text, "at most +0.20");
+    assert.equal(result.explanation.search.scoreDetail.bound, "lower");
+    assert.ok(result.explanation.summary.includes("at least +0.80"));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("native lower bound")));
+    assert.equal(result.explanation.comparison.boundLimited, true);
+    assert.deepEqual(result.explanation.comparison.scoreBounds, {
+      best: "lower",
+      next: "upper"
+    });
+    assert.ok(result.explanation.comparison.reason.includes("bound-limited scores"));
+    assert.equal(result.explanation.alternatives[0].scoreDetail.text, "at least +0.80");
+    assert.ok(result.explanation.alternatives[0].note.includes("score at least +0.80"));
+    assert.equal(result.explanation.alternatives[1].scoreDetail.text, "at most +0.20");
+    assert.ok(result.explanation.alternatives[1].reasons.some((reason) => reason.includes("native upper bound")));
+
+    const analysis = await backend.analyzePosition(createInitialPosition(), {
+      useBook: false,
+      lines: 2
+    });
+
+    assert.equal(analysis.lines[0].scoreDetail.bound, "lower");
+    assert.equal(analysis.lines[1].scoreDetail.bound, "upper");
+    assert.equal(analysis.lines[1].scoreDetail.text, "at most +0.20");
+  } finally {
+    await backend.close();
+  }
+});
+
 test("UCCI backend provides async native coach hints", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,

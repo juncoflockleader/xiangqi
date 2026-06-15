@@ -621,18 +621,21 @@ async function analyzePlayedNativeMove(client, position, move, options) {
 
 function invertScoreDetail(scoreDetail, normalizedScore) {
   if (!scoreDetail) return null;
+  const bound = invertScoreBound(scoreDetail.bound);
 
   if (scoreDetail.kind === "mate") {
     const value = Number.isFinite(scoreDetail.value) ? -scoreDetail.value : null;
     return {
       kind: "mate",
       value,
+      bound,
       normalizedScore,
       text: formatNativeScoreDetail({
         scoreKind: "mate",
         mate: value,
         scoreValue: value,
-        score: normalizedScore
+        score: normalizedScore,
+        scoreBound: bound
       })
     };
   }
@@ -644,17 +647,30 @@ function invertScoreDetail(scoreDetail, normalizedScore) {
     return {
       kind: "cp",
       value,
+      bound,
       normalizedScore,
-      text: formatScore(normalizedScore)
+      text: formatNativeScoreDetail({
+        scoreKind: "cp",
+        scoreValue: value,
+        score: normalizedScore,
+        scoreBound: bound
+      })
     };
   }
 
   return {
     kind: scoreDetail.kind ?? "unknown",
     value: null,
+    bound,
     normalizedScore,
     text: formatScore(normalizedScore)
   };
+}
+
+function invertScoreBound(bound) {
+  if (bound === "lower") return "upper";
+  if (bound === "upper") return "lower";
+  return null;
 }
 
 function invertWdl(wdl) {
@@ -863,6 +879,7 @@ function parseInfoLine(line) {
     multipv: 1,
     scoreKind: null,
     scoreValue: null,
+    scoreBound: null,
     mate: null,
     wdl: null,
     score: null,
@@ -883,6 +900,7 @@ function parseInfoLine(line) {
     } else if (token === "score") {
       const kind = tokens[index + 1]?.toLowerCase();
       const value = Number.parseInt(tokens[index + 2], 10);
+      const bound = normalizeNativeScoreBound(tokens[index + 3]);
       if (kind === "cp") {
         info.scoreKind = "cp";
         info.scoreValue = Number.isFinite(value) ? value : 0;
@@ -894,7 +912,8 @@ function parseInfoLine(line) {
         info.mate = info.scoreValue;
         info.score = Number.isFinite(value) ? Math.sign(value || 1) * (100000 - Math.abs(value)) : 0;
       }
-      index += 2;
+      info.scoreBound = bound;
+      index += bound ? 3 : 2;
     } else if (token === "wdl") {
       const win = Number.parseInt(tokens[index + 1], 10);
       const draw = Number.parseInt(tokens[index + 2], 10);
@@ -915,6 +934,13 @@ function parseInfoLine(line) {
   }
 
   return info;
+}
+
+function normalizeNativeScoreBound(token) {
+  const normalized = String(token ?? "").toLowerCase();
+  if (normalized === "lowerbound") return "lower";
+  if (normalized === "upperbound") return "upper";
+  return null;
 }
 
 function latestPvInfosByMultipv(infos) {
@@ -991,6 +1017,7 @@ function nativeScoreDetail(info = {}) {
     return {
       kind: "mate",
       value: info.mate ?? info.scoreValue ?? null,
+      bound: info.scoreBound ?? null,
       normalizedScore: info.score ?? 0,
       text: formatNativeScoreDetail(info)
     };
@@ -999,6 +1026,7 @@ function nativeScoreDetail(info = {}) {
     return {
       kind: "cp",
       value: info.scoreValue ?? info.score ?? 0,
+      bound: info.scoreBound ?? null,
       normalizedScore: info.score ?? 0,
       text: formatNativeScoreDetail(info)
     };
@@ -1007,20 +1035,30 @@ function nativeScoreDetail(info = {}) {
   return {
     kind: "unknown",
     value: null,
+    bound: info.scoreBound ?? null,
     normalizedScore: info.score ?? 0,
     text: formatScore(info.score ?? 0)
   };
 }
 
 function formatNativeScoreDetail(info = {}) {
+  let text;
   if (info.scoreKind === "mate") {
     const mate = info.mate ?? info.scoreValue ?? 0;
-    if (mate > 0) return `mate in ${mate}`;
-    if (mate < 0) return `getting mated in ${Math.abs(mate)}`;
-    return "forced mate";
+    if (mate > 0) text = `mate in ${mate}`;
+    else if (mate < 0) text = `getting mated in ${Math.abs(mate)}`;
+    else text = "forced mate";
+    return formatScoreBoundText(text, info.scoreBound);
   }
 
-  return formatScore(info.score ?? 0);
+  text = formatScore(info.score ?? 0);
+  return formatScoreBoundText(text, info.scoreBound);
+}
+
+function formatScoreBoundText(text, bound) {
+  if (bound === "lower") return `at least ${text}`;
+  if (bound === "upper") return `at most ${text}`;
+  return text;
 }
 
 function nativeWdl(info = {}) {
@@ -1106,6 +1144,7 @@ function explainNativeMove(position, result, backendName) {
     `${backendName} selected this move through ${protocolLabel} search.`,
     `The native search reported depth ${result.depth} and ${result.nodes} nodes.`,
     `It reported a score of ${scoreText} for the side to move.`,
+    nativeScoreBoundReason(result.scoreDetail),
     nativeWdlReason(result.wdl),
     comparison?.reason,
     continuationReason,
@@ -1151,6 +1190,7 @@ function buildNativeComparisonEvidence(result, position) {
   const scoreGap = Math.max(0, bestScore - nextScore);
   const bestScoreText = best.scoreDetail?.text ?? formatScore(bestScore);
   const nextScoreText = next.scoreDetail?.text ?? formatScore(nextScore);
+  const boundLimited = Boolean(best.scoreDetail?.bound || next.scoreDetail?.bound);
   const bestLine = (best.principalVariation ?? []).map((move) => move.notation ?? moveToNotation(move));
   const nextLine = (next.principalVariation ?? []).map((move) => move.notation ?? moveToNotation(move));
   const bestPlan = buildLinePlan(position, best.principalVariation ?? [best.move], {
@@ -1173,9 +1213,15 @@ function buildNativeComparisonEvidence(result, position) {
     bestPreferencePhrase: "the preferred line starts with",
     bestStartLabel: "the preferred line starts"
   }));
-  const reason = nearlyTied
-    ? `Native MultiPV shows ${bestMove} and ${nextMove} are nearly tied, separated by ${scoreGap} centipawns.`
-    : `Native MultiPV rates ${bestMove} ${scoreGap} centipawns above the next candidate ${nextMove}.`;
+  const reason = nativeComparisonReason({
+    bestMove,
+    nextMove,
+    bestScoreText,
+    nextScoreText,
+    scoreGap,
+    nearlyTied,
+    boundLimited
+  });
 
   return {
     bestMove,
@@ -1186,6 +1232,11 @@ function buildNativeComparisonEvidence(result, position) {
     nextScore,
     bestScoreText,
     nextScoreText,
+    boundLimited,
+    scoreBounds: {
+      best: best.scoreDetail?.bound ?? null,
+      next: next.scoreDetail?.bound ?? null
+    },
     verdict,
     reason,
     bestLine,
@@ -1241,7 +1292,7 @@ function explainNativeAlternatives(position, result, backendName, protocolLabel)
       }),
       principalVariation: explanation.principalVariation,
       principalVariationText: explanation.principalVariationText,
-      note: `${contrast}; native ${protocolLabel} line ${candidate.native?.multipv ?? index + 1} at depth ${candidate.native?.depth ?? result.depth}`
+      note: `${contrast}; native ${protocolLabel} line ${candidate.native?.multipv ?? index + 1} at depth ${candidate.native?.depth ?? result.depth}${candidate.scoreDetail?.text ? `, score ${candidate.scoreDetail.text}` : ""}`
     };
   });
 }
@@ -1272,6 +1323,7 @@ function explainNativeCandidate(position, candidate, context) {
     context.rank === 1
       ? `This is ${context.backendName}'s top native candidate.`
       : `This native line trails the top line by about ${centipawnLoss} centipawns.`,
+    nativeScoreBoundReason(candidate.scoreDetail),
     nativeWdlReason(candidate.wdl),
     ...moveStory.reasons
   ].filter(Boolean);
@@ -1301,6 +1353,26 @@ function nativeAlternativeContrast(index, centipawnLoss) {
   if (index === 0) return "top native line";
   if (centipawnLoss <= 15) return `roughly tied with the top native line, trailing by ${centipawnLoss} centipawns`;
   return `trails the top native line by ${centipawnLoss} centipawns`;
+}
+
+function nativeComparisonReason({ bestMove, nextMove, bestScoreText, nextScoreText, scoreGap, nearlyTied, boundLimited }) {
+  if (boundLimited) {
+    return `Native MultiPV reports bound-limited scores: ${bestMove} is ${bestScoreText}, while ${nextMove} is ${nextScoreText}; the displayed gap is ${scoreGap} centipawns, but the exact margin may differ.`;
+  }
+
+  return nearlyTied
+    ? `Native MultiPV shows ${bestMove} and ${nextMove} are nearly tied, separated by ${scoreGap} centipawns.`
+    : `Native MultiPV rates ${bestMove} ${scoreGap} centipawns above the next candidate ${nextMove}.`;
+}
+
+function nativeScoreBoundReason(scoreDetail) {
+  if (scoreDetail?.bound === "lower") {
+    return `The reported score is a native lower bound (${scoreDetail.text}), so the exact evaluation may be even better.`;
+  }
+  if (scoreDetail?.bound === "upper") {
+    return `The reported score is a native upper bound (${scoreDetail.text}), so the exact evaluation may be no better.`;
+  }
+  return null;
 }
 
 function nativeWdlReason(wdl) {
