@@ -620,6 +620,7 @@ function globalKingSafety(position, side, enemyControl) {
 
   const guardCount = countGuards(position, side);
   score += Math.min(4, guardCount) * 18;
+  score += fortressShapeValue(position, side, kingSquare);
 
   if (isOpenFileTowardEnemyKing(position, kingSquare, side)) {
     score -= 80;
@@ -639,6 +640,80 @@ function globalKingSafety(position, side, enemyControl) {
   }
 
   score += palaceControlSafety(position, side, kingSquare, enemyControl);
+
+  return score;
+}
+
+function fortressShapeValue(position, side, kingSquare) {
+  const advisors = pieceSquares(position, side, PIECES.ADVISOR);
+  const elephants = pieceSquares(position, side, PIECES.ELEPHANT);
+  const advisorCount = advisors.length;
+  const elephantCount = elephants.length;
+  let score = 0;
+
+  score -= Math.max(0, 2 - advisorCount) * 12;
+  score -= Math.max(0, 2 - elephantCount) * 8;
+
+  if (advisorCount >= 2) score += 18;
+  if (elephantCount >= 2) score += 14;
+  if (advisorCount >= 2 && elephantCount >= 2) score += 18;
+
+  score += advisorShapeValue(side, advisors);
+  score += elephantShapeValue(side, elephants);
+
+  const homeRank = side === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  if (fileOf(kingSquare) === 4 && rankOf(kingSquare) === homeRank && advisorCount >= 2 && elephantCount >= 2) {
+    score += 8;
+  }
+
+  return score;
+}
+
+function pieceSquares(position, side, type) {
+  const squares = [];
+  for (let square = 0; square < position.board.length; square += 1) {
+    const piece = position.board[square];
+    if (piece?.side === side && piece.type === type) squares.push(square);
+  }
+  return squares;
+}
+
+function advisorShapeValue(side, advisors) {
+  const homeRank = side === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  const centerRank = side === SIDES.RED ? BOARD_RANKS - 2 : 1;
+  let score = 0;
+
+  const homeCornerCount = advisors.filter((square) => {
+    const file = fileOf(square);
+    return rankOf(square) === homeRank && (file === 3 || file === 5);
+  }).length;
+  const centerCount = advisors.filter((square) => fileOf(square) === 4 && rankOf(square) === centerRank).length;
+
+  score += homeCornerCount * 6;
+  score += centerCount * 8;
+  if (homeCornerCount >= 2) score += 10;
+  if (homeCornerCount >= 1 && centerCount >= 1) score += 6;
+
+  return score;
+}
+
+function elephantShapeValue(side, elephants) {
+  const homeRank = side === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  const advancedRank = side === SIDES.RED ? BOARD_RANKS - 3 : 2;
+  let score = 0;
+
+  const homeWingCount = elephants.filter((square) => {
+    const file = fileOf(square);
+    return rankOf(square) === homeRank && (file === 2 || file === 6);
+  }).length;
+  const centralGuardCount = elephants.filter((square) => {
+    const file = fileOf(square);
+    return rankOf(square) === advancedRank && file === 4;
+  }).length;
+
+  score += homeWingCount * 4;
+  score += centralGuardCount * 8;
+  if (homeWingCount >= 2) score += 12;
 
   return score;
 }
