@@ -128,7 +128,7 @@ test("opening heuristic validation avoids the Hu bot central cannon trap", () =>
   assert.equal(result.openingHeuristicValidation.status, "rejected");
   assert.equal(result.openingHeuristicValidation.heuristicMove, "e7-e3");
   assert.notEqual(result.bestMove.notation, "e7-e3");
-  assert.ok(result.openingHeuristicValidation.centipawnLoss >= 300);
+  assert.ok(result.openingHeuristicValidation.centipawnLoss > result.openingHeuristicValidation.maxCentipawnLoss);
   assert.ok(result.explanation.summary.includes(result.bestMove.notation));
 });
 

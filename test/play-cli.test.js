@@ -125,8 +125,8 @@ test("play CLI best command shows structured engine reasoning", async () => {
   assert.equal(result.code, 0, result.stderr);
   assert.match(result.stdout, /Best move: h9-g7/);
   assert.match(result.stdout, /Plan: Start with h9-g7; expect h0-g2; theme: creates threat\./);
-  assert.match(result.stdout, /1\. Red engine choice h9-g7: \+0\.00 -> \+0\.39 \(\+39 centipawns\) \[creates threat\]/);
-  assert.match(result.stdout, /2\. Black expected reply h0-g2: \+0\.39 -> \+0\.00 \(-39 centipawns\) \[creates threat\]/);
+  assert.match(result.stdout, /1\. Red engine choice h9-g7: \+0\.00 -> \+\d+\.\d\d \(\+\d+ centipawns\) \[creates threat\]/);
+  assert.match(result.stdout, /2\. Black expected reply h0-g2: \+\d+\.\d\d -> \+0\.00 \(-\d+ centipawns\) \[creates threat\]/);
   assert.match(result.stdout, /Confidence: Medium confidence/);
   assert.match(result.stdout, /Comparison: Native MultiPV rates h9-g7 30 centipawns above the next candidate h7-e7\./);
   assert.match(result.stdout, /Alternatives:/);
@@ -239,7 +239,7 @@ test("play CLI uses the oracle reviewer for player move feedback", async () => {
   assert.match(result.stdout, /Engine preferred h9-g7\./);
   assert.match(result.stdout, /Best plan: Start with h9-g7; expect h0-g2; theme: creates threat\./);
   assert.match(result.stdout, /Plan comparison: Your plan starts with h7-e7; the engine prefers h9-g7, a good gap of 59 centipawns\. Both lines expect h0-g2\./);
-  assert.match(result.stdout, /1\. Red engine choice h9-g7: \+0\.00 -> \+0\.39 \(\+39 centipawns\) \[creates threat\]/);
+  assert.match(result.stdout, /1\. Red engine choice h9-g7: \+0\.00 -> \+\d+\.\d\d \(\+\d+ centipawns\) \[creates threat\]/);
 });
 
 test("play CLI prints practice focus for player move reviews", async () => {

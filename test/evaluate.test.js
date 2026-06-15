@@ -78,3 +78,26 @@ test("evaluation descriptions surface pressure on the general", () => {
   assert.ok(delta.delta.kingAttack > 0);
   assert.ok(notes.some((note) => note.term === "kingAttack" && note.text.includes("pressure on the general")));
 });
+
+test("evaluation penalizes loose attacked pieces", () => {
+  const loose = parseFen("4k4/9/9/4r4/9/4R4/P8/9/9/4K4 r");
+  const defended = parseFen("4k4/9/9/4r4/9/4R4/4P4/9/9/4K4 r");
+  const looseEval = evaluatePosition(loose, SIDES.RED, { detailed: true });
+  const defendedEval = evaluatePosition(defended, SIDES.RED, { detailed: true });
+
+  assert.ok(defendedEval.terms.red.pieceSafety > looseEval.terms.red.pieceSafety);
+  assert.ok(defendedEval.difference.pieceSafety > looseEval.difference.pieceSafety);
+});
+
+test("evaluation descriptions surface improved piece safety", () => {
+  const position = parseFen("4k4/9/9/4r4/9/4R4/9/4P4/9/4K4 r");
+  const next = applyLegalMove(position, {
+    from: coordToIndex("e7"),
+    to: coordToIndex("e6")
+  });
+  const delta = evaluateMoveDelta(position, next, SIDES.RED);
+  const notes = describeEvaluationTerms(delta.delta);
+
+  assert.ok(delta.delta.pieceSafety > 0);
+  assert.ok(notes.some((note) => note.term === "pieceSafety" && note.text.includes("piece safety")));
+});

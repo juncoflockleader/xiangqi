@@ -10,7 +10,7 @@ The current engine is dependency-free JavaScript and includes:
 - Iterative-deepening negamax search with alpha-beta and principal variation search.
 - Zobrist hashing, bounded depth-preferred transposition table, bounded quiescence transposition table, aspiration windows, quiescence search with bounded quiet-check search and delta pruning, capture-history/check/positive and negative history/countermove/continuation-history/root-score/internal-iterative-deepening move ordering, mate-distance pruning, bounded check, recapture, and singular extensions, static-exchange pruning, ProbCut capture pruning, shallow razoring, guarded and verified null-move pruning, shallow forward and reverse futility pruning, late-move pruning and adaptive late-move reductions, repetition diagnostics, and root candidate analysis.
 - Explainable opening-book support with a curated early repertoire, heuristic fallback for off-book opening positions, deterministic selection, and pure-search opt-out.
-- Evaluation terms for material, piece-square placement, mobility, threats, pawn progress, king safety, pressure on the general, blocked-horse coordination, and rook/cannon line pressure.
+- Evaluation terms for material, piece-square placement, mobility, threats, pawn progress, king safety, pressure on the general, piece safety, blocked-horse coordination, and rook/cannon line pressure.
 - Static exchange analysis for distinguishing clean wins, tactically poisoned captures, and defended captures that remain sound after recaptures.
 - Immediate pressure/threat analysis for both sides.
 - Perft helpers for validating move generation while the engine grows.

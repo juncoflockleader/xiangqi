@@ -458,22 +458,22 @@ test("search extends immediate recaptures", () => {
 });
 
 test("quiescence can delta-prune hopeless captures", () => {
-  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/9/9/9/2BAKAB2 r");
   const withPruning = searchBestMove(position, {
-    depth: 2,
+    depth: 3,
     timeLimitMs: 1000,
     useAspiration: false,
     useReverseFutilityPruning: false
   });
   const withoutPruning = searchBestMove(position, {
-    depth: 2,
+    depth: 3,
     timeLimitMs: 1000,
     useAspiration: false,
     useReverseFutilityPruning: false,
     useDeltaPruning: false
   });
 
-  assert.equal(withPruning.depth, 2);
+  assert.equal(withPruning.depth, 3);
   assert.equal(withPruning.bestMove.notation, withoutPruning.bestMove.notation);
   assert.ok(withPruning.stats.deltaPrunes > 0);
   assert.equal(withoutPruning.stats.deltaPrunes, 0);

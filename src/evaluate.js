@@ -13,6 +13,7 @@ import {
   indexOf,
   isInside,
   opponent,
+  ownRiverSide,
   palaceContains,
   rankOf
 } from "./board.js";
@@ -43,6 +44,14 @@ export function evaluatePosition(position, perspective = position.turn, options 
     [SIDES.RED]: createTerms(),
     [SIDES.BLACK]: createTerms()
   };
+  const pseudoMoves = {
+    [SIDES.RED]: generatePseudoMoves(position, SIDES.RED),
+    [SIDES.BLACK]: generatePseudoMoves(position, SIDES.BLACK)
+  };
+  const control = {
+    [SIDES.RED]: createControlMap(position, SIDES.RED),
+    [SIDES.BLACK]: createControlMap(position, SIDES.BLACK)
+  };
 
   for (let square = 0; square < position.board.length; square += 1) {
     const piece = position.board[square];
@@ -57,10 +66,11 @@ export function evaluatePosition(position, perspective = position.turn, options 
   }
 
   for (const side of [SIDES.RED, SIDES.BLACK]) {
-    const pseudoMoves = generatePseudoMoves(position, side);
-    terms[side].mobility += mobilityValue(pseudoMoves);
-    terms[side].threats += threatValue(pseudoMoves);
-    terms[side].kingAttack += kingAttackValue(position, side, pseudoMoves);
+    const sideMoves = pseudoMoves[side];
+    terms[side].mobility += mobilityValue(sideMoves);
+    terms[side].threats += threatValue(sideMoves);
+    terms[side].pieceSafety += pieceSafetyValue(position, side, control[side], control[opponent(side)]);
+    terms[side].kingAttack += kingAttackValue(position, side, sideMoves);
     terms[side].kingSafety += globalKingSafety(position, side);
 
     if (isInCheck(position, opponent(side))) {
@@ -126,6 +136,7 @@ function createTerms() {
     pawnStructure: 0,
     kingSafety: 0,
     kingAttack: 0,
+    pieceSafety: 0,
     coordination: 0,
     linePressure: 0
   };
@@ -302,6 +313,207 @@ function threatValue(moves) {
   return score;
 }
 
+function pieceSafetyValue(position, side, ownControl, enemyControl) {
+  let score = 0;
+
+  for (let square = 0; square < position.board.length; square += 1) {
+    const piece = position.board[square];
+    if (!piece || piece.side !== side || piece.type === PIECES.KING) continue;
+
+    const value = PIECE_VALUES[piece.type];
+    const own = ownControl.get(square);
+    const enemy = enemyControl.get(square);
+
+    if (enemy) {
+      const defenders = own?.count ?? 0;
+      const attackers = enemy.count;
+      const loosePenalty = defenders === 0
+        ? Math.min(180, value * 0.16)
+        : Math.min(80, value * 0.06);
+      const overloadPenalty = Math.max(0, attackers - defenders) * 10;
+      const cheapAttackerPenalty = enemy.minAttackerValue < value ? 14 : 0;
+
+      score -= Math.round(loosePenalty + overloadPenalty + cheapAttackerPenalty);
+      continue;
+    }
+
+    if (own && value >= PIECE_VALUES[PIECES.HORSE]) {
+      score += Math.min(18, Math.round(value * 0.018)) + Math.min(2, own.count) * 2;
+    }
+  }
+
+  return score;
+}
+
+function createControlMap(position, side) {
+  const control = new Map();
+
+  for (let square = 0; square < position.board.length; square += 1) {
+    const piece = position.board[square];
+    if (!piece || piece.side !== side) continue;
+
+    for (const target of controlledSquares(position, square, piece)) {
+      addControl(control, target, piece);
+    }
+  }
+
+  return control;
+}
+
+function addControl(control, square, piece) {
+  const current = control.get(square) ?? {
+    count: 0,
+    minAttackerValue: Number.POSITIVE_INFINITY
+  };
+  current.count += 1;
+  current.minAttackerValue = Math.min(current.minAttackerValue, PIECE_VALUES[piece.type]);
+  control.set(square, current);
+}
+
+function controlledSquares(position, square, piece) {
+  switch (piece.type) {
+    case PIECES.KING:
+      return shortRangeControls(square, piece, [[0, -1], [1, 0], [0, 1], [-1, 0]], palaceContains);
+    case PIECES.ADVISOR:
+      return shortRangeControls(square, piece, [[1, 1], [1, -1], [-1, 1], [-1, -1]], palaceContains);
+    case PIECES.ELEPHANT:
+      return elephantControls(position, square, piece);
+    case PIECES.HORSE:
+      return horseControls(position, square);
+    case PIECES.ROOK:
+      return rookControls(position, square);
+    case PIECES.CANNON:
+      return cannonControls(position, square);
+    case PIECES.PAWN:
+      return pawnControls(square, piece);
+    default:
+      return [];
+  }
+}
+
+function shortRangeControls(square, piece, deltas, contains) {
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  const controls = [];
+
+  for (const [dx, dy] of deltas) {
+    const targetFile = file + dx;
+    const targetRank = rank + dy;
+    if (!contains(piece.side, targetFile, targetRank)) continue;
+    controls.push(indexOf(targetFile, targetRank));
+  }
+
+  return controls;
+}
+
+function elephantControls(position, square, piece) {
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  const controls = [];
+
+  for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+    const targetFile = file + dx * 2;
+    const targetRank = rank + dy * 2;
+    const eyeFile = file + dx;
+    const eyeRank = rank + dy;
+    if (!isInside(targetFile, targetRank)) continue;
+    if (!ownRiverSide(piece.side, targetRank)) continue;
+    if (position.board[indexOf(eyeFile, eyeRank)]) continue;
+    controls.push(indexOf(targetFile, targetRank));
+  }
+
+  return controls;
+}
+
+function horseControls(position, square) {
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  const controls = [];
+
+  for (const [dx, dy] of [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]]) {
+    const targetFile = file + dx;
+    const targetRank = rank + dy;
+    if (!isInside(targetFile, targetRank)) continue;
+
+    const legFile = Math.abs(dx) === 2 ? file + Math.sign(dx) : file;
+    const legRank = Math.abs(dy) === 2 ? rank + Math.sign(dy) : rank;
+    if (position.board[indexOf(legFile, legRank)]) continue;
+    controls.push(indexOf(targetFile, targetRank));
+  }
+
+  return controls;
+}
+
+function rookControls(position, square) {
+  const controls = [];
+  forEachRay(square, (target) => {
+    controls.push(target);
+    return !position.board[target];
+  });
+  return controls;
+}
+
+function cannonControls(position, square) {
+  const controls = [];
+  const file = fileOf(square);
+  const rank = rankOf(square);
+
+  for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+    let targetFile = file + dx;
+    let targetRank = rank + dy;
+    let screenFound = false;
+
+    while (isInside(targetFile, targetRank)) {
+      const target = indexOf(targetFile, targetRank);
+      const occupant = position.board[target];
+      if (!screenFound) {
+        if (occupant) screenFound = true;
+      } else if (occupant) {
+        controls.push(target);
+        break;
+      }
+
+      targetFile += dx;
+      targetRank += dy;
+    }
+  }
+
+  return controls;
+}
+
+function pawnControls(square, piece) {
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  const controls = [];
+  const forwardRank = rank + forwardDelta(piece.side);
+  if (isInside(file, forwardRank)) controls.push(indexOf(file, forwardRank));
+
+  if (hasCrossedRiver(piece.side, rank)) {
+    for (const sideFile of [file - 1, file + 1]) {
+      if (isInside(sideFile, rank)) controls.push(indexOf(sideFile, rank));
+    }
+  }
+
+  return controls;
+}
+
+function forEachRay(square, visit) {
+  const file = fileOf(square);
+  const rank = rankOf(square);
+
+  for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+    let targetFile = file + dx;
+    let targetRank = rank + dy;
+
+    while (isInside(targetFile, targetRank)) {
+      const shouldContinue = visit(indexOf(targetFile, targetRank));
+      if (!shouldContinue) break;
+      targetFile += dx;
+      targetRank += dy;
+    }
+  }
+}
+
 function kingAttackValue(position, side, pseudoMoves) {
   const enemy = opponent(side);
   const enemyKingSquare = position.board.findIndex((piece) => piece?.side === enemy && piece.type === PIECES.KING);
@@ -403,6 +615,7 @@ function readableTerm(term) {
     pawnStructure: "pawn progress",
     kingSafety: "king safety",
     kingAttack: "pressure on the general",
+    pieceSafety: "piece safety",
     coordination: "piece coordination",
     linePressure: "rook and cannon line pressure"
   };
