@@ -508,6 +508,33 @@ test("quiescence reuses tactical leaf bounds from its transposition table", () =
   assert.ok(result.stats.qnodes < disabled.stats.qnodes);
 });
 
+test("search reuses cached static evaluations", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const result = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    exactRootScores: true
+  });
+  const disabled = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    useEvaluationCache: false,
+    exactRootScores: true
+  });
+
+  assert.equal(result.depth, 3);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.equal(Math.round(result.score), Math.round(disabled.score));
+  assert.ok(result.stats.evalCacheStores > 0);
+  assert.ok(result.stats.evalCacheHits > 0);
+  assert.equal(disabled.stats.evalCacheStores, 0);
+  assert.equal(disabled.stats.evalCacheHits, 0);
+});
+
 test("search prunes shallow quiet moves with futility margins", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const withPruning = searchBestMove(position, {

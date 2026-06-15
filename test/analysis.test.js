@@ -105,6 +105,7 @@ test("move explanations surface selective-search diagnostics", () => {
   const selectiveWork = (
     result.stats.ttHits +
     result.stats.qttHits +
+    result.stats.evalCacheHits +
     result.stats.nullMovePrunes +
     result.stats.probCutPrunes +
     result.stats.seePrunes +
@@ -124,6 +125,7 @@ test("move explanations surface selective-search diagnostics", () => {
   assert.ok(selectivityFactor);
   assert.match(selectivityFactor.text, /Selective search/);
   assert.match(selectivityFactor.text, /quiescence-table reuse/);
+  assert.match(selectivityFactor.text, /evaluation-cache reuse/);
 });
 
 test("analysis line count is clamped to a useful range", () => {

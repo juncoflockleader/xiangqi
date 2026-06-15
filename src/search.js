@@ -87,6 +87,7 @@ export function searchBestMove(position, options = {}) {
       ?? options.transpositionReplacementSample
   });
   quiescenceTable.nextGeneration?.();
+  const evaluationCache = options.evaluationCache ?? new Map();
   const history = new Map();
   const killers = new Map();
   const countermoves = new Map();
@@ -136,6 +137,7 @@ export function searchBestMove(position, options = {}) {
       deadline,
       table,
       quiescenceTable,
+      evaluationCache,
       history,
       killers,
       countermoves,
@@ -166,6 +168,7 @@ export function searchBestMove(position, options = {}) {
       useDeltaPruning: options.useDeltaPruning !== false,
       useQuiescenceChecks: options.useQuiescenceChecks !== false,
       useQuiescenceTable: options.useQuiescenceTable !== false,
+      useEvaluationCache: options.useEvaluationCache !== false,
       useRecaptureExtensions: options.useRecaptureExtensions !== false,
       useSeePruning: options.useSeePruning !== false,
       useCaptureHistory: options.useCaptureHistory !== false,
@@ -443,11 +446,11 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   context.stats.nodes += 1;
   if (isTimedOut(context)) {
     context.timedOut = true;
-    return evaluatePosition(position, position.turn).score;
+    return evaluateStatic(position, position.turn, context);
   }
 
   if (ply >= context.maxPly) {
-    return evaluatePosition(position, position.turn).score;
+    return evaluateStatic(position, position.turn, context);
   }
 
   const repetitionKey = positionKey(position);
@@ -561,7 +564,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     return inCheck ? -MATE_SCORE + ply : -MATE_SCORE + ply;
   }
 
-  const staticScore = inCheck ? null : evaluatePosition(position, position.turn).score;
+  const staticScore = inCheck ? null : evaluateStatic(position, position.turn, context);
   if (shouldPruneReverseFutility({ depth, inCheck, alpha, beta, staticScore, context })) {
     context.stats.reverseFutilityPrunes += 1;
     leavePosition(context, repetitionKey);
@@ -588,7 +591,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     });
     if (context.timedOut) {
       leavePosition(context, repetitionKey);
-      return evaluatePosition(position, position.turn).score;
+      return evaluateStatic(position, position.turn, context);
     }
   }
   const ordered = orderMoves(position, legalMoves, principalMove, context, ply, previousMove);
@@ -622,7 +625,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   });
   if (context.timedOut) {
     leavePosition(context, repetitionKey);
-    return probCutScore ?? evaluatePosition(position, position.turn).score;
+    return probCutScore ?? evaluateStatic(position, position.turn, context);
   }
   if (probCutScore !== null) {
     leavePosition(context, repetitionKey);
@@ -839,11 +842,11 @@ function quiescence(position, alpha, beta, ply, context, qChecksRemaining) {
 
   if (isTimedOut(context)) {
     context.timedOut = true;
-    return evaluatePosition(position, position.turn).score;
+    return evaluateStatic(position, position.turn, context);
   }
 
   if (ply >= context.maxPly) {
-    return evaluatePosition(position, position.turn).score;
+    return evaluateStatic(position, position.turn, context);
   }
 
   const mateWindow = applyMateDistanceWindow(alpha, beta, ply, context);
@@ -872,7 +875,7 @@ function quiescence(position, alpha, beta, ply, context, qChecksRemaining) {
       return mateScore;
     }
   } else {
-    const standPat = evaluatePosition(position, position.turn).score;
+    const standPat = evaluateStatic(position, position.turn, context);
     bestScore = standPat;
 
     if (standPat >= beta) {
@@ -1042,6 +1045,24 @@ function getCaptureAnalysis(position, move, context) {
   const analysis = analyzeCapture(position, move);
   context.tacticalCache.set(key, analysis);
   return analysis;
+}
+
+function evaluateStatic(position, perspective, context) {
+  if (!context?.useEvaluationCache) {
+    return evaluatePosition(position, perspective).score;
+  }
+
+  const key = `${hashPosition(position)}:${perspective}`;
+  const cached = context.evaluationCache.get(key);
+  if (cached !== undefined) {
+    context.stats.evalCacheHits += 1;
+    return cached;
+  }
+
+  const score = evaluatePosition(position, perspective).score;
+  context.evaluationCache.set(key, score);
+  context.stats.evalCacheStores += 1;
+  return score;
 }
 
 function toMoveKey(move) {
@@ -1762,6 +1783,8 @@ function createSearchStats() {
     qttReplacements: 0,
     qttEvictions: 0,
     qttSkips: 0,
+    evalCacheHits: 0,
+    evalCacheStores: 0,
     ttHits: 0,
     ttStores: 0,
     ttReplacements: 0,
@@ -1822,6 +1845,8 @@ function mergeSearchStats(total, next) {
     qttReplacements: total.qttReplacements + next.qttReplacements,
     qttEvictions: total.qttEvictions + next.qttEvictions,
     qttSkips: total.qttSkips + next.qttSkips,
+    evalCacheHits: total.evalCacheHits + next.evalCacheHits,
+    evalCacheStores: total.evalCacheStores + next.evalCacheStores,
     ttHits: total.ttHits + next.ttHits,
     ttStores: total.ttStores + next.ttStores,
     ttReplacements: total.ttReplacements + next.ttReplacements,
