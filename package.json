@@ -7,6 +7,7 @@
   "scripts": {
     "demo": "node examples/engine-demo.mjs",
     "play": "node examples/play-cli.mjs",
+    "web": "node examples/web-server.mjs",
     "bench": "node examples/benchmark.mjs",
     "bench:oracle": "node examples/oracle-benchmark.mjs",
     "book:oracle": "node examples/oracle-opening.mjs",

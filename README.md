@@ -32,6 +32,7 @@ The current engine is dependency-free JavaScript and includes:
 
 ```sh
 npm run play
+npm run web
 npm run study
 node examples/engine-demo.mjs
 node examples/benchmark.mjs
@@ -54,6 +55,10 @@ while you play. Engine turns print the principal-variation plan, and `best`/`why
 expand it into per-ply score, motif steps, and why-not comparisons for candidate
 alternatives. After your move is reviewed, the demo prints your played plan and,
 when it wanted a different move, the engine's preferred plan.
+
+For a browser board, run `npm run web` and open `http://127.0.0.1:5175`. It uses
+the same learning backend as the CLI, prefers the local Pikafish preset when
+available, and falls back to the JavaScript engine.
 
 For a one-position learning report, run `npm run study`. It prints the best move,
 candidate lines, progressive hints, pressure, and an optional review of a move

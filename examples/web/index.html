@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Xiangqi</title>
+    <link rel="stylesheet" href="/app.css">
+  </head>
+  <body>
+    <main class="app-shell" id="app">
+      <section class="board-section" aria-label="Xiangqi board">
+        <div class="topbar">
+          <div>
+            <h1>Xiangqi</h1>
+            <p id="gameStatus">Starting...</p>
+          </div>
+          <div class="turn-pill" id="turnPill">Red</div>
+        </div>
+        <div class="board-wrap">
+          <div class="board" id="board"></div>
+        </div>
+      </section>
+
+      <aside class="side-panel">
+        <section class="controls" aria-label="Game controls">
+          <div class="control-row">
+            <label for="sideSelect">Side</label>
+            <select id="sideSelect">
+              <option value="red">Red</option>
+              <option value="black">Black</option>
+            </select>
+          </div>
+          <div class="button-row">
+            <button id="newButton" type="button">New</button>
+            <button id="undoButton" type="button">Undo</button>
+          </div>
+          <div class="button-row">
+            <button id="hintButton" type="button">Hint</button>
+            <button id="bestButton" type="button">Best</button>
+          </div>
+        </section>
+
+        <section class="panel-block">
+          <h2>Engine</h2>
+          <div id="engineInfo" class="meta-list"></div>
+        </section>
+
+        <section class="panel-block">
+          <h2>Last Move</h2>
+          <div id="lastMovePanel" class="stack muted">No moves yet.</div>
+        </section>
+
+        <section class="panel-block">
+          <h2>Reasoning</h2>
+          <div id="reasoningPanel" class="stack muted">Ask for Best, Hint, or make a move.</div>
+        </section>
+
+        <section class="panel-block">
+          <h2>History</h2>
+          <ol id="historyList" class="history-list"></ol>
+        </section>
+      </aside>
+    </main>
+
+    <template id="pieceTemplate">
+      <span class="piece"></span>
+    </template>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
