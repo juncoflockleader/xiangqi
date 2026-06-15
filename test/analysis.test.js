@@ -128,6 +128,25 @@ test("move explanations surface selective-search diagnostics", () => {
   assert.match(selectivityFactor.text, /evaluation-cache reuse/);
 });
 
+test("move explanations surface check-evasion ordering diagnostics", () => {
+  const position = parseFen("3ak4/9/4r4/9/9/9/9/9/9/3K5 r");
+  const engine = createEngine({ depth: 3, timeLimitMs: 2000 });
+  const result = engine.chooseMove(position, {
+    useBook: false,
+    depth: 3,
+    timeLimitMs: 2000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  });
+  const selectivityFactor = result.explanation.confidence.factors
+    .find((factor) => factor.kind === "selectivity");
+
+  assert.ok(result.stats.checkEvasionOrderHits > 0);
+  assert.ok(result.explanation.reasons.some((reason) => reason.includes("check-evasion ordering")));
+  assert.ok(selectivityFactor);
+  assert.match(selectivityFactor.text, /check-evasion ordering/);
+});
+
 test("analysis line count is clamped to a useful range", () => {
   const position = createInitialPosition();
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });

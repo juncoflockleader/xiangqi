@@ -433,6 +433,9 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.continuationHistoryHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.continuationHistoryHits, "continuation-history hit"));
   }
+  if ((stats.checkEvasionOrderHits ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.checkEvasionOrderHits, "check-evasion ordering hint"));
+  }
   if ((stats.singularExtensions ?? 0) > 0) {
     orderingParts.push(formatCount(stats.singularExtensions, "singular extension"));
   }
@@ -463,6 +466,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   if ((stats.captureHistoryHits ?? 0) > 0) supports.push("capture-history ordering");
   if ((stats.iidMoveHits ?? 0) > 0) supports.push("internal iterative deepening");
   if ((stats.continuationHistoryHits ?? 0) > 0) supports.push("continuation-history ordering");
+  if ((stats.checkEvasionOrderHits ?? 0) > 0) supports.push("check-evasion ordering");
   if ((stats.deepReductions ?? 0) > 0) supports.push("adaptive late-move reductions");
   if ((stats.singularExtensions ?? 0) > 0) supports.push("singular extensions");
   if ((stats.nullMovePrunes ?? 0) > 0 || (stats.nullMoveVerifications ?? 0) > 0) {

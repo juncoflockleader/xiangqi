@@ -535,6 +535,37 @@ test("search reuses cached static evaluations", () => {
   assert.equal(disabled.stats.evalCacheHits, 0);
 });
 
+test("search orders legal check evasions before generic quiet moves", () => {
+  const position = parseFen("4k4/9/9/9/9/9/9/4r4/9/3AK4 r");
+  const result = searchBestMove(position, {
+    depth: 2,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    exactRootScores: true
+  });
+  const disabled = searchBestMove(position, {
+    depth: 2,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    useCheckEvasionOrdering: false,
+    exactRootScores: true
+  });
+
+  assert.equal(result.depth, 2);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.equal(Math.round(result.score), Math.round(disabled.score));
+  assert.ok(result.stats.checkEvasionOrderHits > 0);
+  assert.ok(result.stats.checkEvasionCaptures > 0);
+  assert.ok(result.stats.checkEvasionBlocks > 0);
+  assert.ok(result.stats.checkEvasionKingMoves > 0);
+  assert.equal(disabled.stats.checkEvasionOrderHits, 0);
+  assert.equal(disabled.stats.checkEvasionCaptures, 0);
+  assert.equal(disabled.stats.checkEvasionBlocks, 0);
+  assert.equal(disabled.stats.checkEvasionKingMoves, 0);
+});
+
 test("search prunes shallow quiet moves with futility margins", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const withPruning = searchBestMove(position, {

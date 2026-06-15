@@ -7,11 +7,14 @@ import {
 } from "./constants.js";
 import {
   makeMove,
+  fileOf,
+  indexOf,
   moveKey,
   moveToNotation,
   opponent,
   parseMoveNotation,
   positionKey,
+  rankOf,
   sameMove
 } from "./board.js";
 import { hashPosition } from "./hash.js";
@@ -19,8 +22,10 @@ import { createTranspositionTable } from "./transposition.js";
 import { resolveSearchBudget } from "./time.js";
 import {
   annotateMove,
+  findKing,
   generateCaptures,
   generateLegalMoves,
+  generatePseudoMoves,
   isInCheck
 } from "./movegen.js";
 import { evaluatePosition } from "./evaluate.js";
@@ -160,6 +165,7 @@ export function searchBestMove(position, options = {}) {
       usePvs: options.usePvs !== false,
       useCountermoves: options.useCountermoves !== false,
       useContinuationHistory: options.useContinuationHistory !== false,
+      useCheckEvasionOrdering: options.useCheckEvasionOrdering !== false,
       useRootScoreOrdering: options.useRootScoreOrdering !== false,
       useMateDistancePruning: options.useMateDistancePruning !== false,
       useReverseFutilityPruning: options.useReverseFutilityPruning !== false,
@@ -302,7 +308,8 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
   let bestScore = -INFINITY_SCORE;
   let bestLine = [];
   const candidates = [];
-  const moves = orderMoves(position, rootMoves, previousBest, context, 0);
+  const checkInfo = isInCheck(position, position.turn) ? checkEvasionInfo(position) : null;
+  const moves = orderMoves(position, rootMoves, previousBest, context, 0, null, checkInfo);
 
   for (const move of moves) {
     if (isTimedOut(context)) {
@@ -594,7 +601,8 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       return evaluateStatic(position, position.turn, context);
     }
   }
-  const ordered = orderMoves(position, legalMoves, principalMove, context, ply, previousMove);
+  const checkInfo = inCheck ? checkEvasionInfo(position) : null;
+  const ordered = orderMoves(position, legalMoves, principalMove, context, ply, previousMove, checkInfo);
   const searchedQuietMoves = [];
   const searchedCaptures = [];
 
@@ -864,7 +872,8 @@ function quiescence(position, alpha, beta, ply, context, qChecksRemaining) {
   let bestScore = -INFINITY_SCORE;
 
   if (inCheck) {
-    moves = orderMoves(position, generateLegalMoves(position, position.turn), null, context, ply);
+    const checkInfo = checkEvasionInfo(position);
+    moves = orderMoves(position, generateLegalMoves(position, position.turn), null, context, ply, null, checkInfo);
     if (moves.length === 0) {
       const mateScore = -MATE_SCORE + ply;
       storeQuiescenceTransposition(context, transpositionKey, {
@@ -991,21 +1000,22 @@ function givesCheck(position, move) {
   return isInCheck(next, next.turn);
 }
 
-function orderMoves(position, moves, principalMove, context, ply, previousMove = null) {
+function orderMoves(position, moves, principalMove, context, ply, previousMove = null, checkInfo = null) {
   return moves
     .map((move) => ({
       move,
-      score: moveOrderingScore(position, move, principalMove, context, ply, previousMove)
+      score: moveOrderingScore(position, move, principalMove, context, ply, previousMove, checkInfo)
     }))
     .sort((a, b) => b.score - a.score)
     .map((entry) => entry.move);
 }
 
-function moveOrderingScore(position, move, principalMove, context, ply, previousMove) {
+function moveOrderingScore(position, move, principalMove, context, ply, previousMove, checkInfo = null) {
   let score = 0;
 
   if (context.priorityMoveKeys?.has(moveKey(move))) score += 1_500_000;
   if (sameMove(move, principalMove)) score += 1_000_000;
+  score += checkEvasionOrderingScore(move, checkInfo, context);
   if (ply === 0 && context.useRootScoreOrdering && context.rootMoveScores?.has(moveKey(move))) {
     score += 500_000 + clampOrderingScore(context.rootMoveScores.get(moveKey(move)));
     context.stats.rootScoreOrderHits += 1;
@@ -1027,6 +1037,140 @@ function moveOrderingScore(position, move, principalMove, context, ply, previous
   score += context.history.get(moveKey(move)) ?? 0;
 
   return score;
+}
+
+function checkEvasionOrderingScore(move, checkInfo, context) {
+  if (!context.useCheckEvasionOrdering || !checkInfo) return 0;
+
+  let score = 0;
+  let ordered = false;
+
+  if (checkInfo.attackerSquares.has(move.to)) {
+    score += 130_000 + (move.captured ? PIECE_VALUES[move.captured.type] * 16 : 0);
+    context.stats.checkEvasionCaptures += 1;
+    ordered = true;
+  }
+
+  if (move.piece.type === PIECES.KING) {
+    score += 100_000;
+    context.stats.checkEvasionKingMoves += 1;
+    ordered = true;
+  }
+
+  if (move.piece.type !== PIECES.KING && checkInfo.blockSquares.has(move.to)) {
+    score += 80_000;
+    context.stats.checkEvasionBlocks += 1;
+    ordered = true;
+  }
+
+  if (ordered) context.stats.checkEvasionOrderHits += 1;
+  return score;
+}
+
+function checkEvasionInfo(position) {
+  const side = position.turn;
+  const kingSquare = findKing(position, side);
+  if (kingSquare === -1) {
+    return {
+      kingSquare,
+      attackerSquares: new Set(),
+      blockSquares: new Set()
+    };
+  }
+
+  const enemy = opponent(side);
+  const attacks = generatePseudoMoves(position, enemy)
+    .filter((move) => move.to === kingSquare);
+  const flyingGeneralSquare = flyingGeneralAttackerSquare(position, side, kingSquare);
+  if (flyingGeneralSquare !== null) {
+    attacks.push({
+      from: flyingGeneralSquare,
+      to: kingSquare,
+      piece: position.board[flyingGeneralSquare]
+    });
+  }
+
+  const attackerSquares = new Set();
+  const blockSquares = new Set();
+
+  for (const attack of attacks) {
+    attackerSquares.add(attack.from);
+    for (const square of checkBlockSquares(position, attack, kingSquare)) {
+      blockSquares.add(square);
+    }
+  }
+
+  return {
+    kingSquare,
+    attackerSquares,
+    blockSquares
+  };
+}
+
+function flyingGeneralAttackerSquare(position, side, kingSquare) {
+  const enemyKing = findKing(position, opponent(side));
+  if (enemyKing === -1 || fileOf(enemyKing) !== fileOf(kingSquare)) return null;
+  return squaresBetween(enemyKing, kingSquare).every((square) => !position.board[square])
+    ? enemyKing
+    : null;
+}
+
+function checkBlockSquares(position, attack, kingSquare) {
+  if (!attack?.piece) return [];
+
+  if (
+    attack.piece.type === PIECES.ROOK
+    || attack.piece.type === PIECES.CANNON
+    || attack.piece.type === PIECES.KING
+  ) {
+    return lineAligned(attack.from, kingSquare) ? squaresBetween(attack.from, kingSquare) : [];
+  }
+
+  if (attack.piece.type === PIECES.HORSE) {
+    const leg = horseLegSquare(attack.from, kingSquare);
+    return leg === null || position.board[leg] ? [] : [leg];
+  }
+
+  return [];
+}
+
+function lineAligned(first, second) {
+  return fileOf(first) === fileOf(second) || rankOf(first) === rankOf(second);
+}
+
+function squaresBetween(first, second) {
+  const firstFile = fileOf(first);
+  const firstRank = rankOf(first);
+  const secondFile = fileOf(second);
+  const secondRank = rankOf(second);
+  const fileStep = Math.sign(secondFile - firstFile);
+  const rankStep = Math.sign(secondRank - firstRank);
+
+  if (firstFile !== secondFile && firstRank !== secondRank) return [];
+
+  const squares = [];
+  let file = firstFile + fileStep;
+  let rank = firstRank + rankStep;
+
+  while (file !== secondFile || rank !== secondRank) {
+    squares.push(indexOf(file, rank));
+    file += fileStep;
+    rank += rankStep;
+  }
+
+  return squares;
+}
+
+function horseLegSquare(from, to) {
+  const dx = fileOf(to) - fileOf(from);
+  const dy = rankOf(to) - rankOf(from);
+  if (!((Math.abs(dx) === 1 && Math.abs(dy) === 2) || (Math.abs(dx) === 2 && Math.abs(dy) === 1))) {
+    return null;
+  }
+
+  const legFile = Math.abs(dx) === 2 ? fileOf(from) + Math.sign(dx) : fileOf(from);
+  const legRank = Math.abs(dy) === 2 ? rankOf(from) + Math.sign(dy) : rankOf(from);
+  return indexOf(legFile, legRank);
 }
 
 function isGoodCapture(position, move, context) {
@@ -1826,6 +1970,10 @@ function createSearchStats() {
     countermoveHits: 0,
     continuationHistoryStores: 0,
     continuationHistoryHits: 0,
+    checkEvasionOrderHits: 0,
+    checkEvasionCaptures: 0,
+    checkEvasionBlocks: 0,
+    checkEvasionKingMoves: 0,
     historyMaluses: 0,
     rootScoreOrderHits: 0,
     iidSearches: 0,
@@ -1888,6 +2036,10 @@ function mergeSearchStats(total, next) {
     countermoveHits: total.countermoveHits + next.countermoveHits,
     continuationHistoryStores: total.continuationHistoryStores + next.continuationHistoryStores,
     continuationHistoryHits: total.continuationHistoryHits + next.continuationHistoryHits,
+    checkEvasionOrderHits: total.checkEvasionOrderHits + next.checkEvasionOrderHits,
+    checkEvasionCaptures: total.checkEvasionCaptures + next.checkEvasionCaptures,
+    checkEvasionBlocks: total.checkEvasionBlocks + next.checkEvasionBlocks,
+    checkEvasionKingMoves: total.checkEvasionKingMoves + next.checkEvasionKingMoves,
     historyMaluses: total.historyMaluses + next.historyMaluses,
     rootScoreOrderHits: total.rootScoreOrderHits + next.rootScoreOrderHits,
     iidSearches: total.iidSearches + next.iidSearches,

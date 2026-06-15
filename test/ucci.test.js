@@ -44,6 +44,10 @@ test("UCCI session searches a FEN position", () => {
   assert.ok(output.some((line) => /\blmp \d+/.test(line)));
   assert.ok(output.some((line) => /\bcaphist \d+/.test(line)));
   assert.ok(output.some((line) => /\bch \d+/.test(line)));
+  assert.ok(output.some((line) => /\bce \d+/.test(line)));
+  assert.ok(output.some((line) => /\bcecap \d+/.test(line)));
+  assert.ok(output.some((line) => /\bceblock \d+/.test(line)));
+  assert.ok(output.some((line) => /\bceking \d+/.test(line)));
   assert.ok(output.some((line) => line.includes("hmalus")));
   assert.ok(output.includes("bestmove e9e2"));
   assert.ok(output.some((line) => line.includes("reason: Wins a rook")));
