@@ -4,6 +4,7 @@ import {
   MATE_SCORE,
   createEngine,
   createInitialPosition,
+  generateCaptures,
   generateLegalMoves,
   hashPosition,
   makeMove,
@@ -556,6 +557,42 @@ test("quiescence reuses tactical leaf bounds from its transposition table", () =
   assert.equal(disabled.stats.qttStores, 0);
   assert.equal(disabled.stats.qttHits, 0);
   assert.ok(result.stats.qnodes < disabled.stats.qnodes);
+});
+
+test("quiescence orders stored tactical hash moves before generic leaf moves", () => {
+  const position = parseFen("4k4/9/9/9/9/9/4r4/9/4R4/4K4 r");
+  const rootMove = generateLegalMoves(position)
+    .find((candidate) => candidate.notation === "e8-e7");
+  const child = makeMove(position, rootMove);
+  const hashMove = generateCaptures(child)[0];
+  const seededTable = () => new Map([
+    [`${hashPosition(child)}:q:1`, {
+      flag: "lower",
+      score: 0,
+      depth: 1,
+      bestMove: hashMove
+    }]
+  ]);
+
+  const result = searchBestMove(position, {
+    depth: 1,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    exactRootScores: true,
+    quiescenceTable: seededTable()
+  });
+  const disabled = searchBestMove(position, {
+    depth: 1,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    exactRootScores: true,
+    quiescenceTable: seededTable(),
+    useQuiescenceHashMoveOrdering: false
+  });
+
+  assert.equal(hashMove.notation, "e6-e7");
+  assert.ok(result.stats.qttMoveHits > 0);
+  assert.equal(disabled.stats.qttMoveHits, 0);
 });
 
 test("search reuses cached static evaluations", () => {

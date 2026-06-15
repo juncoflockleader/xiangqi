@@ -1642,6 +1642,7 @@ function createEmptyStats() {
     qttReplacements: 0,
     qttEvictions: 0,
     qttSkips: 0,
+    qttMoveHits: 0,
     evalCacheHits: 0,
     evalCacheStores: 0,
     tacticalCacheHits: 0,

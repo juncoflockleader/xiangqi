@@ -425,6 +425,9 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.qttHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.qttHits, "quiescence-table hit"));
   }
+  if ((stats.qttMoveHits ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.qttMoveHits, "quiescence hash-move ordering hint"));
+  }
   if ((stats.evalCacheHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.evalCacheHits, "evaluation-cache hit"));
   }
@@ -491,6 +494,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
 
   if ((stats.ttHits ?? 0) > 0) supports.push("transposition-table reuse");
   if ((stats.qttHits ?? 0) > 0) supports.push("quiescence-table reuse");
+  if ((stats.qttMoveHits ?? 0) > 0) supports.push("quiescence hash-move ordering");
   if ((stats.evalCacheHits ?? 0) > 0) supports.push("evaluation-cache reuse");
   if ((stats.tacticalCacheHits ?? 0) > 0) supports.push("static-exchange cache reuse");
   if ((stats.tacticalMoveOrderHits ?? 0) > 0) supports.push("tactical-motif ordering");

@@ -5,7 +5,10 @@ import {
   buildLinePlan,
   createEngine,
   createInitialPosition,
+  generateCaptures,
   generateLegalMoves,
+  hashPosition,
+  makeMove,
   parseFen
 } from "../src/index.js";
 
@@ -185,6 +188,38 @@ test("move explanations surface history-gravity learning diagnostics", () => {
   assert.ok(result.stats.historyGravityUpdates > 0);
   assert.ok(selectivityFactor);
   assert.match(selectivityFactor.text, /history-gravity learning/);
+});
+
+test("move explanations surface quiescence hash-move ordering diagnostics", () => {
+  const position = parseFen("4k4/9/9/9/9/9/4r4/9/4R4/4K4 r");
+  const rootMove = generateLegalMoves(position)
+    .find((candidate) => candidate.notation === "e8-e7");
+  const child = makeMove(position, rootMove);
+  const hashMove = generateCaptures(child)[0];
+  const quiescenceTable = new Map([
+    [`${hashPosition(child)}:q:1`, {
+      flag: "lower",
+      score: 0,
+      depth: 1,
+      bestMove: hashMove
+    }]
+  ]);
+  const engine = createEngine({ depth: 1, timeLimitMs: 1000 });
+  const result = engine.chooseMove(position, {
+    useBook: false,
+    depth: 1,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    exactRootScores: true,
+    quiescenceTable
+  });
+  const selectivityFactor = result.explanation.confidence.factors
+    .find((factor) => factor.kind === "selectivity");
+
+  assert.ok(result.stats.qttMoveHits > 0);
+  assert.ok(result.explanation.reasons.some((reason) => reason.includes("quiescence hash-move")));
+  assert.ok(selectivityFactor);
+  assert.match(selectivityFactor.text, /quiescence hash-move ordering/);
 });
 
 test("move explanations surface continuation-history reduction tuning", () => {

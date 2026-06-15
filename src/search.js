@@ -188,6 +188,7 @@ export function searchBestMove(position, options = {}) {
       useDeltaPruning: options.useDeltaPruning !== false,
       useQuiescenceChecks: options.useQuiescenceChecks !== false,
       useQuiescenceTable: options.useQuiescenceTable !== false,
+      useQuiescenceHashMoveOrdering: options.useQuiescenceHashMoveOrdering !== false,
       useEvaluationCache: options.useEvaluationCache !== false,
       useTacticalCache: options.useTacticalCache !== false,
       useRecaptureExtensions: options.useRecaptureExtensions !== false,
@@ -891,19 +892,30 @@ function quiescence(position, alpha, beta, ply, context, qChecksRemaining) {
   const transpositionKey = quiescenceTranspositionKey(position, qChecksRemaining);
   const tt = probeQuiescenceTransposition(context, transpositionKey, alpha, beta, ply);
   if (tt.hit) return tt.score;
+  const hashMove = context.useQuiescenceHashMoveOrdering ? tt.bestMove : null;
 
   let moves;
   let bestScore = -INFINITY_SCORE;
+  let bestMove = null;
 
   if (inCheck) {
     const checkInfo = checkEvasionInfo(position);
-    moves = orderMoves(position, generateLegalMoves(position, position.turn), null, context, ply, null, checkInfo);
+    moves = orderQuiescenceMoves(
+      position,
+      generateLegalMoves(position, position.turn),
+      hashMove,
+      context,
+      ply,
+      null,
+      checkInfo
+    );
     if (moves.length === 0) {
       const mateScore = -MATE_SCORE + ply;
       storeQuiescenceTransposition(context, transpositionKey, {
         score: scoreToTransposition(mateScore, ply),
         flag: EXACT,
-        depth: qChecksRemaining
+        depth: qChecksRemaining,
+        bestMove: null
       });
       return mateScore;
     }
@@ -916,23 +928,24 @@ function quiescence(position, alpha, beta, ply, context, qChecksRemaining) {
       storeQuiescenceTransposition(context, transpositionKey, {
         score: scoreToTransposition(standPat, ply),
         flag: LOWER,
-        depth: qChecksRemaining
+        depth: qChecksRemaining,
+        bestMove: null
       });
       return beta;
     }
     if (standPat > alpha) alpha = standPat;
 
-    const captures = [];
-    for (const move of orderMoves(position, generateCaptures(position), null, context, ply)) {
+    const tacticalMoves = [];
+    for (const move of generateCaptures(position)) {
       if (!isGoodCapture(position, move, context)) continue;
       if (shouldPruneDelta({ position, move, standPat, alpha, context })) {
         context.stats.deltaPrunes += 1;
         continue;
       }
-      captures.push(move);
+      tacticalMoves.push(move);
     }
-    const checkingMoves = quietCheckingMoves(position, context, qChecksRemaining, ply);
-    moves = [...captures, ...checkingMoves];
+    tacticalMoves.push(...quietCheckingMoves(position, context, qChecksRemaining));
+    moves = orderQuiescenceMoves(position, tacticalMoves, hashMove, context, ply);
   }
 
   for (const move of moves) {
@@ -945,13 +958,17 @@ function quiescence(position, alpha, beta, ply, context, qChecksRemaining) {
     const nextQChecks = move.captured ? qChecksRemaining : Math.max(0, qChecksRemaining - 1);
     const score = normalizeScore(-quiescence(next, -beta, -alpha, ply + 1, context, nextQChecks));
     if (context.timedOut) return score;
-    if (score > bestScore) bestScore = score;
+    if (score > bestScore) {
+      bestScore = score;
+      bestMove = move;
+    }
     if (score >= beta) {
       context.stats.cutoffs += 1;
       storeQuiescenceTransposition(context, transpositionKey, {
         score: scoreToTransposition(score, ply),
         flag: LOWER,
-        depth: qChecksRemaining
+        depth: qChecksRemaining,
+        bestMove: move
       });
       return beta;
     }
@@ -963,31 +980,32 @@ function quiescence(position, alpha, beta, ply, context, qChecksRemaining) {
   storeQuiescenceTransposition(context, transpositionKey, {
     score: scoreToTransposition(bestScore, ply),
     flag: bestScore <= alphaOriginal ? UPPER : EXACT,
-    depth: qChecksRemaining
+    depth: qChecksRemaining,
+    bestMove
   });
   return alpha;
 }
 
 function probeQuiescenceTransposition(context, key, alpha, beta, ply) {
-  if (!context.useQuiescenceTable) return { hit: false, score: null };
+  if (!context.useQuiescenceTable) return { hit: false, score: null, bestMove: null };
 
   const tt = context.quiescenceTable.get(key);
-  if (!tt) return { hit: false, score: null };
+  if (!tt) return { hit: false, score: null, bestMove: null };
 
   const ttScore = scoreFromTransposition(tt.score, ply);
   if (tt.flag === EXACT) {
     context.stats.qttHits += 1;
-    return { hit: true, score: ttScore };
+    return { hit: true, score: ttScore, bestMove: tt.bestMove ?? null };
   }
   if (tt.flag === LOWER && ttScore >= beta) {
     context.stats.qttHits += 1;
-    return { hit: true, score: ttScore };
+    return { hit: true, score: ttScore, bestMove: tt.bestMove ?? null };
   }
   if (tt.flag === UPPER && ttScore <= alpha) {
     context.stats.qttHits += 1;
-    return { hit: true, score: ttScore };
+    return { hit: true, score: ttScore, bestMove: tt.bestMove ?? null };
   }
-  return { hit: false, score: null };
+  return { hit: false, score: null, bestMove: tt.bestMove ?? null };
 }
 
 function storeQuiescenceTransposition(context, key, entry) {
@@ -1009,10 +1027,10 @@ function quiescenceTranspositionKey(position, qChecksRemaining) {
   return `${hashPosition(position)}:q:${qChecksRemaining}`;
 }
 
-function quietCheckingMoves(position, context, qChecksRemaining, ply) {
+function quietCheckingMoves(position, context, qChecksRemaining) {
   if (!context.useQuiescenceChecks || qChecksRemaining <= 0) return [];
 
-  const checks = orderMoves(position, generateLegalMoves(position, position.turn), null, context, ply)
+  const checks = generateLegalMoves(position, position.turn)
     .filter((move) => !move.captured && givesCheck(position, move));
 
   context.stats.qchecks += checks.length;
@@ -1032,6 +1050,14 @@ function orderMoves(position, moves, principalMove, context, ply, previousMove =
     }))
     .sort((a, b) => b.score - a.score)
     .map((entry) => entry.move);
+}
+
+function orderQuiescenceMoves(position, moves, hashMove, context, ply, previousMove = null, checkInfo = null) {
+  const principalMove = context.useQuiescenceHashMoveOrdering ? hashMove : null;
+  if (principalMove && moves.some((move) => sameMove(move, principalMove))) {
+    context.stats.qttMoveHits += 1;
+  }
+  return orderMoves(position, moves, principalMove, context, ply, previousMove, checkInfo);
 }
 
 function moveOrderingScore(position, move, principalMove, context, ply, previousMove, checkInfo = null) {
@@ -2085,6 +2111,7 @@ function createSearchStats() {
     qttReplacements: 0,
     qttEvictions: 0,
     qttSkips: 0,
+    qttMoveHits: 0,
     evalCacheHits: 0,
     evalCacheStores: 0,
     tacticalCacheHits: 0,
@@ -2165,6 +2192,7 @@ function mergeSearchStats(total, next) {
     qttReplacements: total.qttReplacements + next.qttReplacements,
     qttEvictions: total.qttEvictions + next.qttEvictions,
     qttSkips: total.qttSkips + next.qttSkips,
+    qttMoveHits: total.qttMoveHits + next.qttMoveHits,
     evalCacheHits: total.evalCacheHits + next.evalCacheHits,
     evalCacheStores: total.evalCacheStores + next.evalCacheStores,
     tacticalCacheHits: total.tacticalCacheHits + next.tacticalCacheHits,

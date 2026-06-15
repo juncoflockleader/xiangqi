@@ -32,6 +32,7 @@ test("UCCI session searches a FEN position", () => {
   assert.ok(output.some((line) => line.includes("qchecks")));
   assert.ok(output.some((line) => /\bqtthits \d+/.test(line)));
   assert.ok(output.some((line) => /\bqttstores \d+/.test(line)));
+  assert.ok(output.some((line) => /\bqttmove \d+/.test(line)));
   assert.ok(output.some((line) => /\bevalhits \d+/.test(line)));
   assert.ok(output.some((line) => /\bevalstores \d+/.test(line)));
   assert.ok(output.some((line) => /\btacthits \d+/.test(line)));
