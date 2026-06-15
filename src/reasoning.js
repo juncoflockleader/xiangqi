@@ -181,9 +181,8 @@ export function explainMoveFeatures(position, move) {
   if (createdThreat && createdThreat.score >= 400) {
     reasons.push(`It creates an immediate threat: ${createdThreat.summary}`);
   }
-  if (beforeOpponentThreat && (!afterOpponentThreat || afterOpponentThreat.score + 120 < beforeOpponentThreat.score)) {
-    reasons.push(`It reduces the opponent's strongest immediate threat: ${beforeOpponentThreat.summary}`);
-  }
+  const defensiveReason = defensiveThreatReason(beforeOpponentThreat, afterOpponentThreat);
+  if (defensiveReason) reasons.push(defensiveReason);
   if (Math.abs(delta.deltaScore) >= 20) {
     reasons.push(`${delta.deltaScore >= 0 ? "Static evaluation improves" : "Static evaluation accepts a short-term cost"} by ${Math.abs(Math.round(delta.deltaScore))} centipawns.`);
   }
@@ -765,10 +764,32 @@ function lineMoveMotifs(position, move) {
   const threat = analyzeThreats(next, position.turn, { limit: 1 })[0];
   if (threat && threat.score >= 400) motifs.push("creates threat");
 
+  const beforeOpponentThreat = topThreat(position, opponent(position.turn));
+  const afterOpponentThreat = topThreat(next, next.turn);
+  if (defensiveThreatReason(beforeOpponentThreat, afterOpponentThreat)) motifs.push("answers threat");
+
   const replies = generateLegalMoves(next, next.turn).length;
   if (replies <= 3) motifs.push("limits replies");
 
   return unique(motifs);
+}
+
+function defensiveThreatReason(beforeOpponentThreat, afterOpponentThreat) {
+  if (!beforeOpponentThreat || beforeOpponentThreat.score < 250) return null;
+
+  if (!afterOpponentThreat) {
+    return `It parries the opponent's strongest immediate threat: ${beforeOpponentThreat.summary}`;
+  }
+
+  if (afterOpponentThreat.score + 120 >= beforeOpponentThreat.score) return null;
+
+  const before = sentenceFragment(beforeOpponentThreat.summary);
+  const after = sentenceFragment(afterOpponentThreat.summary);
+  return `It reduces the opponent's strongest immediate threat from "${before}" to "${after}".`;
+}
+
+function sentenceFragment(text) {
+  return String(text ?? "").replace(/[.。]+$/u, "");
 }
 
 function summarizeLinePlan(first, reply, continuation, motifs) {

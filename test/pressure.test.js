@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import {
   analyzePressure,
   analyzeThreats,
+  buildLinePlan,
   createEngine,
+  explainMoveFeatures,
+  generateLegalMoves,
   parseFen,
   topThreat
 } from "../src/index.js";
@@ -41,6 +44,18 @@ test("engine pressure API and explanations surface immediate threats", () => {
 
   assert.equal(pressure.threats[0].notation, "e9-e2");
   assert.ok(result.explanation.reasons.some((reason) => reason.includes("immediate threat")));
+});
+
+test("move explanations name parried opponent threats", () => {
+  const position = parseFen("4k4/9/9/9/9/r3P4/9/9/9/R3K4 r");
+  const move = generateLegalMoves(position)
+    .find((candidate) => candidate.notation === "a9-a5");
+  const explanation = explainMoveFeatures(position, move);
+  const linePlan = buildLinePlan(position, [move], { perspective: "red" });
+
+  assert.ok(explanation.reasons.some((reason) => reason.includes("parries the opponent's strongest immediate threat")));
+  assert.ok(explanation.reasons.some((reason) => reason.includes("Black rook a5-a9 wins a rook cleanly")));
+  assert.ok(linePlan.motifs.includes("answers threat"));
 });
 
 test("pressure describes attacks on the general without material language", () => {

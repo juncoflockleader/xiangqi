@@ -108,7 +108,7 @@ test("position study separates opening candidates from search candidates", () =>
   assert.equal(study.nextSteps[0].kind, "opening-search-check");
   assert.match(text, /Opening candidates:/);
   assert.match(text, /Search check: b7-b0 is the top search candidate, while h9-g7 is the opening-book choice\./);
-  assert.match(text, /Plan: Start with h9-g7; theme: creates threat\./);
+  assert.match(text, /Plan: Start with h9-g7; theme: creates threat, answers threat\./);
 });
 
 test("position study can include a played move review", () => {
@@ -322,7 +322,7 @@ test("backend position study preserves native ponder replies", async () => {
     assert.deepEqual(study.decision.principalVariation, ["h9-g7", "h0-g2"]);
     assert.equal(study.decision.linePlan.expectedReply, "h0-g2");
     assert.equal(study.candidateLines[0].linePlan.expectedReply, "h0-g2");
-    assert.match(text, /Plan: Start with h9-g7; expect h0-g2; theme: creates threat\./);
+    assert.match(text, /Plan: Start with h9-g7; expect h0-g2; theme: creates threat, answers threat\./);
   } finally {
     await backend.close();
   }
