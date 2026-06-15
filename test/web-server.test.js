@@ -48,8 +48,9 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(stylesheet, /inset: var\(--grid-inset-y\) var\(--grid-inset-x\)/);
     assert.match(stylesheet, /--grid-inset-x: calc\(100% \/ \(9 \* 2\)\)/);
     assert.match(stylesheet, /--grid-inset-y: calc\(100% \/ \(10 \* 2\)\)/);
-    assert.match(stylesheet, /--piece-size: clamp\(24px, 70%, 38px\)/);
-    assert.match(stylesheet, /--piece-font-size: 13px/);
+    assert.match(stylesheet, /--piece-size: clamp\(30px, 84%, 44px\)/);
+    assert.match(stylesheet, /--piece-font-size: 15px/);
+    assert.match(stylesheet, /transform: translate3d\(-50%, -50%, 0\)/);
     assert.match(stylesheet, /\.board-grid-major/);
     assert.match(stylesheet, /vector-effect: non-scaling-stroke/);
     assert.match(stylesheet, /\.move-chip \.move-notation/);

@@ -136,9 +136,9 @@ h2 {
   --grid-line-strong: rgba(61, 35, 13, 0.9);
   --grid-inset-x: calc(100% / (9 * 2));
   --grid-inset-y: calc(100% / (10 * 2));
-  --point-size: clamp(32px, 10.5%, 50px);
-  --piece-size: clamp(24px, 70%, 38px);
-  --piece-font-size: 13px;
+  --point-size: clamp(36px, 10.75%, 54px);
+  --piece-size: clamp(30px, 84%, 44px);
+  --piece-font-size: 15px;
   width: min(100%, 760px);
   margin: 0 auto;
   aspect-ratio: 9 / 10;
@@ -295,10 +295,9 @@ h2 {
   position: absolute;
   z-index: 1;
   width: var(--point-size);
-  height: auto;
+  height: var(--point-size);
   min-height: 0;
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
+  transform: translate3d(-50%, -50%, 0);
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -332,6 +331,7 @@ h2 {
   position: relative;
   z-index: 2;
   width: var(--piece-size);
+  min-width: 0;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -346,6 +346,7 @@ h2 {
   letter-spacing: 0;
   line-height: 1;
   text-align: center;
+  text-rendering: optimizeLegibility;
   overflow: hidden;
   white-space: nowrap;
 }
@@ -353,7 +354,7 @@ h2 {
 .piece::before {
   content: "";
   position: absolute;
-  inset: 3px;
+  inset: clamp(3px, 9%, 5px);
   border: 1px solid currentColor;
   border-radius: inherit;
   opacity: 0.48;
@@ -576,9 +577,9 @@ h2 {
 
   .board-wrap {
     --board-padding: 8px;
-    --point-size: clamp(30px, 10%, 44px);
-    --piece-size: clamp(23px, 68%, 34px);
-    --piece-font-size: 12px;
+    --point-size: clamp(34px, 10.75%, 46px);
+    --piece-size: clamp(29px, 84%, 39px);
+    --piece-font-size: 13px;
   }
 
   .river-label {
