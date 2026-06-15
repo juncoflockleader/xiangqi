@@ -252,6 +252,9 @@ test("backend position study preserves structured decision alternatives", async 
     assert.equal(study.decision.alternatives[0].scoreText, "+0.42");
     assert.equal(study.decision.alternatives[1].move, "h7-e7");
     assert.equal(study.decision.alternatives[1].verdict, "playable");
+    assert.equal(study.decision.alternatives[1].planComparison.bestMove, "h9-g7");
+    assert.equal(study.decision.alternatives[1].planComparison.playedMove, "h7-e7");
+    assert.equal(study.decision.alternatives[1].planComparison.centipawnLoss, 30);
     assert.ok(study.decision.alternatives[1].reasons[0].includes("top native line"));
     assert.match(text, /Comparison: Native MultiPV rates h9-g7 30 centipawns/);
     assert.match(text, /Decision alternatives:/);

@@ -393,6 +393,10 @@ test("UCCI backend chooseMove can include native MultiPV alternatives", async ()
     assert.equal(result.explanation.alternatives[1].move, "h7-e7");
     assert.equal(result.explanation.alternatives[1].centipawnLoss, 30);
     assert.equal(result.explanation.alternatives[1].verdict, "playable");
+    assert.equal(result.explanation.alternatives[1].planComparison.playedMove, "h7-e7");
+    assert.equal(result.explanation.alternatives[1].planComparison.bestMove, "h9-g7");
+    assert.equal(result.explanation.alternatives[1].planComparison.classification, "playable");
+    assert.equal(result.explanation.alternatives[1].planComparison.summary, "This native line starts with h7-e7; the top native line starts with h9-g7, a playable gap of 30 centipawns. Both lines expect h0-g2.");
     assert.ok(result.explanation.alternatives[1].reasons[0].includes("top native line"));
     assert.ok(result.explanation.alternatives[1].principalVariationText.includes("h7-e7"));
     assert.ok(result.explanation.alternatives[1].note.includes("native UCCI line 2"));

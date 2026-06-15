@@ -1,3 +1,5 @@
+import { summarizePlanComparisonEvidence } from "./plan-comparison.js";
+
 export function summarizeComparisonEvidence(comparison) {
   if (!comparison) return null;
 
@@ -25,6 +27,7 @@ export function summarizeAlternativeEvidence(alternatives) {
     expectedReply: alternative.expectedReply ?? null,
     motifs: [...(alternative.motifs ?? [])],
     linePlanSummary: alternative.linePlanSummary ?? "",
+    planComparison: summarizePlanComparisonEvidence(alternative.planComparison),
     principalVariation: [...(alternative.principalVariation ?? [])],
     principalVariationText: alternative.principalVariationText ?? "",
     note: alternative.note ?? ""

@@ -17,6 +17,7 @@ import { generateLegalMoves, isInCheck } from "./movegen.js";
 import { analyzeThreats, topThreat } from "./pressure.js";
 import { formatPrincipalVariation } from "./search.js";
 import { analyzeCapture } from "./tactics.js";
+import { compareLinePlans, summarizePlanComparisonEvidence } from "./plan-comparison.js";
 
 export function explainMove(position, searchResult) {
   const move = searchResult.bestMove;
@@ -445,6 +446,11 @@ function lineMoveNotation(move) {
 
 function explainAlternatives(position, candidates) {
   const bestScore = candidates[0]?.score ?? 0;
+  const bestLinePlan = candidates[0]
+    ? buildLinePlan(position, candidates[0].principalVariation ?? [candidates[0].move], {
+        perspective: position.turn
+      })
+    : null;
 
   return candidates.slice(0, 5).map((candidate, index) => {
     const move = candidate.move;
@@ -486,6 +492,19 @@ function explainAlternatives(position, candidates) {
       expectedReply,
       motifs: linePlan.motifs,
       linePlanSummary: linePlan.summary,
+      planComparison: alternativePlanComparison(linePlan, bestLinePlan, {
+        index,
+        centipawnLoss,
+        verdict,
+        playedPlanLabel: "This candidate line",
+        playedLineLabel: "This candidate line",
+        playedStartLabel: "This candidate line starts",
+        bestLineLabel: "the top line",
+        bestLineSentenceLabel: "The top line",
+        bestPossessiveLabel: "the top line's",
+        bestPreferencePhrase: "the top line starts with",
+        bestStartLabel: "the top line starts"
+      }),
       principalVariation,
       principalVariationText: principalVariation.join(" "),
       note: `${contrast}; ${tactical.length > 0
@@ -493,6 +512,22 @@ function explainAlternatives(position, candidates) {
         : `${PIECE_NAMES[move.piece.type]} move with search score ${formatScore(candidate.score)}`}`
     };
   });
+}
+
+function alternativePlanComparison(linePlan, bestLinePlan, options = {}) {
+  if (options.index === 0) return null;
+  return summarizePlanComparisonEvidence(compareLinePlans(linePlan, bestLinePlan, {
+    centipawnLoss: options.centipawnLoss,
+    classification: options.verdict,
+    playedPlanLabel: options.playedPlanLabel,
+    playedLineLabel: options.playedLineLabel,
+    playedStartLabel: options.playedStartLabel,
+    bestLineLabel: options.bestLineLabel,
+    bestLineSentenceLabel: options.bestLineSentenceLabel,
+    bestPossessiveLabel: options.bestPossessiveLabel,
+    bestPreferencePhrase: options.bestPreferencePhrase,
+    bestStartLabel: options.bestStartLabel
+  }));
 }
 
 function alternativeVerdict(index, centipawnLoss) {

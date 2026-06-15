@@ -1200,6 +1200,11 @@ function buildNativeComparisonEvidence(result, position) {
 
 function explainNativeAlternatives(position, result, backendName, protocolLabel) {
   const bestScore = result.candidates[0]?.score ?? result.score ?? 0;
+  const bestLinePlan = result.candidates[0]
+    ? buildLinePlan(position, result.candidates[0].principalVariation ?? [result.candidates[0].move], {
+        perspective: position.turn
+      })
+    : null;
 
   return result.candidates.slice(0, 5).map((candidate, index) => {
     const explanation = explainNativeCandidate(position, candidate, {
@@ -1210,6 +1215,7 @@ function explainNativeAlternatives(position, result, backendName, protocolLabel)
     });
     const linePlan = explanation.linePlan;
     const centipawnLoss = explanation.centipawnLoss;
+    const verdict = nativeAlternativeVerdict(index, centipawnLoss);
     const contrast = nativeAlternativeContrast(index, centipawnLoss);
 
     return {
@@ -1219,7 +1225,7 @@ function explainNativeAlternatives(position, result, backendName, protocolLabel)
       scoreDetail: candidate.scoreDetail ?? null,
       wdl: candidate.wdl ?? null,
       centipawnLoss,
-      verdict: nativeAlternativeVerdict(index, centipawnLoss),
+      verdict,
       summary: explanation.summary,
       reasons: unique([
         contrast,
@@ -1228,11 +1234,32 @@ function explainNativeAlternatives(position, result, backendName, protocolLabel)
       expectedReply: linePlan.expectedReply,
       motifs: linePlan.motifs,
       linePlanSummary: linePlan.summary,
+      planComparison: nativeAlternativePlanComparison(linePlan, bestLinePlan, {
+        index,
+        centipawnLoss,
+        verdict
+      }),
       principalVariation: explanation.principalVariation,
       principalVariationText: explanation.principalVariationText,
       note: `${contrast}; native ${protocolLabel} line ${candidate.native?.multipv ?? index + 1} at depth ${candidate.native?.depth ?? result.depth}`
     };
   });
+}
+
+function nativeAlternativePlanComparison(linePlan, bestLinePlan, options = {}) {
+  if (options.index === 0) return null;
+  return summarizePlanComparisonEvidence(compareLinePlans(linePlan, bestLinePlan, {
+    centipawnLoss: options.centipawnLoss,
+    classification: options.verdict,
+    playedPlanLabel: "This native line",
+    playedLineLabel: "This native line",
+    playedStartLabel: "This native line starts",
+    bestLineLabel: "the top native line",
+    bestLineSentenceLabel: "The top native line",
+    bestPossessiveLabel: "the top native line's",
+    bestPreferencePhrase: "the top native line starts with",
+    bestStartLabel: "the top native line starts"
+  }));
 }
 
 function explainNativeCandidate(position, candidate, context) {

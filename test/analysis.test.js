@@ -69,6 +69,7 @@ test("move explanations contrast root alternatives", () => {
   assert.ok(alternatives[0].summary.includes(alternatives[0].move));
   assert.ok(alternatives[0].reasons.some((reason) => reason.includes("top line")));
   assert.equal(alternatives[0].linePlanSummary, result.explanation.linePlan.summary);
+  assert.equal(alternatives[0].planComparison, null);
   assert.ok(Array.isArray(alternatives[0].motifs));
   assert.ok(alternatives[0].principalVariationText.includes(alternatives[0].move));
 
@@ -79,6 +80,10 @@ test("move explanations contrast root alternatives", () => {
     assert.ok(alternative.reasons.length > 0);
     assert.match(alternative.reasons[0], /roughly tied|trails the top line/);
     assert.equal(typeof alternative.linePlanSummary, "string");
+    assert.equal(alternative.planComparison.playedMove, alternative.move);
+    assert.equal(alternative.planComparison.bestMove, alternatives[0].move);
+    assert.equal(alternative.planComparison.centipawnLoss, alternative.centipawnLoss);
+    assert.ok(alternative.planComparison.summary.includes("top line"));
     assert.equal(
       alternative.expectedReply,
       alternative.principalVariation.length > 1 ? alternative.principalVariation[1] : null
