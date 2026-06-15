@@ -232,6 +232,9 @@ function coordinationValue(position, piece, square) {
   if (piece.type === PIECES.HORSE) {
     return horseLegCoordination(position, piece, square);
   }
+  if (piece.type === PIECES.ELEPHANT) {
+    return elephantEyeCoordination(position, piece, square);
+  }
 
   return 0;
 }
@@ -258,6 +261,33 @@ function horseLegCoordination(position, piece, square) {
   }
 
   return blockedLegs === 0 ? score + 18 : score;
+}
+
+function elephantEyeCoordination(position, piece, square) {
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  let openEyes = 0;
+  let score = 0;
+
+  for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+    const targetFile = file + dx * 2;
+    const targetRank = rank + dy * 2;
+    const eyeFile = file + dx;
+    const eyeRank = rank + dy;
+    if (!isInside(targetFile, targetRank)) continue;
+    if (!ownRiverSide(piece.side, targetRank)) continue;
+
+    const blocker = position.board[indexOf(eyeFile, eyeRank)];
+    if (blocker) {
+      score -= blocker.side === piece.side ? 14 : 18;
+      continue;
+    }
+
+    openEyes += 1;
+    score += 7;
+  }
+
+  return openEyes >= 2 ? score + 6 : score;
 }
 
 function linePressureValue(position, piece, square) {
