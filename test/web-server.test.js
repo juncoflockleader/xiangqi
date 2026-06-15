@@ -26,7 +26,9 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(page, /id="localeSelect"/);
     assert.match(script, /function renderBoard/);
     assert.match(script, /function intersectionPercent/);
+    assert.match(script, /move-label/);
     assert.match(stylesheet, /\.file-labels/);
+    assert.match(stylesheet, /\.move-label/);
     assert.match(stylesheet, /min-height: 0/);
     assert.equal(created.ok, true);
     assert.equal(created.state.playerSide, "red");

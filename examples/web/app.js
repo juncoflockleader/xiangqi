@@ -1,6 +1,10 @@
 const files = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
 const ranks = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 const chineseNumerals = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
+const pointCount = {
+  files: files.length,
+  ranks: ranks.length
+};
 
 const pieceNames = {
   zh: {
@@ -317,7 +321,8 @@ function renderBoard() {
 
   const cellsByCoord = new Map(game.board.map((cell) => [cell.coord, cell]));
   const legalFrom = legalMovesFrom();
-  const legalTargets = selectedTargets();
+  const legalTargetMoves = selectedTargetMoves();
+  const legalTargets = new Set(legalTargetMoves.keys());
 
   elements.boardWrap.classList.toggle("black-view", game.playerSide === "black");
   elements.board.innerHTML = "";
@@ -327,15 +332,16 @@ function renderBoard() {
       const coord = `${file}${rank}`;
       const cell = cellsByCoord.get(coord);
       const point = visualPoint(coord, game.playerSide);
+      const targetMove = legalTargetMoves.get(coord);
       const button = document.createElement("button");
       button.type = "button";
       button.className = "cell";
       button.dataset.coord = coord;
-      button.style.left = intersectionPercent(point.file, files.length);
-      button.style.top = intersectionPercent(point.rank, ranks.length);
+      button.style.left = intersectionPercent(point.file, pointCount.files);
+      button.style.top = intersectionPercent(point.rank, pointCount.ranks);
       button.disabled = state.pending || !game.playerTurn;
-      button.title = cellTitle(cell, coord);
-      button.setAttribute("aria-label", cellTitle(cell, coord));
+      button.title = cellTitle(cell, coord, targetMove);
+      button.setAttribute("aria-label", cellTitle(cell, coord, targetMove));
       if (state.selected === coord) button.classList.add("selected");
       if (legalTargets.has(coord)) button.classList.add("target");
 
@@ -345,6 +351,12 @@ function renderBoard() {
         piece.textContent = cell.piece.symbol;
         piece.title = cellTitle(cell, coord);
         button.append(piece);
+      }
+      if (targetMove) {
+        const moveLabel = document.createElement("span");
+        moveLabel.className = `move-label ${point.file % 2 === 0 ? "move-label-high" : "move-label-low"}`;
+        moveLabel.textContent = moveText(targetMove.notation, targetMove.zhNotation);
+        button.append(moveLabel);
       }
 
       if (game.playerTurn && (cell?.piece?.side === game.playerSide || legalTargets.has(coord) || legalFrom.has(coord))) {
@@ -532,11 +544,15 @@ function legalMovesFrom() {
 }
 
 function selectedTargets() {
-  if (!state.selected) return new Set();
-  return new Set(
+  return new Set(selectedTargetMoves().keys());
+}
+
+function selectedTargetMoves() {
+  if (!state.selected) return new Map();
+  return new Map(
     (state.game?.legalMoves ?? [])
       .filter((move) => move.fromCoord === state.selected)
-      .map((move) => move.toCoord)
+      .map((move) => [move.toCoord, move])
   );
 }
 
@@ -614,10 +630,11 @@ function intersectionPercent(index, count) {
   return `${edgeInset + (index * span) / (count - 1)}%`;
 }
 
-function cellTitle(cell, coord) {
+function cellTitle(cell, coord, targetMove = null) {
   const point = localizedPoint(coord);
-  if (!cell?.piece) return `${t("emptyPoint")} ${point}`;
-  return `${pieceName(cell.piece)} ${point}`;
+  const move = targetMove ? `，${moveText(targetMove.notation, targetMove.zhNotation)}` : "";
+  if (!cell?.piece) return `${t("emptyPoint")} ${point}${move}`;
+  return `${pieceName(cell.piece)} ${point}${move}`;
 }
 
 function pieceName(piece) {

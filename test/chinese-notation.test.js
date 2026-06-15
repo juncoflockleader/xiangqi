@@ -4,6 +4,7 @@ import {
   createInitialPosition,
   lineToChineseNotation,
   moveToChineseNotation,
+  parseFen,
   parseChineseMoveNotation,
   parsePortableMoveNotation
 } from "../src/index.js";
@@ -25,6 +26,12 @@ test("Chinese notation can follow a principal variation", () => {
     lineToChineseNotation(position, ["h7-e7", "h0-g2"]),
     ["炮二平五", "馬8進7"]
   );
+});
+
+test("Chinese notation localizes file numbers for red horizontal cannon moves", () => {
+  const position = parseFen("4k4/9/9/9/9/9/9/2C6/9/4K4 r");
+
+  assert.equal(moveToChineseNotation(position, "c7-e7"), "炮七平五");
 });
 
 test("Chinese notation resolves legal moves from traditional and simplified text", () => {
