@@ -63,6 +63,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     terms[piece.side].kingSafety += localDefenseValue(position, piece, square);
     terms[piece.side].coordination += coordinationValue(position, piece, square);
     terms[piece.side].linePressure += linePressureValue(position, piece, square);
+    terms[piece.side].pinPressure += pinPressureValue(position, piece, square);
     terms[piece.side].rookActivity += rookActivityValue(position, piece, square);
     terms[piece.side].horsePressure += horsePressureValue(position, piece, square);
   }
@@ -143,6 +144,7 @@ function createTerms() {
     pieceSafety: 0,
     coordination: 0,
     linePressure: 0,
+    pinPressure: 0,
     rookActivity: 0,
     horsePressure: 0
   };
@@ -396,6 +398,43 @@ function linePressureValue(position, piece, square) {
   return 0;
 }
 
+function pinPressureValue(position, piece, square) {
+  if (piece.type !== PIECES.ROOK && piece.type !== PIECES.CANNON) return 0;
+
+  const enemy = opponent(piece.side);
+  const enemyKingSquare = position.board.findIndex(
+    (candidate) => candidate?.side === enemy && candidate.type === PIECES.KING
+  );
+  if (enemyKingSquare === -1 || !lineAligned(square, enemyKingSquare)) return 0;
+
+  const blockers = linePiecesBetween(position, square, enemyKingSquare);
+  if (piece.type === PIECES.ROOK) {
+    if (blockers.length !== 1) return 0;
+    const [target] = blockers;
+    return pinnedTargetValue(target, enemy);
+  }
+
+  if (blockers.length !== 2) return 0;
+  const [screen, target] = blockers;
+  const screenBonus = screen.piece.side === piece.side ? 14 : 6;
+  return pinnedTargetValue(target, enemy) + screenBonus;
+}
+
+function pinnedTargetValue(target, enemy) {
+  if (target.piece.side !== enemy || target.piece.type === PIECES.KING) return 0;
+
+  const file = fileOf(target.square);
+  const rank = rankOf(target.square);
+  const value = PIECE_VALUES[target.piece.type] ?? 0;
+  let score = Math.min(86, Math.round(value * 0.09));
+
+  if (palaceContains(enemy, file, rank)) score += 18;
+  if (file === 4) score += 10;
+  if (target.piece.type === PIECES.ADVISOR || target.piece.type === PIECES.ELEPHANT) score += 12;
+
+  return score;
+}
+
 function rookActivityValue(position, piece, square) {
   if (piece.type !== PIECES.ROOK) return 0;
 
@@ -501,6 +540,28 @@ function countLineBlockers(position, from, to) {
   }
 
   return blockers;
+}
+
+function linePiecesBetween(position, from, to) {
+  const fromFile = fileOf(from);
+  const fromRank = rankOf(from);
+  const toFile = fileOf(to);
+  const toRank = rankOf(to);
+  const fileStep = Math.sign(toFile - fromFile);
+  const rankStep = Math.sign(toRank - fromRank);
+  const pieces = [];
+  let file = fromFile + fileStep;
+  let rank = fromRank + rankStep;
+
+  while (file !== toFile || rank !== toRank) {
+    const square = indexOf(file, rank);
+    const piece = position.board[square];
+    if (piece) pieces.push({ square, piece });
+    file += fileStep;
+    rank += rankStep;
+  }
+
+  return pieces;
 }
 
 function lineAligned(first, second) {
@@ -972,6 +1033,7 @@ function readableTerm(term) {
     pieceSafety: "piece safety",
     coordination: "piece coordination",
     linePressure: "rook and cannon line pressure",
+    pinPressure: "palace pin pressure",
     rookActivity: "rook activity",
     horsePressure: "horse outpost pressure"
   };
