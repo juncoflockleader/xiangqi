@@ -20,6 +20,7 @@ import {
   opponent,
   parseFen,
   pieceLabel,
+  positionKey,
   playGameMoveAsync,
   resolveEnginePlayLevel,
   toFen
@@ -247,6 +248,18 @@ async function handleApiPost(context, url) {
     return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine) });
   }
 
+  if (url.pathname === "/api/jump") {
+    const session = requireSession(context.sessions, body.sessionId);
+    await enqueueSession(session, async () => {
+      const ply = parsePly(body.ply, session.game.moves.length);
+      const before = session.game;
+      session.game = truncateGameAtPly(session.game, ply);
+      session.undoStack.push(before);
+      await maybePlayEngineTurn(session, context.engine);
+    });
+    return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine) });
+  }
+
   sendJson(context.response, 404, { ok: false, error: "Unknown API route." });
 }
 
@@ -309,6 +322,37 @@ function searchOptions(session) {
     lines: session.lines,
     useBook: session.useBook
   };
+}
+
+function parsePly(value, maxPly) {
+  const ply = Number.parseInt(value, 10);
+  if (!Number.isInteger(ply) || ply < 0 || ply > maxPly) {
+    throw httpError(400, `Unsupported tree ply: ${value}.`);
+  }
+  return ply;
+}
+
+function truncateGameAtPly(game, ply) {
+  const moves = game.moves.slice(0, ply);
+  const positions = game.positions.slice(0, ply + 1);
+  const position = positions.at(-1) ?? game.initialPosition;
+
+  return {
+    ...game,
+    position,
+    moves,
+    positions,
+    positionCounts: countPositions(positions)
+  };
+}
+
+function countPositions(positions) {
+  const counts = new Map();
+  for (const position of positions) {
+    const key = positionKey(position);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
 }
 
 function serializeState(session, engine) {

@@ -38,6 +38,8 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function buildMoveTree/);
     assert.match(script, /function renderMainlineTreeNode/);
     assert.match(script, /function boardCellsForTreeSelection/);
+    assert.match(script, /function restoreTreeNode/);
+    assert.match(script, /"\/api\/jump"/);
     assert.match(script, /function intersectionPercent/);
     assert.match(script, /const glyphLocale = isChineseLocale\(\) \? state\.locale : "zh-TW"/);
     assert.match(script, /function renderSelectedMoves/);
@@ -51,6 +53,7 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(stylesheet, /\.selected-moves/);
     assert.match(stylesheet, /\.move-tree-list/);
     assert.match(stylesheet, /\.move-tree-branches/);
+    assert.match(stylesheet, /\.tree-restore-button/);
     assert.match(stylesheet, /\.board-wrap\.tree-preview/);
     assert.match(stylesheet, /\.move-label/);
     assert.match(stylesheet, /width: var\(--board-play-width\)/);
@@ -97,6 +100,8 @@ test("web server plays a player move, engine reply, hints, best move, and undo",
     const hint = await postJson(`${app.url}/api/hint`, { sessionId });
     const moved = await postJson(`${app.url}/api/move`, { sessionId, move: "h7-e7" });
     const undone = await postJson(`${app.url}/api/undo`, { sessionId });
+    const movedAgain = await postJson(`${app.url}/api/move`, { sessionId, move: "h7-e7" });
+    const jumped = await postJson(`${app.url}/api/jump`, { sessionId, ply: 0 });
 
     assert.equal(best.ok, true);
     assert.equal(typeof best.best.bestMove, "string");
@@ -126,6 +131,12 @@ test("web server plays a player move, engine reply, hints, best move, and undo",
     assert.equal(undone.ok, true);
     assert.equal(undone.state.history.length, 0);
     assert.equal(undone.state.playerTurn, true);
+    assert.equal(movedAgain.ok, true);
+    assert.equal(movedAgain.state.history.length, 2);
+    assert.equal(jumped.ok, true);
+    assert.equal(jumped.state.history.length, 0);
+    assert.equal(jumped.state.playerTurn, true);
+    assert.equal(jumped.state.canUndo, true);
   } finally {
     await app.close();
   }

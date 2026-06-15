@@ -676,6 +676,20 @@ h2 {
   background: rgba(255, 249, 231, 0.68);
 }
 
+.tree-action-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.tree-restore-button {
+  min-height: 34px;
+  border-color: rgba(36, 122, 91, 0.34);
+  background: rgba(236, 247, 241, 0.88);
+  color: var(--focus);
+  padding: 6px 10px;
+  font-weight: 780;
+}
+
 .score {
   color: var(--muted);
   font-size: 13px;

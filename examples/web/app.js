@@ -216,6 +216,7 @@ const zhTwTranslations = {
   expand: "展開",
   fold: "收合",
   selectedNode: "已選",
+  restorePoint: "回到此處",
   askPrompt: "可查看最佳、提示，或直接走棋。",
   redToMove: "紅方走棋",
   blackToMove: "黑方走棋",
@@ -273,6 +274,7 @@ const zhCnTranslations = {
   branchPoint: "分岔点",
   currentPosition: "当前",
   expand: "展开",
+  restorePoint: "回到此处",
   askPrompt: "可查看最佳着法、提示，或直接走棋。",
   redToMove: "红方走棋",
   blackToMove: "黑方走棋",
@@ -340,6 +342,7 @@ const translations = {
     expand: "Expand",
     fold: "Collapse",
     selectedNode: "selected",
+    restorePoint: "Restore here",
     askPrompt: "Ask for Best, Hint, or make a move.",
     redToMove: "Red to move",
     blackToMove: "Black to move",
@@ -646,9 +649,13 @@ function renderLastMove() {
   if (review?.planComparison?.summary) {
     details.push(`<div class="line">${escapeHtml(localizedPlanComparisonSummary(review.planComparison))}</div>`);
   }
+  if (treeNode?.kind === "main" && treeNode.id !== latestMainlineNodeId()) {
+    details.push(`<div class="tree-action-row"><button class="tree-restore-button" type="button" data-tree-restore="${escapeHtml(treeNode.id)}">${escapeHtml(t("restorePoint"))}</button></div>`);
+  }
 
   elements.lastMovePanel.className = "stack";
   elements.lastMovePanel.innerHTML = details.join("");
+  bindTreeRestoreAction();
 }
 
 function renderAlternativeSummary(node) {
@@ -926,6 +933,27 @@ function selectTreeNode(id) {
   state.selected = null;
   state.panel = panelFromTreeSelection() ?? panelFromMove(state.game);
   render();
+}
+
+async function restoreTreeNode(id) {
+  const node = findTreeNode(id);
+  if (node?.kind !== "main") return;
+  await runRequest(async () => {
+    const result = await api("/api/jump", {
+      sessionId: state.sessionId,
+      ply: node.move.ply
+    });
+    state.treeSelectedId = latestMainlineNodeId(result.state);
+    state.panel = panelFromMove(result.state);
+    state.selected = null;
+    setGame(result.state);
+  });
+}
+
+function bindTreeRestoreAction() {
+  elements.lastMovePanel.querySelectorAll("[data-tree-restore]").forEach((button) => {
+    button.addEventListener("click", () => restoreTreeNode(button.dataset.treeRestore));
+  });
 }
 
 function toggleTreeNode(id) {
