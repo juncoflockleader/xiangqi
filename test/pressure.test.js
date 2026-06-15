@@ -51,3 +51,12 @@ test("pressure describes attacks on the general without material language", () =
   assert.ok(threat.summary.includes("opposing general"));
   assert.equal(threat.summary.includes("wins a general"), false);
 });
+
+test("pressure labels discovered checks as a tactical motif", () => {
+  const position = parseFen("4k4/9/9/9/4P4/9/4R4/9/9/4K4 r");
+  const threat = topThreat(position);
+
+  assert.equal(threat.notation, "e4-d4");
+  assert.ok(threat.motifs.includes("discovered check"));
+  assert.ok(threat.summary.includes("uncovers a rook check"));
+});

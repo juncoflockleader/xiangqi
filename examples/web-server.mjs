@@ -687,6 +687,7 @@ function summarizeCoachLevelsZh(coach) {
 }
 
 function motifZh(motif) {
+  if (/discovered/i.test(motif)) return "閃擊將軍";
   if (/check/i.test(motif)) return "將軍";
   if (/capture|wins/i.test(motif)) return "得子";
   if (/threat/i.test(motif)) return "威脅";

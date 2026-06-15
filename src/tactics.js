@@ -128,6 +128,43 @@ export function analyzePins(position, move) {
   };
 }
 
+export function analyzeDiscoveredCheck(position, move) {
+  if (!move) return null;
+
+  const side = move.piece?.side ?? position.turn;
+  const after = makeMove(position, move);
+  const movedPiece = after.board[move.to];
+  if (!movedPiece || movedPiece.side !== side) return null;
+
+  const enemy = opponent(side);
+  const enemyKingSquare = after.board.findIndex((piece) => piece?.side === enemy && piece.type === PIECES.KING);
+  if (enemyKingSquare === -1 || !isInCheck(after, enemy)) return null;
+
+  const attackers = checkingAttackers(after, side, enemyKingSquare);
+  const discoveries = attackers
+    .filter((attacker) => attacker.square !== move.to)
+    .map((attacker) => discoveredCheckEntry(position, after, move, attacker, enemyKingSquare))
+    .filter(Boolean);
+
+  if (discoveries.length === 0) return null;
+
+  const directCheck = attackers.some((attacker) => attacker.square === move.to);
+  const score = discoveries.reduce((sum, entry) => (
+    sum + (entry.method === "horse-leg" ? 520 : 460) + entry.pieceValue / 8
+  ), directCheck ? 180 : 0);
+
+  return {
+    move,
+    notation: moveToNotation(move),
+    piece: movedPiece,
+    pieceName: PIECE_NAMES[movedPiece.type],
+    discoveredChecks: discoveries,
+    directCheck,
+    score: Math.round(score),
+    summary: summarizeDiscoveredCheck(move, movedPiece, discoveries, directCheck)
+  };
+}
+
 export function analyzeStaticExchange(position, move, options = {}) {
   if (!move.captured) {
     return {
@@ -243,6 +280,123 @@ function summarizePins(move, piece, pins) {
   const pin = pins[0];
   const screenText = pin.screen ? ` using the ${pin.screen.pieceName} on ${pin.screen.coord} as a screen` : "";
   return `The ${PIECE_NAMES[piece.type]} ${moveToNotation(move)} pins the ${pin.targetName} on ${pin.targetCoord} to the general${screenText}.`;
+}
+
+function checkingAttackers(position, side, enemyKingSquare) {
+  const attackers = [];
+
+  for (let square = 0; square < position.board.length; square += 1) {
+    const piece = position.board[square];
+    if (!piece || piece.side !== side) continue;
+    const attack = checkAttackEntry(position, square, piece, enemyKingSquare);
+    if (attack) attackers.push(attack);
+  }
+
+  return attackers;
+}
+
+function checkAttackEntry(position, square, piece, enemyKingSquare) {
+  if (piece.type === PIECES.ROOK || piece.type === PIECES.CANNON || piece.type === PIECES.KING) {
+    if (!lineAligned(square, enemyKingSquare)) return null;
+    if (piece.type === PIECES.KING && fileOf(square) !== fileOf(enemyKingSquare)) return null;
+    const blockers = occupiedBetween(position, square, enemyKingSquare);
+    if (piece.type === PIECES.CANNON ? blockers.length !== 1 : blockers.length !== 0) return null;
+    return attackEntry(square, piece, piece.type === PIECES.CANNON ? { screen: blockers[0] } : {});
+  }
+
+  if (piece.type === PIECES.HORSE) {
+    const leg = horseLegSquare(square, enemyKingSquare);
+    if (leg === null || position.board[leg]) return null;
+    return attackEntry(square, piece, { leg });
+  }
+
+  return null;
+}
+
+function attackEntry(square, piece, details = {}) {
+  return {
+    square,
+    coord: indexToCoord(square),
+    piece,
+    pieceName: PIECE_NAMES[piece.type],
+    pieceValue: PIECE_VALUES[piece.type],
+    ...details
+  };
+}
+
+function discoveredCheckEntry(before, after, move, attacker, enemyKingSquare) {
+  if (attacker.piece.type === PIECES.HORSE) {
+    return horseDiscoveredCheckEntry(before, after, move, attacker);
+  }
+
+  return lineDiscoveredCheckEntry(before, after, move, attacker, enemyKingSquare);
+}
+
+function lineDiscoveredCheckEntry(before, after, move, attacker, enemyKingSquare) {
+  if (!lineAligned(attacker.square, enemyKingSquare)) return null;
+  if (attacker.piece.type === PIECES.KING && fileOf(attacker.square) !== fileOf(enemyKingSquare)) return null;
+
+  const beforeBlockers = occupiedBetween(before, attacker.square, enemyKingSquare);
+  if (!beforeBlockers.some((blocker) => blocker.square === move.from)) return null;
+
+  const afterBlockers = occupiedBetween(after, attacker.square, enemyKingSquare);
+  if (attacker.piece.type === PIECES.CANNON) {
+    if (afterBlockers.length !== 1) return null;
+    return discoveredEntry(attacker, {
+      method: "cannon-line",
+      screen: afterBlockers[0],
+      uncoveredFrom: indexToCoord(move.from)
+    });
+  }
+
+  if (afterBlockers.length !== 0) return null;
+  return discoveredEntry(attacker, {
+    method: attacker.piece.type === PIECES.KING ? "flying-general" : "line",
+    uncoveredFrom: indexToCoord(move.from)
+  });
+}
+
+function horseDiscoveredCheckEntry(before, after, move, attacker) {
+  if (attacker.leg !== move.from) return null;
+  if (!before.board[move.from] || after.board[move.from]) return null;
+  return discoveredEntry(attacker, {
+    method: "horse-leg",
+    uncoveredFrom: indexToCoord(move.from)
+  });
+}
+
+function discoveredEntry(attacker, details) {
+  return {
+    attackerSquare: attacker.square,
+    attackerCoord: attacker.coord,
+    attackerPiece: attacker.piece,
+    attackerName: attacker.pieceName,
+    pieceValue: attacker.pieceValue,
+    ...details
+  };
+}
+
+function horseLegSquare(from, to) {
+  const fromFile = fileOf(from);
+  const fromRank = rankOf(from);
+  const toFile = fileOf(to);
+  const toRank = rankOf(to);
+  const dx = toFile - fromFile;
+  const dy = toRank - fromRank;
+  if (!((Math.abs(dx) === 1 && Math.abs(dy) === 2) || (Math.abs(dx) === 2 && Math.abs(dy) === 1))) {
+    return null;
+  }
+
+  const legFile = Math.abs(dx) === 2 ? fromFile + Math.sign(dx) : fromFile;
+  const legRank = Math.abs(dy) === 2 ? fromRank + Math.sign(dy) : fromRank;
+  return indexOf(legFile, legRank);
+}
+
+function summarizeDiscoveredCheck(move, piece, discoveries, directCheck) {
+  const first = discoveries[0];
+  const screenText = first.screen ? ` using the ${first.screen.pieceName} on ${first.screen.coord} as a screen` : "";
+  const doubleText = directCheck || discoveries.length > 1 ? " and creates a double-check motif" : "";
+  return `The ${PIECE_NAMES[piece.type]} ${moveToNotation(move)} uncovers a ${first.attackerName} check from ${first.attackerCoord}${screenText}${doubleText}.`;
 }
 
 function summarizeCapture(move, exchangeScore, cheapestRecapture) {

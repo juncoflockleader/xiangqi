@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  analyzeDiscoveredCheck,
   analyzeFork,
   analyzePins,
   analyzeCapture,
@@ -97,6 +98,50 @@ test("move explanations name pin tactics", () => {
 
   assert.ok(review.explanation.move.reasons.some((reason) => reason.includes("pins the rook on e3")));
   assert.ok(review.playedLinePlan.motifs.includes("pin"));
+});
+
+test("discovered-check analysis detects opened rook lines", () => {
+  const position = parseFen("4k4/9/9/9/4P4/9/4R4/9/9/4K4 r");
+  const move = generateLegalMoves(position).find((candidate) => candidate.notation === "e4-d4");
+  const discovered = analyzeDiscoveredCheck(position, move);
+
+  assert.equal(discovered.notation, "e4-d4");
+  assert.equal(discovered.pieceName, "pawn");
+  assert.equal(discovered.discoveredChecks[0].attackerName, "rook");
+  assert.equal(discovered.discoveredChecks[0].attackerCoord, "e6");
+  assert.equal(discovered.discoveredChecks[0].method, "line");
+  assert.ok(discovered.summary.includes("uncovers a rook check from e6"));
+});
+
+test("discovered-check analysis detects cannon screens", () => {
+  const position = parseFen("4k4/9/9/9/4P4/9/4P4/9/4C4/4K4 r");
+  const move = generateLegalMoves(position).find((candidate) => candidate.notation === "e4-d4");
+  const discovered = analyzeDiscoveredCheck(position, move);
+
+  assert.equal(discovered.discoveredChecks[0].attackerName, "cannon");
+  assert.equal(discovered.discoveredChecks[0].screen.coord, "e6");
+  assert.equal(discovered.discoveredChecks[0].method, "cannon-line");
+  assert.ok(discovered.summary.includes("using the pawn on e6 as a screen"));
+});
+
+test("discovered-check analysis detects unblocked horse legs", () => {
+  const position = parseFen("4k4/3P5/3H5/9/9/4P4/9/9/9/4K4 r");
+  const move = generateLegalMoves(position).find((candidate) => candidate.notation === "d1-c1");
+  const discovered = analyzeDiscoveredCheck(position, move);
+
+  assert.equal(discovered.discoveredChecks[0].attackerName, "horse");
+  assert.equal(discovered.discoveredChecks[0].attackerCoord, "d2");
+  assert.equal(discovered.discoveredChecks[0].method, "horse-leg");
+  assert.ok(discovered.summary.includes("uncovers a horse check from d2"));
+});
+
+test("move explanations name discovered-check tactics", () => {
+  const position = parseFen("4k4/9/9/9/4P4/9/4R4/9/9/4K4 r");
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  const review = engine.reviewMove(position, "e4-d4", { depth: 1, timeLimitMs: 500 });
+
+  assert.ok(review.explanation.move.reasons.some((reason) => reason.includes("uncovers a rook check from e6")));
+  assert.ok(review.playedLinePlan.motifs.includes("discovered check"));
 });
 
 test("move explanations mention recapture risk for unsafe captures", () => {
