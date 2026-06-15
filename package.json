@@ -9,6 +9,7 @@
     "play": "node examples/play-cli.mjs",
     "web": "node examples/web-server.mjs",
     "bench": "node examples/benchmark.mjs",
+    "build:native": "node scripts/build-native.mjs",
     "bench:oracle": "node examples/oracle-benchmark.mjs",
     "book:oracle": "node examples/oracle-opening.mjs",
     "spar": "node examples/sparring.mjs",

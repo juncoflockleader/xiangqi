@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import {
   listNativeEnginePresets,
   mergeNativeEngineOptions,
@@ -18,6 +18,29 @@ test("lists the Pikafish native engine preset", () => {
   assert.deepEqual(pikafish.engineOptions, [
     { name: "UCI_ShowWDL", value: true }
   ]);
+});
+
+test("lists the local C++ native engine preset", () => {
+  const presets = listNativeEnginePresets();
+  const localCpp = presets.find((preset) => preset.id === "local-cpp");
+
+  assert.equal(localCpp.name, "Xiangqi Native C++");
+  assert.equal(localCpp.protocol, "uci");
+  assert.deepEqual(localCpp.engineOptions, []);
+});
+
+test("local C++ preset resolves the in-repository build artifact", () => {
+  const preset = resolveNativeEnginePreset("local-cpp", {
+    baseDir: "/repo/xiangqi",
+    env: {}
+  });
+
+  assert.equal(preset.protocol, "uci");
+  const expectedCommand = process.platform === "win32"
+    ? "build/xiangqi-native.exe"
+    : "build/xiangqi-native";
+  assert.equal(preset.command, resolve("/repo/xiangqi", expectedCommand));
+  assert.deepEqual(preset.engineOptions, []);
 });
 
 test("Pikafish preset configures UCI, WDL, and optional NNUE file", () => {

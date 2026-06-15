@@ -2,7 +2,9 @@
 
 An early Chinese chess learning-app foundation focused on the engine layer.
 
-The current engine is dependency-free JavaScript and includes:
+The project now has two engine layers: a mature dependency-free JavaScript
+learning/reference engine, and an in-repository C++ UCI engine that can be
+built locally for faster native search. Together they include:
 
 - Full Xiangqi board representation and FEN parsing.
 - Legal move generation for generals, advisors, elephants, horses, rooks, cannons, and pawns.
@@ -23,6 +25,7 @@ The current engine is dependency-free JavaScript and includes:
 - Position-study bundles that combine best move, candidate lines, hints, pressure, optional move review, and oracle evidence for UI screens.
 - Game-history helpers for play sessions, reviewed move logs, engine decision logs, position history, repeated-position detection with cycle/check diagnostics, and async native-backend play.
 - A backend adapter contract and async UCI/UCCI process wrapper so the JS reference engine can sit beside a native C++/WASM engine without changing the learning-app API.
+- A local C++ UCI engine (`native/xiangqi_native.cpp`) with legal Xiangqi move generation, alpha-beta search, quiescence, MultiPV telemetry, and a `local-cpp` preset for native search without downloading another engine.
 - Native-engine score details for forced mate scores and UCI WDL triplets, so tactical lessons can explain "mate in N" and win/draw/loss expectations instead of only normalized centipawns.
 - Named engine profiles for fast play, balanced play, deeper analysis, and native UCI/UCCI analysis setups.
 - Shared time-control budgeting for fixed movetime and clock-based `wtime`/`btime`/increment searches, with phase-aware moves-to-go estimates, soft-stop management, low-clock caps, and configurable move overhead.
@@ -35,6 +38,7 @@ The current engine is dependency-free JavaScript and includes:
 npm run play
 npm run web
 npm run study
+npm run build:native
 node examples/engine-demo.mjs
 node examples/benchmark.mjs
 node examples/oracle-benchmark.mjs --help
@@ -137,6 +141,28 @@ and `pikafish.nnue`; use `PIKAFISH_VARIANT=sse41-popcnt`,
 `PIKAFISH_BINARY=Linux/pikafish-bmi2`, `PIKAFISH_COMMAND`,
 `XIANGQI_PIKAFISH_AUTO_DISCOVER=false`, or explicit `--command` when the CPU or
 bundle layout needs a different executable.
+
+For the in-repository C++ engine, build once and use the `local-cpp` preset:
+
+```sh
+npm run build:native
+
+npm run probe:native -- \
+  --preset local-cpp \
+  --depth 2 \
+  --time 500 \
+  --lines 2
+
+npm run play -- \
+  --side black \
+  --engine-preset local-cpp \
+  --level club
+```
+
+The C++ engine is intentionally smaller than Pikafish, but it is the migration
+target for making this learning app's own engine faster. The JavaScript layer
+still supplies the opening book, explanations, review artifacts, and fallback
+behavior around native search.
 
 Use `--fen` with the play demo or native probe to start from a tactical training
 position. Player move reviews print the classification, score evidence, plan
@@ -435,7 +461,7 @@ available or when the native process cannot start during a turn:
 
 ```js
 const backend = createLearningEngineBackend({
-  nativePreset: "pikafish",
+  nativePreset: "pikafish", // or "local-cpp" after npm run build:native
   playLevel: "club",
   depth: 10,
   timeLimitMs: 5000,

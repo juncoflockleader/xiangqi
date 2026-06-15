@@ -2,6 +2,9 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 
 const DEFAULT_PIKAFISH_INSTALL_ROOT = ".engines/pikafish";
+const DEFAULT_LOCAL_CPP_COMMAND = defaultPlatform() === "win32"
+  ? "build/xiangqi-native.exe"
+  : "build/xiangqi-native";
 const PIKAFISH_PLATFORM_DIRS = Object.freeze({
   android: "Android",
   darwin: "MacOS",
@@ -18,6 +21,13 @@ const PRESETS = Object.freeze({
     engineOptions: Object.freeze([
       Object.freeze({ name: "UCI_ShowWDL", value: true })
     ])
+  }),
+  "local-cpp": Object.freeze({
+    id: "local-cpp",
+    name: "Xiangqi Native C++",
+    protocol: "uci",
+    description: "In-repository C++ UCI engine built with npm run build:native.",
+    engineOptions: Object.freeze([])
   })
 });
 
@@ -41,6 +51,7 @@ export function resolveNativeEnginePreset(name, options = {}) {
   }
 
   if (preset.id === "pikafish") return resolvePikafishPreset(preset, options);
+  if (preset.id === "local-cpp") return resolveLocalCppPreset(preset, options);
   return resolveGenericPreset(preset, options);
 }
 
@@ -124,6 +135,34 @@ function resolvePikafishPreset(preset, options) {
       options.engineOptions
     )
   };
+}
+
+function resolveLocalCppPreset(preset, options) {
+  const env = options.env ?? defaultEnv();
+  const command = firstText(
+    options.command,
+    env.XIANGQI_LOCAL_CPP_COMMAND,
+    env.XIANGQI_NATIVE_CPP_COMMAND,
+    env.XIANGQI_ENGINE_COMMAND,
+    localCppCommandPath(options)
+  );
+
+  return {
+    preset: preset.id,
+    name: preset.name,
+    description: preset.description,
+    protocol: options.protocol ?? preset.protocol,
+    command,
+    args: normalizeArgs(options.args),
+    cwd: options.cwd,
+    engineOptions: mergeNativeEngineOptions(preset.engineOptions, options.engineOptions)
+  };
+}
+
+function localCppCommandPath(options) {
+  const baseDir = options.baseDir ?? defaultCwd();
+  const output = firstText(options.output, options.binary, options.executable, DEFAULT_LOCAL_CPP_COMMAND);
+  return resolvePath(baseDir, output);
 }
 
 function discoverPikafishHome(options, env) {
