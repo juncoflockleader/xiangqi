@@ -1662,6 +1662,8 @@ function createEmptyStats() {
     lmrResearches: 0,
     pvsResearches: 0,
     nullMovePrunes: 0,
+    nullMoveVerifications: 0,
+    nullMoveVerificationFailures: 0,
     countermoveStores: 0,
     countermoveHits: 0,
     historyMaluses: 0,

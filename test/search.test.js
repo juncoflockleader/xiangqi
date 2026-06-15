@@ -175,6 +175,32 @@ test("search uses selective pruning and PVS in quiet tactical trees", () => {
   assert.ok(result.stats.nullMovePrunes > 0);
 });
 
+test("search verifies deep null-move cutoffs when requested", () => {
+  const position = parseFen("4k4/9/4h4/4c4/4P4/9/4C4/9/9/4K4 r");
+  const result = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    nullMoveVerificationMinDepth: 3
+  });
+  const disabled = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    nullMoveVerificationMinDepth: 3,
+    useNullMoveVerification: false
+  });
+
+  assert.equal(result.depth, 4);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.ok(result.stats.nullMoveVerifications > 0);
+  assert.ok(result.stats.nullMovePrunes > 0);
+  assert.equal(disabled.stats.nullMoveVerifications, 0);
+  assert.equal(disabled.stats.nullMoveVerificationFailures, 0);
+});
+
 test("search uses aspiration windows after the first completed depth", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const result = searchBestMove(position, {

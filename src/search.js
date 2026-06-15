@@ -39,6 +39,7 @@ const FUTILITY_DEPTH_MARGIN = 70;
 const RAZOR_BASE_MARGIN = 180;
 const RAZOR_DEPTH_MARGIN = 120;
 const NULL_MOVE_MIN_DEPTH = 3;
+const NULL_MOVE_VERIFICATION_MIN_DEPTH = 5;
 const TRANSPOSITION_MATE_BOUND = MATE_SCORE - 1000;
 const DEFAULT_SOFT_TIME_FRACTION = 0.55;
 const DEFAULT_SOFT_MIN_DEPTH = 2;
@@ -128,6 +129,7 @@ export function searchBestMove(position, options = {}) {
       deltaMargin: options.deltaMargin ?? DEFAULT_DELTA_MARGIN,
       useAspiration: options.useAspiration !== false && !exactRootScores,
       useNullMove: options.useNullMove !== false,
+      useNullMoveVerification: options.useNullMoveVerification !== false,
       usePvs: options.usePvs !== false,
       useCountermoves: options.useCountermoves !== false,
       useRootScoreOrdering: options.useRootScoreOrdering !== false,
@@ -141,6 +143,7 @@ export function searchBestMove(position, options = {}) {
       useHistoryMalus: options.useHistoryMalus !== false,
       useProbCut: options.useProbCut !== false,
       useInternalIterativeDeepening: options.useInternalIterativeDeepening !== false,
+      nullMoveVerificationMinDepth: Math.max(3, Math.floor(numberOption(options.nullMoveVerificationMinDepth, NULL_MOVE_VERIFICATION_MIN_DEPTH))),
       seePruneMargin: Math.max(0, numberOption(options.seePruneMargin, DEFAULT_SEE_PRUNE_MARGIN)),
       probCutMargin: Math.max(0, numberOption(options.probCutMargin, DEFAULT_PROBCUT_MARGIN)),
       iidMinDepth: Math.max(2, Math.floor(numberOption(options.iidMinDepth, IID_MIN_DEPTH))),
@@ -475,9 +478,36 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     }
 
     if (nullScore >= beta) {
-      context.stats.nullMovePrunes += 1;
-      leavePosition(context, repetitionKey);
-      return beta;
+      if (shouldVerifyNullMoveCutoff(position, depth, context)) {
+        const verificationScore = verifyNullMoveCutoff({
+          position,
+          depth,
+          beta,
+          ply,
+          context,
+          extensionsRemaining,
+          previousMove,
+          principalMove: tt?.bestMove ?? null,
+          reduction
+        });
+
+        if (context.timedOut) {
+          leavePosition(context, repetitionKey);
+          return verificationScore ?? nullScore;
+        }
+
+        if (verificationScore < beta) {
+          context.stats.nullMoveVerificationFailures += 1;
+        } else {
+          context.stats.nullMovePrunes += 1;
+          leavePosition(context, repetitionKey);
+          return beta;
+        }
+      } else {
+        context.stats.nullMovePrunes += 1;
+        leavePosition(context, repetitionKey);
+        return beta;
+      }
     }
   }
 
@@ -1100,6 +1130,61 @@ function shouldTryNullMove(position, depth, beta, inCheck, context, allowNullMov
   return true;
 }
 
+function shouldVerifyNullMoveCutoff(position, depth, context) {
+  if (!context.useNullMoveVerification) return false;
+  if (depth < context.nullMoveVerificationMinDepth) return false;
+  return hasNullMoveMaterial(position, position.turn);
+}
+
+function verifyNullMoveCutoff({
+  position,
+  depth,
+  beta,
+  ply,
+  context,
+  extensionsRemaining,
+  previousMove,
+  principalMove,
+  reduction
+}) {
+  context.stats.nullMoveVerifications += 1;
+  const verificationDepth = Math.max(0, depth - 1 - reduction);
+  const alpha = beta - 1;
+  const legalMoves = generateLegalMoves(position, position.turn);
+
+  if (legalMoves.length === 0) return -MATE_SCORE + ply;
+
+  let bestScore = -INFINITY_SCORE;
+  const moves = orderMoves(position, legalMoves, principalMove, context, ply, previousMove);
+
+  for (const move of moves) {
+    if (isTimedOut(context)) {
+      context.timedOut = true;
+      break;
+    }
+
+    const next = makeMove(position, move);
+    const score = normalizeScore(-negamax(
+      next,
+      Math.max(0, verificationDepth - 1),
+      -beta,
+      -alpha,
+      ply + 1,
+      context,
+      null,
+      extensionsRemaining,
+      false,
+      move
+    ));
+
+    if (context.timedOut) break;
+    if (score > bestScore) bestScore = score;
+    if (score >= beta) return score;
+  }
+
+  return bestScore;
+}
+
 function nullMoveReduction(depth) {
   return depth >= 5 ? 3 : 2;
 }
@@ -1282,6 +1367,8 @@ function createSearchStats() {
     lmrResearches: 0,
     pvsResearches: 0,
     nullMovePrunes: 0,
+    nullMoveVerifications: 0,
+    nullMoveVerificationFailures: 0,
     countermoveStores: 0,
     countermoveHits: 0,
     historyMaluses: 0,
@@ -1323,6 +1410,8 @@ function mergeSearchStats(total, next) {
     lmrResearches: total.lmrResearches + next.lmrResearches,
     pvsResearches: total.pvsResearches + next.pvsResearches,
     nullMovePrunes: total.nullMovePrunes + next.nullMovePrunes,
+    nullMoveVerifications: total.nullMoveVerifications + next.nullMoveVerifications,
+    nullMoveVerificationFailures: total.nullMoveVerificationFailures + next.nullMoveVerificationFailures,
     countermoveStores: total.countermoveStores + next.countermoveStores,
     countermoveHits: total.countermoveHits + next.countermoveHits,
     historyMaluses: total.historyMaluses + next.historyMaluses,
