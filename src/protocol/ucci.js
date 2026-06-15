@@ -4,6 +4,7 @@ import {
   parseFen,
   parseMoveNotation
 } from "../board.js";
+import { createLearningEngineBackend } from "../backend-factory.js";
 import { createEngine } from "../engine.js";
 import { formatScore } from "../reasoning.js";
 import { resolveSearchBudget } from "../time.js";
@@ -19,8 +20,9 @@ const DEFAULT_OPTIONS = Object.freeze({
 
 export class UcciSession {
   constructor(options = {}) {
-    this.options = { ...DEFAULT_OPTIONS, ...options };
-    this.engine = createEngine(this.options);
+    const { engine, ...sessionOptions } = options;
+    this.options = { ...DEFAULT_OPTIONS, ...sessionOptions };
+    this.engine = engine ?? createEngine(this.options);
     this.initialPosition = createInitialPosition();
     this.position = createInitialPosition();
     this.moveHistory = [];
@@ -94,28 +96,10 @@ export class UcciSession {
   }
 
   setOption(line) {
-    const name = readSetOptionField(line, "name", "value");
-    const value = readSetOptionField(line, "value");
-
-    if (!name) return ["info string ignored empty option"];
-
-    const normalized = name.toLowerCase();
-    if (normalized === "depth") {
-      this.options.depth = clampInteger(value, 1, 12, this.options.depth);
-    } else if (normalized === "movetime" || normalized === "timelimitms") {
-      this.options.timeLimitMs = clampInteger(value, 50, 120000, this.options.timeLimitMs);
-    } else if (normalized === "multipv") {
-      this.options.multiPv = clampInteger(value, 1, 12, this.options.multiPv);
-    } else if (normalized === "hintlevels") {
-      this.options.hintLevels = clampInteger(value, 1, 4, this.options.hintLevels);
-    } else if (normalized === "hashentries" || normalized === "maxtranspositionentries") {
-      this.options.maxTranspositionEntries = clampInteger(value, 128, 1_000_000, this.options.maxTranspositionEntries);
-    } else if (normalized === "usebook") {
-      this.options.useBook = parseBoolean(value, this.options.useBook);
-    }
-
-    this.engine = createEngine(this.options);
-    return [];
+    const update = applySessionOption(this.options, line);
+    if (update.outputs.length > 0) return update.outputs;
+    if (update.changed) this.engine = createEngine(this.options);
+    return update.outputs;
   }
 
   setPosition(line) {
@@ -162,36 +146,7 @@ export class UcciSession {
       useBook: this.options.useBook
     });
 
-    if (!result.bestMove) {
-      return [
-        `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes}`,
-        "bestmove 0000"
-      ];
-    }
-
-    const pv = result.principalVariation.map(protocolMove).join(" ");
-    const outputs = [];
-
-    if (result.source === "opening-book") {
-      outputs.push(`info string book ${result.book.name}: ${result.book.idea}`);
-    }
-
-    for (const iteration of result.iterations ?? []) {
-      outputs.push(formatIterationInfo(iteration));
-    }
-
-    outputs.push(
-      `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes} qnodes ${result.stats.qnodes} qchecks ${result.stats.qchecks} tthits ${result.stats.ttHits} ttstores ${result.stats.ttStores} ttevict ${result.stats.ttEvictions} asp ${result.stats.aspirationSearches} asphi ${result.stats.aspirationFailHigh} asplo ${result.stats.aspirationFailLow} ext ${result.stats.extensions} recext ${result.stats.recaptureExtensions} soft ${result.stats.softStops} see ${result.stats.seePrunes} mdp ${result.stats.mateDistancePrunes} razor ${result.stats.razorPrunes} pcut ${result.stats.probCutPrunes} pcsearch ${result.stats.probCutSearches} futil ${result.stats.futilityPrunes} delta ${result.stats.deltaPrunes} nmp ${result.stats.nullMovePrunes} cm ${result.stats.countermoveHits} hmalus ${result.stats.historyMaluses} rootord ${result.stats.rootScoreOrderHits} rootmoves ${result.stats.rootMovesSearched} pvs ${result.stats.pvsResearches} pv ${pv}`,
-      `info string ${result.explanation.summary}`
-    );
-    pushPlanInfo(outputs, "go", result.explanation.linePlan, { steps: true });
-
-    for (const reason of result.explanation.reasons.slice(0, 3)) {
-      outputs.push(`info string reason: ${reason}`);
-    }
-
-    outputs.push(`bestmove ${protocolMove(result.bestMove)}`);
-    return outputs;
+    return formatGoResult(result);
   }
 
   analyze(line) {
@@ -204,22 +159,7 @@ export class UcciSession {
       bannedMoves: this.bannedMoves
     });
 
-    if (result.lines.length === 0) return ["info string no legal move"];
-
-    const outputs = result.lines.map((entry) => (
-      `info multipv ${entry.rank} depth ${result.depth} score cp ${entry.score} cploss ${entry.centipawnLoss} pv ${entry.principalVariation.map(stripMoveSeparator).join(" ")}`
-    ));
-
-    for (const entry of result.lines) {
-      outputs.push(`info string line ${entry.rank}: ${entry.explanation.summary}`);
-      pushPlanInfo(outputs, `line ${entry.rank}`, entry.explanation.linePlan);
-      for (const reason of entry.explanation.reasons.slice(0, 2)) {
-        outputs.push(`info string line ${entry.rank} reason: ${reason}`);
-      }
-    }
-
-    outputs.push(`bestmove ${protocolMove(result.bestMove)}`);
-    return outputs;
+    return formatAnalyzeResult(result);
   }
 
   book() {
@@ -248,7 +188,7 @@ export class UcciSession {
 
     return [
       ...setPositionOutput,
-      `info string probe score ${formatScore(result.score)} best ${result.bestMove ? protocolMove(result.bestMove) : "0000"}`
+      ...formatProbeResult(result)
     ];
   }
 
@@ -256,19 +196,7 @@ export class UcciSession {
     const tokens = line.split(/\s+/);
     const limit = readTokenInteger(tokens, "limit", 3);
     const pressure = this.engine.pressure(this.position, { limit });
-    const outputs = [
-      `info string pressure side ${pressure.side} incheck ${pressure.inCheck ? "true" : "false"}`
-    ];
-
-    for (const threat of pressure.threats) {
-      outputs.push(`info string threat ${threat.notation}: ${threat.summary}`);
-    }
-
-    for (const threat of pressure.opponentThreats) {
-      outputs.push(`info string opponent-threat ${threat.notation}: ${threat.summary}`);
-    }
-
-    return outputs;
+    return formatPressureResult(pressure);
   }
 
   review(line) {
@@ -282,19 +210,7 @@ export class UcciSession {
         useBook: this.options.useBook
       }
     });
-    const outputs = [
-      `info string review moves ${result.summary.totalMoves} avgcp ${result.summary.averageCentipawnLoss} book ${result.summary.bookMoves} blunders ${result.summary.classifications.blunder}`
-    ];
-
-    for (const moment of result.keyMoments.slice(0, 3)) {
-      outputs.push(`info string moment ${moment.ply} ${moment.side} ${moment.notation} ${moment.classification} loss ${moment.centipawnLoss} best ${stripMoveSeparator(moment.bestMove)}: ${moment.summary}`);
-      pushReviewScoreInfo(outputs, `moment ${moment.ply}`, moment);
-      pushPlanInfo(outputs, `moment ${moment.ply} played`, moment.playedLinePlan);
-      pushPlanInfo(outputs, `moment ${moment.ply} best`, moment.bestLinePlan);
-      pushPlanComparisonInfo(outputs, `moment ${moment.ply}`, moment.planComparison);
-    }
-
-    return outputs;
+    return formatReviewResult(result);
   }
 
   reviewMove(line) {
@@ -307,21 +223,7 @@ export class UcciSession {
       ...options,
       useBook: this.options.useBook
     });
-    const outputs = [
-      `info string reviewmove played ${stripMoveSeparator(review.move.notation)} ${review.classification} loss ${review.centipawnLoss} best ${protocolMove(review.bestMove)}: ${review.explanation.summary}`
-    ];
-
-    pushReviewScoreInfo(outputs, "reviewmove", review);
-    pushPlanInfo(outputs, "reviewmove played", review.playedLinePlan);
-    pushPlanInfo(outputs, "reviewmove best", review.bestLinePlan);
-    pushPlanComparisonInfo(outputs, "reviewmove", review.planComparison);
-
-    for (const reason of review.explanation.reasons.slice(0, 3)) {
-      outputs.push(`info string reviewmove reason: ${reason}`);
-    }
-
-    outputs.push(`bestmove ${protocolMove(review.bestMove)}`);
-    return outputs;
+    return formatReviewMoveResult(review);
   }
 
   lesson(line) {
@@ -344,24 +246,7 @@ export class UcciSession {
         includeModelMoves
       }
     });
-    const outputs = [
-      `info string lesson cards ${result.summary.totalCards} avgcp ${result.averageCentipawnLoss} highimpact ${result.summary.highImpact}`
-    ];
-
-    for (const card of result.cards) {
-      outputs.push(`info string lesson ${card.rank} ${card.type} ply ${card.ply} side ${card.side} played ${stripMoveSeparator(card.playedMove)} best ${stripMoveSeparator(card.bestMove)} loss ${card.centipawnLoss} tags ${card.tags.join(",")}`);
-      outputs.push(`info string lesson ${card.rank} prompt: ${card.prompt}`);
-      for (const hint of card.hints) {
-        outputs.push(`info string lesson ${card.rank} hint ${hint.level} ${hint.kind}: ${hint.text}`);
-      }
-      pushReviewScoreInfo(outputs, `lesson ${card.rank}`, card);
-      pushPlanInfo(outputs, `lesson ${card.rank} played`, card.playedLinePlan);
-      pushPlanInfo(outputs, `lesson ${card.rank} best`, card.bestLinePlan);
-      pushPlanComparisonInfo(outputs, `lesson ${card.rank}`, card.planComparison);
-      outputs.push(`info string lesson ${card.rank} answer ${stripMoveSeparator(card.answer.move)}: ${card.answer.summary}`);
-    }
-
-    return outputs;
+    return formatLessonResult(result);
   }
 
   hint(line) {
@@ -376,30 +261,7 @@ export class UcciSession {
       bannedMoves: this.bannedMoves,
       useBook: this.options.useBook
     });
-    const outputs = [
-      `info string hint side ${result.side} source ${result.source} depth ${result.depth ?? 0}`
-    ];
-
-    for (const level of result.levels) {
-      outputs.push(`info string hint level ${level.level} ${level.kind} ${level.title}: ${level.text}`);
-    }
-
-    if (!result.bestMove) {
-      outputs.push("bestmove 0000");
-      return outputs;
-    }
-
-    for (const alternative of result.alternatives.slice(0, lines)) {
-      outputs.push(`info string hint candidate ${alternative.rank} ${stripMoveSeparator(alternative.notation)} score ${alternative.score}`);
-    }
-
-    const shouldReveal = result.levels.some((level) => level.kind === "reveal");
-    if (shouldReveal) {
-      outputs.push(`info string hint best ${protocolMove(result.bestMove)} pv ${result.principalVariation.map(stripMoveSeparator).join(" ")}`);
-      outputs.push(`bestmove ${protocolMove(result.bestMove)}`);
-    }
-
-    return outputs;
+    return formatHintResult(result, lines);
   }
 
   explain() {
@@ -409,12 +271,209 @@ export class UcciSession {
       bannedMoves: this.bannedMoves
     });
 
-    if (!result.bestMove) return ["info string no legal move"];
+    return formatExplainResult(result);
+  }
+}
+
+export class AsyncUcciSession extends UcciSession {
+  constructor(options = {}) {
+    const { backend, engine, ...sessionOptions } = options;
+    super({
+      ...sessionOptions,
+      engine: backend ?? engine ?? createLearningEngineBackend(sessionOptions)
+    });
+  }
+
+  async handleLine(line) {
+    const trimmed = line.trim();
+    if (!trimmed) return [];
+
+    try {
+      const [command] = trimmed.split(/\s+/, 1);
+
+      switch (command.toLowerCase()) {
+        case "ucci":
+          return this.identify();
+        case "isready":
+          await this.engine.ready?.();
+          return ["readyok"];
+        case "setoption":
+          return this.setOption(trimmed);
+        case "position":
+          return this.setPosition(trimmed);
+        case "banmoves":
+          return this.setBannedMoves(trimmed);
+        case "book":
+          return this.book();
+        case "go":
+          return this.go(trimmed);
+        case "analyze":
+          return this.analyze(trimmed);
+        case "probe":
+          return this.probe(trimmed);
+        case "pressure":
+          return this.pressure(trimmed);
+        case "reviewmove":
+        case "review-move":
+          return this.reviewMove(trimmed);
+        case "review":
+          return this.review(trimmed);
+        case "lesson":
+        case "lessons":
+          return this.lesson(trimmed);
+        case "hint":
+        case "coach":
+          return this.hint(trimmed);
+        case "explain":
+          return this.explain();
+        case "quit":
+          return ["bye"];
+        default:
+          return [`info string unknown command: ${trimmed}`];
+      }
+    } catch (error) {
+      return [`info string error: ${error.message}`];
+    }
+  }
+
+  async setOption(line) {
+    const update = applySessionOption(this.options, line);
+    if (update.outputs.length > 0) return update.outputs;
+    if (update.changed) await this.resetEngine();
+    return update.outputs;
+  }
+
+  async resetEngine() {
+    const previous = this.engine;
+    await previous.close?.();
+    this.engine = createLearningEngineBackend(this.options);
+  }
+
+  async go(line) {
+    const options = parseGoOptions(line, this.options, this.position.turn, this.position);
+    const multiPv = readTokenInteger(line.split(/\s+/), "multipv", this.options.multiPv);
+    if (multiPv > 1) {
+      return this.analyze(`analyze depth ${options.depth} movetime ${options.timeLimitMs} lines ${multiPv}`);
+    }
+
+    const result = await this.engine.chooseMove(this.position, {
+      ...options,
+      bannedMoves: this.bannedMoves,
+      useBook: this.options.useBook
+    });
+
+    return formatGoResult(result);
+  }
+
+  async analyze(line) {
+    const tokens = line.split(/\s+/);
+    const options = parseGoOptions(line.replace(/^analyze/i, "go"), this.options, this.position.turn, this.position);
+    const lines = readTokenInteger(tokens, "lines", readTokenInteger(tokens, "multipv", 3));
+    const result = await this.engine.analyzePosition(this.position, {
+      ...options,
+      lines,
+      bannedMoves: this.bannedMoves
+    });
+
+    return formatAnalyzeResult(result);
+  }
+
+  async probe(line) {
+    const setPositionOutput = line.trim().toLowerCase() === "probe"
+      ? []
+      : this.setPosition(line.replace(/^probe/i, "position"));
+    const result = await this.engine.chooseMove(this.position, {
+      depth: Math.max(1, Math.min(2, this.options.depth)),
+      timeLimitMs: Math.min(500, this.options.timeLimitMs)
+    });
 
     return [
-      `info string ${result.explanation.summary}`,
-      ...result.explanation.reasons.map((reason) => `info string reason: ${reason}`)
+      ...setPositionOutput,
+      ...formatProbeResult(result)
     ];
+  }
+
+  async review(line) {
+    if (this.moveHistory.length === 0) return ["info string review no moves"];
+
+    const options = parseGoOptions(line.replace(/^review/i, "go"), this.options, this.initialPosition.turn, this.initialPosition);
+    const result = await this.engine.reviewGame(this.moveHistory, {
+      initialPosition: this.initialPosition,
+      reviewOptions: {
+        ...options,
+        useBook: this.options.useBook
+      }
+    });
+
+    return formatReviewResult(result);
+  }
+
+  async reviewMove(line) {
+    const tokens = line.split(/\s+/);
+    const moveText = readReviewMoveText(tokens);
+    if (!moveText) return ["info string reviewmove missing move"];
+
+    const options = parseGoOptions(line.replace(/^review-?move/i, "go"), this.options, this.position.turn, this.position);
+    const review = await this.engine.reviewMove(this.position, moveText, {
+      ...options,
+      useBook: this.options.useBook
+    });
+
+    return formatReviewMoveResult(review);
+  }
+
+  async lesson(line) {
+    if (this.moveHistory.length === 0) return ["info string lesson no moves"];
+
+    const tokens = line.split(/\s+/);
+    const options = parseGoOptions(line.replace(/^lessons?/i, "go"), this.options, this.initialPosition.turn, this.initialPosition);
+    const maxCards = readTokenInteger(tokens, "cards", readTokenInteger(tokens, "maxcards", 3));
+    const includeBook = readTokenBoolean(tokens, "book", true);
+    const includeModelMoves = readTokenBoolean(tokens, "model", false);
+    const result = await this.engine.lessonPlan(this.moveHistory, {
+      initialPosition: this.initialPosition,
+      reviewOptions: {
+        ...options,
+        useBook: this.options.useBook
+      },
+      lessonOptions: {
+        maxCards: Math.max(1, Math.min(12, maxCards)),
+        includeBook,
+        includeModelMoves
+      }
+    });
+
+    return formatLessonResult(result);
+  }
+
+  async hint(line) {
+    const tokens = line.split(/\s+/);
+    const options = parseGoOptions(line.replace(/^(hint|coach)/i, "go"), this.options, this.position.turn, this.position);
+    const lines = readTokenInteger(tokens, "lines", readTokenInteger(tokens, "multipv", 3));
+    const maxLevels = readTokenInteger(tokens, "levels", readTokenInteger(tokens, "maxlevels", this.options.hintLevels));
+    const result = await this.engine.coachMove(this.position, {
+      ...options,
+      lines,
+      maxLevels: Math.max(1, Math.min(4, maxLevels)),
+      bannedMoves: this.bannedMoves,
+      useBook: this.options.useBook
+    });
+
+    return formatHintResult(result, lines);
+  }
+
+  async explain() {
+    const result = await this.engine.chooseMove(this.position, {
+      depth: this.options.depth,
+      timeLimitMs: this.options.timeLimitMs,
+      bannedMoves: this.bannedMoves
+    });
+
+    return formatExplainResult(result);
+  }
+
+  async close() {
+    await this.engine.close?.();
   }
 }
 
@@ -434,6 +493,172 @@ function formatIterationInfo(iteration) {
     : iteration.stableBestMove ? "true" : "false";
 
   return `info depth ${iteration.depth} currmove ${move} score cp ${Math.round(iteration.score)} nodes ${iteration.nodes} stable ${stable} pv ${pv}`;
+}
+
+function formatGoResult(result) {
+  if (!result.bestMove) {
+    return [
+      `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes}`,
+      "bestmove 0000"
+    ];
+  }
+
+  const pv = result.principalVariation.map(protocolMove).join(" ");
+  const stats = result.stats ?? {};
+  const outputs = [];
+
+  if (result.source === "opening-book") {
+    outputs.push(`info string book ${result.book.name}: ${result.book.idea}`);
+  }
+
+  for (const iteration of result.iterations ?? []) {
+    outputs.push(formatIterationInfo(iteration));
+  }
+
+  outputs.push(
+    `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes} qnodes ${stats.qnodes ?? 0} qchecks ${stats.qchecks ?? 0} tthits ${stats.ttHits ?? 0} ttstores ${stats.ttStores ?? 0} ttevict ${stats.ttEvictions ?? 0} asp ${stats.aspirationSearches ?? 0} asphi ${stats.aspirationFailHigh ?? 0} asplo ${stats.aspirationFailLow ?? 0} ext ${stats.extensions ?? 0} recext ${stats.recaptureExtensions ?? 0} soft ${stats.softStops ?? 0} see ${stats.seePrunes ?? 0} mdp ${stats.mateDistancePrunes ?? 0} razor ${stats.razorPrunes ?? 0} pcut ${stats.probCutPrunes ?? 0} pcsearch ${stats.probCutSearches ?? 0} futil ${stats.futilityPrunes ?? 0} delta ${stats.deltaPrunes ?? 0} nmp ${stats.nullMovePrunes ?? 0} cm ${stats.countermoveHits ?? 0} hmalus ${stats.historyMaluses ?? 0} rootord ${stats.rootScoreOrderHits ?? 0} rootmoves ${stats.rootMovesSearched ?? 0} pvs ${stats.pvsResearches ?? 0} pv ${pv}`,
+    `info string ${result.explanation.summary}`
+  );
+  pushPlanInfo(outputs, "go", result.explanation.linePlan, { steps: true });
+
+  for (const reason of result.explanation.reasons.slice(0, 3)) {
+    outputs.push(`info string reason: ${reason}`);
+  }
+
+  outputs.push(`bestmove ${protocolMove(result.bestMove)}`);
+  return outputs;
+}
+
+function formatAnalyzeResult(result) {
+  if (result.lines.length === 0) return ["info string no legal move"];
+
+  const outputs = result.lines.map((entry) => (
+    `info multipv ${entry.rank} depth ${result.depth} score cp ${entry.score} cploss ${entry.centipawnLoss} pv ${entry.principalVariation.map(stripMoveSeparator).join(" ")}`
+  ));
+
+  for (const entry of result.lines) {
+    outputs.push(`info string line ${entry.rank}: ${entry.explanation.summary}`);
+    pushPlanInfo(outputs, `line ${entry.rank}`, entry.explanation.linePlan);
+    for (const reason of entry.explanation.reasons.slice(0, 2)) {
+      outputs.push(`info string line ${entry.rank} reason: ${reason}`);
+    }
+  }
+
+  outputs.push(`bestmove ${protocolMove(result.bestMove)}`);
+  return outputs;
+}
+
+function formatProbeResult(result) {
+  return [
+    `info string probe score ${formatScore(result.score)} best ${result.bestMove ? protocolMove(result.bestMove) : "0000"}`
+  ];
+}
+
+function formatPressureResult(pressure) {
+  const outputs = [
+    `info string pressure side ${pressure.side} incheck ${pressure.inCheck ? "true" : "false"}`
+  ];
+
+  for (const threat of pressure.threats) {
+    outputs.push(`info string threat ${threat.notation}: ${threat.summary}`);
+  }
+
+  for (const threat of pressure.opponentThreats) {
+    outputs.push(`info string opponent-threat ${threat.notation}: ${threat.summary}`);
+  }
+
+  return outputs;
+}
+
+function formatReviewResult(result) {
+  const outputs = [
+    `info string review moves ${result.summary.totalMoves} avgcp ${result.summary.averageCentipawnLoss} book ${result.summary.bookMoves} blunders ${result.summary.classifications.blunder}`
+  ];
+
+  for (const moment of result.keyMoments.slice(0, 3)) {
+    outputs.push(`info string moment ${moment.ply} ${moment.side} ${moment.notation} ${moment.classification} loss ${moment.centipawnLoss} best ${stripMoveSeparator(moment.bestMove)}: ${moment.summary}`);
+    pushReviewScoreInfo(outputs, `moment ${moment.ply}`, moment);
+    pushPlanInfo(outputs, `moment ${moment.ply} played`, moment.playedLinePlan);
+    pushPlanInfo(outputs, `moment ${moment.ply} best`, moment.bestLinePlan);
+    pushPlanComparisonInfo(outputs, `moment ${moment.ply}`, moment.planComparison);
+  }
+
+  return outputs;
+}
+
+function formatReviewMoveResult(review) {
+  const outputs = [
+    `info string reviewmove played ${stripMoveSeparator(review.move.notation)} ${review.classification} loss ${review.centipawnLoss} best ${protocolMove(review.bestMove)}: ${review.explanation.summary}`
+  ];
+
+  pushReviewScoreInfo(outputs, "reviewmove", review);
+  pushPlanInfo(outputs, "reviewmove played", review.playedLinePlan);
+  pushPlanInfo(outputs, "reviewmove best", review.bestLinePlan);
+  pushPlanComparisonInfo(outputs, "reviewmove", review.planComparison);
+
+  for (const reason of review.explanation.reasons.slice(0, 3)) {
+    outputs.push(`info string reviewmove reason: ${reason}`);
+  }
+
+  outputs.push(`bestmove ${protocolMove(review.bestMove)}`);
+  return outputs;
+}
+
+function formatLessonResult(result) {
+  const outputs = [
+    `info string lesson cards ${result.summary.totalCards} avgcp ${result.averageCentipawnLoss} highimpact ${result.summary.highImpact}`
+  ];
+
+  for (const card of result.cards) {
+    outputs.push(`info string lesson ${card.rank} ${card.type} ply ${card.ply} side ${card.side} played ${stripMoveSeparator(card.playedMove)} best ${stripMoveSeparator(card.bestMove)} loss ${card.centipawnLoss} tags ${card.tags.join(",")}`);
+    outputs.push(`info string lesson ${card.rank} prompt: ${card.prompt}`);
+    for (const hint of card.hints) {
+      outputs.push(`info string lesson ${card.rank} hint ${hint.level} ${hint.kind}: ${hint.text}`);
+    }
+    pushReviewScoreInfo(outputs, `lesson ${card.rank}`, card);
+    pushPlanInfo(outputs, `lesson ${card.rank} played`, card.playedLinePlan);
+    pushPlanInfo(outputs, `lesson ${card.rank} best`, card.bestLinePlan);
+    pushPlanComparisonInfo(outputs, `lesson ${card.rank}`, card.planComparison);
+    outputs.push(`info string lesson ${card.rank} answer ${stripMoveSeparator(card.answer.move)}: ${card.answer.summary}`);
+  }
+
+  return outputs;
+}
+
+function formatHintResult(result, lines) {
+  const outputs = [
+    `info string hint side ${result.side} source ${result.source} depth ${result.depth ?? 0}`
+  ];
+
+  for (const level of result.levels) {
+    outputs.push(`info string hint level ${level.level} ${level.kind} ${level.title}: ${level.text}`);
+  }
+
+  if (!result.bestMove) {
+    outputs.push("bestmove 0000");
+    return outputs;
+  }
+
+  for (const alternative of result.alternatives.slice(0, lines)) {
+    outputs.push(`info string hint candidate ${alternative.rank} ${stripMoveSeparator(alternative.notation)} score ${alternative.score}`);
+  }
+
+  const shouldReveal = result.levels.some((level) => level.kind === "reveal");
+  if (shouldReveal) {
+    outputs.push(`info string hint best ${protocolMove(result.bestMove)} pv ${result.principalVariation.map(stripMoveSeparator).join(" ")}`);
+    outputs.push(`bestmove ${protocolMove(result.bestMove)}`);
+  }
+
+  return outputs;
+}
+
+function formatExplainResult(result) {
+  if (!result.bestMove) return ["info string no legal move"];
+
+  return [
+    `info string ${result.explanation.summary}`,
+    ...result.explanation.reasons.map((reason) => `info string reason: ${reason}`)
+  ];
 }
 
 function pushPlanInfo(outputs, prefix, linePlan, options = {}) {
@@ -504,6 +729,32 @@ function parseGoOptions(line, defaults, side = "red", position = null) {
     timeLimitMs: timeBudget.timeLimitMs,
     timeBudget
   };
+}
+
+function applySessionOption(options, line) {
+  const name = readSetOptionField(line, "name", "value");
+  const value = readSetOptionField(line, "value");
+
+  if (!name) return { changed: false, outputs: ["info string ignored empty option"] };
+
+  const normalized = name.toLowerCase();
+  if (normalized === "depth") {
+    options.depth = clampInteger(value, 1, 12, options.depth);
+  } else if (normalized === "movetime" || normalized === "timelimitms") {
+    options.timeLimitMs = clampInteger(value, 50, 120000, options.timeLimitMs);
+  } else if (normalized === "multipv") {
+    options.multiPv = clampInteger(value, 1, 12, options.multiPv);
+  } else if (normalized === "hintlevels") {
+    options.hintLevels = clampInteger(value, 1, 4, options.hintLevels);
+  } else if (normalized === "hashentries" || normalized === "maxtranspositionentries") {
+    options.maxTranspositionEntries = clampInteger(value, 128, 1_000_000, options.maxTranspositionEntries);
+  } else if (normalized === "usebook") {
+    options.useBook = parseBoolean(value, options.useBook);
+  } else {
+    return { changed: false, outputs: [] };
+  }
+
+  return { changed: true, outputs: [] };
 }
 
 function readTokenInteger(tokens, name, fallback) {

@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { UcciSession } from "../src/index.js";
+import { spawn } from "node:child_process";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { AsyncUcciSession, UcciSession } from "../src/index.js";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const MOCK_UCCI_PATH = resolve(root, "fixtures/mock-ucci.mjs");
 
 test("UCCI session identifies itself", () => {
   const session = new UcciSession();
@@ -104,6 +110,60 @@ test("UCCI go multipv delegates to analysis output", () => {
 
   assert.equal(output.filter((line) => line.startsWith("info multipv ")).length, 3);
   assert.ok(output.some((line) => line.startsWith("bestmove ")));
+});
+
+test("async UCCI session can search through a native backend", async () => {
+  const session = new AsyncUcciSession({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH],
+    protocol: "uci",
+    depth: 2,
+    timeLimitMs: 100,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    useBook: false,
+    engineOptions: {
+      MockTie: true
+    }
+  });
+
+  try {
+    assert.deepEqual(await session.handleLine("isready"), ["readyok"]);
+    assert.deepEqual(await session.handleLine("position startpos"), []);
+    const output = await session.handleLine("go depth 2 movetime 100 multipv 2");
+
+    assert.equal(output.filter((line) => line.startsWith("info multipv ")).length, 2);
+    assert.ok(output.some((line) => line.includes("Native UCI Engine")));
+    assert.ok(output.some((line) => line.includes("line 1 plan: Start with h9-g7")));
+    assert.ok(output.includes("bestmove h9g7"));
+  } finally {
+    await session.close();
+  }
+});
+
+test("xiangqi-ucci CLI can use a native backend from environment", async () => {
+  const result = await runUcciCli([
+    "ucci",
+    "isready",
+    "position startpos",
+    "go depth 2 movetime 100",
+    "quit"
+  ].join("\n"), {
+    XIANGQI_ENGINE_COMMAND: process.execPath,
+    XIANGQI_ENGINE_ARGS: "fixtures/mock-ucci.mjs",
+    XIANGQI_ENGINE_PROTOCOL: "uci",
+    XIANGQI_ENGINE_OPTIONS: "MockTie=true",
+    XIANGQI_ENGINE_USE_BOOK: "false",
+    XIANGQI_ENGINE_STARTUP_TIMEOUT_MS: "1000",
+    XIANGQI_ENGINE_COMMAND_TIMEOUT_MS: "1000"
+  });
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /id name Xiangqi Learning Engine/);
+  assert.match(result.stdout, /readyok/);
+  assert.match(result.stdout, /Native UCI Engine/);
+  assert.match(result.stdout, /bestmove h9g7/);
+  assert.match(result.stdout, /bye/);
 });
 
 test("UCCI MultiPV option changes default go output", () => {
@@ -254,3 +314,41 @@ test("UCCI HintLevels option controls default hint depth", () => {
   assert.equal(output.some((line) => line.includes("hint level 3")), false);
   assert.equal(output.some((line) => line.startsWith("bestmove ")), false);
 });
+
+function runUcciCli(input, env = {}) {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(process.execPath, ["bin/xiangqi-ucci.mjs"], {
+      cwd: root,
+      stdio: ["pipe", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        ...env
+      }
+    });
+    let stdout = "";
+    let stderr = "";
+    const timeout = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error(`xiangqi-ucci CLI timed out\nstdout:\n${stdout}\nstderr:\n${stderr}`));
+    }, 5000);
+
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      resolvePromise({ code, stdout, stderr });
+    });
+
+    child.stdin.end(`${input}\n`);
+  });
+}

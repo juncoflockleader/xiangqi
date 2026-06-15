@@ -262,6 +262,35 @@ test("UCCI backend applies native engine options before search", async () => {
   }
 });
 
+test("UCCI backend maps a direct eval file to the native EvalFile option", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    evalFile: "pikafish.nnue",
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      Hash: 64
+    }
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), { useBook: false });
+    const description = describeEngineBackend(backend);
+
+    assert.deepEqual(description.nativeOptions, [
+      { name: "EvalFile", value: "pikafish.nnue" },
+      { name: "Hash", value: 64 }
+    ]);
+    assert.ok(result.raw.some((line) => line.includes("setoption name EvalFile value pikafish.nnue")));
+    assert.ok(result.raw.some((line) => line.includes("setoption name Hash value 64")));
+  } finally {
+    await backend.close();
+  }
+});
+
 test("UCCI backend accepts array and button-style native options", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,

@@ -12,6 +12,7 @@ import { ENGINE_BACKEND_FEATURES, createEngineBackend } from "./backend.js";
 import { bookMoveToCandidate } from "./book.js";
 import { classifyMoveLoss, createEngine } from "./engine.js";
 import { analyzeReviewMistakes } from "./mistakes.js";
+import { mergeNativeEngineOptions } from "./native-presets.js";
 import { compareLinePlans } from "./plan-comparison.js";
 import { assessSearchConfidence, buildLinePlan, explainBookMove, explainMoveFeatures, explainReviewedMove, formatScore } from "./reasoning.js";
 import { annotateMove, generateLegalMoves } from "./movegen.js";
@@ -27,7 +28,13 @@ const DEFAULT_UCCI_TIMEOUT_MS = 5000;
 const DEFAULT_SEARCH_TIMEOUT_MS = 30000;
 
 export function createUcciEngineBackend(options = {}) {
-  const backendOptions = resolveEngineOptions(options);
+  const backendOptions = resolveEngineOptions({
+    ...options,
+    engineOptions: mergeNativeEngineOptions(
+      evalFileEngineOption(options.evalFile ?? options.nnue),
+      options.engineOptions
+    )
+  });
   if (!backendOptions.command) {
     throw new Error("Native engine backend requires a command.");
   }
@@ -181,6 +188,10 @@ export function createUcciEngineBackend(options = {}) {
   });
 
   return backend;
+}
+
+function evalFileEngineOption(evalFile) {
+  return evalFile ? [{ name: "EvalFile", value: evalFile }] : [];
 }
 
 class UcciProcessClient {

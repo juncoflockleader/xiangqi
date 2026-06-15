@@ -759,6 +759,28 @@ The engine includes a small UCCI-style command adapter:
 node bin/xiangqi-ucci.mjs
 ```
 
+By default the adapter uses the in-process JavaScript reference engine. To
+drive a stronger downloaded engine through the same explainable learning layer,
+point it at any UCI/UCCI command:
+
+```sh
+XIANGQI_ENGINE_COMMAND=/path/to/pikafish \
+XIANGQI_ENGINE_PROTOCOL=uci \
+XIANGQI_ENGINE_EVAL_FILE=/path/to/pikafish.nnue \
+XIANGQI_ENGINE_OPTIONS="Threads=4,Hash=512" \
+XIANGQI_ENGINE_USE_BOOK=false \
+node bin/xiangqi-ucci.mjs
+```
+
+The same settings are also available as flags, for example
+`node bin/xiangqi-ucci.mjs --engine-preset pikafish --no-book` after running
+`npm run install:pikafish`. When a native command or preset is configured, UCI
+is the default protocol because modern top Xiangqi engines such as Pikafish use
+UCI; set `--engine-protocol ucci` or `XIANGQI_ENGINE_PROTOCOL=ucci` for UCCI
+engines. The protocol output still includes the learning lines (`reason`,
+`plan`, `reviewmove`, `lesson`, score/WDL evidence) while the move choice comes
+from the native backend.
+
 Example session:
 
 ```text
