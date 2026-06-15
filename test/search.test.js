@@ -924,5 +924,6 @@ test("search penalizes failed quiet moves in history ordering", () => {
   assert.equal(result.depth, 3);
   assert.equal(result.bestMove.notation, disabled.bestMove.notation);
   assert.ok(result.stats.historyMaluses > 0);
+  assert.ok(result.stats.historyGravityUpdates > 0);
   assert.equal(disabled.stats.historyMaluses, 0);
 });

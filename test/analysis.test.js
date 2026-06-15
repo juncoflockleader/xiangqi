@@ -170,6 +170,23 @@ test("move explanations surface check-history ordering diagnostics", () => {
   assert.match(selectivityFactor.text, /check-history ordering/);
 });
 
+test("move explanations surface history-gravity learning diagnostics", () => {
+  const position = parseFen("4k4/9/4h4/4c4/4P4/9/4C4/9/9/4K4 r");
+  const engine = createEngine({ depth: 3, timeLimitMs: 1000 });
+  const result = engine.chooseMove(position, {
+    useBook: false,
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false
+  });
+  const selectivityFactor = result.explanation.confidence.factors
+    .find((factor) => factor.kind === "selectivity");
+
+  assert.ok(result.stats.historyGravityUpdates > 0);
+  assert.ok(selectivityFactor);
+  assert.match(selectivityFactor.text, /history-gravity learning/);
+});
+
 test("move explanations surface continuation-history reduction tuning", () => {
   const position = parseFen("4k4/9/9/9/9/9/4P4/9/9/3KR4 r");
   const engine = createEngine({ depth: 7, timeLimitMs: 5000 });

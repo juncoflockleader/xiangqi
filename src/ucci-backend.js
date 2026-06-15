@@ -1699,6 +1699,7 @@ function createEmptyStats() {
     checkEvasionBlocks: 0,
     checkEvasionKingMoves: 0,
     historyMaluses: 0,
+    historyGravityUpdates: 0,
     rootScoreOrderHits: 0,
     rootRankOrderHits: 0,
     iidSearches: 0,

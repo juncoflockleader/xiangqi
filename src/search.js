@@ -78,6 +78,7 @@ const LATE_MOVE_PRUNING_DEPTH_FACTOR = 3;
 const SINGULAR_EXTENSION_MIN_DEPTH = 5;
 const SINGULAR_EXTENSION_REDUCTION = 2;
 const DEFAULT_SINGULAR_EXTENSION_MARGIN = 90;
+const HISTORY_GRAVITY_LIMIT = 200_000;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -839,7 +840,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
         rememberKiller(context, ply, move);
         rememberCountermove(context, previousMove, move);
         if (givesCheck) bumpCheckHistory(context, move, depth * depth * 8);
-        bumpHistory(context.history, move, depth * depth);
+        bumpHistory(context, move, depth * depth);
         bumpContinuationHistory(context, previousMove, move, depth * depth);
       }
       break;
@@ -1948,23 +1949,26 @@ function checkHistoryScore(context, move) {
   return Math.max(-40_000, Math.min(40_000, score));
 }
 
-function bumpHistory(history, move, amount) {
+function bumpHistory(context, move, amount) {
   const key = moveKey(move);
-  history.set(key, clampOrderingScore((history.get(key) ?? 0) + amount));
+  context.history.set(key, gravityHistoryValue(context.history.get(key) ?? 0, amount));
+  context.stats.historyGravityUpdates += 1;
 }
 
 function bumpCaptureHistory(context, move, amount) {
   if (!context.useCaptureHistory || !move.captured) return;
   const key = captureHistoryKey(move);
-  context.captureHistory.set(key, clampOrderingScore((context.captureHistory.get(key) ?? 0) + amount));
+  context.captureHistory.set(key, gravityHistoryValue(context.captureHistory.get(key) ?? 0, amount));
   context.stats.captureHistoryStores += 1;
+  context.stats.historyGravityUpdates += 1;
 }
 
 function bumpCheckHistory(context, move, amount) {
   if (!context.useCheckHistory || move.captured) return;
   const key = moveKey(move);
-  context.checkHistory.set(key, clampOrderingScore((context.checkHistory.get(key) ?? 0) + amount));
+  context.checkHistory.set(key, gravityHistoryValue(context.checkHistory.get(key) ?? 0, amount));
   context.stats.checkHistoryStores += 1;
+  context.stats.historyGravityUpdates += 1;
 }
 
 function penalizeFailedCaptures(context, moves, amount) {
@@ -1987,18 +1991,25 @@ function bumpContinuationHistory(context, previousMove, move, amount) {
   if (!context.useContinuationHistory || !previousMove) return;
   const previousKey = moveKey(previousMove);
   const moveTable = context.continuationHistory.get(previousKey) ?? new Map();
-  moveTable.set(moveKey(move), clampOrderingScore((moveTable.get(moveKey(move)) ?? 0) + amount));
+  const key = moveKey(move);
+  moveTable.set(key, gravityHistoryValue(moveTable.get(key) ?? 0, amount));
   context.continuationHistory.set(previousKey, moveTable);
   context.stats.continuationHistoryStores += 1;
+  context.stats.historyGravityUpdates += 1;
 }
 
 function penalizeFailedQuietMoves(context, moves, amount, previousMove) {
   if (!context.useHistoryMalus || moves.length === 0) return;
   for (const move of moves) {
-    bumpHistory(context.history, move, -amount);
+    bumpHistory(context, move, -amount);
     bumpContinuationHistory(context, previousMove, move, -amount);
   }
   context.stats.historyMaluses += moves.length;
+}
+
+function gravityHistoryValue(current, bonus) {
+  const scaled = current + bonus - Math.trunc(current * Math.abs(bonus) / HISTORY_GRAVITY_LIMIT);
+  return clampOrderingScore(scaled);
 }
 
 function isTimedOut(context) {
@@ -2134,6 +2145,7 @@ function createSearchStats() {
     checkEvasionBlocks: 0,
     checkEvasionKingMoves: 0,
     historyMaluses: 0,
+    historyGravityUpdates: 0,
     rootScoreOrderHits: 0,
     rootRankOrderHits: 0,
     iidSearches: 0,
@@ -2213,6 +2225,7 @@ function mergeSearchStats(total, next) {
     checkEvasionBlocks: total.checkEvasionBlocks + next.checkEvasionBlocks,
     checkEvasionKingMoves: total.checkEvasionKingMoves + next.checkEvasionKingMoves,
     historyMaluses: total.historyMaluses + next.historyMaluses,
+    historyGravityUpdates: total.historyGravityUpdates + next.historyGravityUpdates,
     rootScoreOrderHits: total.rootScoreOrderHits + next.rootScoreOrderHits,
     rootRankOrderHits: total.rootRankOrderHits + next.rootRankOrderHits,
     iidSearches: total.iidSearches + next.iidSearches,
