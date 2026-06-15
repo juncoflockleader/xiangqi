@@ -2,6 +2,12 @@ import { INITIAL_FEN } from "./constants.js";
 import { createEngine } from "./engine.js";
 import { moveToNotation, parseFen } from "./board.js";
 import { describeEngineBackendStatus } from "./backend.js";
+import {
+  summarizeAlternativeEvidence,
+  summarizeComparisonEvidence,
+  summarizeLinePlanEvidence
+} from "./explanation-artifacts.js";
+import { summarizePlanComparisonEvidence } from "./plan-comparison.js";
 
 export const ENGINE_BENCHMARKS = Object.freeze([
   Object.freeze({
@@ -220,6 +226,12 @@ export function formatOracleComparisonReport(report) {
     if (result.candidateSummary) lines.push(`  Candidate: ${result.candidateSummary}`);
     if (result.oracleSummary) lines.push(`  Oracle: ${result.oracleSummary}`);
     if (result.oracleReview?.summary) lines.push(`  Review: ${result.oracleReview.summary}`);
+    if (result.oracleReview?.planComparison?.summary) {
+      lines.push(`  Plan: ${result.oracleReview.planComparison.summary}`);
+    }
+    if (result.oracleReview?.practiceFocus?.title) {
+      lines.push(`  Focus: ${result.oracleReview.practiceFocus.title} - ${result.oracleReview.practiceFocus.text}`);
+    }
   }
 
   return lines.join("\n");
@@ -411,9 +423,19 @@ function summarizeOracleReview(review) {
     centipawnLoss: review.centipawnLoss,
     playedScore: review.playedScore,
     bestScore: review.bestScore,
+    playedScoreDetail: review.playedScoreDetail ?? null,
+    bestScoreDetail: review.bestAnalysis?.scoreDetail ?? null,
+    playedWdl: review.playedWdl ?? null,
+    bestWdl: review.bestAnalysis?.wdl ?? null,
     depth: review.depth,
     nodes: review.nodes,
     mistakes: review.mistakes ?? null,
+    practiceFocus: review.practiceFocus ?? null,
+    playedLinePlan: summarizeLinePlanEvidence(review.playedLinePlan),
+    bestLinePlan: summarizeLinePlanEvidence(review.bestLinePlan),
+    planComparison: summarizePlanComparisonEvidence(review.planComparison),
+    bestComparison: summarizeComparisonEvidence(review.bestComparison ?? review.bestAnalysis?.explanation?.comparison),
+    bestAlternatives: summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives),
     summary: review.explanation?.summary ?? "",
     reasons: [...(review.explanation?.reasons ?? [])]
   };

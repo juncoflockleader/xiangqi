@@ -621,10 +621,12 @@ npm run bench:oracle -- --oracle-preset pikafish \
 
 The oracle benchmark lets the JavaScript candidate move first, asks the native
 engine for its own best move, then uses the oracle review path to grade the
-candidate move by centipawn loss and classification. Use `--benchmarks
-./benchmarks.json` for custom positions; oracle-only suites can omit
-`expectedMove` because the oracle supplies the reference. Use `--tag opening`,
-`--tag tactic`, or `--json` for focused regression runs.
+candidate move by centipawn loss and classification. Each reviewed result also
+keeps lesson-ready artifacts such as the played-vs-oracle plan comparison,
+played and best line plans, practice focus, and native candidate alternatives.
+Use `--benchmarks ./benchmarks.json` for custom positions; oracle-only suites
+can omit `expectedMove` because the oracle supplies the reference. Use
+`--tag opening`, `--tag tactic`, or `--json` for focused regression runs.
 
 Compare backends on the same benchmark suite:
 

@@ -194,8 +194,14 @@ test("oracle comparison surfaces review-needed disagreements", async () => {
   assert.equal(result.oracleMove, "h7-e7");
   assert.equal(result.oracleReview.centipawnLoss, 180);
   assert.equal(result.oracleReview.classification, "blunder");
+  assert.equal(result.oracleReview.planComparison.summary, "Scripted plan starts with a9-a8; scripted oracle prefers h7-e7, a blunder gap of 180 centipawns.");
+  assert.equal(result.oracleReview.practiceFocus.title, "Decision quality");
+  assert.equal(result.oracleReview.playedLinePlan.firstMove, "a9-a8");
+  assert.equal(result.oracleReview.bestLinePlan.firstMove, "h7-e7");
   assert.ok(text.includes("REVIEW book-central-cannon"));
   assert.ok(text.includes("candidate a9-a8 vs oracle h7-e7"));
+  assert.ok(text.includes("Plan: Scripted plan starts with a9-a8; scripted oracle prefers h7-e7"));
+  assert.ok(text.includes("Focus: Decision quality"));
 });
 
 test("engine comparison rejects entries without chooseMove", async () => {
@@ -262,6 +268,51 @@ function createScriptedOracleBackend(base, notation, reviewResult) {
         bestScore: 0,
         depth: 1,
         nodes: 12,
+        playedLinePlan: {
+          summary: `Start with ${playedNotation}.`,
+          firstMove: playedNotation,
+          expectedReply: null,
+          continuation: [],
+          moves: [],
+          motifs: [],
+          evaluationSwing: 0
+        },
+        bestLinePlan: {
+          summary: `Start with ${notation}.`,
+          firstMove: notation,
+          expectedReply: null,
+          continuation: [],
+          moves: [],
+          motifs: [],
+          evaluationSwing: 0
+        },
+        planComparison: {
+          kind: "different-first-move",
+          summary: `Scripted plan starts with ${playedNotation}; scripted oracle prefers ${notation}, a ${reviewResult.classification} gap of ${reviewResult.centipawnLoss} centipawns.`,
+          playedMove: playedNotation,
+          bestMove: notation,
+          sameFirstMove: false,
+          sameExpectedReply: true,
+          sameContinuation: true,
+          sharedMotifs: [],
+          missedMotifs: [],
+          playedOnlyMotifs: [],
+          centipawnLoss: reviewResult.centipawnLoss,
+          classification: reviewResult.classification,
+          evaluationSwingDelta: 0,
+          evaluationSwingDeltaText: "+0 centipawns",
+          playedSummary: `Start with ${playedNotation}.`,
+          bestSummary: `Start with ${notation}.`,
+          reasons: [`Scripted oracle prefers ${notation}.`]
+        },
+        practiceFocus: {
+          kind: "practice",
+          category: "scripted",
+          title: "Decision quality",
+          text: "Practice comparing candidate moves before committing.",
+          drill: "candidate-comparison",
+          severity: 1
+        },
         explanation: {
           summary: `${playedNotation} loses ${reviewResult.centipawnLoss} centipawns against the oracle.`,
           reasons: [`The oracle prefers ${notation}.`]
