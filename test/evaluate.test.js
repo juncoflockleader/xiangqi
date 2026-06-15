@@ -79,6 +79,29 @@ test("evaluation descriptions surface cannon screen creation as line pressure", 
   assert.ok(notes.some((note) => note.term === "linePressure" && note.text.includes("line pressure")));
 });
 
+test("evaluation rewards useful cannon platforms against valuable targets", () => {
+  const platform = parseFen("3k5/9/4r4/9/9/4P4/9/9/4C4/4K4 r");
+  const noTarget = parseFen("3k5/9/r8/9/9/4P4/9/9/4C4/4K4 r");
+  const platformEval = evaluatePosition(platform, SIDES.RED, { detailed: true });
+  const noTargetEval = evaluatePosition(noTarget, SIDES.RED, { detailed: true });
+
+  assert.ok(platformEval.terms.red.cannonPlatform - noTargetEval.terms.red.cannonPlatform >= 45);
+  assert.ok(platformEval.difference.cannonPlatform > noTargetEval.difference.cannonPlatform);
+});
+
+test("evaluation descriptions surface cannon platform pressure", () => {
+  const position = parseFen("3k5/9/4r4/9/3P5/9/9/9/4C4/4K4 r");
+  const next = applyLegalMove(position, {
+    from: coordToIndex("d4"),
+    to: coordToIndex("e4")
+  });
+  const delta = evaluateMoveDelta(position, next, SIDES.RED);
+  const notes = describeEvaluationTerms(delta.delta);
+
+  assert.ok(delta.delta.cannonPlatform >= 45);
+  assert.ok(notes.some((note) => note.term === "cannonPlatform" && note.text.includes("cannon platform pressure")));
+});
+
 test("evaluation rewards direct rook pins to the general", () => {
   const pinned = parseFen("4k4/9/9/4h4/9/4R4/9/9/9/4K4 r");
   const unpinned = parseFen("4k4/9/9/4h4/9/R8/9/9/9/4K4 r");

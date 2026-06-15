@@ -64,6 +64,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     terms[piece.side].kingSafety += localDefenseValue(position, piece, square);
     terms[piece.side].coordination += coordinationValue(position, piece, square);
     terms[piece.side].linePressure += linePressureValue(position, piece, square);
+    terms[piece.side].cannonPlatform += cannonPlatformValue(position, piece, square);
     terms[piece.side].pinPressure += pinPressureValue(position, piece, square);
     terms[piece.side].rookActivity += rookActivityValue(position, piece, square);
     terms[piece.side].riverControl += riverControlValue(position, piece, square);
@@ -148,6 +149,7 @@ function createTerms() {
     pieceSafety: 0,
     coordination: 0,
     linePressure: 0,
+    cannonPlatform: 0,
     pinPressure: 0,
     batteryPressure: 0,
     rookActivity: 0,
@@ -473,6 +475,90 @@ function linePressureValue(position, piece, square) {
   if (blockers === 0) return 22;
   if (blockers === 2) return 14;
   return 0;
+}
+
+function cannonPlatformValue(position, piece, square) {
+  if (piece.type !== PIECES.CANNON) return 0;
+
+  let score = 0;
+  for (const [fileStep, rankStep] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+    const platform = cannonPlatformRay(position, square, fileStep, rankStep);
+    if (!platform.screen) continue;
+
+    if (!platform.target) {
+      if (platform.screen.piece.side === piece.side && platform.emptiesBeforeScreen <= 2) score += 2;
+      continue;
+    }
+
+    if (platform.target.piece.side === piece.side) {
+      score -= platform.emptiesAfterScreen <= 1 ? 5 : 2;
+      continue;
+    }
+
+    score += platform.screen.piece.side === piece.side ? 8 : 5;
+    score += cannonTargetPressure(platform.target.piece);
+    score += Math.max(0, 4 - Math.min(4, platform.emptiesBeforeScreen)) * 2;
+    if (platform.emptiesAfterScreen <= 1) score += 6;
+    else if (platform.emptiesAfterScreen <= 3) score += 3;
+
+    if (palaceContains(opponent(piece.side), fileOf(platform.target.square), rankOf(platform.target.square))) {
+      score += 10;
+    }
+  }
+
+  return score;
+}
+
+function cannonPlatformRay(position, square, fileStep, rankStep) {
+  let targetFile = fileOf(square) + fileStep;
+  let targetRank = rankOf(square) + rankStep;
+  let emptiesBeforeScreen = 0;
+
+  while (isInside(targetFile, targetRank)) {
+    const target = indexOf(targetFile, targetRank);
+    const piece = position.board[target];
+    if (piece) {
+      const platformTarget = cannonPlatformTarget(position, targetFile + fileStep, targetRank + rankStep, fileStep, rankStep);
+      return {
+        screen: { square: target, piece },
+        target: platformTarget,
+        emptiesBeforeScreen,
+        emptiesAfterScreen: platformTarget?.emptiesBeforeTarget ?? 0
+      };
+    }
+    emptiesBeforeScreen += 1;
+    targetFile += fileStep;
+    targetRank += rankStep;
+  }
+
+  return {
+    screen: null,
+    target: null,
+    emptiesBeforeScreen,
+    emptiesAfterScreen: 0
+  };
+}
+
+function cannonPlatformTarget(position, file, rank, fileStep, rankStep) {
+  let emptiesBeforeTarget = 0;
+  let targetFile = file;
+  let targetRank = rank;
+
+  while (isInside(targetFile, targetRank)) {
+    const square = indexOf(targetFile, targetRank);
+    const piece = position.board[square];
+    if (piece) return { square, piece, emptiesBeforeTarget };
+    emptiesBeforeTarget += 1;
+    targetFile += fileStep;
+    targetRank += rankStep;
+  }
+
+  return null;
+}
+
+function cannonTargetPressure(piece) {
+  if (piece.type === PIECES.KING) return 90;
+  return Math.min(54, Math.round((PIECE_VALUES[piece.type] ?? 0) * 0.055));
 }
 
 function pinPressureValue(position, piece, square) {
@@ -1212,6 +1298,7 @@ function readableTerm(term) {
     pieceSafety: "piece safety",
     coordination: "piece coordination",
     linePressure: "rook and cannon line pressure",
+    cannonPlatform: "cannon platform pressure",
     pinPressure: "palace pin pressure",
     batteryPressure: "rook-cannon battery pressure",
     rookActivity: "rook activity",
