@@ -193,6 +193,7 @@ export function searchBestMove(position, options = {}) {
       useQuiescenceChecks: options.useQuiescenceChecks !== false,
       useQuiescenceTable: options.useQuiescenceTable !== false,
       useQuiescenceHashMoveOrdering: options.useQuiescenceHashMoveOrdering !== false,
+      useTranspositionMoveOrdering: options.useTranspositionMoveOrdering !== false,
       useEvaluationCache: options.useEvaluationCache !== false,
       useTacticalCache: options.useTacticalCache !== false,
       useRecaptureExtensions: options.useRecaptureExtensions !== false,
@@ -568,7 +569,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
           context,
           extensionsRemaining,
           previousMove,
-          principalMove: tt?.bestMove ?? null,
+          principalMove: context.useTranspositionMoveOrdering ? (tt?.bestMove ?? null) : null,
           reduction
         });
 
@@ -610,8 +611,9 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   let bestScore = -INFINITY_SCORE;
   let bestMove = null;
   let bestChildLine = [];
-  const ttPrincipalMove = tt?.bestMove ?? null;
-  let principalMove = ttPrincipalMove;
+  const ttBestMove = tt?.bestMove ?? null;
+  const ttOrderingMove = context.useTranspositionMoveOrdering ? ttBestMove : null;
+  let principalMove = ttOrderingMove;
   if (!principalMove) {
     principalMove = internalIterativeDeepeningMoveHint({
       position,
@@ -631,6 +633,9 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     }
   }
   const checkInfo = inCheck ? checkEvasionInfo(position) : null;
+  if (ttOrderingMove && legalMoves.some((move) => sameMove(move, ttOrderingMove))) {
+    context.stats.ttMoveHits += 1;
+  }
   const ordered = orderMoves(position, legalMoves, principalMove, context, ply, previousMove, checkInfo);
   const searchedQuietMoves = [];
   const searchedQuietChecks = [];
@@ -684,7 +689,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       context,
       extensionsRemaining,
       tt,
-      ttPrincipalMove,
+      ttPrincipalMove: ttBestMove,
       inCheck,
       previousMove
     });
@@ -2307,6 +2312,7 @@ function createSearchStats() {
     ttReplacements: 0,
     ttEvictions: 0,
     ttSkips: 0,
+    ttMoveHits: 0,
     cutoffs: 0,
     aspirationSearches: 0,
     aspirationFailHigh: 0,
@@ -2399,6 +2405,7 @@ function mergeSearchStats(total, next) {
     ttReplacements: total.ttReplacements + next.ttReplacements,
     ttEvictions: total.ttEvictions + next.ttEvictions,
     ttSkips: total.ttSkips + next.ttSkips,
+    ttMoveHits: total.ttMoveHits + next.ttMoveHits,
     cutoffs: total.cutoffs + next.cutoffs,
     aspirationSearches: total.aspirationSearches + next.aspirationSearches,
     aspirationFailHigh: total.aspirationFailHigh + next.aspirationFailHigh,

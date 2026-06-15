@@ -425,6 +425,9 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.ttHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.ttHits, "transposition-table hit"));
   }
+  if ((stats.ttMoveHits ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.ttMoveHits, "transposition hash-move ordering hint"));
+  }
   if ((stats.qttHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.qttHits, "quiescence-table hit"));
   }
@@ -509,6 +512,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   const supports = [];
 
   if ((stats.ttHits ?? 0) > 0) supports.push("transposition-table reuse");
+  if ((stats.ttMoveHits ?? 0) > 0) supports.push("transposition hash-move ordering");
   if ((stats.qttHits ?? 0) > 0) supports.push("quiescence-table reuse");
   if ((stats.qttMoveHits ?? 0) > 0) supports.push("quiescence hash-move ordering");
   if ((stats.evalCacheHits ?? 0) > 0) supports.push("evaluation-cache reuse");

@@ -222,6 +222,32 @@ test("move explanations surface quiescence hash-move ordering diagnostics", () =
   assert.match(selectivityFactor.text, /quiescence hash-move ordering/);
 });
 
+test("move explanations surface transposition hash-move ordering diagnostics", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const engine = createEngine({ depth: 2, timeLimitMs: 1000 });
+  engine.chooseMove(position, {
+    useBook: false,
+    depth: 2,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  });
+  const result = engine.chooseMove(position, {
+    useBook: false,
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  });
+  const selectivityFactor = result.explanation.confidence.factors
+    .find((factor) => factor.kind === "selectivity");
+
+  assert.ok(result.stats.ttMoveHits > 0);
+  assert.ok(result.explanation.reasons.some((reason) => reason.includes("transposition hash-move")));
+  assert.ok(selectivityFactor);
+  assert.match(selectivityFactor.text, /transposition hash-move ordering/);
+});
+
 test("move explanations surface continuation-history reduction tuning", () => {
   const position = parseFen("4k4/9/9/9/9/9/4P4/9/9/3KR4 r");
   const engine = createEngine({ depth: 7, timeLimitMs: 5000 });

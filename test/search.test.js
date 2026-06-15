@@ -381,6 +381,47 @@ test("search uses internal iterative deepening when hash move ordering is unavai
   assert.equal(disabled.stats.iidMoveHits, 0);
 });
 
+test("search orders transposition-table hash moves before generic replies", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const createSeededTable = () => {
+    const table = new Map();
+    for (const rootMove of generateLegalMoves(position)) {
+      const child = makeMove(position, rootMove);
+      const reply = generateLegalMoves(child)[0];
+      if (reply) {
+        table.set(hashPosition(child), {
+          depth: 0,
+          flag: "lower",
+          score: 0,
+          bestMove: reply
+        });
+      }
+    }
+    return table;
+  };
+  const commonOptions = {
+    depth: 2,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    candidateLimit: Number.POSITIVE_INFINITY
+  };
+  const result = searchBestMove(position, {
+    ...commonOptions,
+    transpositionTable: createSeededTable()
+  });
+  const disabled = searchBestMove(position, {
+    ...commonOptions,
+    transpositionTable: createSeededTable(),
+    useTranspositionMoveOrdering: false
+  });
+
+  assert.equal(result.depth, 2);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.ok(result.stats.ttMoveHits > 0);
+  assert.equal(disabled.stats.ttMoveHits, 0);
+});
+
 test("search adapts late-move reductions by depth and move order", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const adaptive = searchBestMove(position, {

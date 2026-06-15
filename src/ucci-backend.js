@@ -1652,6 +1652,7 @@ function createEmptyStats() {
     ttReplacements: 0,
     ttEvictions: 0,
     ttSkips: 0,
+    ttMoveHits: 0,
     cutoffs: 0,
     aspirationSearches: 0,
     aspirationFailHigh: 0,
