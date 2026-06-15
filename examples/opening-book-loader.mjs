@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
 import {
+  createOpeningBookFromGames,
   createOpeningBookFromCsv,
   createOpeningBookFromOracleArtifact,
   createOpeningBookFromText
@@ -18,7 +19,8 @@ export async function loadOpeningBook(options) {
   }
 
   try {
-    if (format === "json") return createOpeningBookFromOracleArtifact(text);
+    if (format === "json") return createOpeningBookFromJson(text);
+    if (format === "games") return createOpeningBookFromGames(JSON.parse(text));
     if (format === "csv") return createOpeningBookFromCsv(text);
     if (format === "tsv") return createOpeningBookFromCsv(text, { delimiter: "\t" });
     return createOpeningBookFromText(text);
@@ -41,6 +43,14 @@ export function resolveBookFormat(path, requested = "auto") {
 export function parseBookFormat(value = "auto") {
   const normalized = String(value || "auto").toLowerCase();
   if (normalized === "oracle" || normalized === "records") return "json";
-  if (["auto", "json", "csv", "tsv", "text"].includes(normalized)) return normalized;
-  throw new Error("--book-format must be auto, json, csv, tsv, text, oracle, or records.");
+  if (["auto", "json", "games", "csv", "tsv", "text"].includes(normalized)) return normalized;
+  throw new Error("--book-format must be auto, json, games, csv, tsv, text, oracle, or records.");
+}
+
+function createOpeningBookFromJson(text) {
+  const parsed = JSON.parse(text);
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray(parsed.games)) {
+    return createOpeningBookFromGames(parsed);
+  }
+  return createOpeningBookFromOracleArtifact(parsed);
 }

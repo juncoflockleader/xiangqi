@@ -259,6 +259,7 @@ Import or merge opening data:
 import {
   createEngine,
   createOpeningBookFromCsv,
+  createOpeningBookFromGames,
   createOpeningBookFromRecords,
   createOpeningBookFromText,
   DEFAULT_OPENING_BOOK,
@@ -289,9 +290,19 @@ const csvBook = createOpeningBookFromCsv(`
   moves,games,red_win_rate,draw_rate,black_win_rate,cp,source,name,tags
   "h7-e7 h0-g2",1200,0.54,0.24,0.22,32,master-db,Central Cannon,csv
 `);
+
+const gameDatabaseBook = createOpeningBookFromGames({
+  source: "master-games",
+  maxPly: 40,
+  games: [
+    { moves: ["h9-g7", "h0-g2", "b9-c7"], result: "1-0" },
+    { moves: "h9-g7 h0-g2", result: "1/2-1/2" },
+    { moves: ["h7-e7", "b0-c2"], result: "0-1" }
+  ]
+});
 ```
 
-The text importer accepts move lines plus optional `weight`, `count`, `frequency`, or `games` metadata. The structured-record importer also accepts common database priors such as `games`, `redWinRate`, `drawRate`, `blackWinRate`, `engineScore`, `source`, and `year`; the CSV/TSV importer recognizes common headers such as `moves`, `red_win_rate`, `draw_rate`, `black_win_rate`, `cp`, `source`, `name`, and `tags`. Imported records weight each continuation for the side to move and carry a database summary into the explanation. Repeated lines aggregate their weights, which makes it suitable for converting a larger opening database into engine heuristics.
+The text importer accepts move lines plus optional `weight`, `count`, `frequency`, or `games` metadata. The structured-record importer also accepts common database priors such as `games`, `redWinRate`, `drawRate`, `blackWinRate`, `engineScore`, `source`, and `year`; the CSV/TSV importer recognizes common headers such as `moves`, `red_win_rate`, `draw_rate`, `black_win_rate`, `cp`, `source`, `name`, and `tags`. `createOpeningBookFromGames` accepts raw game records, aggregates the first `maxPly` plies by position, and derives frequency plus red/draw/black result priors from results like `1-0`, `0-1`, and `1/2-1/2`; use `minGames` to filter rare continuations. Imported records weight each continuation for the side to move and carry a database summary into the explanation. Repeated lines aggregate their weights, which makes it suitable for converting a larger opening database into engine heuristics.
 
 Generate opening records from a native oracle when no curated opening database is
 available yet:
@@ -336,6 +347,7 @@ You can also try the generated book directly in the terminal game:
 
 ```sh
 npm run play -- --side black --book ./oracle-opening-book.json
+npm run play -- --side black --book ./games-book.json --book-format games
 ```
 
 Use `--records-only` when you only want the raw records array for

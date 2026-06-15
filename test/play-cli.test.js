@@ -57,6 +57,37 @@ test("play CLI can load an oracle opening artifact as its book", async () => {
   }
 });
 
+test("play CLI can load raw game records as an opening book", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "xiangqi-play-games-book-"));
+  const bookPath = join(dir, "games-book.json");
+
+  try {
+    await writeFile(bookPath, `${JSON.stringify({
+      source: "Play Fixture Games",
+      maxPly: 2,
+      games: [
+        { moves: ["h9-g7", "h0-g2"], result: "1-0" },
+        { moves: "h9-g7 h0-g2", result: "1/2-1/2" },
+        { moves: ["h7-e7", "b0-c2"], result: "0-1" }
+      ]
+    }, null, 2)}\n`, "utf8");
+
+    const result = await runPlayCli([
+      "--side", "black",
+      "--book", bookPath,
+      "--depth", "1",
+      "--time", "100"
+    ], "quit\n");
+
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.stdout, /Opening book: .*games-book\.json \(json\)/);
+    assert.match(result.stdout, /Engine played h9-g7/);
+    assert.match(result.stdout, /Game Database Continuation/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("play CLI can use a native UCI engine backend", async () => {
   const result = await runPlayCli([
     "--side", "black",

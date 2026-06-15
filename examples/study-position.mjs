@@ -443,7 +443,7 @@ Options:
   --time ms             Move time budget. Default: 1000.
   --lines n             Candidate lines to report. Default: 3.
   --book file           Load opening book data from JSON, CSV/TSV, or text.
-  --book-format format  Book format: auto, json, csv, tsv, text, oracle, records.
+  --book-format format  Book format: auto, json, games, csv, tsv, text, oracle, records.
   --fen fen             Study a FEN position. Default: initial position.
   --move move           Review a played move from the studied position.
   --played-move move    Alias for --move.

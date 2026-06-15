@@ -441,7 +441,7 @@ Options:
   --time ms             Move time budget. Default: 750.
   --lines n             Candidate lines to compare. Default: 3.
   --book file           Load opening book data from JSON, CSV/TSV, or text.
-  --book-format format  Book format: auto, json, csv, tsv, text.
+  --book-format format  Book format: auto, json, games, csv, tsv, text.
   --engine-command cmd  Use a native UCI/UCCI engine for play, with JS fallback.
   --engine-arg value    Append one native engine argument.
   --engine-args values  Append whitespace-separated native engine arguments.

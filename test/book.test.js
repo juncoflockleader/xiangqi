@@ -4,6 +4,7 @@ import {
   createEngine,
   createInitialPosition,
   createOpeningBookFromCsv,
+  createOpeningBookFromGames,
   createOpeningBookFromRecords,
   createOpeningBookFromText,
   DEFAULT_OPENING_BOOK,
@@ -288,4 +289,48 @@ test("opening database parser auto-detects TSV exports", () => {
   assert.equal(records[0].blackWinRate, "0.5");
   assert.equal(records[0].drawRate, "0.2");
   assert.equal(records[0].name, "TSV Screen Horse");
+});
+
+test("raw game records aggregate into opening-book database priors", () => {
+  const book = createOpeningBookFromGames({
+    source: "sample-game-db",
+    maxPly: 2,
+    games: [
+      { moves: ["h9-g7", "h0-g2"], result: "1-0", year: 2025, tags: ["master"] },
+      { moves: "h9-g7 h0-g2", result: "1/2-1/2", year: 2026 },
+      { moves: ["h7-e7", "b0-c2"], result: "0-1", year: 2026 }
+    ]
+  });
+  const engine = createEngine({ book, openingHeuristics: false, depth: 1, timeLimitMs: 500 });
+  const root = engine.openingBook(createInitialPosition());
+  const afterHorse = engine.openingBook(engine.play(createInitialPosition(), "h9-g7"));
+
+  assert.equal(root.move.notation, "h9-g7");
+  assert.equal(root.entry.database.games, 2);
+  assert.equal(Math.round(root.entry.database.redWinRate * 100), 50);
+  assert.equal(Math.round(root.entry.database.drawRate * 100), 50);
+  assert.equal(Math.round(root.entry.database.expectedScore * 100), 75);
+  assert.equal(root.entry.database.source, "sample-game-db");
+  assert.ok(root.entry.database.summary.includes("2 database games"));
+  assert.ok(root.entry.tags.includes("game-db"));
+  assert.ok(root.entry.tags.includes("master"));
+  assert.equal(afterHorse.move.notation, "h0-g2");
+  assert.equal(afterHorse.entry.database.side, "black");
+  assert.equal(afterHorse.entry.database.games, 2);
+});
+
+test("raw game opening aggregation can filter rare moves", () => {
+  const book = createOpeningBookFromGames([
+    { moves: ["h9-g7", "h0-g2"], result: "1-0" },
+    { moves: ["h9-g7", "b0-c2"], result: "1-0" },
+    { moves: ["h7-e7", "h0-g2"], result: "0-1" }
+  ], { maxPly: 1, minGames: 2 });
+  const root = lookupOpeningBook(createInitialPosition(), {
+    book,
+    openingHeuristics: false
+  });
+
+  assert.equal(root.move.notation, "h9-g7");
+  assert.equal(root.entries.length, 1);
+  assert.equal(root.entry.database.games, 2);
 });

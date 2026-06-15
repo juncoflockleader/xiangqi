@@ -579,7 +579,7 @@ Options:
   --study-time ms          Position-study move time. Default: time.
   --lines n                Candidate lines in position studies. Default: 3.
   --book file              Load opening book data from JSON, CSV/TSV, or text.
-  --book-format format     Book format: auto, json, csv, tsv, text, oracle, records.
+  --book-format format     Book format: auto, json, games, csv, tsv, text, oracle, records.
   --max-key-moments n      Key reviewed moments to keep. Default: 5.
   --max-cards n            Lesson cards to create. Default: 4.
   --max-position-studies n Key moments to expand into studies. Default: 3.

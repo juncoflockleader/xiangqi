@@ -213,6 +213,30 @@ export function createOpeningBookFromRecords(records, options = {}) {
   }, options);
 }
 
+export function createOpeningBookFromGames(data = {}, options = {}) {
+  const spec = Array.isArray(data) ? { games: data } : data ?? {};
+  const records = aggregateOpeningGameRecords(spec.games ?? [], {
+    ...options,
+    initialPosition: spec.initialPosition ?? spec.initialFen ?? spec.startFen ?? options.initialPosition ?? options.initialFen,
+    maxPly: spec.maxPly ?? spec.maxPlies ?? spec.plies ?? options.maxPly ?? options.maxPlies ?? options.plies,
+    minGames: spec.minGames ?? options.minGames,
+    source: spec.source ?? options.source,
+    name: spec.name ?? options.name,
+    idea: spec.idea ?? options.idea,
+    tags: uniqueTags([
+      ...normalizeTags(options.tags),
+      ...normalizeTags(spec.tags),
+      "game-db"
+    ])
+  });
+
+  return createOpeningBookFromRecords(records, {
+    ...options,
+    initialPosition: spec.initialPosition ?? spec.initialFen ?? spec.startFen ?? options.initialPosition ?? options.initialFen,
+    aggregateRecords: true
+  });
+}
+
 export function createOpeningBookFromCsv(text, options = {}) {
   return createOpeningBookFromRecords(parseOpeningBookCsv(text, options), options);
 }
@@ -399,6 +423,142 @@ function mergeBookEntries(existing, incoming) {
     sources: (existing.sources ?? 1) + (incoming.sources ?? 1),
     database: mergeDatabaseMetadata(existing.database, incoming.database)
   });
+}
+
+function aggregateOpeningGameRecords(games, options = {}) {
+  const initialPosition = normalizeInitialPosition(options.initialPosition ?? options.initialFen);
+  const maxPly = normalizeGamePlyLimit(options.maxPly ?? options.maxPlies ?? options.plies ?? 40);
+  const minGames = normalizeMinimumGames(options.minGames ?? 1);
+  const groups = new Map();
+
+  for (let gameIndex = 0; gameIndex < games.length; gameIndex += 1) {
+    const game = games[gameIndex];
+    const moves = normalizeGameMoves(game);
+    const result = normalizeGameResult(game);
+    let position = normalizeInitialPosition(
+      game?.initialPosition
+        ?? game?.initialFen
+        ?? game?.startFen
+        ?? game?.fen
+        ?? initialPosition
+    );
+
+    for (let ply = 0; ply < Math.min(moves.length, maxPly); ply += 1) {
+      const moveText = gameMoveText(moves[ply], gameIndex, ply);
+      const legalMove = resolveGameBookMove(position, moveText, gameIndex, ply);
+      const notation = moveToNotation(legalMove);
+      const key = positionKey(position);
+      const groupKey = `${key}|${notation}`;
+      const group = groups.get(groupKey) ?? {
+        fen: key,
+        move: notation,
+        games: 0,
+        resultGames: 0,
+        redWins: 0,
+        blackWins: 0,
+        draws: 0,
+        sources: new Set(),
+        years: new Set(),
+        tags: new Set(normalizeTags(options.tags))
+      };
+
+      group.games += 1;
+      if (result === "red") {
+        group.resultGames += 1;
+        group.redWins += 1;
+      } else if (result === "black") {
+        group.resultGames += 1;
+        group.blackWins += 1;
+      } else if (result === "draw") {
+        group.resultGames += 1;
+        group.draws += 1;
+      }
+
+      const source = game?.source ?? game?.database ?? game?.db ?? options.source;
+      if (source) group.sources.add(String(source));
+      const year = normalizeOptionalNumber(game?.year);
+      if (year !== null) group.years.add(Math.round(year));
+      for (const tag of normalizeTags(game?.tags)) group.tags.add(tag);
+      groups.set(groupKey, group);
+      position = makeMove(position, legalMove);
+    }
+  }
+
+  return [...groups.values()]
+    .filter((group) => group.games >= minGames)
+    .sort((a, b) => a.fen.localeCompare(b.fen) || a.move.localeCompare(b.move))
+    .map((group) => gameGroupRecord(group, options));
+}
+
+function normalizeGameMoves(game) {
+  if (Array.isArray(game)) return game;
+  if (typeof game === "string") return game.trim().split(/\s+/).filter(Boolean);
+
+  const moves = game?.moves ?? game?.line ?? game?.pv;
+  if (Array.isArray(moves)) return moves;
+  if (typeof moves === "string") return moves.trim().split(/\s+/).filter(Boolean);
+
+  throw new Error("Opening game record requires moves.");
+}
+
+function normalizeGameResult(game) {
+  const value = typeof game === "object" && game !== null
+    ? game.result ?? game.outcome ?? game.winner
+    : null;
+  if (value === undefined || value === null || value === "") return null;
+
+  const normalized = String(value).trim().toLowerCase().replace(/[\s_]+/g, "-");
+  if (["1-0", "red", "r", "red-win", "redwin"].includes(normalized)) return "red";
+  if (["0-1", "black", "b", "black-win", "blackwin"].includes(normalized)) return "black";
+  if (["1/2-1/2", "0.5-0.5", "draw", "d", "tie"].includes(normalized)) return "draw";
+  return null;
+}
+
+function gameMoveText(move, gameIndex, ply) {
+  const value = typeof move === "string" ? move : move?.move ?? move?.notation;
+  if (!value) {
+    throw new Error(`Opening game ${gameIndex + 1} move ${ply + 1} has no move notation.`);
+  }
+  return value;
+}
+
+function resolveGameBookMove(position, notation, gameIndex, ply) {
+  const parsed = parseMoveNotation(notation);
+  const legalMove = generateLegalMoves(position, position.turn)
+    .find((move) => sameMove(move, parsed));
+
+  if (!legalMove) {
+    throw new Error(`Illegal opening game move ${notation} in game ${gameIndex + 1} at ply ${ply + 1} from ${positionKey(position)}`);
+  }
+
+  return legalMove;
+}
+
+function gameGroupRecord(group, options) {
+  const resultStats = group.resultGames > 0
+    ? {
+        redWins: group.redWins,
+        blackWins: group.blackWins,
+        draws: group.draws,
+        redWinRate: group.redWins / group.resultGames,
+        blackWinRate: group.blackWins / group.resultGames,
+        drawRate: group.draws / group.resultGames
+      }
+    : {};
+  const sources = [...group.sources];
+  const years = [...group.years].sort((a, b) => a - b);
+
+  return {
+    fen: group.fen,
+    move: group.move,
+    games: group.games,
+    ...resultStats,
+    source: sources.length > 0 ? sources.join(", ") : options.source,
+    year: years.length === 1 ? years[0] : undefined,
+    name: options.name ?? "Game Database Continuation",
+    idea: options.idea ?? "This continuation is aggregated from raw game records and weighted by early-game popularity and results.",
+    tags: uniqueTags([...group.tags, "game-db"])
+  };
 }
 
 function addOpeningRecord(positions, record, options = {}) {
@@ -831,6 +991,18 @@ function canonicalMoveNotation(move) {
 function normalizeWeight(value) {
   const parsed = Number(value ?? 1);
   return Number.isFinite(parsed) ? Math.max(1, parsed) : 1;
+}
+
+function normalizeGamePlyLimit(value) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 40;
+  return Math.max(1, Math.min(200, parsed));
+}
+
+function normalizeMinimumGames(value) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 1;
+  return Math.max(1, parsed);
 }
 
 function normalizeOptionalNumber(value) {
