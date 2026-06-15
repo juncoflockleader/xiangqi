@@ -167,6 +167,9 @@ export function formatPositionStudy(study) {
         ? `, loss ${alternative.centipawnLoss} cp`
         : "";
       lines.push(`  ${alternative.rank}. ${alternative.move} (${alternative.scoreText}, ${verdict}${loss})`);
+      if (alternative.planComparison?.summary) {
+        lines.push(`     Why not: ${alternative.planComparison.summary}`);
+      }
     }
   }
 

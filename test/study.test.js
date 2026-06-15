@@ -258,6 +258,7 @@ test("backend position study preserves structured decision alternatives", async 
     assert.ok(study.decision.alternatives[1].reasons[0].includes("top native line"));
     assert.match(text, /Comparison: Native MultiPV rates h9-g7 30 centipawns/);
     assert.match(text, /Decision alternatives:/);
+    assert.match(text, /Why not: This native line starts with h7-e7; the top native line starts with h9-g7/);
   } finally {
     await backend.close();
   }

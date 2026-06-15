@@ -51,9 +51,9 @@ red against the fast JavaScript engine; use `npm run play -- --side black`,
 to experiment. Moves use coordinate notation such as `h9-g7` or `h9g7`, and the
 `hint`, `best`, and `why` commands show the learning-oriented explanation layer
 while you play. Engine turns print the principal-variation plan, and `best`/`why`
-expand it into per-ply score and motif steps. After your move is reviewed, the
-demo prints your played plan and, when it wanted a different move, the engine's
-preferred plan.
+expand it into per-ply score, motif steps, and why-not comparisons for candidate
+alternatives. After your move is reviewed, the demo prints your played plan and,
+when it wanted a different move, the engine's preferred plan.
 
 For a one-position learning report, run `npm run study`. It prints the best move,
 candidate lines, progressive hints, pressure, and an optional review of a move

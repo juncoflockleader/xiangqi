@@ -132,6 +132,7 @@ test("play CLI best command shows structured engine reasoning", async () => {
   assert.match(result.stdout, /Alternatives:/);
   assert.match(result.stdout, /1\. h9-g7: best, \+0\.42, loss 0 cp, expects h0-g2/);
   assert.match(result.stdout, /2\. h7-e7: playable, \+0\.12, loss 30 cp, expects h0-g2/);
+  assert.match(result.stdout, /Why not: This native line starts with h7-e7; the top native line starts with h9-g7/);
   assert.match(result.stdout, /Reasons:/);
 });
 

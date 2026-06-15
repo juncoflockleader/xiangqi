@@ -360,6 +360,9 @@ function printAlternatives(alternatives) {
     if (alternative.linePlanSummary) {
       console.log(`     ${alternative.linePlanSummary}`);
     }
+    if (alternative.planComparison?.summary) {
+      console.log(`     Why not: ${alternative.planComparison.summary}`);
+    }
   }
 }
 
