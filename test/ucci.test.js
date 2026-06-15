@@ -152,6 +152,7 @@ test("UCCI review summarizes loaded move history", () => {
   assert.ok(output.some((line) => line.includes("book 2")));
   assert.ok(output.some((line) => line.includes("moment 1 played plan: Start with")));
   assert.ok(output.some((line) => line.includes("moment 1 best plan: Start with")));
+  assert.ok(output.some((line) => line.includes("moment 1 plan comparison:")));
 });
 
 test("UCCI review reports no moves when history is empty", () => {
@@ -172,6 +173,7 @@ test("UCCI lesson summarizes reviewed move history as cards", () => {
   assert.ok(output.some((line) => line.includes("hint 1")));
   assert.ok(output.some((line) => line.includes("lesson 1 played plan: Start with")));
   assert.ok(output.some((line) => line.includes("lesson 1 best plan: Start with")));
+  assert.ok(output.some((line) => line.includes("lesson 1 plan comparison:")));
   assert.ok(output.some((line) => line.includes("answer")));
 });
 

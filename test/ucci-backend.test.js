@@ -586,6 +586,9 @@ test("UCCI backend reviews moves with native search scores", async () => {
     assert.equal(review.playedLinePlan.expectedReply, "h0-g2");
     assert.equal(review.bestLinePlan.firstMove, "h9-g7");
     assert.equal(review.bestLinePlan.expectedReply, "h0-g2");
+    assert.equal(review.planComparison.kind, "different-first-move");
+    assert.equal(review.planComparison.centipawnLoss, 59);
+    assert.equal(review.planComparison.summary, "Your plan starts with h7-e7; the engine prefers h9-g7, a good gap of 59 centipawns. Both lines expect h0-g2.");
     assert.ok(review.bestExplanation.summary.includes("Native UCCI Engine"));
     assert.ok(review.explanation.reasons.some((reason) => reason.includes("h9-g7")));
   } finally {
@@ -616,6 +619,7 @@ test("UCCI backend reviews games with native move reviews", async () => {
     assert.equal(review.keyMoments[0].bestComparison.bestMove, "h9-g7");
     assert.equal(review.keyMoments[0].bestAlternatives.length, 2);
     assert.equal(review.keyMoments[0].playedLinePlan.firstMove, "h7-e7");
+    assert.equal(review.keyMoments[0].planComparison.bestMove, "h9-g7");
     assert.equal(review.status.state, "playing");
   } finally {
     await backend.close();

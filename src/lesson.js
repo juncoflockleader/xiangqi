@@ -1,5 +1,6 @@
 import { moveToNotation } from "./board.js";
 import { summarizeAlternativeEvidence, summarizeComparisonEvidence, summarizeLinePlanEvidence } from "./explanation-artifacts.js";
+import { summarizePlanComparisonEvidence } from "./plan-comparison.js";
 
 const SEVERE_CLASSIFICATIONS = Object.freeze(["blunder", "mistake", "inaccuracy"]);
 const POSITIVE_CLASSIFICATIONS = Object.freeze(["best", "excellent"]);
@@ -89,6 +90,7 @@ function createLessonCard(move, rank) {
     bestAlternatives: alternativesFor(move.review),
     playedLinePlan: playedLinePlanFor(move.review),
     bestLinePlan: bestLinePlanFor(move.review),
+    planComparison: planComparisonFor(move.review),
     mistakes: move.review.mistakes,
     tags,
     hints: lessonHints(move, type, bestMove),
@@ -103,6 +105,7 @@ function createLessonCard(move, rank) {
       bestAlternatives: alternativesFor(move.review),
       playedLinePlan: playedLinePlanFor(move.review),
       bestLinePlan: bestLinePlanFor(move.review),
+      planComparison: planComparisonFor(move.review),
       summary: move.review.explanation.summary,
       reasons: move.review.explanation.reasons,
       principalVariation: move.review.principalVariation ?? []
@@ -261,6 +264,10 @@ function alternativesFor(review) {
 
 function playedLinePlanFor(review) {
   return summarizeLinePlanEvidence(review.playedLinePlan);
+}
+
+function planComparisonFor(review) {
+  return summarizePlanComparisonEvidence(review.planComparison);
 }
 
 function bestLinePlanFor(review) {

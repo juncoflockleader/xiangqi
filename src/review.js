@@ -9,6 +9,7 @@ import {
 import { generateLegalMoves } from "./movegen.js";
 import { gameStatus } from "./game.js";
 import { summarizeAlternativeEvidence, summarizeComparisonEvidence, summarizeLinePlanEvidence } from "./explanation-artifacts.js";
+import { summarizePlanComparisonEvidence } from "./plan-comparison.js";
 
 const CLASSIFICATIONS = Object.freeze([
   "best",
@@ -223,6 +224,7 @@ function selectKeyMoments(moves, limit) {
       bestAlternatives: alternativesFor(item.review),
       playedLinePlan: playedLinePlanFor(item.review),
       bestLinePlan: bestLinePlanFor(item.review),
+      planComparison: planComparisonFor(item.review),
       mistakes: item.review.mistakes,
       book: item.book,
       summary: item.review.explanation.summary,
@@ -268,6 +270,10 @@ function alternativesFor(review) {
 
 function playedLinePlanFor(review) {
   return summarizeLinePlanEvidence(review.playedLinePlan);
+}
+
+function planComparisonFor(review) {
+  return summarizePlanComparisonEvidence(review.planComparison);
 }
 
 function bestLinePlanFor(review) {

@@ -330,6 +330,11 @@ function printComparison(comparison) {
   }
 }
 
+function printPlanComparison(comparison) {
+  if (!comparison?.summary) return;
+  console.log(`Plan comparison: ${comparison.summary}`);
+}
+
 function printAlternatives(alternatives) {
   if (!alternatives?.length) return;
 
@@ -389,6 +394,7 @@ function printReview(review) {
       includeSteps: true
     });
   }
+  printPlanComparison(review.planComparison);
 }
 
 function printGameOver(status) {

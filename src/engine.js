@@ -4,6 +4,7 @@ import { bookMoveToCandidate, lookupOpeningBook } from "./book.js";
 import { evaluatePosition } from "./evaluate.js";
 import { analyzePressure } from "./pressure.js";
 import { buildLinePlan, explainBookMove, explainCandidateMove, explainMove, explainReviewedMove } from "./reasoning.js";
+import { compareLinePlans } from "./plan-comparison.js";
 import { analyzeReviewMistakes } from "./mistakes.js";
 import { reviewGameWithEngine } from "./review.js";
 import { coachMoveWithEngine } from "./coach.js";
@@ -119,13 +120,18 @@ export function createEngine(defaultOptions = {}) {
       const playedPrincipalVariation = candidate.principalVariation?.length
         ? candidate.principalVariation
         : [annotatedMove];
+      const classification = isBestMove ? "best" : classifyMoveLoss(Math.max(16, centipawnLoss));
+      const bestLinePlan = bestExplanation.linePlan ?? null;
+      const playedLinePlan = buildLinePlan(position, playedPrincipalVariation, {
+        perspective: position.turn
+      });
       const reviewed = {
         move: annotatedMove,
         bestMove,
         bestScore: Math.round(search.score),
         playedScore: Math.round(candidate.score),
         centipawnLoss: Math.round(centipawnLoss),
-        classification: isBestMove ? "best" : classifyMoveLoss(Math.max(16, centipawnLoss)),
+        classification,
         isBestMove,
         principalVariation: playedPrincipalVariation.map((pvMove) => pvMove.notation ?? moveToNotation(pvMove)),
         bestAnalysis: {
@@ -133,9 +139,11 @@ export function createEngine(defaultOptions = {}) {
           explanation: bestExplanation
         },
         bestExplanation,
-        bestLinePlan: bestExplanation.linePlan ?? null,
-        playedLinePlan: buildLinePlan(position, playedPrincipalVariation, {
-          perspective: position.turn
+        bestLinePlan,
+        playedLinePlan,
+        planComparison: compareLinePlans(playedLinePlan, bestLinePlan, {
+          centipawnLoss: Math.round(centipawnLoss),
+          classification
         }),
         depth: search.depth,
         nodes: search.nodes

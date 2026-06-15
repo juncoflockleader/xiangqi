@@ -1,5 +1,6 @@
 import { moveToNotation, toFen } from "./board.js";
 import { summarizeAlternativeEvidence, summarizeComparisonEvidence, summarizeLinePlanEvidence } from "./explanation-artifacts.js";
+import { summarizePlanComparisonEvidence } from "./plan-comparison.js";
 import { practiceFocusFromReview } from "./practice.js";
 
 const DEFAULT_STUDY_LINES = 3;
@@ -107,6 +108,9 @@ export function formatPositionStudy(study) {
   if (study.playedMoveReview) {
     const review = study.playedMoveReview;
     lines.push(`Review: ${review.move} is ${review.classification}, ${review.centipawnLoss} cp loss; best ${review.bestMove}.`);
+    if (review.planComparison?.summary) {
+      lines.push(`Plan comparison: ${review.planComparison.summary}`);
+    }
   }
 
   if (study.practiceFocus) {
@@ -335,6 +339,7 @@ function summarizeReview(review) {
     bestWdl: review.bestAnalysis?.wdl ?? null,
     playedLinePlan: summarizeLinePlanEvidence(review.playedLinePlan),
     bestLinePlan: summarizeLinePlanEvidence(review.bestLinePlan ?? review.bestExplanation?.linePlan ?? review.bestAnalysis?.explanation?.linePlan),
+    planComparison: summarizePlanComparisonEvidence(review.planComparison),
     bestComparison: summarizeComparisonEvidence(review.bestComparison ?? review.bestAnalysis?.explanation?.comparison),
     bestAlternatives: summarizeAlternativeEvidence(review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives),
     depth: review.depth ?? 0,

@@ -12,6 +12,7 @@ import { ENGINE_BACKEND_FEATURES, createEngineBackend } from "./backend.js";
 import { bookMoveToCandidate } from "./book.js";
 import { classifyMoveLoss, createEngine } from "./engine.js";
 import { analyzeReviewMistakes } from "./mistakes.js";
+import { compareLinePlans } from "./plan-comparison.js";
 import { assessSearchConfidence, buildLinePlan, explainBookMove, explainMoveFeatures, explainReviewedMove, formatScore } from "./reasoning.js";
 import { annotateMove, generateLegalMoves } from "./movegen.js";
 import { hasClockTimeControl, resolveSearchBudget } from "./time.js";
@@ -547,6 +548,11 @@ async function nativeReviewMove(client, position, moveOrNotation, options) {
     ? playedCandidate.principalVariation
     : [annotateMove(position, move)];
   const centipawnLoss = Math.max(0, bestAnalysis.score - playedCandidate.score);
+  const classification = isBestMove ? "best" : classifyMoveLoss(Math.max(16, centipawnLoss));
+  const bestLinePlan = bestAnalysis.explanation?.linePlan ?? null;
+  const playedLinePlan = buildLinePlan(position, playedPrincipalVariation, {
+    perspective: position.turn
+  });
   const reviewed = {
     source: nativeSource(options.protocol),
     move,
@@ -554,14 +560,16 @@ async function nativeReviewMove(client, position, moveOrNotation, options) {
     bestScore: Math.round(bestAnalysis.score),
     playedScore: Math.round(playedCandidate.score),
     centipawnLoss: Math.round(centipawnLoss),
-    classification: isBestMove ? "best" : classifyMoveLoss(Math.max(16, centipawnLoss)),
+    classification,
     isBestMove,
     principalVariation: playedPrincipalVariation.map((pvMove) => pvMove.notation ?? moveToNotation(pvMove)),
     bestAnalysis,
     bestExplanation: bestAnalysis.explanation,
-    bestLinePlan: bestAnalysis.explanation?.linePlan ?? null,
-    playedLinePlan: buildLinePlan(position, playedPrincipalVariation, {
-      perspective: position.turn
+    bestLinePlan,
+    playedLinePlan,
+    planComparison: compareLinePlans(playedLinePlan, bestLinePlan, {
+      centipawnLoss: Math.round(centipawnLoss),
+      classification
     }),
     bestComparison: bestAnalysis.explanation?.comparison ?? null,
     bestAlternatives: bestAnalysis.explanation?.alternatives ?? [],

@@ -87,6 +87,9 @@ test("move review classifies tactical mistake patterns", () => {
   assert.match(review.playedLinePlan.summary, /Start with e6-e5/);
   assert.equal(review.bestLinePlan.firstMove, review.bestMove.notation);
   assert.match(review.bestLinePlan.summary, /Start with/);
+  assert.equal(review.planComparison.playedMove, "e6-e5");
+  assert.equal(review.planComparison.bestMove, review.bestMove.notation);
+  assert.match(review.planComparison.summary, /Your plan starts with e6-e5/);
 });
 
 test("standalone game review helper accepts an engine", () => {
@@ -126,4 +129,5 @@ test("move review falls back when timeout prevents root candidate scoring", () =
   assert.ok(Number.isFinite(review.playedScore));
   assert.ok(review.principalVariation.includes("h7-e7"));
   assert.equal(review.playedLinePlan.firstMove, "h7-e7");
+  assert.equal(review.planComparison.playedMove, "h7-e7");
 });

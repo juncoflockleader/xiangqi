@@ -186,6 +186,7 @@ test("play CLI uses the oracle reviewer for player move feedback", async () => {
   assert.match(result.stdout, /Your plan: Start with h7-e7; expect h0-g2; theme: creates threat\./);
   assert.match(result.stdout, /Engine preferred h9-g7\./);
   assert.match(result.stdout, /Best plan: Start with h9-g7; expect h0-g2; theme: creates threat\./);
+  assert.match(result.stdout, /Plan comparison: Your plan starts with h7-e7; the engine prefers h9-g7, a good gap of 59 centipawns\. Both lines expect h0-g2\./);
   assert.match(result.stdout, /1\. Red engine choice h9-g7: \+0\.00 -> \+0\.39 \(\+39 centipawns\) \[creates threat\]/);
 });
 

@@ -287,6 +287,7 @@ export class UcciSession {
       outputs.push(`info string moment ${moment.ply} ${moment.side} ${moment.notation} ${moment.classification} loss ${moment.centipawnLoss} best ${stripMoveSeparator(moment.bestMove)}: ${moment.summary}`);
       pushPlanInfo(outputs, `moment ${moment.ply} played`, moment.playedLinePlan);
       pushPlanInfo(outputs, `moment ${moment.ply} best`, moment.bestLinePlan);
+      pushPlanComparisonInfo(outputs, `moment ${moment.ply}`, moment.planComparison);
     }
 
     return outputs;
@@ -324,6 +325,7 @@ export class UcciSession {
       }
       pushPlanInfo(outputs, `lesson ${card.rank} played`, card.playedLinePlan);
       pushPlanInfo(outputs, `lesson ${card.rank} best`, card.bestLinePlan);
+      pushPlanComparisonInfo(outputs, `lesson ${card.rank}`, card.planComparison);
       outputs.push(`info string lesson ${card.rank} answer ${stripMoveSeparator(card.answer.move)}: ${card.answer.summary}`);
     }
 
@@ -411,6 +413,11 @@ function pushPlanInfo(outputs, prefix, linePlan, options = {}) {
     const motifs = step.motifs?.length ? ` motifs ${step.motifs.join(",")}` : "";
     outputs.push(`info string ${prefix} plan step ${step.ply} ${step.side} ${step.role} ${stripMoveSeparator(step.move)} ${step.scoreBeforeText}->${step.scoreAfterText} ${step.scoreDeltaText}${motifs}`);
   }
+}
+
+function pushPlanComparisonInfo(outputs, prefix, comparison) {
+  if (!comparison?.summary) return;
+  outputs.push(`info string ${prefix} plan comparison: ${comparison.summary}`);
 }
 
 function parseGoOptions(line, defaults, side = "red", position = null) {

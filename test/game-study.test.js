@@ -43,6 +43,7 @@ test("game study bundles review, lesson cards, and position studies", () => {
   assert.match(formatted, /Practice focus:/);
   assert.match(formatted, /Played plan: Start with/);
   assert.match(formatted, /Best plan: Start with/);
+  assert.match(formatted, /Plan comparison:/);
   assert.equal(study.positionStudies[0].type, "position-study");
   assert.equal(study.positionStudies[0].gameMoment.ply, study.keyMoments[0].ply);
   assert.ok(study.positionStudies[0].playedMoveReview);
@@ -167,13 +168,16 @@ test("game study preserves native review comparison evidence", async () => {
     assert.equal(study.keyMoments[0].playedLinePlan.expectedReply, "h0-g2");
     assert.equal(study.keyMoments[0].bestLinePlan.firstMove, "h9-g7");
     assert.equal(study.keyMoments[0].bestLinePlan.expectedReply, "h0-g2");
+    assert.equal(study.keyMoments[0].planComparison.summary, "Your plan starts with h7-e7; the engine prefers h9-g7, a good gap of 59 centipawns. Both lines expect h0-g2.");
     assert.equal(study.lessonPlan.cards[0].bestComparison.nextMove, "h7-e7");
     assert.equal(study.lessonPlan.cards[0].playedLinePlan.summary, study.keyMoments[0].playedLinePlan.summary);
     assert.equal(study.lessonPlan.cards[0].bestLinePlan.summary, study.keyMoments[0].bestLinePlan.summary);
+    assert.equal(study.lessonPlan.cards[0].planComparison.summary, study.keyMoments[0].planComparison.summary);
     assert.equal(study.positionStudies[0].gameMoment.bestComparison.bestMove, "h9-g7");
     assert.equal(study.positionStudies[0].gameMoment.bestAlternatives[1].verdict, "playable");
     assert.equal(study.positionStudies[0].gameMoment.playedLinePlan.summary, study.keyMoments[0].playedLinePlan.summary);
     assert.equal(study.positionStudies[0].gameMoment.bestLinePlan.summary, study.keyMoments[0].bestLinePlan.summary);
+    assert.equal(study.positionStudies[0].gameMoment.planComparison.summary, study.keyMoments[0].planComparison.summary);
   } finally {
     await backend.close();
   }

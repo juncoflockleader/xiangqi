@@ -1,5 +1,6 @@
 import { parseFen, toFen } from "./board.js";
 import { summarizeAlternativeEvidence, summarizeComparisonEvidence, summarizeLinePlanEvidence } from "./explanation-artifacts.js";
+import { summarizePlanComparisonEvidence } from "./plan-comparison.js";
 import { createLessonPlanFromReview } from "./lesson.js";
 import { aggregatePracticeFocusFromReview } from "./practice.js";
 import { studyPositionWithBackend, studyPositionWithEngine } from "./study.js";
@@ -45,6 +46,9 @@ export function formatGameStudy(study) {
       }
       if (moment.bestLinePlan?.summary) {
         lines.push(`     Best plan: ${moment.bestLinePlan.summary}`);
+      }
+      if (moment.planComparison?.summary) {
+        lines.push(`     Plan comparison: ${moment.planComparison.summary}`);
       }
     }
   }
@@ -179,6 +183,7 @@ function attachGameMoment(study, move) {
       bestAlternatives: alternativesFor(move.review),
       playedLinePlan: playedLinePlanFor(move.review),
       bestLinePlan: bestLinePlanFor(move.review),
+      planComparison: planComparisonFor(move.review),
       book: move.book
     }
   };
@@ -282,6 +287,10 @@ function alternativesFor(review) {
 
 function playedLinePlanFor(review) {
   return summarizeLinePlanEvidence(review.playedLinePlan);
+}
+
+function planComparisonFor(review) {
+  return summarizePlanComparisonEvidence(review.planComparison);
 }
 
 function bestLinePlanFor(review) {

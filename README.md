@@ -168,6 +168,7 @@ console.log(study.candidateLines.map((line) => [line.move, line.scoreText]));
 console.log(study.decision.linePlan.summary);
 console.log(study.playedMoveReview?.playedLinePlan?.summary);
 console.log(study.playedMoveReview?.bestLinePlan?.summary);
+console.log(study.playedMoveReview?.planComparison?.summary);
 console.log(study.searchDisagreement?.summary);
 console.log(study.playedMoveReview?.classification);
 console.log(study.practiceFocus?.title);
@@ -198,6 +199,7 @@ console.log(gameStudy.summary);
 console.log(gameStudy.lessonPlan.cards[0]?.prompt);
 console.log(gameStudy.keyMoments[0]?.playedLinePlan?.summary);
 console.log(gameStudy.keyMoments[0]?.bestLinePlan?.summary);
+console.log(gameStudy.keyMoments[0]?.planComparison?.summary);
 console.log(gameStudy.positionStudies[0]?.summary);
 console.log(gameStudy.practiceFocus[0]?.title);
 ```
@@ -205,8 +207,8 @@ console.log(gameStudy.practiceFocus[0]?.title);
 `gameStudy` returns the full move review, compact key moments, lesson cards,
 position-study bundles for selected plies, aggregated practice focus, final FEN,
 played-line and preferred-line plans for key moments and lesson cards, and
-next-step prompts so a learning UI can move from game recap into focused
-practice.
+played-vs-best plan comparisons, and next-step prompts so a learning UI can
+move from game recap into focused practice.
 
 You can also generate the same artifact from the command line, which is handy
 after online sparring or imported game records:
@@ -378,6 +380,7 @@ const nativeReview = await nativeBackend.reviewMove(position, "h7-e7");
 console.log(nativeReview.explanation.summary);
 console.log(nativeReview.playedLinePlan.summary);
 console.log(nativeReview.bestLinePlan.summary);
+console.log(nativeReview.planComparison.summary);
 
 const nativeGameReview = await nativeBackend.reviewGame(["h7-e7", "h0-g2"]);
 console.log(nativeGameReview.summary);
@@ -486,11 +489,15 @@ console.log(review.mistakes.primary);
 console.log(review.explanation.summary);
 console.log(review.playedLinePlan.summary);
 console.log(review.bestLinePlan.summary);
+console.log(review.planComparison.summary);
 ```
 
 `reviewMove` compares the played move against the searched best line and returns a practical grade: `best`, `excellent`, `good`, `inaccuracy`, `mistake`, or `blunder`. It also returns `bestLinePlan` plus `mistakes`, a structured pattern summary for learning flows, such as missed material, unsafe capture, missed check, missed threat, allowed threat, or positional drift.
 `playedLinePlan` describes the continuation behind the move that was actually
 played, so a UI can compare "your idea" against the engine's preferred plan.
+`planComparison` packages that contrast into a learner-ready summary plus
+structured fields for first-move match, expected-reply match, motifs, and the
+centipawn gap.
 
 Analyze several candidate lines:
 

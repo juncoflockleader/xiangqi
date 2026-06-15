@@ -99,6 +99,7 @@ test("position study can include a played move review", () => {
   assert.equal(study.playedMoveReview.classification, "blunder");
   assert.ok(study.playedMoveReview.centipawnLoss > 1000);
   assert.equal(study.playedMoveReview.playedLinePlan.firstMove, "e9-f9");
+  assert.equal(study.playedMoveReview.planComparison.playedMove, "e9-f9");
   assert.equal(study.nextSteps[0].kind, "correction");
   assert.equal(study.nextSteps[1].kind, "practice");
   assert.equal(study.practiceFocus.category, "missed-material");
@@ -107,6 +108,7 @@ test("position study can include a played move review", () => {
   assert.equal(study.practiceFocus.move, "e9-f9");
   assert.equal(study.practiceFocus.bestMove, "e9-e2");
   assert.match(text, /Practice: Material tactics/);
+  assert.match(text, /Plan comparison: Your plan starts with e9-f9/);
   assert.ok(study.summary.includes("e9-f9 is blunder"));
 });
 
@@ -325,6 +327,7 @@ test("backend position study preserves played-move review alternatives", async (
     assert.equal(study.playedMoveReview.playedLinePlan.expectedReply, "h0-g2");
     assert.equal(study.playedMoveReview.bestLinePlan.firstMove, "h9-g7");
     assert.equal(study.playedMoveReview.bestLinePlan.expectedReply, "h0-g2");
+    assert.equal(study.playedMoveReview.planComparison.summary, "Your plan starts with h7-e7; the engine prefers h9-g7, a good gap of 59 centipawns. Both lines expect h0-g2.");
   } finally {
     await backend.close();
   }
