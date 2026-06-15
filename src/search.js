@@ -55,6 +55,9 @@ const IID_REDUCTION = 2;
 const IID_MOVE_LIMIT = 8;
 const LMR_MIN_DEPTH = 3;
 const LMR_BASE_MOVE_INDEX = 4;
+const SINGULAR_EXTENSION_MIN_DEPTH = 5;
+const SINGULAR_EXTENSION_REDUCTION = 2;
+const DEFAULT_SINGULAR_EXTENSION_MARGIN = 90;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -147,6 +150,7 @@ export function searchBestMove(position, options = {}) {
       useAdaptiveLmr: options.useAdaptiveLmr !== false,
       useProbCut: options.useProbCut !== false,
       useInternalIterativeDeepening: options.useInternalIterativeDeepening !== false,
+      useSingularExtensions: options.useSingularExtensions !== false,
       nullMoveVerificationMinDepth: Math.max(3, Math.floor(numberOption(options.nullMoveVerificationMinDepth, NULL_MOVE_VERIFICATION_MIN_DEPTH))),
       seePruneMargin: Math.max(0, numberOption(options.seePruneMargin, DEFAULT_SEE_PRUNE_MARGIN)),
       probCutMargin: Math.max(0, numberOption(options.probCutMargin, DEFAULT_PROBCUT_MARGIN)),
@@ -154,6 +158,10 @@ export function searchBestMove(position, options = {}) {
       iidReduction: Math.max(1, Math.floor(numberOption(options.iidReduction, IID_REDUCTION))),
       iidMoveLimit: Math.max(1, Math.floor(numberOption(options.iidMoveLimit, IID_MOVE_LIMIT))),
       iidActive: false,
+      singularExtensionMinDepth: Math.max(3, Math.floor(numberOption(options.singularExtensionMinDepth, SINGULAR_EXTENSION_MIN_DEPTH))),
+      singularExtensionReduction: Math.max(1, Math.floor(numberOption(options.singularExtensionReduction, SINGULAR_EXTENSION_REDUCTION))),
+      singularExtensionMargin: Math.max(1, numberOption(options.singularExtensionMargin, DEFAULT_SINGULAR_EXTENSION_MARGIN)),
+      singularActive: false,
       useSoftTimeManagement: options.useSoftTimeManagement !== false && !exactRootScores,
       softDeadline,
       softMinDepth: Math.max(1, Math.floor(numberOption(options.softMinDepth, DEFAULT_SOFT_MIN_DEPTH))),
@@ -525,7 +533,8 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   let bestScore = -INFINITY_SCORE;
   let bestMove = null;
   let bestChildLine = [];
-  let principalMove = tt?.bestMove ?? null;
+  const ttPrincipalMove = tt?.bestMove ?? null;
+  let principalMove = ttPrincipalMove;
   if (!principalMove) {
     principalMove = internalIterativeDeepeningMoveHint({
       position,
@@ -587,7 +596,20 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     const next = makeMove(position, move);
     let childLine = [];
     const givesCheck = isInCheck(next, next.turn);
-    const extensionReason = extensionReasonFor({
+    const singularReason = singularExtensionReasonFor({
+      position,
+      orderedMoves: ordered,
+      move,
+      depth,
+      ply,
+      context,
+      extensionsRemaining,
+      tt,
+      ttPrincipalMove,
+      inCheck,
+      previousMove
+    });
+    const extensionReason = singularReason ?? extensionReasonFor({
       inCheck,
       givesCheck,
       move,
@@ -901,6 +923,136 @@ function extensionReasonFor({ inCheck, givesCheck, move, previousMove, extension
   if (isRecapture(move, previousMove, context)) return "recapture";
   if (move.captured && PIECE_VALUES[move.captured.type] >= PIECE_VALUES[move.piece.type] * 2) return "winning-capture";
   return null;
+}
+
+function singularExtensionReasonFor({
+  position,
+  orderedMoves,
+  move,
+  depth,
+  ply,
+  context,
+  extensionsRemaining,
+  tt,
+  ttPrincipalMove,
+  inCheck,
+  previousMove
+}) {
+  if (!shouldTrySingularExtension({
+    orderedMoves,
+    move,
+    depth,
+    context,
+    extensionsRemaining,
+    tt,
+    ttPrincipalMove,
+    inCheck
+  })) {
+    return null;
+  }
+
+  const ttScore = scoreFromTransposition(tt.score, ply);
+  const singularBeta = Math.max(-INFINITY_SCORE + 1, ttScore - singularExtensionMargin(depth, context));
+  const childDepth = Math.max(0, depth - 1 - context.singularExtensionReduction);
+  const previousSingularActive = context.singularActive;
+  let alternativeScore = -INFINITY_SCORE;
+
+  context.singularActive = true;
+  context.stats.singularExtensionSearches += 1;
+
+  try {
+    alternativeScore = searchExcludedMoveBestScore({
+      position,
+      moves: orderedMoves,
+      excludedMove: move,
+      threshold: singularBeta,
+      childDepth,
+      ply,
+      context,
+      extensionsRemaining,
+      previousMove
+    });
+  } finally {
+    context.singularActive = previousSingularActive;
+  }
+
+  if (context.timedOut) return null;
+  if (alternativeScore < singularBeta) {
+    context.stats.singularExtensions += 1;
+    return "singular";
+  }
+
+  context.stats.singularExtensionRejects += 1;
+  return null;
+}
+
+function shouldTrySingularExtension({
+  orderedMoves,
+  move,
+  depth,
+  context,
+  extensionsRemaining,
+  tt,
+  ttPrincipalMove,
+  inCheck
+}) {
+  if (!context.useSingularExtensions) return false;
+  if (context.singularActive) return false;
+  if (extensionsRemaining <= 0) return false;
+  if (inCheck) return false;
+  if (depth < context.singularExtensionMinDepth) return false;
+  if ((orderedMoves?.length ?? 0) < 2) return false;
+  if (!tt || !ttPrincipalMove || !sameMove(move, ttPrincipalMove)) return false;
+  if (tt.flag === UPPER) return false;
+  if ((tt.depth ?? 0) < depth - 2) return false;
+  if (Math.abs(scoreFromTransposition(tt.score, 0)) >= MATE_SCORE - 1000) return false;
+  return true;
+}
+
+function searchExcludedMoveBestScore({
+  position,
+  moves,
+  excludedMove,
+  threshold,
+  childDepth,
+  ply,
+  context,
+  extensionsRemaining,
+  previousMove
+}) {
+  let bestScore = -INFINITY_SCORE;
+
+  for (const move of moves) {
+    if (sameMove(move, excludedMove)) continue;
+    if (isTimedOut(context)) {
+      context.timedOut = true;
+      break;
+    }
+
+    const next = makeMove(position, move);
+    const score = normalizeScore(-negamax(
+      next,
+      childDepth,
+      -threshold,
+      -threshold + 1,
+      ply + 1,
+      context,
+      null,
+      extensionsRemaining,
+      false,
+      move
+    ));
+
+    if (context.timedOut) break;
+    if (score > bestScore) bestScore = score;
+    if (score >= threshold) break;
+  }
+
+  return bestScore;
+}
+
+function singularExtensionMargin(depth, context) {
+  return context.singularExtensionMargin + depth * 4;
 }
 
 function isRecapture(move, previousMove, context) {
@@ -1381,6 +1533,9 @@ function createSearchStats() {
     aspirationFailLow: 0,
     extensions: 0,
     recaptureExtensions: 0,
+    singularExtensionSearches: 0,
+    singularExtensions: 0,
+    singularExtensionRejects: 0,
     softStops: 0,
     seePrunes: 0,
     mateDistancePrunes: 0,
@@ -1426,6 +1581,9 @@ function mergeSearchStats(total, next) {
     aspirationFailLow: total.aspirationFailLow + next.aspirationFailLow,
     extensions: total.extensions + next.extensions,
     recaptureExtensions: total.recaptureExtensions + next.recaptureExtensions,
+    singularExtensionSearches: total.singularExtensionSearches + next.singularExtensionSearches,
+    singularExtensions: total.singularExtensions + next.singularExtensions,
+    singularExtensionRejects: total.singularExtensionRejects + next.singularExtensionRejects,
     softStops: total.softStops + next.softStops,
     seePrunes: total.seePrunes + next.seePrunes,
     mateDistancePrunes: total.mateDistancePrunes + next.mateDistancePrunes,

@@ -419,6 +419,9 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.deepReductions ?? 0) > 0) {
     orderingParts.push(formatCount(stats.deepReductions, "deeper adaptive late-move reduction"));
   }
+  if ((stats.singularExtensions ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.singularExtensions, "singular extension"));
+  }
 
   if (orderingParts.length > 0) {
     reasons.push(`Move ordering evidence included ${formatList(orderingParts)}, helping the search focus depth on promising replies.`);
@@ -441,6 +444,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   if ((stats.ttHits ?? 0) > 0) supports.push("transposition-table reuse");
   if ((stats.iidMoveHits ?? 0) > 0) supports.push("internal iterative deepening");
   if ((stats.deepReductions ?? 0) > 0) supports.push("adaptive late-move reductions");
+  if ((stats.singularExtensions ?? 0) > 0) supports.push("singular extensions");
   if ((stats.nullMovePrunes ?? 0) > 0 || (stats.nullMoveVerifications ?? 0) > 0) {
     supports.push("null-move pruning");
   }

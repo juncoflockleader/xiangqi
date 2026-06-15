@@ -354,6 +354,47 @@ test("search adapts late-move reductions by depth and move order", () => {
   assert.equal(fixed.stats.reductionPlies, fixed.stats.reductions);
 });
 
+test("search extends hash moves when alternatives fail singular verification", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const rootMove = generateLegalMoves(position)[0];
+  const child = makeMove(position, rootMove);
+  const singularMove = generateLegalMoves(child)[0];
+  const createSeededTable = () => new Map([
+    [hashPosition(child), {
+      depth: 3,
+      flag: "lower",
+      score: 5000,
+      bestMove: singularMove
+    }]
+  ]);
+  const result = searchBestMove(position, {
+    depth: 5,
+    timeLimitMs: 1000,
+    transpositionTable: createSeededTable(),
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    singularExtensionMinDepth: 3,
+    singularExtensionMargin: 1
+  });
+  const disabled = searchBestMove(position, {
+    depth: 5,
+    timeLimitMs: 1000,
+    transpositionTable: createSeededTable(),
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    useSingularExtensions: false,
+    singularExtensionMinDepth: 3,
+    singularExtensionMargin: 1
+  });
+
+  assert.equal(result.depth, 5);
+  assert.ok(result.stats.singularExtensionSearches > 0);
+  assert.ok(result.stats.singularExtensions > 0);
+  assert.ok(result.stats.extensions >= result.stats.singularExtensions);
+  assert.equal(disabled.stats.singularExtensionSearches, 0);
+  assert.equal(disabled.stats.singularExtensions, 0);
+});
+
 test("quiescence can include bounded quiet checking moves", () => {
   const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
   const withChecks = searchBestMove(position, {
