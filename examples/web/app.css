@@ -154,10 +154,6 @@ h2 {
   transition: transform 160ms ease;
 }
 
-.board-wrap.black-view .board-art {
-  transform: rotate(180deg);
-}
-
 .board-lines {
   position: absolute;
   inset: var(--grid-inset-y) var(--grid-inset-x);
@@ -344,9 +340,9 @@ h2 {
   background: radial-gradient(circle at 35% 30%, #fff9e6 0%, #f6e0a9 62%, #d7af5b 100%);
   box-shadow: 0 4px 8px rgba(52, 34, 13, 0.22);
   font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
-  font-size: clamp(12px, 2.35vw, 17px);
+  font-size: clamp(10px, 2vw, 15px);
   font-weight: 800;
-  line-height: 1;
+  line-height: 0.92;
 }
 
 .piece.red {

@@ -20,7 +20,9 @@ test("web server serves the browser game and starts a session", async () => {
 
     assert.match(page, /<main class="app-shell"/);
     assert.match(page, /楚河/);
-    assert.match(page, /漢界/);
+    assert.match(page, /汉界/);
+    assert.match(page, /中文（简体）/);
+    assert.match(page, /中文（繁體）/);
     assert.match(page, /file-labels-north/);
     assert.match(page, />九</);
     assert.match(page, /id="localeSelect"/);
@@ -30,6 +32,7 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(stylesheet, /\.file-labels/);
     assert.match(stylesheet, /\.move-label/);
     assert.match(stylesheet, /min-height: 0/);
+    assert.doesNotMatch(stylesheet, /rotate\(180deg\)/);
     assert.equal(created.ok, true);
     assert.equal(created.state.playerSide, "red");
     assert.equal(created.state.engineSide, "black");

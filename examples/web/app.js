@@ -1,13 +1,36 @@
 const files = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
 const ranks = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 const chineseNumerals = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
+const blackFileLabels = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 const pointCount = {
   files: files.length,
   ranks: ranks.length
 };
 
 const pieceNames = {
-  zh: {
+  "zh-CN": {
+    red: {
+      king: "帅",
+      general: "帅",
+      advisor: "仕",
+      elephant: "相",
+      horse: "马",
+      rook: "车",
+      cannon: "炮",
+      pawn: "兵"
+    },
+    black: {
+      king: "将",
+      general: "将",
+      advisor: "士",
+      elephant: "象",
+      horse: "马",
+      rook: "车",
+      cannon: "炮",
+      pawn: "卒"
+    }
+  },
+  "zh-TW": {
     red: {
       king: "帥",
       general: "帥",
@@ -53,58 +76,118 @@ const pieceNames = {
   }
 };
 
-const translations = {
-  zh: {
-    appTitle: "中國象棋",
-    language: "語言",
-    side: "方位",
-    red: "紅方",
-    black: "黑方",
-    newGame: "新局",
-    undo: "悔棋",
-    hint: "提示",
-    best: "最佳",
-    engine: "引擎",
-    lastMove: "上一手",
-    reasoning: "思路",
-    history: "棋譜",
-    starting: "啟動中...",
-    noMoves: "尚未走棋。",
-    askPrompt: "可查看最佳、提示，或直接走棋。",
-    redToMove: "紅方走棋",
-    blackToMove: "黑方走棋",
-    inCheck: "（被將軍）",
-    gameOver: "終局",
-    repetition: "重複局面和棋",
-    wins: "勝",
-    level: "級別",
-    depth: "深度",
-    time: "用時",
-    lines: "候選",
-    fallback: "備援",
-    confidence: "信心",
-    bestMove: "最佳",
-    whyNot: "為何不選",
-    noHint: "暫無提示。",
-    noDecision: "尚無決策。",
-    engineSelected: "引擎已選擇一手。",
-    moveReviewed: "已覆盤此手。",
-    candidate: "候選",
-    expectedReply: "預期",
-    loss: "損失",
-    scorePrefix: "評分",
-    bookSource: "開局庫",
-    searchSource: "搜索",
-    suggests: "建議",
-    bestAgreement: "與最佳著法一致",
-    bestAlternative: "最佳應為",
-    player: "你",
-    engineActor: "引擎",
-    emptyPoint: "空位"
+const localeMeta = {
+  "zh-CN": {
+    lang: "zh-CN",
+    river: ["楚河", "汉界"],
+    redAbbrev: "红",
+    blackAbbrev: "黑"
   },
+  "zh-TW": {
+    lang: "zh-Hant",
+    river: ["楚河", "漢界"],
+    redAbbrev: "紅",
+    blackAbbrev: "黑"
+  },
+  en: {
+    lang: "en",
+    river: ["Chu River", "Han Border"],
+    redAbbrev: "Red",
+    blackAbbrev: "Black"
+  }
+};
+
+const zhTwTranslations = {
+  appTitle: "中國象棋",
+  language: "語言",
+  localeSimplified: "中文（簡體）",
+  localeTraditional: "中文（繁體）",
+  localeEnglish: "English",
+  side: "方位",
+  red: "紅方",
+  black: "黑方",
+  newGame: "新局",
+  undo: "悔棋",
+  hint: "提示",
+  best: "最佳",
+  engine: "引擎",
+  lastMove: "上一手",
+  reasoning: "思路",
+  history: "棋譜",
+  starting: "啟動中...",
+  noMoves: "尚未走棋。",
+  askPrompt: "可查看最佳、提示，或直接走棋。",
+  redToMove: "紅方走棋",
+  blackToMove: "黑方走棋",
+  inCheck: "（被將軍）",
+  gameOver: "終局",
+  repetition: "重複局面和棋",
+  wins: "勝",
+  level: "級別",
+  depth: "深度",
+  time: "用時",
+  lines: "候選",
+  fallback: "備援",
+  confidence: "信心",
+  bestMove: "最佳",
+  whyNot: "為何不選",
+  noHint: "暫無提示。",
+  noDecision: "尚無決策。",
+  engineSelected: "引擎已選擇一手。",
+  moveReviewed: "已覆盤此手。",
+  candidate: "候選",
+  expectedReply: "預期",
+  loss: "損失",
+  scorePrefix: "評分",
+  bookSource: "開局庫",
+  searchSource: "搜索",
+  suggests: "建議",
+  bestAgreement: "與最佳著法一致",
+  bestAlternative: "最佳應為",
+  player: "你",
+  engineActor: "引擎",
+  emptyPoint: "空位"
+};
+
+const zhCnTranslations = {
+  ...zhTwTranslations,
+  appTitle: "中国象棋",
+  language: "语言",
+  localeSimplified: "中文（简体）",
+  localeTraditional: "中文（繁体）",
+  red: "红方",
+  black: "黑方",
+  history: "棋谱",
+  starting: "启动中...",
+  redToMove: "红方走棋",
+  blackToMove: "黑方走棋",
+  inCheck: "（被将军）",
+  repetition: "重复局面和棋",
+  wins: "胜",
+  level: "级别",
+  time: "用时",
+  fallback: "备用",
+  whyNot: "为何不选",
+  noHint: "暂无提示。",
+  noDecision: "尚无决策。",
+  engineSelected: "引擎已选择一手。",
+  moveReviewed: "已复盘此手。",
+  loss: "损失",
+  scorePrefix: "评分",
+  bookSource: "开局库",
+  bestAgreement: "与最佳着法一致",
+  bestAlternative: "最佳应为"
+};
+
+const translations = {
+  "zh-CN": zhCnTranslations,
+  "zh-TW": zhTwTranslations,
   en: {
     appTitle: "Xiangqi",
     language: "Language",
+    localeSimplified: "Chinese (Simplified)",
+    localeTraditional: "Chinese (Traditional)",
+    localeEnglish: "English",
     side: "Side",
     red: "Red",
     black: "Black",
@@ -184,7 +267,7 @@ elements.hintButton.addEventListener("click", () => requestHint());
 elements.bestButton.addEventListener("click", () => requestBest());
 elements.sideSelect.addEventListener("change", () => newGame());
 elements.localeSelect.addEventListener("change", () => {
-  state.locale = elements.localeSelect.value === "en" ? "en" : "zh";
+  state.locale = normalizeLocale(elements.localeSelect.value);
   saveLocale(state.locale);
   applyLocale();
 });
@@ -325,6 +408,7 @@ function renderBoard() {
   const legalTargets = new Set(legalTargetMoves.keys());
 
   elements.boardWrap.classList.toggle("black-view", game.playerSide === "black");
+  renderBoardLabels(game.playerSide);
   elements.board.innerHTML = "";
 
   for (const rank of ranks) {
@@ -348,7 +432,7 @@ function renderBoard() {
       if (cell?.piece) {
         const piece = document.createElement("span");
         piece.className = `piece ${cell.piece.side}`;
-        piece.textContent = cell.piece.symbol;
+        piece.textContent = pieceSymbol(cell.piece);
         piece.title = cellTitle(cell, coord);
         button.append(piece);
       }
@@ -476,7 +560,7 @@ function renderReview(review) {
 }
 
 function renderHint(hint) {
-  const levels = state.locale === "zh" && hint?.zhLevels?.length ? hint.zhLevels : hint?.levels ?? [];
+  const levels = isChineseLocale() && hint?.zhLevels?.length ? hint.zhLevels : hint?.levels ?? [];
   const parts = levels.slice(0, 4).map((level) => (
     `<div class="line"><strong>${escapeHtml(level.title ?? `Hint ${level.level}`)}</strong><br>${escapeHtml(level.text ?? "")}</div>`
   ));
@@ -494,7 +578,7 @@ function renderAlternatives(alternatives) {
     const why = alternative.planComparison?.summary
       ? `<div class="score">${t("whyNot")}: ${escapeHtml(alternative.planComparison.summary)}</div>`
       : "";
-    const verdict = state.locale === "zh" && (!alternative.verdict || alternative.verdict === "candidate")
+    const verdict = isChineseLocale() && (!alternative.verdict || alternative.verdict === "candidate")
       ? t("candidate")
       : alternative.verdict ?? t("candidate");
     return `<li><strong>${formatMoveHtml(alternative.move, alternative.zhMove)}</strong> <span class="score">${escapeHtml(verdict)}, ${escapeHtml(score)}${escapeHtml(loss)}${escapeHtml(reply)}</span>${why}</li>`;
@@ -576,13 +660,17 @@ function updateDisabled() {
 }
 
 function applyLocale() {
-  document.documentElement.lang = state.locale === "zh" ? "zh-Hant" : "en";
+  document.documentElement.lang = localeMeta[state.locale]?.lang ?? "en";
   document.querySelectorAll("[data-i18n]").forEach((element) => {
     const key = element.dataset.i18n;
     element.textContent = t(key);
   });
+  setOptionText(elements.localeSelect, "zh-CN", t("localeSimplified"));
+  setOptionText(elements.localeSelect, "zh-TW", t("localeTraditional"));
+  setOptionText(elements.localeSelect, "en", t("localeEnglish"));
   setOptionText(elements.sideSelect, "red", sideName("red"));
   setOptionText(elements.sideSelect, "black", sideName("black"));
+  renderBoardLabels(state.game?.playerSide ?? elements.sideSelect.value);
 
   if (state.game) {
     render();
@@ -598,7 +686,7 @@ function applyLocale() {
 function gameOverText(status) {
   if (status.state === "repetition") return t("repetition");
   if (status.winner) {
-    return state.locale === "zh"
+    return isChineseLocale()
       ? `${sideName(status.winner)}${t("wins")}`
       : `${capitalize(status.state)}. ${capitalize(status.winner)} ${t("wins")}`;
   }
@@ -607,6 +695,34 @@ function gameOverText(status) {
 
 function t(key) {
   return translations[state.locale]?.[key] ?? translations.en[key] ?? key;
+}
+
+function isChineseLocale() {
+  return state.locale === "zh-CN" || state.locale === "zh-TW";
+}
+
+function renderBoardLabels(playerSide = "red") {
+  const viewSide = playerSide === "black" ? "black" : "red";
+  const northSide = viewSide === "black" ? "red" : "black";
+  const southSide = viewSide === "black" ? "black" : "red";
+  const [riverLeft, riverRight] = localeMeta[state.locale]?.river ?? localeMeta.en.river;
+
+  document.querySelector(".river-left").textContent = riverLeft;
+  document.querySelector(".river-right").textContent = riverRight;
+  renderFileLabels(".file-labels-north .file-label", northSide, viewSide);
+  renderFileLabels(".file-labels-south .file-label", southSide, viewSide);
+}
+
+function renderFileLabels(selector, side, viewSide) {
+  document.querySelectorAll(selector).forEach((label, visualFile) => {
+    const file = viewSide === "black" ? files.length - 1 - visualFile : visualFile;
+    label.textContent = fileLabel(side, file);
+  });
+}
+
+function fileLabel(side, file) {
+  if (side === "black") return blackFileLabels[file] ?? String(file + 1);
+  return chineseNumerals[files.length - 1 - file] ?? String(files.length - file);
 }
 
 function setOptionText(select, value, text) {
@@ -638,10 +754,17 @@ function cellTitle(cell, coord, targetMove = null) {
 }
 
 function pieceName(piece) {
-  if (state.locale === "zh") {
-    return piece.zhLabel ?? `${sideName(piece.side)}${pieceNames.zh[piece.side]?.[piece.type] ?? piece.symbol ?? ""}`;
+  if (isChineseLocale()) {
+    return `${sideName(piece.side)}${pieceSymbol(piece)}`;
   }
   return piece.label ?? pieceNames.en[piece.side]?.[piece.type] ?? piece.symbol ?? "";
+}
+
+function pieceSymbol(piece) {
+  return pieceNames[state.locale]?.[piece.side]?.[piece.type]
+    ?? pieceNames["zh-TW"]?.[piece.side]?.[piece.type]
+    ?? piece.symbol
+    ?? "";
 }
 
 function sideName(side) {
@@ -655,14 +778,15 @@ function actorName(actor) {
 }
 
 function localizedPoint(coord) {
-  if (state.locale !== "zh") return coord;
+  if (!isChineseLocale()) return coord;
   const file = files.indexOf(coord[0]);
   if (file === -1) return coord;
-  return `${coord}（紅${chineseNumerals[files.length - 1 - file]}路／黑${file + 1}路）`;
+  const meta = localeMeta[state.locale] ?? localeMeta["zh-CN"];
+  return `${coord}（${meta.redAbbrev}${chineseNumerals[files.length - 1 - file]}路／${meta.blackAbbrev}${file + 1}路）`;
 }
 
 function localizedDecisionSummary(decision) {
-  if (state.locale !== "zh") return decision.summary ?? t("engineSelected");
+  if (!isChineseLocale()) return decision.summary ?? t("engineSelected");
   const move = moveText(decision.bestMove, decision.zhBestMove);
   const source = decision.source === "book" || decision.source?.startsWith("opening") || /book move|opening book/i.test(decision.summary ?? "")
     ? t("bookSource")
@@ -672,7 +796,7 @@ function localizedDecisionSummary(decision) {
 }
 
 function localizedReviewSummary(review) {
-  if (state.locale !== "zh") return review.summary ?? t("moveReviewed");
+  if (!isChineseLocale()) return review.summary ?? t("moveReviewed");
   const move = moveText(review.move, review.zhMove);
   if (review.isBestMove) return move ? `${move}${t("bestAgreement")}。` : t("moveReviewed");
   const best = moveText(review.bestMove, review.zhBestMove);
@@ -681,22 +805,34 @@ function localizedReviewSummary(review) {
 }
 
 function moveText(notation, zhNotation) {
-  if (state.locale === "zh" && zhNotation) return zhNotation;
+  if (isChineseLocale() && zhNotation) return localizedChineseNotation(zhNotation);
   return notation ?? zhNotation ?? "";
+}
+
+function localizedChineseNotation(text) {
+  if (state.locale !== "zh-CN") return text;
+  return String(text ?? "")
+    .replace(/[帥]/g, "帅")
+    .replace(/[將]/g, "将")
+    .replace(/[傌馬]/g, "马")
+    .replace(/[俥車]/g, "车")
+    .replace(/[砲]/g, "炮")
+    .replace(/[進]/g, "进")
+    .replace(/[後]/g, "后");
 }
 
 function localizedLinePlanSummary(linePlan) {
   if (!linePlan) return "";
-  return state.locale === "zh" ? linePlan.zhSummary ?? linePlan.summary ?? "" : linePlan.summary ?? linePlan.zhSummary ?? "";
+  return isChineseLocale() ? linePlan.zhSummary ?? linePlan.summary ?? "" : linePlan.summary ?? linePlan.zhSummary ?? "";
 }
 
 function localizedReasons(decision) {
-  if (state.locale === "zh" && decision.zhReasons?.length) return decision.zhReasons;
+  if (isChineseLocale() && decision.zhReasons?.length) return decision.zhReasons;
   return decision.reasons ?? [];
 }
 
 function confidenceLabel(confidence) {
-  if (state.locale !== "zh") return confidence.label;
+  if (!isChineseLocale()) return confidence.label;
   return {
     "very-high": "信心很高",
     high: "信心高",
@@ -707,7 +843,7 @@ function confidenceLabel(confidence) {
 
 function formatMoveHtml(notation, zhNotation) {
   const primary = moveText(notation, zhNotation);
-  const secondary = state.locale === "zh" ? notation : zhNotation;
+  const secondary = isChineseLocale() ? notation : zhNotation;
   if (!primary) return "";
   const secondaryHtml = secondary && secondary !== primary
     ? `<span class="notation-secondary">${escapeHtml(secondary)}</span>`
@@ -717,9 +853,9 @@ function formatMoveHtml(notation, zhNotation) {
 
 function loadLocale() {
   try {
-    return localStorage.getItem("xiangqi.locale") === "en" ? "en" : "zh";
+    return normalizeLocale(localStorage.getItem("xiangqi.locale"));
   } catch {
-    return "zh";
+    return "zh-CN";
   }
 }
 
@@ -729,6 +865,13 @@ function saveLocale(locale) {
   } catch {
     // Local storage can be unavailable in strict browser contexts.
   }
+}
+
+function normalizeLocale(locale) {
+  if (locale === "zh-TW" || locale === "zh-Hant") return "zh-TW";
+  if (locale === "zh-CN" || locale === "zh-Hans" || locale === "zh") return "zh-CN";
+  if (locale === "en") return "en";
+  return "zh-CN";
 }
 
 function formatCentipawns(value) {
