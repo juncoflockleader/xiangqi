@@ -328,6 +328,8 @@ function maybeBookResult(position, options, tableSize) {
       qttSkips: 0,
       evalCacheHits: 0,
       evalCacheStores: 0,
+      tacticalCacheHits: 0,
+      tacticalCacheStores: 0,
       ttHits: 0,
       ttStores: 0,
       ttReplacements: 0,

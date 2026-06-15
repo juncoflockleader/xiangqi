@@ -99,6 +99,7 @@ export function searchBestMove(position, options = {}) {
   const continuationHistory = new Map();
   const captureHistory = new Map();
   const checkHistory = new Map();
+  const tacticalCache = options.tacticalCache ?? new Map();
   const candidateLimit = options.candidateLimit ?? 8;
   const exactRootScores = options.exactRootScores === true || !Number.isFinite(candidateLimit);
   const bannedMoveKeys = new Set((options.bannedMoves ?? []).map(moveKey));
@@ -179,6 +180,7 @@ export function searchBestMove(position, options = {}) {
       useQuiescenceChecks: options.useQuiescenceChecks !== false,
       useQuiescenceTable: options.useQuiescenceTable !== false,
       useEvaluationCache: options.useEvaluationCache !== false,
+      useTacticalCache: options.useTacticalCache !== false,
       useRecaptureExtensions: options.useRecaptureExtensions !== false,
       useSeePruning: options.useSeePruning !== false,
       useCaptureHistory: options.useCaptureHistory !== false,
@@ -211,7 +213,7 @@ export function searchBestMove(position, options = {}) {
       softMinDepth: Math.max(1, Math.floor(numberOption(options.softMinDepth, DEFAULT_SOFT_MIN_DEPTH))),
       softStableDepths: Math.max(1, Math.floor(numberOption(options.softStableDepths, DEFAULT_SOFT_STABLE_DEPTHS))),
       softScoreGap: Math.max(0, numberOption(options.softScoreGap, DEFAULT_SOFT_SCORE_GAP)),
-      tacticalCache: new Map(),
+      tacticalCache,
       stats: createSearchStats(),
       nodes: 0,
       timedOut: false
@@ -1193,12 +1195,17 @@ function isGoodCapture(position, move, context) {
 }
 
 function getCaptureAnalysis(position, move, context) {
+  if (!context?.useTacticalCache) return analyzeCapture(position, move);
+
   const key = `${hashPosition(position)}:${moveKey(move)}`;
-  const cached = context.tacticalCache.get(key);
-  if (cached) return cached;
+  if (context.tacticalCache.has(key)) {
+    context.stats.tacticalCacheHits += 1;
+    return context.tacticalCache.get(key);
+  }
 
   const analysis = analyzeCapture(position, move);
   context.tacticalCache.set(key, analysis);
+  context.stats.tacticalCacheStores += 1;
   return analysis;
 }
 
@@ -1970,6 +1977,8 @@ function createSearchStats() {
     qttSkips: 0,
     evalCacheHits: 0,
     evalCacheStores: 0,
+    tacticalCacheHits: 0,
+    tacticalCacheStores: 0,
     ttHits: 0,
     ttStores: 0,
     ttReplacements: 0,
@@ -2041,6 +2050,8 @@ function mergeSearchStats(total, next) {
     qttSkips: total.qttSkips + next.qttSkips,
     evalCacheHits: total.evalCacheHits + next.evalCacheHits,
     evalCacheStores: total.evalCacheStores + next.evalCacheStores,
+    tacticalCacheHits: total.tacticalCacheHits + next.tacticalCacheHits,
+    tacticalCacheStores: total.tacticalCacheStores + next.tacticalCacheStores,
     ttHits: total.ttHits + next.ttHits,
     ttStores: total.ttStores + next.ttStores,
     ttReplacements: total.ttReplacements + next.ttReplacements,

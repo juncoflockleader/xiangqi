@@ -421,6 +421,9 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.evalCacheHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.evalCacheHits, "evaluation-cache hit"));
   }
+  if ((stats.tacticalCacheHits ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.tacticalCacheHits, "static-exchange cache hit"));
+  }
   if ((stats.captureHistoryHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.captureHistoryHits, "capture-history hit"));
   }
@@ -469,6 +472,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   if ((stats.ttHits ?? 0) > 0) supports.push("transposition-table reuse");
   if ((stats.qttHits ?? 0) > 0) supports.push("quiescence-table reuse");
   if ((stats.evalCacheHits ?? 0) > 0) supports.push("evaluation-cache reuse");
+  if ((stats.tacticalCacheHits ?? 0) > 0) supports.push("static-exchange cache reuse");
   if ((stats.captureHistoryHits ?? 0) > 0) supports.push("capture-history ordering");
   if ((stats.checkHistoryHits ?? 0) > 0) supports.push("check-history ordering");
   if ((stats.killerHits ?? 0) > 0) supports.push("killer-move ordering");

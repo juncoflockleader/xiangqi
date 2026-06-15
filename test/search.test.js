@@ -780,6 +780,33 @@ test("search learns capture history for capture ordering", () => {
   assert.equal(disabled.stats.captureHistoryHits, 0);
 });
 
+test("search reuses static exchange analysis through the tactical cache", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const result = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    exactRootScores: true
+  });
+  const disabled = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    useTacticalCache: false,
+    exactRootScores: true
+  });
+
+  assert.equal(result.depth, 3);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.equal(Math.round(result.score), Math.round(disabled.score));
+  assert.ok(result.stats.tacticalCacheStores > 0);
+  assert.ok(result.stats.tacticalCacheHits > 0);
+  assert.equal(disabled.stats.tacticalCacheStores, 0);
+  assert.equal(disabled.stats.tacticalCacheHits, 0);
+});
+
 test("search orders quiet replies with continuation history", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const result = searchBestMove(position, {
