@@ -230,7 +230,12 @@ function buildProbeReport(backend, decision, review, options) {
       bestScore: review.bestScore,
       bestScoreDetail: review.bestAnalysis?.scoreDetail ?? null,
       bestWdl: review.bestAnalysis?.wdl ?? null,
-      summary: review.explanation?.summary ?? ""
+      summary: review.explanation?.summary ?? "",
+      mistakes: review.mistakes ?? null,
+      practiceFocus: review.practiceFocus ?? null,
+      playedLinePlan: review.playedLinePlan ?? null,
+      bestLinePlan: review.bestLinePlan ?? null,
+      planComparison: review.planComparison ?? null
     } : null
   };
 }
@@ -269,6 +274,12 @@ function formatProbeReport(report) {
     if (report.review.bestScoreDetail?.text) lines.push(`Review best score: ${report.review.bestScoreDetail.text}`);
     if (report.review.bestWdl?.text) lines.push(`Review WDL: ${report.review.bestWdl.text}`);
     if (report.review.summary) lines.push(`Review summary: ${report.review.summary}`);
+    if (report.review.practiceFocus) {
+      lines.push(`Practice: ${report.review.practiceFocus.title} (${report.review.practiceFocus.drill}) - ${report.review.practiceFocus.text}`);
+    }
+    if (report.review.planComparison?.summary) {
+      lines.push(`Review plan comparison: ${report.review.planComparison.summary}`);
+    }
   }
 
   return lines.join("\n");

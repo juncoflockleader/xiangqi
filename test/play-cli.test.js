@@ -222,6 +222,22 @@ test("play CLI uses the oracle reviewer for player move feedback", async () => {
   assert.match(result.stdout, /1\. Red engine choice h9-g7: \+0\.00 -> \+0\.39 \(\+39 centipawns\) \[creates threat\]/);
 });
 
+test("play CLI prints practice focus for player move reviews", async () => {
+  const result = await runPlayCli([
+    "--side", "red",
+    "--fen", "4k4/9/4r4/9/9/9/9/9/9/3KR4 r",
+    "--depth", "2",
+    "--time", "500",
+    "--no-book"
+  ], "e9f9\nquit\n");
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /Initial FEN: 4k4\/9\/4r4\/9\/9\/9\/9\/9\/9\/3KR4 r/);
+  assert.match(result.stdout, /You played e9-f9/);
+  assert.match(result.stdout, /Review: blunder,/);
+  assert.match(result.stdout, /Practice: Material tactics \(candidate-captures\) - Practice scanning forcing captures before choosing a quiet move\./);
+});
+
 function runPlayCli(args, input, env = {}) {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(process.execPath, ["examples/play-cli.mjs", ...args], {

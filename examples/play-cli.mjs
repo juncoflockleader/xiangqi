@@ -14,6 +14,7 @@ import {
   historyKeys,
   opponent,
   playGameMoveAsync,
+  parseFen,
   resolveNativeEnginePreset,
   toFen
 } from "../src/index.js";
@@ -50,7 +51,7 @@ try {
 const engine = createPlayBackend(options, openingBook);
 const rl = createInterface({ input, output });
 const engineSide = opponent(options.playerSide);
-let game = createGame();
+let game = createGame(options.initialFen ? parseFen(options.initialFen) : undefined);
 let undoStack = [];
 let lastEngineDecision = null;
 let inputClosed = false;
@@ -75,6 +76,9 @@ if (options.oraclePresetName) {
 }
 if (options.bookPath) {
   console.log(`Opening book: ${options.bookPath} (${resolveBookFormat(options.bookPath, options.bookFormat)})`);
+}
+if (options.initialFen) {
+  console.log(`Initial FEN: ${options.initialFen}`);
 }
 console.log("Move notation uses board coordinates, for example h9-g7 or h9g7.");
 console.log("Commands: moves, hint, best, why, fen, undo, help, quit.");
@@ -384,6 +388,7 @@ function printReview(review) {
   }
   printReviewScoreEvidence(review);
   console.log(review.explanation.summary);
+  printPracticeFocus(review.practiceFocus);
   printLinePlan(review.playedLinePlan, {
     label: "Your plan",
     includeSteps: false
@@ -409,6 +414,12 @@ function printReviewScoreEvidence(review) {
   if (review.playedWdl?.text || review.bestAnalysis?.wdl?.text) {
     console.log(`WDL: played ${review.playedWdl?.text ?? "unknown"}; best ${review.bestAnalysis?.wdl?.text ?? "unknown"}.`);
   }
+}
+
+function printPracticeFocus(practiceFocus) {
+  if (!practiceFocus) return;
+  const drill = practiceFocus.drill ? ` (${practiceFocus.drill})` : "";
+  console.log(`Practice: ${practiceFocus.title}${drill} - ${practiceFocus.text}`);
 }
 
 function printGameOver(status) {
@@ -442,6 +453,7 @@ Options:
   --lines n             Candidate lines to compare. Default: 3.
   --book file           Load opening book data from JSON, CSV/TSV, or text.
   --book-format format  Book format: auto, json, games, csv, tsv, text.
+  --fen FEN             Start from a supplied Xiangqi FEN.
   --engine-command cmd  Use a native UCI/UCCI engine for play, with JS fallback.
   --engine-arg value    Append one native engine argument.
   --engine-args values  Append whitespace-separated native engine arguments.
@@ -499,6 +511,7 @@ function parseArgs(args) {
     lines: numberFromEnv(process.env.XIANGQI_ENGINE_LINES, 3),
     bookPath: process.env.XIANGQI_OPENING_BOOK,
     bookFormat: process.env.XIANGQI_OPENING_BOOK_FORMAT ?? "auto",
+    initialFen: process.env.XIANGQI_PLAY_FEN,
     engineCommand: process.env.XIANGQI_ENGINE_COMMAND,
     engineArgs: splitEnvArgs(process.env.XIANGQI_ENGINE_ARGS),
     engineProtocol: process.env.XIANGQI_ENGINE_PROTOCOL ?? "uci",
@@ -567,6 +580,11 @@ function parseArgs(args) {
     }
     if (arg === "--book-format") {
       parsed.bookFormat = parseBookFormat(requireValue(args, index, arg));
+      index += 1;
+      continue;
+    }
+    if (arg === "--fen") {
+      parsed.initialFen = requireValue(args, index, arg);
       index += 1;
       continue;
     }

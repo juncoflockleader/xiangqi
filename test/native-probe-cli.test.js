@@ -48,6 +48,35 @@ test("native probe CLI verifies a configured UCI backend", async () => {
   assert.equal(report.review.move, "h9-g7");
   assert.equal(report.review.classification, "best");
   assert.equal(report.review.bestScoreDetail.kind, "cp");
+  assert.equal(report.review.practiceFocus, null);
+});
+
+test("native probe CLI reports practice focus for reviewed mistakes", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "examples/native-probe.mjs",
+    "--command", process.execPath,
+    "--arg", "fixtures/mock-ucci.mjs",
+    "--protocol", "uci",
+    "--fen", "4k4/9/4r4/9/9/9/9/9/9/3KR4 r",
+    "--depth", "2",
+    "--time", "100",
+    "--lines", "1",
+    "--review", "e9-f9",
+    "--json"
+  ], {
+    cwd: root,
+    timeout: 5000
+  });
+  const report = JSON.parse(stdout);
+
+  assert.equal(report.bestMove, "e9-e2");
+  assert.equal(report.review.move, "e9-f9");
+  assert.equal(report.review.bestMove, "e9-e2");
+  assert.equal(report.review.classification, "blunder");
+  assert.equal(report.review.practiceFocus.category, "missed-material");
+  assert.equal(report.review.practiceFocus.title, "Material tactics");
+  assert.equal(report.review.practiceFocus.drill, "candidate-captures");
+  assert.match(report.review.planComparison.summary, /Your plan starts with e9-f9/);
 });
 
 test("native probe CLI applies the Pikafish preset", async () => {

@@ -99,10 +99,13 @@ npm run install:pikafish
 
 npm run play -- \
   --side black \
+  --fen "4k4/9/4r4/9/9/9/9/9/9/3KR4 r" \
   --engine-preset pikafish
 
 npm run probe:native -- \
   --preset pikafish \
+  --fen "4k4/9/4r4/9/9/9/9/9/9/3KR4 r" \
+  --review e9-f9 \
   --lines 3
 
 npm run spar -- \
@@ -120,6 +123,10 @@ default install. If you unpack a Pikafish bundle locally, `PIKAFISH_HOME=/path/t
 lets the preset infer the macOS Apple Silicon binary path and `pikafish.nnue`;
 use `PIKAFISH_COMMAND`, `XIANGQI_PIKAFISH_AUTO_DISCOVER=false`, or explicit
 `--command` when the bundle layout differs.
+
+Use `--fen` with the play demo or native probe to start from a tactical training
+position. Player move reviews print the classification, score evidence, plan
+comparison, and a practice drill when the review detects a teachable pattern.
 
 Or keep the fast local engine for move choice while a stronger oracle grades
 engine picks and player move reviews:

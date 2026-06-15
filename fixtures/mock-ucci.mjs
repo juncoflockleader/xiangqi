@@ -60,6 +60,12 @@ rl.on("line", (line) => {
       } else if (hasOption("MockRejectHeuristic")) {
         write(`info depth ${depth} score cp 320 nodes 144 pv ${nativeMove("b7b3")} ${nativeMove("h2h4")}`);
         write(`bestmove ${nativeMove("b7b3")}`);
+      } else if (isRookTacticPosition()) {
+        write(`info depth ${depth} score cp 1041 nodes 99 pv ${nativeMove("e9e2")}`);
+        write(`bestmove ${nativeMove("e9e2")}`);
+      } else if (isRookTacticAfterQuietMove()) {
+        write(`info depth ${depth} score cp 0 nodes 99 pv ${nativeMove("e2d2")}`);
+        write(`bestmove ${nativeMove("e2d2")}`);
       } else if (/\sb(?:\s|$)/.test(currentPosition)) {
         write(`info depth ${depth} score cp 17 nodes 77 pv ${nativeMove("h0g2")}`);
         write(`bestmove ${nativeMove("h0g2")}`);
@@ -110,6 +116,14 @@ rl.on("line", (line) => {
 
 function hasOption(name) {
   return appliedOptions.some((option) => option.includes(`name ${name}`));
+}
+
+function isRookTacticPosition() {
+  return /4k4\/9\/4r4\/9\/9\/9\/9\/9\/9\/3KR4\s+w\b/.test(currentPosition);
+}
+
+function isRookTacticAfterQuietMove() {
+  return /4k4\/9\/4r4\/9\/9\/9\/9\/9\/9\/3K1R3\s+b\b/.test(currentPosition);
 }
 
 function depthFromGo(command) {
