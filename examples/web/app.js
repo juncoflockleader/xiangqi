@@ -1,6 +1,53 @@
 const files = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
 const ranks = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
+const pieceNames = {
+  zh: {
+    red: {
+      king: "帥",
+      general: "帥",
+      advisor: "仕",
+      elephant: "相",
+      horse: "傌",
+      rook: "俥",
+      cannon: "炮",
+      pawn: "兵"
+    },
+    black: {
+      king: "將",
+      general: "將",
+      advisor: "士",
+      elephant: "象",
+      horse: "馬",
+      rook: "車",
+      cannon: "砲",
+      pawn: "卒"
+    }
+  },
+  en: {
+    red: {
+      king: "Red general",
+      general: "Red general",
+      advisor: "Red advisor",
+      elephant: "Red elephant",
+      horse: "Red horse",
+      rook: "Red chariot",
+      cannon: "Red cannon",
+      pawn: "Red soldier"
+    },
+    black: {
+      king: "Black general",
+      general: "Black general",
+      advisor: "Black advisor",
+      elephant: "Black elephant",
+      horse: "Black horse",
+      rook: "Black chariot",
+      cannon: "Black cannon",
+      pawn: "Black soldier"
+    }
+  }
+};
+
 const translations = {
   zh: {
     appTitle: "中國象棋",
@@ -47,7 +94,8 @@ const translations = {
     bestAgreement: "與最佳著法一致",
     bestAlternative: "最佳應為",
     player: "你",
-    engineActor: "引擎"
+    engineActor: "引擎",
+    emptyPoint: "空位"
   },
   en: {
     appTitle: "Xiangqi",
@@ -94,7 +142,8 @@ const translations = {
     bestAgreement: "matches the best move",
     bestAlternative: "best was",
     player: "player",
-    engineActor: "engine"
+    engineActor: "engine",
+    emptyPoint: "empty point"
   }
 };
 
@@ -266,22 +315,26 @@ function renderBoard() {
   if (!game) return;
 
   const cellsByCoord = new Map(game.board.map((cell) => [cell.coord, cell]));
-  const viewRanks = game.playerSide === "black" ? [...ranks].reverse() : ranks;
-  const viewFiles = game.playerSide === "black" ? [...files].reverse() : files;
   const legalFrom = legalMovesFrom();
   const legalTargets = selectedTargets();
 
   elements.boardWrap.classList.toggle("black-view", game.playerSide === "black");
   elements.board.innerHTML = "";
-  for (const rank of viewRanks) {
-    for (const file of viewFiles) {
+
+  for (const rank of ranks) {
+    for (const file of files) {
       const coord = `${file}${rank}`;
       const cell = cellsByCoord.get(coord);
+      const point = visualPoint(coord, game.playerSide);
       const button = document.createElement("button");
       button.type = "button";
       button.className = "cell";
       button.dataset.coord = coord;
+      button.style.left = pointPercent(point.file, files.length);
+      button.style.top = pointPercent(point.rank, ranks.length);
       button.disabled = state.pending || !game.playerTurn;
+      button.title = cellTitle(cell, coord);
+      button.setAttribute("aria-label", cellTitle(cell, coord));
       if (state.selected === coord) button.classList.add("selected");
       if (legalTargets.has(coord)) button.classList.add("target");
 
@@ -289,7 +342,7 @@ function renderBoard() {
         const piece = document.createElement("span");
         piece.className = `piece ${cell.piece.side}`;
         piece.textContent = cell.piece.symbol;
-        piece.title = `${cell.piece.label} ${coord}`;
+        piece.title = cellTitle(cell, coord);
         button.append(piece);
       }
 
@@ -378,16 +431,18 @@ function renderDecision(decision) {
     parts.push(`<div class="line"><strong>${t("bestMove")}</strong> ${formatMoveHtml(decision.bestMove, decision.zhBestMove)}</div>`);
   }
   parts.push(`<div>${escapeHtml(localizedDecisionSummary(decision))}</div>`);
-  if (decision.linePlan?.summary) parts.push(`<div class="line">${escapeHtml(decision.linePlan.summary)}</div>`);
+  const linePlanSummary = localizedLinePlanSummary(decision.linePlan);
+  if (linePlanSummary) parts.push(`<div class="line">${escapeHtml(linePlanSummary)}</div>`);
   if (decision.comparison?.reason) parts.push(`<div class="line">${escapeHtml(decision.comparison.reason)}</div>`);
   if (decision.confidence?.label) {
-    parts.push(`<div class="score">${t("confidence")}: ${escapeHtml(decision.confidence.label)} (${Math.round(decision.confidence.score ?? 0)}/100)</div>`);
+    parts.push(`<div class="score">${t("confidence")}: ${escapeHtml(confidenceLabel(decision.confidence))} (${Math.round(decision.confidence.score ?? 0)}/100)</div>`);
   }
   if (decision.alternatives?.length) {
     parts.push(renderAlternatives(decision.alternatives));
   }
-  if (decision.reasons?.length) {
-    parts.push(`<ul class="reason-list">${decision.reasons.slice(0, 5).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>`);
+  const reasons = localizedReasons(decision);
+  if (reasons.length) {
+    parts.push(`<ul class="reason-list">${reasons.slice(0, 5).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>`);
   }
 
   elements.reasoningPanel.className = "stack";
@@ -408,7 +463,7 @@ function renderReview(review) {
 }
 
 function renderHint(hint) {
-  const levels = hint?.levels ?? [];
+  const levels = state.locale === "zh" && hint?.zhLevels?.length ? hint.zhLevels : hint?.levels ?? [];
   const parts = levels.slice(0, 4).map((level) => (
     `<div class="line"><strong>${escapeHtml(level.title ?? `Hint ${level.level}`)}</strong><br>${escapeHtml(level.text ?? "")}</div>`
   ));
@@ -542,6 +597,31 @@ function setOptionText(select, value, text) {
   if (option) option.textContent = text;
 }
 
+function visualPoint(coord, playerSide) {
+  const file = files.indexOf(coord[0]);
+  const rank = ranks.indexOf(coord[1]);
+  return {
+    file: playerSide === "black" ? files.length - 1 - file : file,
+    rank: playerSide === "black" ? ranks.length - 1 - rank : rank
+  };
+}
+
+function pointPercent(index, count) {
+  return `${((index * 2 + 1) / (count * 2)) * 100}%`;
+}
+
+function cellTitle(cell, coord) {
+  if (!cell?.piece) return `${t("emptyPoint")} ${coord}`;
+  return `${pieceName(cell.piece)} ${coord}`;
+}
+
+function pieceName(piece) {
+  if (state.locale === "zh") {
+    return piece.zhLabel ?? `${sideName(piece.side)}${pieceNames.zh[piece.side]?.[piece.type] ?? piece.symbol ?? ""}`;
+  }
+  return piece.label ?? pieceNames.en[piece.side]?.[piece.type] ?? piece.symbol ?? "";
+}
+
 function sideName(side) {
   return side === "black" ? t("black") : t("red");
 }
@@ -555,7 +635,7 @@ function actorName(actor) {
 function localizedDecisionSummary(decision) {
   if (state.locale !== "zh") return decision.summary ?? t("engineSelected");
   const move = moveText(decision.bestMove, decision.zhBestMove);
-  const source = decision.source === "book" || /book move|opening book/i.test(decision.summary ?? "")
+  const source = decision.source === "book" || decision.source?.startsWith("opening") || /book move|opening book/i.test(decision.summary ?? "")
     ? t("bookSource")
     : t("searchSource");
   const score = Number.isFinite(decision.score) ? `，${t("scorePrefix")} ${formatCentipawns(decision.score)}` : "";
@@ -574,6 +654,26 @@ function localizedReviewSummary(review) {
 function moveText(notation, zhNotation) {
   if (state.locale === "zh" && zhNotation) return zhNotation;
   return notation ?? zhNotation ?? "";
+}
+
+function localizedLinePlanSummary(linePlan) {
+  if (!linePlan) return "";
+  return state.locale === "zh" ? linePlan.zhSummary ?? linePlan.summary ?? "" : linePlan.summary ?? linePlan.zhSummary ?? "";
+}
+
+function localizedReasons(decision) {
+  if (state.locale === "zh" && decision.zhReasons?.length) return decision.zhReasons;
+  return decision.reasons ?? [];
+}
+
+function confidenceLabel(confidence) {
+  if (state.locale !== "zh") return confidence.label;
+  return {
+    "very-high": "信心很高",
+    high: "信心高",
+    medium: "信心中等",
+    low: "信心偏低"
+  }[confidence.level] ?? confidence.label;
 }
 
 function formatMoveHtml(notation, zhNotation) {

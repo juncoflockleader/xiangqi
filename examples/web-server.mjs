@@ -53,6 +53,29 @@ const PIECE_SYMBOLS = Object.freeze({
   })
 });
 
+const PIECE_LABELS_ZH = Object.freeze({
+  red: Object.freeze({
+    king: "紅方帥",
+    general: "紅方帥",
+    advisor: "紅方仕",
+    elephant: "紅方相",
+    horse: "紅方傌",
+    rook: "紅方俥",
+    cannon: "紅方炮",
+    pawn: "紅方兵"
+  }),
+  black: Object.freeze({
+    king: "黑方將",
+    general: "黑方將",
+    advisor: "黑方士",
+    elephant: "黑方象",
+    horse: "黑方馬",
+    rook: "黑方車",
+    cannon: "黑方砲",
+    pawn: "黑方卒"
+  })
+});
+
 const MIME_TYPES = Object.freeze({
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -325,6 +348,7 @@ function serializeBoard(position) {
     piece: piece ? {
       ...piece,
       label: pieceLabel(piece),
+      zhLabel: pieceLabelZh(piece),
       symbol: PIECE_SYMBOLS[piece.side]?.[piece.type] ?? "?"
     } : null
   }));
@@ -357,11 +381,13 @@ function summarizeMove(move, position = null) {
     piece: move.piece ? {
       ...move.piece,
       label: pieceLabel(move.piece),
+      zhLabel: pieceLabelZh(move.piece),
       symbol: PIECE_SYMBOLS[move.piece.side]?.[move.piece.type] ?? "?"
     } : null,
     captured: move.captured ? {
       ...move.captured,
       label: pieceLabel(move.captured),
+      zhLabel: pieceLabelZh(move.captured),
       symbol: PIECE_SYMBOLS[move.captured.side]?.[move.captured.type] ?? "?"
     } : null,
     givesCheck: Boolean(move.givesCheck)
@@ -374,30 +400,36 @@ function summarizeDecision(decision, position = null) {
   const principalVariation = (decision.principalVariation ?? explanation.principalVariation ?? [])
     .map(notationFor)
     .filter(Boolean);
-  return {
+  const alternatives = annotateAlternatives(position, explanation.alternatives);
+  const summary = {
     source: decision.source ?? "search",
     bestMove: notationFor(decision.bestMove),
     zhBestMove: chineseNotationFor(position, decision.bestMove),
     score: Math.round(decision.score ?? 0),
     scoreDetail: decision.scoreDetail ?? explanation.search?.scoreDetail ?? null,
+    scoreText: scoreTextFor(decision, explanation),
     wdl: decision.wdl ?? explanation.search?.wdl ?? null,
     depth: decision.depth ?? 0,
     nodes: decision.nodes ?? 0,
     summary: explanation.summary ?? "",
     reasons: [...(explanation.reasons ?? [])],
     confidence: explanation.confidence ?? null,
-    linePlan: explanation.linePlan ?? null,
+    linePlan: annotateLinePlan(position, explanation.linePlan),
     comparison: explanation.comparison ?? null,
-    alternatives: annotateAlternatives(position, explanation.alternatives),
+    alternatives,
     principalVariation,
     zhPrincipalVariation: chineseLineFor(position, principalVariation),
     oracleReview: decision.oracleReview ?? explanation.oracleReview ?? null,
     backendFallback: decision.backendFallback ?? null
   };
+  return {
+    ...summary,
+    zhReasons: summarizeDecisionReasonsZh(summary)
+  };
 }
 
 function summarizeReview(review, position = null) {
-  return {
+  const summary = {
     move: notationFor(review.move),
     zhMove: chineseNotationFor(position, review.move),
     bestMove: notationFor(review.bestMove),
@@ -407,33 +439,43 @@ function summarizeReview(review, position = null) {
     isBestMove: Boolean(review.isBestMove),
     summary: review.explanation?.summary ?? "",
     reasons: [...(review.explanation?.reasons ?? [])],
+    zhReasons: [],
     playedScore: review.playedScore ?? null,
     bestScore: review.bestScore ?? null,
     playedScoreDetail: review.playedScoreDetail ?? null,
     bestScoreDetail: review.bestAnalysis?.scoreDetail ?? null,
     playedWdl: review.playedWdl ?? null,
     bestWdl: review.bestAnalysis?.wdl ?? null,
-    playedLinePlan: review.playedLinePlan ?? null,
-    bestLinePlan: review.bestLinePlan ?? null,
+    playedLinePlan: annotateLinePlan(position, review.playedLinePlan),
+    bestLinePlan: annotateLinePlan(position, review.bestLinePlan),
     planComparison: review.planComparison ?? null,
     practiceFocus: review.practiceFocus ?? null,
     mistakes: review.mistakes ?? null,
     bestAlternatives: annotateAlternatives(position, review.bestAlternatives ?? review.bestAnalysis?.explanation?.alternatives)
   };
+  return {
+    ...summary,
+    zhReasons: summarizeReviewReasonsZh(summary)
+  };
 }
 
 function summarizeCoach(coach, position = null) {
   const principalVariation = (coach.principalVariation ?? []).map(notationFor).filter(Boolean);
-  return {
+  const summary = {
     source: coach.source ?? "search",
     bestMove: notationFor(coach.bestMove),
     zhBestMove: chineseNotationFor(position, coach.bestMove),
     score: Math.round(coach.score ?? 0),
+    scoreText: scoreTextFor(coach),
     summary: coach.summary ?? "",
     levels: (coach.levels ?? []).map((level) => ({ ...level })),
     alternatives: annotateAlternatives(position, coach.alternatives),
     principalVariation,
     zhPrincipalVariation: chineseLineFor(position, principalVariation)
+  };
+  return {
+    ...summary,
+    zhLevels: summarizeCoachLevelsZh(summary)
   };
 }
 
@@ -450,6 +492,27 @@ function annotateAlternatives(position, alternatives = []) {
   });
 }
 
+function annotateLinePlan(position, linePlan) {
+  if (!linePlan) return null;
+  const line = [
+    linePlan.firstMove,
+    linePlan.expectedReply,
+    ...(linePlan.continuation ?? [])
+  ].filter(Boolean);
+  const zhLine = chineseLineFor(position, line);
+  return {
+    ...linePlan,
+    zhFirstMove: zhLine[0] ?? null,
+    zhExpectedReply: zhLine[1] ?? null,
+    zhContinuation: zhLine.slice(2),
+    zhSummary: summarizeLinePlanZh(linePlan, zhLine),
+    moves: (linePlan.moves ?? []).map((move, index) => ({
+      ...move,
+      zhNotation: zhLine[index] ?? null
+    }))
+  };
+}
+
 function positionBeforeEntry(entry) {
   if (!entry?.positionBefore) return null;
   try {
@@ -457,6 +520,10 @@ function positionBeforeEntry(entry) {
   } catch {
     return null;
   }
+}
+
+function pieceLabelZh(piece) {
+  return PIECE_LABELS_ZH[piece?.side]?.[piece?.type] ?? PIECE_SYMBOLS[piece?.side]?.[piece?.type] ?? "";
 }
 
 function chineseNotationFor(position, move) {
@@ -481,6 +548,137 @@ function notationFor(move) {
   if (!move) return null;
   if (typeof move === "string") return move;
   return move.notation ?? moveToNotation(move);
+}
+
+function summarizeLinePlanZh(linePlan, zhLine) {
+  if (!linePlan || zhLine.length === 0) return "";
+  const [first, reply, ...rest] = zhLine;
+  const replyText = reply ? `，預期應手 ${reply}` : "";
+  const continuation = rest.length > 0 ? `，後續 ${rest.join(" ")}` : "";
+  const motifs = linePlan.motifs?.length ? `；主題：${linePlan.motifs.map(motifZh).join("、")}` : "";
+  return `先走 ${first}${replyText}${continuation}${motifs}。`;
+}
+
+function summarizeDecisionReasonsZh(decision) {
+  const reasons = [];
+  const move = decision.zhBestMove ?? decision.bestMove;
+  if (!move) return reasons;
+
+  const source = decision.source?.startsWith("opening") || decision.source === "book"
+    ? "開局庫"
+    : decision.source?.startsWith("native")
+      ? "原生引擎"
+      : "搜索";
+
+  if (decision.depth > 0) {
+    reasons.push(`${source}在深度 ${decision.depth} 推薦 ${move}。`);
+  } else {
+    reasons.push(`${source}推薦 ${move}。`);
+  }
+
+  if (decision.scoreText) {
+    reasons.push(`局面評分為 ${decision.scoreText}。`);
+  }
+
+  if (decision.linePlan?.zhSummary) {
+    reasons.push(decision.linePlan.zhSummary);
+  }
+
+  const next = (decision.alternatives ?? []).find((alternative) => alternative.move !== decision.bestMove);
+  if (next) {
+    const gap = Number.isFinite(next.centipawnLoss)
+      ? next.centipawnLoss
+      : Math.max(0, Math.round((decision.score ?? 0) - (next.score ?? 0)));
+    const unit = decision.source?.startsWith("opening") || decision.source === "book" ? "權重點" : "cp";
+    if (gap > 0) {
+      reasons.push(`相較 ${next.zhMove ?? next.move}，首選約領先 ${gap} ${unit}。`);
+    } else {
+      reasons.push(`${next.zhMove ?? next.move} 與首選接近，適合一起比較。`);
+    }
+  }
+
+  return reasons.slice(0, 6);
+}
+
+function summarizeReviewReasonsZh(review) {
+  const reasons = [];
+  const move = review.zhMove ?? review.move;
+  const best = review.zhBestMove ?? review.bestMove;
+
+  if (review.isBestMove) {
+    reasons.push(`${move} 與引擎首選一致。`);
+  } else if (move && best) {
+    reasons.push(`${move} 損失約 ${review.centipawnLoss} cp，建議比較 ${best}。`);
+  }
+  if (review.playedLinePlan?.zhSummary) {
+    reasons.push(`實戰計畫：${review.playedLinePlan.zhSummary}`);
+  }
+  if (review.bestLinePlan?.zhSummary) {
+    reasons.push(`建議計畫：${review.bestLinePlan.zhSummary}`);
+  }
+
+  return reasons.slice(0, 6);
+}
+
+function summarizeCoachLevelsZh(coach) {
+  const move = coach.zhBestMove ?? coach.bestMove;
+  if (!move) {
+    return [{
+      level: 1,
+      kind: "status",
+      title: "狀態",
+      text: "此局面沒有可提示的合法著法。"
+    }];
+  }
+
+  const next = (coach.alternatives ?? []).find((alternative) => alternative.move !== coach.bestMove);
+  return [{
+    level: 1,
+    kind: "concept",
+    title: coach.source?.startsWith("opening") || coach.source === "book" ? "開局方向" : "局面方向",
+    text: coach.source?.startsWith("opening") || coach.source === "book"
+      ? `先考慮 ${move}，用開局庫思路建立子力活躍度。`
+      : "先找能改善協調、限制對手或製造威脅的候選著法。"
+  }, {
+    level: 2,
+    kind: "tactic",
+    title: "戰術線索",
+    text: coach.scoreText ? `目前評分線索為 ${coach.scoreText}。` : "留意將軍、得子和直接威脅。"
+  }, {
+    level: 3,
+    kind: "candidate",
+    title: "候選比較",
+    text: next
+      ? `把 ${move} 與 ${next.zhMove ?? next.move} 放在一起比較。`
+      : `${move} 是目前候選列表中的首選。`
+  }, {
+    level: 4,
+    kind: "reveal",
+    title: "最佳著法",
+    text: `最佳著法是 ${move}。`
+  }];
+}
+
+function motifZh(motif) {
+  if (/check/i.test(motif)) return "將軍";
+  if (/capture|wins/i.test(motif)) return "得子";
+  if (/threat/i.test(motif)) return "威脅";
+  if (/safe/i.test(motif)) return "安全";
+  if (/recapture/i.test(motif)) return "反吃";
+  if (/development|activity/i.test(motif)) return "出子";
+  return motif;
+}
+
+function scoreTextFor(entry, explanation = null) {
+  const detail = entry?.scoreDetail ?? entry?.native?.scoreDetail ?? explanation?.search?.scoreDetail;
+  if (detail?.text) return detail.text;
+  if (Number.isFinite(entry?.score)) return formatCentipawns(entry.score);
+  return null;
+}
+
+function formatCentipawns(value) {
+  const rounded = Math.round(value ?? 0);
+  return `${rounded >= 0 ? "+" : ""}${rounded} cp`;
 }
 
 function ensurePlayerTurn(session) {

@@ -26,6 +26,8 @@ test("web server serves the browser game and starts a session", async () => {
     assert.equal(created.state.playerSide, "red");
     assert.equal(created.state.engineSide, "black");
     assert.equal(created.state.board.length, 90);
+    assert.equal(created.state.board.find((cell) => cell.coord === "a0").piece.zhLabel, "黑方車");
+    assert.equal(created.state.board.find((cell) => cell.coord === "e9").piece.zhLabel, "紅方帥");
     assert.equal(created.state.playerTurn, true);
     assert.ok(created.state.legalMoves.some((move) => move.notation === "h7-e7"));
     assert.ok(created.state.legalMoves.some((move) => move.zhNotation === "炮二平五"));
@@ -56,10 +58,12 @@ test("web server plays a player move, engine reply, hints, best move, and undo",
     assert.equal(best.ok, true);
     assert.equal(typeof best.best.bestMove, "string");
     assert.equal(typeof best.best.zhBestMove, "string");
+    assert.equal(typeof best.best.zhReasons[0], "string");
     assert.ok(best.best.alternatives.length >= 1);
     assert.equal(typeof best.best.alternatives[0].zhMove, "string");
     assert.equal(hint.ok, true);
     assert.ok(hint.hint.levels.length >= 1);
+    assert.ok(hint.hint.zhLevels.some((level) => /最佳著法|候選|局面/.test(level.title + level.text)));
     assert.equal(typeof hint.hint.zhBestMove, "string");
     assert.equal(moved.ok, true);
     assert.equal(moved.state.history[0].notation, "h7-e7");
