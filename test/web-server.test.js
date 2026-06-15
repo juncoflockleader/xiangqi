@@ -23,6 +23,8 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(page, /汉界/);
     assert.match(page, /中文（简体）/);
     assert.match(page, /中文（繁體）/);
+    assert.match(page, /aria-label="象棋棋盘"/);
+    assert.match(page, /data-i18n-aria-label="boardAria"/);
     assert.match(page, /file-labels-north/);
     assert.match(page, /id="selectedMoves"/);
     assert.match(page, />九</);
@@ -32,13 +34,17 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /const glyphLocale = isChineseLocale\(\) \? state\.locale : "zh-TW"/);
     assert.match(script, /function renderSelectedMoves/);
     assert.match(script, /function localizedChineseText/);
+    assert.match(script, /boardAria: "象棋棋盘"/);
+    assert.match(script, /suggests: "建议"/);
     assert.match(script, /move-label/);
     assert.match(script, /legalMovesSuffix/);
     assert.match(stylesheet, /\.file-labels/);
     assert.match(stylesheet, /\.selected-moves/);
     assert.match(stylesheet, /\.move-label/);
     assert.match(stylesheet, /width: var\(--board-play-width\)/);
-    assert.match(stylesheet, /--piece-font-size: clamp\(10px, 2\.35cqw, 14px\)/);
+    assert.match(stylesheet, /--piece-size: clamp\(28px, 76%, 42px\)/);
+    assert.match(stylesheet, /--piece-font-size: 13px/);
+    assert.match(stylesheet, /outline: 2px solid var\(--grid-line-strong\)/);
     assert.match(stylesheet, /\.move-chip \.move-notation/);
     assert.match(stylesheet, /min-height: 0/);
     assert.doesNotMatch(stylesheet, /rotate\(180deg\)/);

@@ -188,6 +188,8 @@ const practiceFocusTranslations = Object.freeze({
 
 const zhTwTranslations = {
   appTitle: "中國象棋",
+  boardAria: "象棋棋盤",
+  controlsAria: "對局控制",
   language: "語言",
   localeSimplified: "中文（簡體）",
   localeTraditional: "中文（繁體）",
@@ -243,23 +245,30 @@ const zhTwTranslations = {
 const zhCnTranslations = {
   ...zhTwTranslations,
   appTitle: "中国象棋",
+  boardAria: "象棋棋盘",
+  controlsAria: "对局控制",
   language: "语言",
   localeSimplified: "中文（简体）",
   localeTraditional: "中文（繁体）",
   side: "执方",
   red: "红方",
   black: "黑方",
+  best: "最佳着法",
   history: "棋谱",
   starting: "启动中...",
+  noMoves: "尚未走棋。",
+  askPrompt: "可查看最佳着法、提示，或直接走棋。",
   redToMove: "红方走棋",
   blackToMove: "黑方走棋",
   inCheck: "（被将军）",
   repetition: "重复局面和棋",
   wins: "胜",
   level: "级别",
+  depth: "深度",
   time: "用时",
+  lines: "候选",
   fallback: "备用",
-  best: "最佳着法",
+  confidence: "信心",
   bestMove: "最佳着法",
   whyNot: "为何不选",
   noHint: "暂无提示。",
@@ -267,11 +276,19 @@ const zhCnTranslations = {
   engineSelected: "引擎已选择一手。",
   moveReviewed: "已复盘此手。",
   legalMoves: "合法着法",
+  legalMovesSuffix: "的合法着法",
+  candidate: "候选",
+  expectedReply: "预期",
   loss: "损失",
   scorePrefix: "评分",
   bookSource: "开局库",
+  searchSource: "搜索",
+  suggests: "建议",
   bestAgreement: "与最佳着法一致",
-  bestAlternative: "最佳应为"
+  bestAlternative: "最佳应为",
+  player: "你",
+  engineActor: "引擎",
+  emptyPoint: "空位"
 };
 
 const translations = {
@@ -279,6 +296,8 @@ const translations = {
   "zh-TW": zhTwTranslations,
   en: {
     appTitle: "Xiangqi",
+    boardAria: "Xiangqi board",
+    controlsAria: "Game controls",
     language: "Language",
     localeSimplified: "Chinese (Simplified)",
     localeTraditional: "Chinese (Traditional)",
@@ -799,9 +818,14 @@ function updateDisabled() {
 
 function applyLocale() {
   document.documentElement.lang = localeMeta[state.locale]?.lang ?? "en";
+  document.title = t("appTitle");
   document.querySelectorAll("[data-i18n]").forEach((element) => {
     const key = element.dataset.i18n;
     element.textContent = t(key);
+  });
+  document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
+    const key = element.dataset.i18nAriaLabel;
+    element.setAttribute("aria-label", t(key));
   });
   setOptionText(elements.localeSelect, "zh-CN", t("localeSimplified"));
   setOptionText(elements.localeSelect, "zh-TW", t("localeTraditional"));
