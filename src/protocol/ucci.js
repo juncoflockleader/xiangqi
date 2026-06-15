@@ -606,7 +606,7 @@ function formatReviewMoveResult(review) {
 
 function formatLessonResult(result) {
   const outputs = [
-    `info string lesson cards ${result.summary.totalCards} avgcp ${result.averageCentipawnLoss} highimpact ${result.summary.highImpact}`
+    `info string lesson cards ${result.summary.totalCards} avgcp ${result.averageCentipawnLoss} highimpact ${result.summary.highImpact} practice ${result.summary.practiceFocus ?? 0}`
   ];
 
   for (const card of result.cards) {
@@ -614,6 +614,9 @@ function formatLessonResult(result) {
     outputs.push(`info string lesson ${card.rank} prompt: ${card.prompt}`);
     for (const hint of card.hints) {
       outputs.push(`info string lesson ${card.rank} hint ${hint.level} ${hint.kind}: ${hint.text}`);
+    }
+    if (card.practiceFocus) {
+      outputs.push(`info string lesson ${card.rank} practice ${card.practiceFocus.drill} ${card.practiceFocus.title}: ${card.practiceFocus.text}`);
     }
     pushReviewScoreInfo(outputs, `lesson ${card.rank}`, card);
     pushPlanInfo(outputs, `lesson ${card.rank} played`, card.playedLinePlan);

@@ -1,6 +1,7 @@
 import { moveToNotation } from "./board.js";
 import { summarizeAlternativeEvidence, summarizeComparisonEvidence, summarizeLinePlanEvidence } from "./explanation-artifacts.js";
 import { summarizePlanComparisonEvidence } from "./plan-comparison.js";
+import { practiceFocusFromReview } from "./practice.js";
 
 const SEVERE_CLASSIFICATIONS = Object.freeze(["blunder", "mistake", "inaccuracy"]);
 const POSITIVE_CLASSIFICATIONS = Object.freeze(["best", "excellent"]);
@@ -67,6 +68,7 @@ function createLessonCard(move, rank) {
   const playedMove = move.notation;
   const answerMove = lessonAnswerMove(move, type, { bestMove, playedMove });
   const tags = lessonTags(move, type);
+  const practiceFocus = practiceFocusFromReview(move.review);
 
   return {
     id: `lesson-${rank}-ply-${move.ply}`,
@@ -96,6 +98,7 @@ function createLessonCard(move, rank) {
     bestLinePlan: bestLinePlanFor(move.review),
     planComparison: planComparisonFor(move.review),
     mistakes: move.review.mistakes,
+    practiceFocus,
     tags,
     hints: lessonHints(move, type, bestMove),
     answer: {
@@ -114,6 +117,7 @@ function createLessonCard(move, rank) {
       playedLinePlan: playedLinePlanFor(move.review),
       bestLinePlan: bestLinePlanFor(move.review),
       planComparison: planComparisonFor(move.review),
+      practiceFocus,
       summary: move.review.explanation.summary,
       reasons: move.review.explanation.reasons,
       principalVariation: move.review.principalVariation ?? []
@@ -226,12 +230,14 @@ function summarizeLessonCards(cards) {
   const byType = countBy(cards, (card) => card.type);
   const bySide = countBy(cards, (card) => card.side);
   const highImpact = cards.filter((card) => card.tags.includes("high-impact")).length;
+  const practiceFocus = cards.filter((card) => card.practiceFocus).length;
 
   return {
     totalCards: cards.length,
     byType,
     bySide,
-    highImpact
+    highImpact,
+    practiceFocus
   };
 }
 

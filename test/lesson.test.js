@@ -29,9 +29,16 @@ test("lesson plan turns reviewed mistakes into correction cards", () => {
   assert.ok(plan.cards[0].prompt.includes("stronger move"));
   assert.ok(plan.cards[0].hints.at(-1).text.includes("e9-e2"));
   assert.equal(plan.cards[0].mistakes.primary, "missed-material");
+  assert.equal(plan.cards[0].practiceFocus.category, "missed-material");
+  assert.equal(plan.cards[0].practiceFocus.title, "Material tactics");
+  assert.equal(plan.cards[0].practiceFocus.drill, "candidate-captures");
+  assert.equal(plan.cards[0].practiceFocus.move, "e9-f9");
+  assert.equal(plan.cards[0].practiceFocus.bestMove, "e9-e2");
+  assert.equal(plan.cards[0].answer.practiceFocus.title, "Material tactics");
   assert.ok(plan.cards[0].tags.includes("missed-material"));
   assert.ok(plan.cards[0].hints.some((hint) => hint.kind === "pattern"));
   assert.equal(plan.summary.byType.correction, 1);
+  assert.equal(plan.summary.practiceFocus, 1);
 });
 
 test("lesson plan can be built from an existing game review", () => {

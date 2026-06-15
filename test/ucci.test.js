@@ -264,6 +264,17 @@ test("UCCI lesson summarizes reviewed move history as cards", () => {
   assert.ok(output.some((line) => line.includes("answer")));
 });
 
+test("UCCI lesson emits practice focus for correction cards", () => {
+  const session = new UcciSession({ depth: 2, timeLimitMs: 1000 });
+  session.handleLine("position fen 4k4/9/4r4/9/9/9/9/9/9/3KR4 r moves e9f9");
+  const output = session.handleLine("lesson depth 2 movetime 1000 cards 1");
+
+  assert.ok(output.some((line) => line.includes("lesson cards 1")));
+  assert.ok(output.some((line) => line.includes("practice 1")));
+  assert.ok(output.some((line) => line.includes("lesson 1 correction")));
+  assert.ok(output.some((line) => line.includes("lesson 1 practice candidate-captures Material tactics")));
+});
+
 test("UCCI lesson can filter opening-book cards", () => {
   const session = new UcciSession({ depth: 1, timeLimitMs: 500 });
   session.handleLine("position startpos moves h7e7 h0g2");
