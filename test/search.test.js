@@ -342,7 +342,18 @@ test("search reuses previous root scores for iterative move ordering", () => {
   assert.equal(result.depth, 2);
   assert.equal(result.bestMove.notation, disabled.bestMove.notation);
   assert.ok(result.stats.rootScoreOrderHits > 0);
+  assert.ok(result.stats.rootRankOrderHits > 0);
   assert.equal(disabled.stats.rootScoreOrderHits, 0);
+  assert.equal(disabled.stats.rootRankOrderHits, 0);
+
+  const engine = createEngine({ depth: 2, timeLimitMs: 1000 });
+  const explained = engine.chooseMove(position, {
+    useBook: false,
+    depth: 2,
+    timeLimitMs: 1000,
+    useAspiration: false
+  });
+  assert.ok(explained.explanation.confidence.factors.some((factor) => factor.text.includes("previous-root-rank ordering")));
 });
 
 test("search uses internal iterative deepening when hash move ordering is unavailable", () => {
@@ -876,6 +887,7 @@ test("search tunes late-move reductions with continuation history", () => {
     timeLimitMs: 5000,
     useAspiration: false,
     useSoftTimeManagement: false,
+    useRootScoreOrdering: false,
     exactRootScores: true
   });
   const disabled = searchBestMove(position, {

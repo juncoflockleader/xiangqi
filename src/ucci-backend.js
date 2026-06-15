@@ -1700,6 +1700,7 @@ function createEmptyStats() {
     checkEvasionKingMoves: 0,
     historyMaluses: 0,
     rootScoreOrderHits: 0,
+    rootRankOrderHits: 0,
     iidSearches: 0,
     iidMoveHits: 0,
     rootMovesSearched: 0,

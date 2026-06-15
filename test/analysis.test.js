@@ -179,6 +179,7 @@ test("move explanations surface continuation-history reduction tuning", () => {
     timeLimitMs: 5000,
     useAspiration: false,
     useSoftTimeManagement: false,
+    useRootScoreOrdering: false,
     exactRootScores: true
   });
   const selectivityFactor = result.explanation.confidence.factors

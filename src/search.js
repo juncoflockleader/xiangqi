@@ -1039,10 +1039,7 @@ function moveOrderingScore(position, move, principalMove, context, ply, previous
   if (context.priorityMoveKeys?.has(moveKey(move))) score += 1_500_000;
   if (sameMove(move, principalMove)) score += 1_000_000;
   score += checkEvasionOrderingScore(move, checkInfo, context);
-  if (ply === 0 && context.useRootScoreOrdering && context.rootMoveScores?.has(moveKey(move))) {
-    score += 500_000 + clampOrderingScore(context.rootMoveScores.get(moveKey(move)));
-    context.stats.rootScoreOrderHits += 1;
-  }
+  score += rootMoveOrderingScore(context, move, ply);
   if (isCountermove(context, previousMove, move)) score += 30_000;
   score += continuationHistoryScore(context, previousMove, move);
   if (move.captured) {
@@ -1300,11 +1297,36 @@ function toMoveKey(move) {
 }
 
 function createRootMoveScoreMap(candidates) {
-  return new Map(candidates.map((candidate) => [moveKey(candidate.move), candidate.score]));
+  return new Map(candidates.map((candidate, rank) => [
+    moveKey(candidate.move),
+    { score: candidate.score, rank }
+  ]));
 }
 
 function clampOrderingScore(score) {
   return Math.max(-200_000, Math.min(200_000, Math.round(score)));
+}
+
+function rootMoveOrderingScore(context, move, ply) {
+  if (ply !== 0 || !context.useRootScoreOrdering) return 0;
+
+  const entry = context.rootMoveScores?.get(moveKey(move));
+  if (entry === undefined) return 0;
+
+  const score = typeof entry === "number" ? entry : entry.score;
+  let bonus = 500_000 + clampOrderingScore(score);
+  context.stats.rootScoreOrderHits += 1;
+
+  if (typeof entry === "object" && Number.isFinite(entry.rank)) {
+    bonus += rootRankOrderingBonus(entry.rank);
+    context.stats.rootRankOrderHits += 1;
+  }
+
+  return bonus;
+}
+
+function rootRankOrderingBonus(rank) {
+  return Math.max(0, 160_000 - rank * 20_000);
 }
 
 function extensionReasonFor({ inCheck, givesCheck, move, previousMove, extensionsRemaining, context }) {
@@ -2113,6 +2135,7 @@ function createSearchStats() {
     checkEvasionKingMoves: 0,
     historyMaluses: 0,
     rootScoreOrderHits: 0,
+    rootRankOrderHits: 0,
     iidSearches: 0,
     iidMoveHits: 0,
     rootMovesSearched: 0,
@@ -2191,6 +2214,7 @@ function mergeSearchStats(total, next) {
     checkEvasionKingMoves: total.checkEvasionKingMoves + next.checkEvasionKingMoves,
     historyMaluses: total.historyMaluses + next.historyMaluses,
     rootScoreOrderHits: total.rootScoreOrderHits + next.rootScoreOrderHits,
+    rootRankOrderHits: total.rootRankOrderHits + next.rootRankOrderHits,
     iidSearches: total.iidSearches + next.iidSearches,
     iidMoveHits: total.iidMoveHits + next.iidMoveHits,
     rootMovesSearched: total.rootMovesSearched + next.rootMovesSearched,

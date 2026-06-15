@@ -434,6 +434,9 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.tacticalMoveOrderHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.tacticalMoveOrderHits, "tactical-motif ordering hint"));
   }
+  if ((stats.rootRankOrderHits ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.rootRankOrderHits, "previous-root-rank ordering hint"));
+  }
   if ((stats.captureHistoryHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.captureHistoryHits, "capture-history hit"));
   }
@@ -488,6 +491,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   if ((stats.evalCacheHits ?? 0) > 0) supports.push("evaluation-cache reuse");
   if ((stats.tacticalCacheHits ?? 0) > 0) supports.push("static-exchange cache reuse");
   if ((stats.tacticalMoveOrderHits ?? 0) > 0) supports.push("tactical-motif ordering");
+  if ((stats.rootRankOrderHits ?? 0) > 0) supports.push("previous-root-rank ordering");
   if ((stats.captureHistoryHits ?? 0) > 0) supports.push("capture-history ordering");
   if ((stats.checkHistoryHits ?? 0) > 0) supports.push("check-history ordering");
   if ((stats.killerHits ?? 0) > 0) supports.push("killer-move ordering");
