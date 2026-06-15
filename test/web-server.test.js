@@ -38,6 +38,8 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function buildMoveTree/);
     assert.match(script, /function renderMainlineTreeNode/);
     assert.match(script, /function boardCellsForTreeSelection/);
+    assert.match(script, /node\.alternative\.boardAfter/);
+    assert.match(script, /t\("variationPreview"\)/);
     assert.match(script, /function restoreTreeNode/);
     assert.match(script, /"\/api\/jump"/);
     assert.match(script, /function intersectionPercent/);
@@ -109,6 +111,7 @@ test("web server plays a player move, engine reply, hints, best move, and undo",
     assert.equal(typeof best.best.zhReasons[0], "string");
     assert.ok(best.best.alternatives.length >= 1);
     assert.equal(typeof best.best.alternatives[0].zhMove, "string");
+    assert.equal(best.best.alternatives[0].boardAfter.length, 90);
     assert.equal(hint.ok, true);
     assert.ok(hint.hint.levels.length >= 1);
     assert.ok(hint.hint.zhLevels.some((level) => /最佳著法|候選|局面/.test(level.title + level.text)));
@@ -118,9 +121,11 @@ test("web server plays a player move, engine reply, hints, best move, and undo",
     assert.equal(moved.state.history[0].zhNotation, "炮二平五");
     assert.equal(moved.state.history[0].boardBefore.length, 90);
     assert.equal(moved.state.history[0].boardAfter.length, 90);
+    assert.ok(moved.state.history[0].review.bestAlternatives.some((alternative) => alternative.boardAfter?.length === 90));
     assert.equal(typeof moved.state.history[1].zhNotation, "string");
     assert.equal(moved.state.history[1].boardBefore.length, 90);
     assert.equal(moved.state.history[1].boardAfter.length, 90);
+    assert.ok(moved.state.history[1].decision.alternatives.some((alternative) => alternative.boardAfter?.length === 90));
     assert.equal(moved.state.history.length, 2);
     assert.equal(moved.state.playerTurn, true);
     assert.equal(moved.state.lastPlayerReview.move, "h7-e7");

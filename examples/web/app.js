@@ -217,6 +217,7 @@ const zhTwTranslations = {
   fold: "收合",
   selectedNode: "已選",
   restorePoint: "回到此處",
+  variationPreview: "預覽局面",
   askPrompt: "可查看最佳、提示，或直接走棋。",
   redToMove: "紅方走棋",
   blackToMove: "黑方走棋",
@@ -275,6 +276,7 @@ const zhCnTranslations = {
   currentPosition: "当前",
   expand: "展开",
   restorePoint: "回到此处",
+  variationPreview: "预览局面",
   askPrompt: "可查看最佳着法、提示，或直接走棋。",
   redToMove: "红方走棋",
   blackToMove: "黑方走棋",
@@ -343,6 +345,7 @@ const translations = {
     fold: "Collapse",
     selectedNode: "selected",
     restorePoint: "Restore here",
+    variationPreview: "preview position",
     askPrompt: "Ask for Best, Hint, or make a move.",
     redToMove: "Red to move",
     blackToMove: "Black to move",
@@ -663,6 +666,9 @@ function renderAlternativeSummary(node) {
   const details = [
     `<div class="line"><strong>${escapeHtml(t("alternativeLine"))}</strong> ${formatMoveHtml(alternative.move, alternative.zhMove)} <span class="score">${escapeHtml(t("branchPoint"))}: ${formatMoveHtml(node.parentMove.notation, node.parentMove.zhNotation)}</span></div>`
   ];
+  if (alternative.boardAfter) {
+    details.push(`<div class="score">${escapeHtml(t("variationPreview"))}: ${formatMoveHtml(alternative.move, alternative.zhMove)}</div>`);
+  }
   const reply = alternative.expectedReply
     ? `<div class="score">${escapeHtml(t("expectedReply"))}: ${formatMoveHtml(alternative.expectedReply, alternative.zhExpectedReply)}</div>`
     : "";
@@ -718,6 +724,9 @@ function renderAlternativeReasoning(node) {
   const parts = [
     `<div>${formatMoveHtml(alternative.move, alternative.zhMove)} <span class="score">${escapeHtml(alternativeSummaryText(alternative))}</span></div>`
   ];
+  if (alternative.boardAfter) {
+    parts.push(`<div class="score">${escapeHtml(t("variationPreview"))}: ${formatMoveHtml(alternative.move, alternative.zhMove)}</div>`);
+  }
   const comparisonSummary = localizedPlanComparisonSummary(alternative.planComparison);
   if (comparisonSummary) {
     parts.push(`<div class="line">${escapeHtml(comparisonSummary)}</div>`);
@@ -1009,7 +1018,9 @@ function panelFromTreeSelection() {
 
 function boardCellsForTreeSelection() {
   const node = selectedTreeNode();
-  if (node?.kind === "alternative") return node.parentMove.boardBefore ?? state.game?.board ?? [];
+  if (node?.kind === "alternative") {
+    return node.alternative.boardAfter ?? node.parentMove.boardBefore ?? state.game?.board ?? [];
+  }
   if (node?.kind === "main" && node.id !== latestMainlineNodeId()) return node.move.boardAfter ?? state.game?.board ?? [];
   return state.game?.board ?? [];
 }

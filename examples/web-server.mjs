@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import {
   SIDES,
+  applyLegalMove,
   chooseAndPlayGameMoveAsync,
   chooseGameMoveAsync,
   createGame,
@@ -19,6 +20,7 @@ import {
   moveToChineseNotation,
   opponent,
   parseFen,
+  parseMoveNotation,
   pieceLabel,
   positionKey,
   playGameMoveAsync,
@@ -531,13 +533,27 @@ function annotateAlternatives(position, alternatives = []) {
   return alternatives.map((alternative) => {
     const line = [alternative.move, alternative.expectedReply].filter(Boolean);
     const zhLine = chineseLineFor(position, line);
+    const afterMove = positionAfterMove(position, alternative.move);
+    const afterReply = afterMove ? positionAfterMove(afterMove, alternative.expectedReply) : null;
     return {
       ...alternative,
       zhMove: zhLine[0] ?? chineseNotationFor(position, alternative.move),
       zhExpectedReply: zhLine[1] ?? null,
+      boardAfter: afterMove ? serializeBoard(afterMove) : null,
+      replyBoardAfter: afterReply ? serializeBoard(afterReply) : null,
       planComparison: annotatePlanComparison(position, alternative.planComparison)
     };
   });
+}
+
+function positionAfterMove(position, move) {
+  if (!position || !move) return null;
+  try {
+    const parsed = typeof move === "string" ? parseMoveNotation(move) : move;
+    return applyLegalMove(position, parsed, position.turn);
+  } catch {
+    return null;
+  }
 }
 
 function annotateLinePlan(position, linePlan) {
