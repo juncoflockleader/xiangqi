@@ -80,6 +80,8 @@ const SINGULAR_EXTENSION_REDUCTION = 2;
 const DEFAULT_SINGULAR_EXTENSION_MARGIN = 90;
 const HISTORY_GRAVITY_LIMIT = 200_000;
 const IMPROVING_EVAL_MARGIN = 12;
+const HISTORY_PRUNING_MAX_DEPTH = 3;
+const HISTORY_PRUNING_BASE_INDEX = 3;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -197,6 +199,7 @@ export function searchBestMove(position, options = {}) {
       useSeePruning: options.useSeePruning !== false,
       useCaptureHistory: options.useCaptureHistory !== false,
       useHistoryMalus: options.useHistoryMalus !== false,
+      useHistoryPruning: options.useHistoryPruning !== false,
       useLateMovePruning: options.useLateMovePruning !== false,
       useLateMoveReductions: options.useLateMoveReductions !== false,
       useAdaptiveLmr: options.useAdaptiveLmr !== false,
@@ -729,6 +732,24 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       context
     })) {
       context.stats.futilityPrunes += 1;
+      continue;
+    }
+
+    if (shouldPruneBadHistory({
+      depth,
+      index,
+      move,
+      inCheck,
+      givesCheck,
+      extension,
+      alpha,
+      beta,
+      context,
+      ply,
+      previousMove,
+      staticTrend
+    })) {
+      context.stats.badHistoryPrunes += 1;
       continue;
     }
 
@@ -1655,6 +1676,55 @@ function reverseFutilityMargin(depth, context, staticTrend) {
   return margin;
 }
 
+function shouldPruneBadHistory({
+  depth,
+  index,
+  move,
+  inCheck,
+  givesCheck,
+  extension,
+  alpha,
+  beta,
+  context,
+  ply,
+  previousMove,
+  staticTrend
+}) {
+  if (!context.useHistoryPruning) return false;
+  if (depth < 1 || depth > HISTORY_PRUNING_MAX_DEPTH) return false;
+  if (index < historyPruningMoveIndex(depth, staticTrend)) return false;
+  if (beta - alpha !== 1) return false;
+  if (inCheck || givesCheck || extension > 0) return false;
+  if (move.captured) return false;
+  if (alpha <= -MATE_SCORE + 1000 || beta >= MATE_SCORE - 1000) return false;
+  if (isImprovingTrend(staticTrend)) {
+    context.stats.badHistoryPruneGuards += 1;
+    return false;
+  }
+  if (isStoredKiller(context, ply, move)) return false;
+  if (isStoredCountermove(context, previousMove, move)) return false;
+
+  const historyScore = context.history.get(moveKey(move)) ?? 0;
+  const continuationScore = continuationHistoryValue(context, previousMove, move);
+  if (historyScore >= 0 && continuationScore >= 0) return false;
+
+  const combinedHistory = historyScore + Math.trunc(continuationScore / 2);
+  const threshold = -historyPruningMargin(depth, staticTrend);
+  if (combinedHistory > threshold) return false;
+
+  return historyScore <= -depth * depth || continuationScore <= -depth * depth;
+}
+
+function historyPruningMoveIndex(depth, staticTrend) {
+  const index = HISTORY_PRUNING_BASE_INDEX + depth;
+  return isWorseningTrend(staticTrend) ? Math.max(2, index - 1) : index;
+}
+
+function historyPruningMargin(depth, staticTrend) {
+  const margin = depth * depth;
+  return isWorseningTrend(staticTrend) ? Math.max(1, Math.floor(margin / 2)) : margin;
+}
+
 function shouldPruneLateMove({
   depth,
   index,
@@ -2241,6 +2311,8 @@ function createSearchStats() {
     probCutPrunes: 0,
     probCutSearches: 0,
     futilityPrunes: 0,
+    badHistoryPrunes: 0,
+    badHistoryPruneGuards: 0,
     lateMovePrunes: 0,
     deltaPrunes: 0,
     reductions: 0,
@@ -2329,6 +2401,8 @@ function mergeSearchStats(total, next) {
     probCutPrunes: total.probCutPrunes + next.probCutPrunes,
     probCutSearches: total.probCutSearches + next.probCutSearches,
     futilityPrunes: total.futilityPrunes + next.futilityPrunes,
+    badHistoryPrunes: total.badHistoryPrunes + next.badHistoryPrunes,
+    badHistoryPruneGuards: total.badHistoryPruneGuards + next.badHistoryPruneGuards,
     lateMovePrunes: total.lateMovePrunes + next.lateMovePrunes,
     deltaPrunes: total.deltaPrunes + next.deltaPrunes,
     reductions: total.reductions + next.reductions,

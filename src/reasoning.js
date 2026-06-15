@@ -405,6 +405,9 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.probCutPrunes ?? 0) > 0) {
     pruneParts.push(formatCount(stats.probCutPrunes, "ProbCut capture prune"));
   }
+  if ((stats.badHistoryPrunes ?? 0) > 0) {
+    pruneParts.push(formatCount(stats.badHistoryPrunes, "bad-history quiet prune"));
+  }
   if (staticPrunes > 0) {
     pruneParts.push(`${staticPrunes} SEE/reverse-futility/futility/late-move/razor/delta prune${staticPrunes === 1 ? "" : "s"}`);
   }
@@ -532,6 +535,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
     supports.push("null-move pruning");
   }
   if ((stats.probCutPrunes ?? 0) > 0) supports.push("ProbCut");
+  if ((stats.badHistoryPrunes ?? 0) > 0) supports.push("bad-history pruning");
   if (staticPrunes > 0) supports.push("static and tactical pruning");
 
   const verificationFailures = stats.nullMoveVerificationFailures ?? 0;

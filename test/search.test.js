@@ -1001,3 +1001,29 @@ test("search penalizes failed quiet moves in history ordering", () => {
   assert.ok(result.stats.historyGravityUpdates > 0);
   assert.equal(disabled.stats.historyMaluses, 0);
 });
+
+test("search prunes quiet moves with poor learned history", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const result = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 5000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  });
+  const disabled = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 5000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    useHistoryPruning: false
+  });
+
+  assert.equal(result.depth, 4);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.equal(Math.round(result.score), Math.round(disabled.score));
+  assert.ok(result.stats.historyMaluses > 0);
+  assert.ok(result.stats.badHistoryPrunes > 0);
+  assert.ok(result.stats.badHistoryPruneGuards > 0);
+  assert.equal(disabled.stats.badHistoryPrunes, 0);
+  assert.equal(disabled.stats.badHistoryPruneGuards, 0);
+});

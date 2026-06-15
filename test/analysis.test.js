@@ -267,6 +267,25 @@ test("move explanations surface improving-position search tuning", () => {
   assert.match(selectivityFactor.text, /improving-position search tuning/);
 });
 
+test("move explanations surface bad-history pruning diagnostics", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const engine = createEngine({ depth: 4, timeLimitMs: 5000 });
+  const result = engine.chooseMove(position, {
+    useBook: false,
+    depth: 4,
+    timeLimitMs: 5000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  });
+  const selectivityFactor = result.explanation.confidence.factors
+    .find((factor) => factor.kind === "selectivity");
+
+  assert.ok(result.stats.badHistoryPrunes > 0);
+  assert.ok(result.explanation.reasons.some((reason) => reason.includes("bad-history quiet prune")));
+  assert.ok(selectivityFactor);
+  assert.match(selectivityFactor.text, /bad-history pruning/);
+});
+
 test("analysis line count is clamped to a useful range", () => {
   const position = createInitialPosition();
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });
