@@ -566,6 +566,28 @@ test("search can order replies with the countermove heuristic", () => {
   assert.equal(disabled.stats.countermoveHits, 0);
 });
 
+test("search orders quiet replies with continuation history", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const result = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false
+  });
+  const disabled = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useContinuationHistory: false
+  });
+
+  assert.equal(result.depth, 3);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.ok(result.stats.continuationHistoryStores > 0);
+  assert.ok(result.stats.continuationHistoryHits > 0);
+  assert.equal(disabled.stats.continuationHistoryStores, 0);
+  assert.equal(disabled.stats.continuationHistoryHits, 0);
+});
+
 test("search penalizes failed quiet moves in history ordering", () => {
   const position = parseFen("4k4/9/4h4/4c4/4P4/9/4C4/9/9/4K4 r");
   const result = searchBestMove(position, {

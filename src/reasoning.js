@@ -419,6 +419,9 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.deepReductions ?? 0) > 0) {
     orderingParts.push(formatCount(stats.deepReductions, "deeper adaptive late-move reduction"));
   }
+  if ((stats.continuationHistoryHits ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.continuationHistoryHits, "continuation-history hit"));
+  }
   if ((stats.singularExtensions ?? 0) > 0) {
     orderingParts.push(formatCount(stats.singularExtensions, "singular extension"));
   }
@@ -443,6 +446,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
 
   if ((stats.ttHits ?? 0) > 0) supports.push("transposition-table reuse");
   if ((stats.iidMoveHits ?? 0) > 0) supports.push("internal iterative deepening");
+  if ((stats.continuationHistoryHits ?? 0) > 0) supports.push("continuation-history ordering");
   if ((stats.deepReductions ?? 0) > 0) supports.push("adaptive late-move reductions");
   if ((stats.singularExtensions ?? 0) > 0) supports.push("singular extensions");
   if ((stats.nullMovePrunes ?? 0) > 0 || (stats.nullMoveVerifications ?? 0) > 0) {

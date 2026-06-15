@@ -1671,6 +1671,8 @@ function createEmptyStats() {
     nullMoveVerificationFailures: 0,
     countermoveStores: 0,
     countermoveHits: 0,
+    continuationHistoryStores: 0,
+    continuationHistoryHits: 0,
     historyMaluses: 0,
     rootScoreOrderHits: 0,
     iidSearches: 0,
