@@ -32,6 +32,8 @@ test("UCCI session searches a FEN position", () => {
   assert.ok(output.some((line) => line.includes("hmalus")));
   assert.ok(output.includes("bestmove e9e2"));
   assert.ok(output.some((line) => line.includes("reason: Wins a rook")));
+  assert.ok(output.some((line) => line.includes("go plan: Start with e9e2") || line.includes("go plan: Start with e9-e2")));
+  assert.ok(output.some((line) => line.includes("go plan step 1 red engine-choice e9e2")));
 });
 
 test("UCCI HashEntries option bounds the transposition cache", () => {
@@ -91,6 +93,7 @@ test("UCCI analyze returns multiple principal variations", () => {
   assert.ok(output.some((line) => line.startsWith("info multipv 1 depth 2")));
   assert.ok(output.some((line) => line.startsWith("info multipv 2 depth 2")));
   assert.ok(output.some((line) => line.includes("line 1 reason:")));
+  assert.ok(output.some((line) => line.includes("line 1 plan: Start with")));
   assert.ok(output.includes("bestmove e9e2"));
 });
 
@@ -147,6 +150,7 @@ test("UCCI review summarizes loaded move history", () => {
 
   assert.ok(output.some((line) => line.includes("review moves 2")));
   assert.ok(output.some((line) => line.includes("book 2")));
+  assert.ok(output.some((line) => line.includes("moment 1 best plan: Start with")));
 });
 
 test("UCCI review reports no moves when history is empty", () => {
@@ -165,6 +169,7 @@ test("UCCI lesson summarizes reviewed move history as cards", () => {
   assert.ok(output.some((line) => line.includes("lesson 1 opening")));
   assert.ok(output.some((line) => line.includes("prompt:")));
   assert.ok(output.some((line) => line.includes("hint 1")));
+  assert.ok(output.some((line) => line.includes("lesson 1 best plan: Start with")));
   assert.ok(output.some((line) => line.includes("answer")));
 });
 

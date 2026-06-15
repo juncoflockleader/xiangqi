@@ -181,6 +181,7 @@ export class UcciSession {
       `info depth ${result.depth} score cp ${Math.round(result.score)} nodes ${result.nodes} qnodes ${result.stats.qnodes} qchecks ${result.stats.qchecks} tthits ${result.stats.ttHits} ttstores ${result.stats.ttStores} ttevict ${result.stats.ttEvictions} asp ${result.stats.aspirationSearches} asphi ${result.stats.aspirationFailHigh} asplo ${result.stats.aspirationFailLow} ext ${result.stats.extensions} recext ${result.stats.recaptureExtensions} soft ${result.stats.softStops} see ${result.stats.seePrunes} mdp ${result.stats.mateDistancePrunes} razor ${result.stats.razorPrunes} pcut ${result.stats.probCutPrunes} pcsearch ${result.stats.probCutSearches} futil ${result.stats.futilityPrunes} delta ${result.stats.deltaPrunes} nmp ${result.stats.nullMovePrunes} cm ${result.stats.countermoveHits} hmalus ${result.stats.historyMaluses} rootord ${result.stats.rootScoreOrderHits} rootmoves ${result.stats.rootMovesSearched} pvs ${result.stats.pvsResearches} pv ${pv}`,
       `info string ${result.explanation.summary}`
     );
+    pushPlanInfo(outputs, "go", result.explanation.linePlan, { steps: true });
 
     for (const reason of result.explanation.reasons.slice(0, 3)) {
       outputs.push(`info string reason: ${reason}`);
@@ -208,6 +209,7 @@ export class UcciSession {
 
     for (const entry of result.lines) {
       outputs.push(`info string line ${entry.rank}: ${entry.explanation.summary}`);
+      pushPlanInfo(outputs, `line ${entry.rank}`, entry.explanation.linePlan);
       for (const reason of entry.explanation.reasons.slice(0, 2)) {
         outputs.push(`info string line ${entry.rank} reason: ${reason}`);
       }
@@ -283,6 +285,7 @@ export class UcciSession {
 
     for (const moment of result.keyMoments.slice(0, 3)) {
       outputs.push(`info string moment ${moment.ply} ${moment.side} ${moment.notation} ${moment.classification} loss ${moment.centipawnLoss} best ${stripMoveSeparator(moment.bestMove)}: ${moment.summary}`);
+      pushPlanInfo(outputs, `moment ${moment.ply} best`, moment.bestLinePlan);
     }
 
     return outputs;
@@ -318,6 +321,7 @@ export class UcciSession {
       for (const hint of card.hints) {
         outputs.push(`info string lesson ${card.rank} hint ${hint.level} ${hint.kind}: ${hint.text}`);
       }
+      pushPlanInfo(outputs, `lesson ${card.rank} best`, card.bestLinePlan);
       outputs.push(`info string lesson ${card.rank} answer ${stripMoveSeparator(card.answer.move)}: ${card.answer.summary}`);
     }
 
@@ -394,6 +398,17 @@ function formatIterationInfo(iteration) {
     : iteration.stableBestMove ? "true" : "false";
 
   return `info depth ${iteration.depth} currmove ${move} score cp ${Math.round(iteration.score)} nodes ${iteration.nodes} stable ${stable} pv ${pv}`;
+}
+
+function pushPlanInfo(outputs, prefix, linePlan, options = {}) {
+  if (!linePlan?.summary) return;
+  outputs.push(`info string ${prefix} plan: ${linePlan.summary}`);
+  if (!options.steps) return;
+
+  for (const step of (linePlan.moves ?? []).slice(0, 5)) {
+    const motifs = step.motifs?.length ? ` motifs ${step.motifs.join(",")}` : "";
+    outputs.push(`info string ${prefix} plan step ${step.ply} ${step.side} ${step.role} ${stripMoveSeparator(step.move)} ${step.scoreBeforeText}->${step.scoreAfterText} ${step.scoreDeltaText}${motifs}`);
+  }
 }
 
 function parseGoOptions(line, defaults, side = "red", position = null) {
