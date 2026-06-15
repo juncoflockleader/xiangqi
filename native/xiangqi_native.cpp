@@ -67,6 +67,10 @@ struct SearchState {
   int64_t ttCutoffs = 0;
   int64_t killerHits = 0;
   int64_t historyUpdates = 0;
+  int64_t nullMovePrunes = 0;
+  int64_t futilityPrunes = 0;
+  int64_t lmrReductions = 0;
+  int64_t lmrResearches = 0;
   int ttHashfull = 0;
   TranspositionTable* tt = nullptr;
   std::array<std::array<Move, 2>, kMaxPly> killers{};
@@ -535,6 +539,41 @@ bool isQuiet(const Move& move) {
   return move.captured == 0;
 }
 
+bool hasNonPawnMaterial(const Board& board, int side) {
+  for (int square = 0; square < kSquares; square += 1) {
+    const int piece = board.cells[square];
+    if (piece == 0 || sideOf(piece) != side) continue;
+    const int type = typeOf(piece);
+    if (type != King && type != Pawn) return true;
+  }
+  return false;
+}
+
+void makeNullMove(Board& board) {
+  board.key ^= sideHash();
+  board.side = -board.side;
+}
+
+void undoNullMove(Board& board) {
+  board.side = -board.side;
+  board.key ^= sideHash();
+}
+
+bool isMateScore(int score) {
+  return std::abs(score) >= kMate - 1000;
+}
+
+int futilityMargin(int depth) {
+  return 140 + depth * 120;
+}
+
+int lateMoveReduction(int depth, int moveIndex, const Move& move, bool inCheck, bool killerCandidate) {
+  if (depth < 3 || moveIndex < 4 || inCheck || killerCandidate || !isQuiet(move)) return 0;
+  int reduction = 1;
+  if (depth >= 5 && moveIndex >= 8) reduction += 1;
+  return std::min(reduction, depth - 2);
+}
+
 bool isKillerMove(const SearchState& state, int ply, const Move& move) {
   if (ply < 0 || ply >= kMaxPly || !isQuiet(move)) return false;
   return sameMove(state.killers[ply][0], move) || sameMove(state.killers[ply][1], move);
@@ -738,13 +777,14 @@ bool timeExpired(SearchState& state) {
 
 int quiescence(Board& board, int alpha, int beta, int ply, int qDepth, SearchState& state);
 
-int negamax(Board& board, int depth, int alpha, int beta, int ply, SearchState& state, std::vector<Move>& pv) {
+int negamax(Board& board, int depth, int alpha, int beta, int ply, SearchState& state, std::vector<Move>& pv, bool allowNullMove = true) {
   if (state.stopped || timeExpired(state)) return evaluateRed(board) * board.side;
   state.nodes += 1;
 
   const bool inCheck = isInCheck(board, board.side);
   if (depth <= 0) return quiescence(board, alpha, beta, ply, inCheck ? 2 : 4, state);
 
+  const int staticScore = evaluateRed(board) * board.side;
   const int alphaOriginal = alpha;
   const int betaOriginal = beta;
   Move hashMove;
@@ -782,6 +822,25 @@ int negamax(Board& board, int depth, int alpha, int beta, int ply, SearchState& 
     }
   }
 
+  if (allowNullMove
+      && depth >= 3
+      && !inCheck
+      && !isMateScore(beta)
+      && hasNonPawnMaterial(board, board.side)
+      && staticScore >= beta) {
+    const int reduction = 2 + depth / 4;
+    makeNullMove(board);
+    std::vector<Move> nullPv;
+    const int nullScore = -negamax(board, depth - 1 - reduction, -beta, -beta + 1, ply + 1, state, nullPv, false);
+    undoNullMove(board);
+    if (state.stopped) return staticScore;
+    if (nullScore >= beta) {
+      state.nullMovePrunes += 1;
+      if (state.tt) state.tt->store(board.key, depth, nullScore, kTtLower, {});
+      return nullScore;
+    }
+  }
+
   auto moves = generateLegalMoves(board, board.side);
   if (moves.empty()) return -kMate + ply;
   orderMoves(moves, state, ply, hashMove);
@@ -795,16 +854,35 @@ int negamax(Board& board, int depth, int alpha, int beta, int ply, SearchState& 
 
   for (Move move : moves) {
     const bool killerCandidate = isKillerMove(state, ply, move);
+    if (!inCheck
+        && depth <= 2
+        && moveIndex > 0
+        && isQuiet(move)
+        && !killerCandidate
+        && !(validMove(hashMove) && sameMove(move, hashMove))
+        && !isMateScore(alpha)
+        && staticScore + futilityMargin(depth) <= alpha) {
+      state.futilityPrunes += 1;
+      continue;
+    }
+
     makeMove(board, move);
     std::vector<Move> childPv;
     int score;
     if (moveIndex == 0) {
-      score = -negamax(board, depth - 1, -beta, -alpha, ply + 1, state, childPv);
+      score = -negamax(board, depth - 1, -beta, -alpha, ply + 1, state, childPv, true);
     } else {
-      score = -negamax(board, depth - 1, -alpha - 1, -alpha, ply + 1, state, childPv);
+      const int reduction = lateMoveReduction(depth, moveIndex, move, inCheck, killerCandidate);
+      if (reduction > 0) state.lmrReductions += 1;
+      score = -negamax(board, depth - 1 - reduction, -alpha - 1, -alpha, ply + 1, state, childPv, true);
+      if (reduction > 0 && score > alpha && !state.stopped) {
+        state.lmrResearches += 1;
+        childPv.clear();
+        score = -negamax(board, depth - 1, -alpha - 1, -alpha, ply + 1, state, childPv, true);
+      }
       if (score > alpha && score < beta && !state.stopped) {
         childPv.clear();
-        score = -negamax(board, depth - 1, -beta, -alpha, ply + 1, state, childPv);
+        score = -negamax(board, depth - 1, -beta, -alpha, ply + 1, state, childPv, true);
       }
     }
     undoMove(board, move);
@@ -1015,6 +1093,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " hashfull " << state.ttHashfull
               << " string tt " << state.ttHits << "/" << state.ttProbes << " cutoffs " << state.ttCutoffs
               << " killers " << state.killerHits << " history " << state.historyUpdates
+              << " nmp " << state.nullMovePrunes << " futil " << state.futilityPrunes
+              << " lmr " << state.lmrReductions << "/" << state.lmrResearches
               << " pv\n";
     std::cout << "bestmove 0000" << std::endl;
     return;
@@ -1031,6 +1111,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " hashfull " << state.ttHashfull
               << " string tt " << state.ttHits << "/" << state.ttProbes << " cutoffs " << state.ttCutoffs
               << " killers " << state.killerHits << " history " << state.historyUpdates
+              << " nmp " << state.nullMovePrunes << " futil " << state.futilityPrunes
+              << " lmr " << state.lmrReductions << "/" << state.lmrResearches
               << " pv " << formatPv(line.pv)
               << std::endl;
   }
