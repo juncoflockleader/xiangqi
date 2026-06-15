@@ -13,7 +13,7 @@ import { bookMoveToCandidate } from "./book.js";
 import { classifyMoveLoss, createEngine } from "./engine.js";
 import { analyzeReviewMistakes } from "./mistakes.js";
 import { mergeNativeEngineOptions } from "./native-presets.js";
-import { compareLinePlans } from "./plan-comparison.js";
+import { compareLinePlans, summarizePlanComparisonEvidence } from "./plan-comparison.js";
 import { practiceFocusFromReview } from "./practice.js";
 import { assessSearchConfidence, buildLinePlan, explainBookMove, explainMoveFeatures, explainReviewedMove, formatScore } from "./reasoning.js";
 import { annotateMove, generateLegalMoves } from "./movegen.js";
@@ -1160,6 +1160,19 @@ function buildNativeComparisonEvidence(result, position) {
     perspective: position.turn
   });
   const nearlyTied = scoreGap <= 15;
+  const verdict = nearlyTied ? "near-tie" : nativeAlternativeVerdict(1, scoreGap);
+  const planComparison = summarizePlanComparisonEvidence(compareLinePlans(nextPlan, bestPlan, {
+    centipawnLoss: scoreGap,
+    classification: verdict,
+    playedPlanLabel: "The runner-up line",
+    playedLineLabel: "The runner-up line",
+    playedStartLabel: "The runner-up line starts",
+    bestLineLabel: "the preferred line",
+    bestLineSentenceLabel: "The preferred line",
+    bestPossessiveLabel: "the preferred line's",
+    bestPreferencePhrase: "the preferred line starts with",
+    bestStartLabel: "the preferred line starts"
+  }));
   const reason = nearlyTied
     ? `Native MultiPV shows ${bestMove} and ${nextMove} are nearly tied, separated by ${scoreGap} centipawns.`
     : `Native MultiPV rates ${bestMove} ${scoreGap} centipawns above the next candidate ${nextMove}.`;
@@ -1173,14 +1186,15 @@ function buildNativeComparisonEvidence(result, position) {
     nextScore,
     bestScoreText,
     nextScoreText,
-    verdict: nearlyTied ? "near-tie" : nativeAlternativeVerdict(1, scoreGap),
+    verdict,
     reason,
     bestLine,
     nextLine,
     bestLineText: bestLine.join(" "),
     nextLineText: nextLine.join(" "),
     bestLinePlan: bestPlan.summary,
-    nextLinePlan: nextPlan.summary
+    nextLinePlan: nextPlan.summary,
+    planComparison
   };
 }
 

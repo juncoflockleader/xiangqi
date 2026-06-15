@@ -377,6 +377,13 @@ test("UCCI backend chooseMove can include native MultiPV alternatives", async ()
     assert.equal(result.explanation.comparison.scoreGap, 30);
     assert.equal(result.explanation.comparison.verdict, "playable");
     assert.ok(result.explanation.comparison.reason.includes("30 centipawns"));
+    assert.equal(result.explanation.comparison.planComparison.kind, "different-first-move");
+    assert.equal(result.explanation.comparison.planComparison.playedMove, "h7-e7");
+    assert.equal(result.explanation.comparison.planComparison.bestMove, "h9-g7");
+    assert.equal(result.explanation.comparison.planComparison.centipawnLoss, 30);
+    assert.equal(result.explanation.comparison.planComparison.classification, "playable");
+    assert.equal(result.explanation.comparison.planComparison.summary, "The runner-up line starts with h7-e7; the preferred line starts with h9-g7, a playable gap of 30 centipawns. Both lines expect h0-g2.");
+    assert.ok(result.explanation.comparison.planComparison.reasons.some((reason) => reason.includes("preferred line starts with h9-g7")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("Native MultiPV rates h9-g7 30 centipawns above")));
     assert.equal(result.explanation.alternatives[0].verdict, "best");
     assert.equal(result.explanation.alternatives[0].centipawnLoss, 0);
@@ -420,6 +427,9 @@ test("UCCI backend explains near-tied native alternatives", async () => {
     assert.equal(result.explanation.comparison.scoreGap, 4);
     assert.equal(result.explanation.comparison.verdict, "near-tie");
     assert.ok(result.explanation.comparison.reason.includes("nearly tied"));
+    assert.equal(result.explanation.comparison.planComparison.classification, "near-tie");
+    assert.equal(result.explanation.comparison.planComparison.centipawnLoss, 4);
+    assert.match(result.explanation.comparison.planComparison.summary, /near-tie gap of 4 centipawns/);
   } finally {
     await backend.close();
   }

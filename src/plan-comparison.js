@@ -1,6 +1,7 @@
 export function compareLinePlans(playedLinePlan, bestLinePlan, options = {}) {
   if (!hasUsablePlan(playedLinePlan) || !hasUsablePlan(bestLinePlan)) return null;
 
+  const labels = normalizeComparisonLabels(options);
   const playedMove = playedLinePlan.firstMove ?? null;
   const bestMove = bestLinePlan.firstMove ?? null;
   const playedExpectedReply = playedLinePlan.expectedReply ?? null;
@@ -18,6 +19,7 @@ export function compareLinePlans(playedLinePlan, bestLinePlan, options = {}) {
   const classification = options.classification ?? null;
   const kind = comparisonKind({ sameFirstMove, sameExpectedReply, sameContinuation });
   const reasons = comparisonReasons({
+    labels,
     playedMove,
     bestMove,
     playedExpectedReply,
@@ -32,6 +34,7 @@ export function compareLinePlans(playedLinePlan, bestLinePlan, options = {}) {
   return {
     kind,
     summary: summarizePlanComparison({
+      labels,
       playedMove,
       bestMove,
       playedExpectedReply,
@@ -106,15 +109,15 @@ function comparisonReasons(context) {
   if (context.sameFirstMove) {
     reasons.push(`Both plans start with ${context.bestMove}.`);
   } else if (context.playedMove && context.bestMove) {
-    reasons.push(`You started with ${context.playedMove}; the engine starts with ${context.bestMove}.`);
+    reasons.push(`${context.labels.playedStart} with ${context.playedMove}; ${context.labels.bestStart} with ${context.bestMove}.`);
   }
 
   if (context.sameExpectedReply && context.bestExpectedReply) {
     reasons.push(`Both lines expect ${context.bestExpectedReply} as the reply.`);
   } else if (context.playedExpectedReply && context.bestExpectedReply) {
-    reasons.push(`Your line expects ${context.playedExpectedReply}; the engine line expects ${context.bestExpectedReply}.`);
+    reasons.push(`${context.labels.playedLine} expects ${context.playedExpectedReply}; ${context.labels.bestLine} expects ${context.bestExpectedReply}.`);
   } else if (context.bestExpectedReply) {
-    reasons.push(`The engine line expects ${context.bestExpectedReply}.`);
+    reasons.push(`${context.labels.bestLineSentence} expects ${context.bestExpectedReply}.`);
   }
 
   if (context.missedMotifs.length > 0) {
@@ -142,20 +145,33 @@ function summarizePlanComparison(context) {
     const replyText = context.bestExpectedReply
       ? ` and expects ${context.bestExpectedReply}`
       : "";
-    return `Your plan matches the engine's first move ${context.bestMove}${replyText}.`;
+    return `${context.labels.playedPlan} matches ${context.labels.bestPossessive} first move ${context.bestMove}${replyText}.`;
   }
 
-  const firstSentence = `Your plan starts with ${context.playedMove}; the engine prefers ${context.bestMove}${gapText}.`;
+  const firstSentence = `${context.labels.playedPlan} starts with ${context.playedMove}; ${context.labels.bestPreference} ${context.bestMove}${gapText}.`;
   if (context.sameExpectedReply && context.bestExpectedReply) {
     return `${firstSentence} Both lines expect ${context.bestExpectedReply}.`;
   }
   if (context.playedExpectedReply && context.bestExpectedReply) {
-    return `${firstSentence} Your line expects ${context.playedExpectedReply}; the engine line expects ${context.bestExpectedReply}.`;
+    return `${firstSentence} ${context.labels.playedLine} expects ${context.playedExpectedReply}; ${context.labels.bestLine} expects ${context.bestExpectedReply}.`;
   }
   if (context.bestExpectedReply) {
-    return `${firstSentence} The engine line expects ${context.bestExpectedReply}.`;
+    return `${firstSentence} ${context.labels.bestLineSentence} expects ${context.bestExpectedReply}.`;
   }
   return firstSentence;
+}
+
+function normalizeComparisonLabels(options) {
+  return {
+    playedPlan: options.playedPlanLabel ?? "Your plan",
+    playedLine: options.playedLineLabel ?? "Your line",
+    playedStart: options.playedStartLabel ?? "You started",
+    bestLine: options.bestLineLabel ?? "the engine line",
+    bestLineSentence: options.bestLineSentenceLabel ?? "The engine line",
+    bestPossessive: options.bestPossessiveLabel ?? "the engine's",
+    bestPreference: options.bestPreferencePhrase ?? "the engine prefers",
+    bestStart: options.bestStartLabel ?? "the engine starts"
+  };
 }
 
 function formatGapPhrase(centipawnLoss, classification) {
