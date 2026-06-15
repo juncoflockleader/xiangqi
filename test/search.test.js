@@ -729,6 +729,35 @@ test("search orders quiet beta cutoffs with killer moves", () => {
   assert.equal(disabled.stats.killerHits, 0);
 });
 
+test("search learns quiet checking moves with check history", () => {
+  const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
+  const result = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    exactRootScores: true
+  });
+  const disabled = searchBestMove(position, {
+    depth: 3,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    useCheckHistory: false,
+    exactRootScores: true
+  });
+
+  assert.equal(result.depth, 3);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.equal(Math.round(result.score), Math.round(disabled.score));
+  assert.ok(result.stats.checkHistoryStores > 0);
+  assert.ok(result.stats.checkHistoryHits > 0);
+  assert.ok(result.stats.checkHistoryMaluses > 0);
+  assert.equal(disabled.stats.checkHistoryStores, 0);
+  assert.equal(disabled.stats.checkHistoryHits, 0);
+  assert.equal(disabled.stats.checkHistoryMaluses, 0);
+});
+
 test("search learns capture history for capture ordering", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const result = searchBestMove(position, {

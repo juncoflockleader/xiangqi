@@ -98,6 +98,7 @@ export function searchBestMove(position, options = {}) {
   const countermoves = new Map();
   const continuationHistory = new Map();
   const captureHistory = new Map();
+  const checkHistory = new Map();
   const candidateLimit = options.candidateLimit ?? 8;
   const exactRootScores = options.exactRootScores === true || !Number.isFinite(candidateLimit);
   const bannedMoveKeys = new Set((options.bannedMoves ?? []).map(moveKey));
@@ -148,6 +149,7 @@ export function searchBestMove(position, options = {}) {
       countermoves,
       continuationHistory,
       captureHistory,
+      checkHistory,
       candidateLimit,
       priorityMoveKeys,
       repetitionCounts: new Map(repetitionCounts),
@@ -166,6 +168,7 @@ export function searchBestMove(position, options = {}) {
       useKillerMoves: options.useKillerMoves !== false,
       useCountermoves: options.useCountermoves !== false,
       useContinuationHistory: options.useContinuationHistory !== false,
+      useCheckHistory: options.useCheckHistory !== false,
       useCheckEvasionOrdering: options.useCheckEvasionOrdering !== false,
       useRootScoreOrdering: options.useRootScoreOrdering !== false,
       useMateDistancePruning: options.useMateDistancePruning !== false,
@@ -605,6 +608,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   const checkInfo = inCheck ? checkEvasionInfo(position) : null;
   const ordered = orderMoves(position, legalMoves, principalMove, context, ply, previousMove, checkInfo);
   const searchedQuietMoves = [];
+  const searchedQuietChecks = [];
   const searchedCaptures = [];
 
   if (shouldRazor({ depth, inCheck, alpha, beta, staticScore, context })) {
@@ -815,9 +819,11 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
         penalizeFailedCaptures(context, searchedCaptures, depth * depth * 16);
         bumpCaptureHistory(context, move, depth * depth * 16);
       } else {
+        penalizeFailedQuietChecks(context, searchedQuietChecks, depth * depth * 8);
         penalizeFailedQuietMoves(context, searchedQuietMoves, depth * depth, previousMove);
         rememberKiller(context, ply, move);
         rememberCountermove(context, previousMove, move);
+        if (givesCheck) bumpCheckHistory(context, move, depth * depth * 8);
         bumpHistory(context.history, move, depth * depth);
         bumpContinuationHistory(context, previousMove, move, depth * depth);
       }
@@ -828,6 +834,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       searchedCaptures.push(move);
     } else {
       searchedQuietMoves.push(move);
+      if (givesCheck) searchedQuietChecks.push(move);
     }
   }
 
@@ -1032,7 +1039,10 @@ function moveOrderingScore(position, move, principalMove, context, ply, previous
   }
 
   const next = makeMove(position, move);
-  if (isInCheck(next, opponent(position.turn))) score += 40_000;
+  if (isInCheck(next, opponent(position.turn))) {
+    score += 40_000;
+    score += checkHistoryScore(context, move);
+  }
 
   if (killerMoveHit(context, ply, move)) score += 25_000;
   score += context.history.get(moveKey(move)) ?? 0;
@@ -1825,6 +1835,13 @@ function captureHistoryScore(context, move) {
   return Math.max(-30_000, Math.min(30_000, score));
 }
 
+function checkHistoryScore(context, move) {
+  if (!context.useCheckHistory || move.captured) return 0;
+  const score = context.checkHistory.get(moveKey(move)) ?? 0;
+  if (score !== 0) context.stats.checkHistoryHits += 1;
+  return Math.max(-40_000, Math.min(40_000, score));
+}
+
 function bumpHistory(history, move, amount) {
   const key = moveKey(move);
   history.set(key, clampOrderingScore((history.get(key) ?? 0) + amount));
@@ -1837,10 +1854,23 @@ function bumpCaptureHistory(context, move, amount) {
   context.stats.captureHistoryStores += 1;
 }
 
+function bumpCheckHistory(context, move, amount) {
+  if (!context.useCheckHistory || move.captured) return;
+  const key = moveKey(move);
+  context.checkHistory.set(key, clampOrderingScore((context.checkHistory.get(key) ?? 0) + amount));
+  context.stats.checkHistoryStores += 1;
+}
+
 function penalizeFailedCaptures(context, moves, amount) {
   if (!context.useCaptureHistory || moves.length === 0) return;
   for (const move of moves) bumpCaptureHistory(context, move, -amount);
   context.stats.captureHistoryMaluses += moves.length;
+}
+
+function penalizeFailedQuietChecks(context, moves, amount) {
+  if (!context.useCheckHistory || moves.length === 0) return;
+  for (const move of moves) bumpCheckHistory(context, move, -amount);
+  context.stats.checkHistoryMaluses += moves.length;
 }
 
 function captureHistoryKey(move) {
@@ -1979,6 +2009,9 @@ function createSearchStats() {
     captureHistoryStores: 0,
     captureHistoryHits: 0,
     captureHistoryMaluses: 0,
+    checkHistoryStores: 0,
+    checkHistoryHits: 0,
+    checkHistoryMaluses: 0,
     countermoveStores: 0,
     countermoveHits: 0,
     continuationHistoryStores: 0,
@@ -2047,6 +2080,9 @@ function mergeSearchStats(total, next) {
     captureHistoryStores: total.captureHistoryStores + next.captureHistoryStores,
     captureHistoryHits: total.captureHistoryHits + next.captureHistoryHits,
     captureHistoryMaluses: total.captureHistoryMaluses + next.captureHistoryMaluses,
+    checkHistoryStores: total.checkHistoryStores + next.checkHistoryStores,
+    checkHistoryHits: total.checkHistoryHits + next.checkHistoryHits,
+    checkHistoryMaluses: total.checkHistoryMaluses + next.checkHistoryMaluses,
     countermoveStores: total.countermoveStores + next.countermoveStores,
     countermoveHits: total.countermoveHits + next.countermoveHits,
     continuationHistoryStores: total.continuationHistoryStores + next.continuationHistoryStores,

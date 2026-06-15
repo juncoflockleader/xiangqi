@@ -149,6 +149,25 @@ test("move explanations surface check-evasion ordering diagnostics", () => {
   assert.match(selectivityFactor.text, /check-evasion ordering/);
 });
 
+test("move explanations surface check-history ordering diagnostics", () => {
+  const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
+  const engine = createEngine({ depth: 3, timeLimitMs: 2000 });
+  const result = engine.chooseMove(position, {
+    useBook: false,
+    depth: 3,
+    timeLimitMs: 2000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  });
+  const selectivityFactor = result.explanation.confidence.factors
+    .find((factor) => factor.kind === "selectivity");
+
+  assert.ok(result.stats.checkHistoryHits > 0);
+  assert.ok(result.explanation.reasons.some((reason) => reason.includes("check-history")));
+  assert.ok(selectivityFactor);
+  assert.match(selectivityFactor.text, /check-history ordering/);
+});
+
 test("analysis line count is clamped to a useful range", () => {
   const position = createInitialPosition();
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });
