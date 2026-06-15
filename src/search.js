@@ -79,6 +79,7 @@ const SINGULAR_EXTENSION_MIN_DEPTH = 5;
 const SINGULAR_EXTENSION_REDUCTION = 2;
 const DEFAULT_SINGULAR_EXTENSION_MARGIN = 90;
 const HISTORY_GRAVITY_LIMIT = 200_000;
+const IMPROVING_EVAL_MARGIN = 12;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -160,6 +161,7 @@ export function searchBestMove(position, options = {}) {
       continuationHistory,
       captureHistory,
       checkHistory,
+      staticEvalStack: [],
       candidateLimit,
       priorityMoveKeys,
       repetitionCounts: new Map(repetitionCounts),
@@ -198,6 +200,7 @@ export function searchBestMove(position, options = {}) {
       useLateMovePruning: options.useLateMovePruning !== false,
       useLateMoveReductions: options.useLateMoveReductions !== false,
       useAdaptiveLmr: options.useAdaptiveLmr !== false,
+      useImprovingHeuristics: options.useImprovingHeuristics !== false,
       useProbCut: options.useProbCut !== false,
       useInternalIterativeDeepening: options.useInternalIterativeDeepening !== false,
       useSingularExtensions: options.useSingularExtensions !== false,
@@ -593,7 +596,8 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   }
 
   const staticScore = inCheck ? null : evaluateStatic(position, position.turn, context);
-  if (shouldPruneReverseFutility({ depth, inCheck, alpha, beta, staticScore, context })) {
+  const staticTrend = staticEvalTrend(context, ply, staticScore);
+  if (shouldPruneReverseFutility({ depth, inCheck, alpha, beta, staticScore, staticTrend, context })) {
     context.stats.reverseFutilityPrunes += 1;
     leavePosition(context, repetitionKey);
     return beta;
@@ -721,6 +725,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       alpha,
       beta,
       staticScore,
+      staticTrend,
       context
     })) {
       context.stats.futilityPrunes += 1;
@@ -738,13 +743,25 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       beta,
       context,
       ply,
-      previousMove
+      previousMove,
+      staticTrend
     })) {
       context.stats.lateMovePrunes += 1;
       continue;
     }
 
-    let reduction = lateMoveReduction({ depth, index, move, inCheck, givesCheck, extension, context, ply, previousMove });
+    let reduction = lateMoveReduction({
+      depth,
+      index,
+      move,
+      inCheck,
+      givesCheck,
+      extension,
+      context,
+      ply,
+      previousMove,
+      staticTrend
+    });
     if (reduction > 0) {
       context.stats.reductions += 1;
       context.stats.reductionPlies += reduction;
@@ -1504,7 +1521,55 @@ function isRecapture(move, previousMove, context) {
   );
 }
 
-function lateMoveReduction({ depth, index, move, inCheck, givesCheck, extension, context, ply, previousMove }) {
+function staticEvalTrend(context, ply, staticScore) {
+  if (!context.useImprovingHeuristics) return { state: "disabled", delta: null };
+
+  if (staticScore === null || !Number.isFinite(staticScore)) {
+    context.staticEvalStack[ply] = null;
+    return { state: "unknown", delta: null };
+  }
+
+  const previousStaticScore = context.staticEvalStack[ply - 2];
+  context.staticEvalStack[ply] = staticScore;
+
+  if (!Number.isFinite(previousStaticScore)) {
+    return { state: "unknown", delta: null };
+  }
+
+  const delta = staticScore - previousStaticScore;
+  if (delta > IMPROVING_EVAL_MARGIN) {
+    context.stats.improvingNodes += 1;
+    return { state: "improving", delta };
+  }
+  if (delta < -IMPROVING_EVAL_MARGIN) {
+    context.stats.nonImprovingNodes += 1;
+    return { state: "worsening", delta };
+  }
+
+  context.stats.stableEvalTrendNodes += 1;
+  return { state: "stable", delta };
+}
+
+function isImprovingTrend(staticTrend) {
+  return staticTrend?.state === "improving";
+}
+
+function isWorseningTrend(staticTrend) {
+  return staticTrend?.state === "worsening";
+}
+
+function lateMoveReduction({
+  depth,
+  index,
+  move,
+  inCheck,
+  givesCheck,
+  extension,
+  context,
+  ply,
+  previousMove,
+  staticTrend
+}) {
   if (!context.useLateMoveReductions) return 0;
   if (depth < LMR_MIN_DEPTH) return 0;
   if (index < LMR_BASE_MOVE_INDEX) return 0;
@@ -1532,6 +1597,14 @@ function lateMoveReduction({ depth, index, move, inCheck, givesCheck, extension,
   if (isStoredKiller(context, ply, move)) reduction -= 1;
   if (isStoredCountermove(context, previousMove, move)) reduction -= 1;
 
+  if (isImprovingTrend(staticTrend) && reduction > 0) {
+    reduction -= 1;
+    context.stats.improvingReductionGuards += 1;
+  } else if (isWorseningTrend(staticTrend) && index >= LMR_BASE_MOVE_INDEX + 2) {
+    reduction += 1;
+    context.stats.nonImprovingReductionBoosts += 1;
+  }
+
   const maxReduction = Math.max(1, depth - 2);
   return Math.max(0, Math.min(maxReduction, reduction));
 }
@@ -1551,6 +1624,7 @@ function shouldPruneFutility({
   alpha,
   beta,
   staticScore,
+  staticTrend,
   context
 }) {
   if (!context.useFutilityPruning) return false;
@@ -1561,21 +1635,24 @@ function shouldPruneFutility({
   if (move.captured) return false;
   if (alpha <= -MATE_SCORE + 1000 || beta >= MATE_SCORE - 1000) return false;
 
-  return staticScore + futilityMargin(depth) <= alpha;
+  return staticScore + futilityMargin(depth, staticTrend) <= alpha;
 }
 
-function shouldPruneReverseFutility({ depth, inCheck, alpha, beta, staticScore, context }) {
+function shouldPruneReverseFutility({ depth, inCheck, alpha, beta, staticScore, staticTrend, context }) {
   if (!context.useReverseFutilityPruning) return false;
   if (inCheck || staticScore === null) return false;
   if (depth < 1 || depth > context.reverseFutilityMaxDepth) return false;
   if (beta - alpha !== 1) return false;
   if (alpha <= -MATE_SCORE + 1000 || beta >= MATE_SCORE - 1000) return false;
 
-  return staticScore - reverseFutilityMargin(depth, context) >= beta;
+  return staticScore - reverseFutilityMargin(depth, context, staticTrend) >= beta;
 }
 
-function reverseFutilityMargin(depth, context) {
-  return context.reverseFutilityBaseMargin + context.reverseFutilityDepthMargin * depth;
+function reverseFutilityMargin(depth, context, staticTrend) {
+  const margin = context.reverseFutilityBaseMargin + context.reverseFutilityDepthMargin * depth;
+  if (isImprovingTrend(staticTrend)) return Math.max(0, margin - 35);
+  if (isWorseningTrend(staticTrend)) return margin + 45;
+  return margin;
 }
 
 function shouldPruneLateMove({
@@ -1589,11 +1666,19 @@ function shouldPruneLateMove({
   beta,
   context,
   ply,
-  previousMove
+  previousMove,
+  staticTrend
 }) {
   if (!context.useLateMovePruning) return false;
   if (depth < 1 || depth > context.lateMovePruningMaxDepth) return false;
-  if (index < lateMovePruningThreshold(depth, context)) return false;
+  const baseThreshold = lateMovePruningBaseThreshold(depth, context);
+  const threshold = lateMovePruningThreshold(depth, context, staticTrend);
+  if (index < threshold) {
+    if (isImprovingTrend(staticTrend) && index >= baseThreshold) {
+      context.stats.improvingLateMoveGuards += 1;
+    }
+    return false;
+  }
   if (beta - alpha !== 1) return false;
   if (inCheck || givesCheck || extension > 0) return false;
   if (move.captured) return false;
@@ -1602,11 +1687,21 @@ function shouldPruneLateMove({
   if (isStoredCountermove(context, previousMove, move)) return false;
   if ((context.history.get(moveKey(move)) ?? 0) > depth * depth) return false;
   if (continuationHistoryValue(context, previousMove, move) > depth * depth) return false;
+  if (isWorseningTrend(staticTrend) && index < baseThreshold) {
+    context.stats.nonImprovingLateMovePrunes += 1;
+  }
   return true;
 }
 
-function lateMovePruningThreshold(depth, context) {
+function lateMovePruningBaseThreshold(depth, context) {
   return context.lateMovePruningBase + depth * context.lateMovePruningDepthFactor;
+}
+
+function lateMovePruningThreshold(depth, context, staticTrend) {
+  const threshold = lateMovePruningBaseThreshold(depth, context);
+  if (isImprovingTrend(staticTrend)) return threshold + 2;
+  if (isWorseningTrend(staticTrend)) return Math.max(1, threshold - 1);
+  return threshold;
 }
 
 function shouldPruneSee({
@@ -1792,8 +1887,11 @@ function shouldUseInternalIterativeDeepening({ depth, alpha, beta, inCheck, lega
   return true;
 }
 
-function futilityMargin(depth) {
-  return FUTILITY_BASE_MARGIN + FUTILITY_DEPTH_MARGIN * depth;
+function futilityMargin(depth, staticTrend) {
+  const margin = FUTILITY_BASE_MARGIN + FUTILITY_DEPTH_MARGIN * depth;
+  if (isImprovingTrend(staticTrend)) return margin + 45;
+  if (isWorseningTrend(staticTrend)) return Math.max(0, margin - 25);
+  return margin;
 }
 
 function shouldTryNullMove(position, depth, beta, inCheck, context, allowNullMove) {
@@ -2149,6 +2247,13 @@ function createSearchStats() {
     reductionPlies: 0,
     deepReductions: 0,
     lmrResearches: 0,
+    improvingNodes: 0,
+    nonImprovingNodes: 0,
+    stableEvalTrendNodes: 0,
+    improvingReductionGuards: 0,
+    nonImprovingReductionBoosts: 0,
+    improvingLateMoveGuards: 0,
+    nonImprovingLateMovePrunes: 0,
     pvsResearches: 0,
     nullMovePrunes: 0,
     nullMoveVerifications: 0,
@@ -2230,6 +2335,13 @@ function mergeSearchStats(total, next) {
     reductionPlies: total.reductionPlies + next.reductionPlies,
     deepReductions: total.deepReductions + next.deepReductions,
     lmrResearches: total.lmrResearches + next.lmrResearches,
+    improvingNodes: total.improvingNodes + next.improvingNodes,
+    nonImprovingNodes: total.nonImprovingNodes + next.nonImprovingNodes,
+    stableEvalTrendNodes: total.stableEvalTrendNodes + next.stableEvalTrendNodes,
+    improvingReductionGuards: total.improvingReductionGuards + next.improvingReductionGuards,
+    nonImprovingReductionBoosts: total.nonImprovingReductionBoosts + next.nonImprovingReductionBoosts,
+    improvingLateMoveGuards: total.improvingLateMoveGuards + next.improvingLateMoveGuards,
+    nonImprovingLateMovePrunes: total.nonImprovingLateMovePrunes + next.nonImprovingLateMovePrunes,
     pvsResearches: total.pvsResearches + next.pvsResearches,
     nullMovePrunes: total.nullMovePrunes + next.nullMovePrunes,
     nullMoveVerifications: total.nullMoveVerifications + next.nullMoveVerifications,

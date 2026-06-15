@@ -242,6 +242,31 @@ test("move explanations surface continuation-history reduction tuning", () => {
   assert.match(selectivityFactor.text, /continuation-history reduction tuning/);
 });
 
+test("move explanations surface improving-position search tuning", () => {
+  const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
+  const engine = createEngine({ depth: 4, timeLimitMs: 5000 });
+  const result = engine.chooseMove(position, {
+    useBook: false,
+    depth: 4,
+    timeLimitMs: 5000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  });
+  const adjustments = result.stats.improvingReductionGuards +
+    result.stats.nonImprovingReductionBoosts +
+    result.stats.improvingLateMoveGuards +
+    result.stats.nonImprovingLateMovePrunes;
+  const selectivityFactor = result.explanation.confidence.factors
+    .find((factor) => factor.kind === "selectivity");
+
+  assert.ok(result.stats.improvingNodes > 0);
+  assert.ok(result.stats.nonImprovingNodes > 0);
+  assert.ok(adjustments > 0);
+  assert.ok(result.explanation.reasons.some((reason) => reason.includes("improving-position")));
+  assert.ok(selectivityFactor);
+  assert.match(selectivityFactor.text, /improving-position search tuning/);
+});
+
 test("analysis line count is clamped to a useful range", () => {
   const position = createInitialPosition();
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });

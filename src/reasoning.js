@@ -458,6 +458,15 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.deepReductions ?? 0) > 0) {
     orderingParts.push(formatCount(stats.deepReductions, "deeper adaptive late-move reduction"));
   }
+  const improvingAdjustments = (
+    (stats.improvingReductionGuards ?? 0) +
+    (stats.nonImprovingReductionBoosts ?? 0) +
+    (stats.improvingLateMoveGuards ?? 0) +
+    (stats.nonImprovingLateMovePrunes ?? 0)
+  );
+  if (improvingAdjustments > 0) {
+    orderingParts.push(formatCount(improvingAdjustments, "improving-position tuning adjustment"));
+  }
   if ((stats.continuationHistoryHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.continuationHistoryHits, "continuation-history hit"));
   }
@@ -510,6 +519,14 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   }
   if ((stats.checkEvasionOrderHits ?? 0) > 0) supports.push("check-evasion ordering");
   if ((stats.deepReductions ?? 0) > 0) supports.push("adaptive late-move reductions");
+  if (
+    (stats.improvingReductionGuards ?? 0) > 0 ||
+    (stats.nonImprovingReductionBoosts ?? 0) > 0 ||
+    (stats.improvingLateMoveGuards ?? 0) > 0 ||
+    (stats.nonImprovingLateMovePrunes ?? 0) > 0
+  ) {
+    supports.push("improving-position search tuning");
+  }
   if ((stats.singularExtensions ?? 0) > 0) supports.push("singular extensions");
   if ((stats.nullMovePrunes ?? 0) > 0 || (stats.nullMoveVerifications ?? 0) > 0) {
     supports.push("null-move pruning");

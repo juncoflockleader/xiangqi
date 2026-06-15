@@ -700,13 +700,15 @@ test("search prunes clearly losing shallow captures with static exchange", () =>
     depth: 4,
     timeLimitMs: 3000,
     useAspiration: false,
-    useSoftTimeManagement: false
+    useSoftTimeManagement: false,
+    useImprovingHeuristics: false
   });
   const withoutPruning = searchBestMove(position, {
     depth: 4,
     timeLimitMs: 3000,
     useAspiration: false,
     useSoftTimeManagement: false,
+    useImprovingHeuristics: false,
     useSeePruning: false
   });
 
@@ -942,6 +944,41 @@ test("search tunes late-move reductions with continuation history", () => {
   assert.ok(result.stats.continuationReductionBoosts + result.stats.continuationReductionMaluses > 0);
   assert.equal(disabled.stats.continuationReductionBoosts, 0);
   assert.equal(disabled.stats.continuationReductionMaluses, 0);
+});
+
+test("search tunes pruning and reductions with improving static-eval trends", () => {
+  const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
+  const result = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 5000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  });
+  const disabled = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 5000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    useImprovingHeuristics: false
+  });
+  const adjustments = result.stats.improvingReductionGuards +
+    result.stats.nonImprovingReductionBoosts +
+    result.stats.improvingLateMoveGuards +
+    result.stats.nonImprovingLateMovePrunes;
+  const disabledAdjustments = disabled.stats.improvingReductionGuards +
+    disabled.stats.nonImprovingReductionBoosts +
+    disabled.stats.improvingLateMoveGuards +
+    disabled.stats.nonImprovingLateMovePrunes;
+
+  assert.equal(result.depth, 4);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.equal(Math.round(result.score), Math.round(disabled.score));
+  assert.ok(result.stats.improvingNodes > 0);
+  assert.ok(result.stats.nonImprovingNodes > 0);
+  assert.ok(adjustments > 0);
+  assert.equal(disabled.stats.improvingNodes, 0);
+  assert.equal(disabled.stats.nonImprovingNodes, 0);
+  assert.equal(disabledAdjustments, 0);
 });
 
 test("search penalizes failed quiet moves in history ordering", () => {

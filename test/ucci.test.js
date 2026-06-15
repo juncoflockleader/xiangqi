@@ -60,6 +60,12 @@ test("UCCI session searches a FEN position", () => {
   assert.ok(output.some((line) => /\bceking \d+/.test(line)));
   assert.ok(output.some((line) => line.includes("hmalus")));
   assert.ok(output.some((line) => /\bhgrav \d+/.test(line)));
+  assert.ok(output.some((line) => /\bimp \d+/.test(line)));
+  assert.ok(output.some((line) => /\bnimp \d+/.test(line)));
+  assert.ok(output.some((line) => /\bimprd \d+/.test(line)));
+  assert.ok(output.some((line) => /\bnimprd \d+/.test(line)));
+  assert.ok(output.some((line) => /\bimplmp \d+/.test(line)));
+  assert.ok(output.some((line) => /\bnimlmp \d+/.test(line)));
   assert.ok(output.includes("bestmove e9e2"));
   assert.ok(output.some((line) => line.includes("reason: Wins a rook")));
   assert.ok(output.some((line) => line.includes("go plan: Start with e9e2") || line.includes("go plan: Start with e9-e2")));
