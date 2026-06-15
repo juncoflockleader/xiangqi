@@ -903,9 +903,7 @@ function visualPoint(coord, playerSide) {
 
 function intersectionPercent(index, count) {
   if (count <= 1) return "50%";
-  const edgeInset = 50 / count;
-  const span = 100 - edgeInset * 2;
-  return `${edgeInset + (index * span) / (count - 1)}%`;
+  return `${(index * 100) / (count - 1)}%`;
 }
 
 function cellTitle(cell, coord, targetMove = null) {

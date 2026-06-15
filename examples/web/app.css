@@ -136,9 +136,9 @@ h2 {
   --grid-line-strong: rgba(61, 35, 13, 0.9);
   --grid-inset-x: calc(100% / 18);
   --grid-inset-y: calc(100% / 20);
-  --point-size: clamp(34px, 8.2%, 56px);
-  --piece-size: clamp(28px, 76%, 42px);
-  --piece-font-size: 13px;
+  --point-size: clamp(32px, 11.5%, 54px);
+  --piece-size: clamp(26px, 70%, 40px);
+  --piece-font-size: clamp(11px, 2.3vw, 16px);
   width: min(100%, 760px);
   margin: 0 auto;
   aspect-ratio: 9 / 10;
@@ -297,13 +297,10 @@ h2 {
 
 .board {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: var(--board-play-width);
-  aspect-ratio: 9 / 10;
-  transform: translate(-50%, -50%);
-  z-index: 1;
+  inset: var(--grid-inset-y) var(--grid-inset-x);
+  z-index: 4;
   overflow: visible;
+  pointer-events: auto;
 }
 
 .cell {
@@ -358,7 +355,7 @@ h2 {
   font-size: var(--piece-font-size);
   font-weight: 800;
   font-variant-east-asian: traditional;
-  line-height: 1;
+  line-height: 0.95;
   text-align: center;
   overflow: hidden;
   white-space: nowrap;

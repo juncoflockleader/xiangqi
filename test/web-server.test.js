@@ -42,8 +42,9 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(stylesheet, /\.selected-moves/);
     assert.match(stylesheet, /\.move-label/);
     assert.match(stylesheet, /width: var\(--board-play-width\)/);
-    assert.match(stylesheet, /--piece-size: clamp\(28px, 76%, 42px\)/);
-    assert.match(stylesheet, /--piece-font-size: 13px/);
+    assert.match(stylesheet, /inset: var\(--grid-inset-y\) var\(--grid-inset-x\)/);
+    assert.match(stylesheet, /--piece-size: clamp\(26px, 70%, 40px\)/);
+    assert.match(stylesheet, /--piece-font-size: clamp\(11px, 2\.3vw, 16px\)/);
     assert.match(stylesheet, /outline: 2px solid var\(--grid-line-strong\)/);
     assert.match(stylesheet, /\.move-chip \.move-notation/);
     assert.match(stylesheet, /min-height: 0/);
