@@ -76,6 +76,9 @@ rl.on("line", (line) => {
       } else if (hasOption("MockShortPvPonder")) {
         write(`info depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")}`);
         write(`bestmove ${nativeMove("h9g7")} ponder ${nativeMove("h0g2")}`);
+      } else if (hasOption("MockTelemetry")) {
+        write(`info depth ${depth} seldepth ${depth + 4} score cp 42 nodes 123 time 15 nps 8200 hashfull 321 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+        write(`bestmove ${nativeMove("h9g7")}`);
       } else if (hasOption("MockScoreBounds")) {
         write(`info multipv 1 depth ${depth} score cp 80 lowerbound nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
         write(`info multipv 2 depth ${depth} score cp 20 upperbound nodes 123 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);

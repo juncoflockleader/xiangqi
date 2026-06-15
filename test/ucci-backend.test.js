@@ -104,6 +104,51 @@ test("UCCI backend searches through an external process", async () => {
   }
 });
 
+test("native backend preserves search telemetry from info lines", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    depth: 3,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockDepthFromGo: true,
+      MockTelemetry: true
+    }
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), { useBook: false });
+
+    assert.equal(result.depth, 3);
+    assert.equal(result.seldepth, 7);
+    assert.equal(result.nodes, 123);
+    assert.equal(result.timeMs, 15);
+    assert.equal(result.nps, 8200);
+    assert.equal(result.hashfull, 321);
+    assert.deepEqual(result.telemetry, {
+      seldepth: 7,
+      timeMs: 15,
+      nps: 8200,
+      hashfull: 321,
+      hashfullText: "32.1%"
+    });
+    assert.equal(result.stats.seldepth, 7);
+    assert.equal(result.stats.timeMs, 15);
+    assert.equal(result.stats.nps, 8200);
+    assert.equal(result.stats.hashfull, 321);
+    assert.equal(result.candidates[0].native.telemetry.hashfullText, "32.1%");
+    assert.equal(result.iterations[0].telemetry.seldepth, 7);
+    assert.equal(result.explanation.search.telemetry.hashfullText, "32.1%");
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("Native search telemetry")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("8.2k nodes/s")));
+  } finally {
+    await backend.close();
+  }
+});
+
 test("UCCI backend close resolves when native process already exited", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,

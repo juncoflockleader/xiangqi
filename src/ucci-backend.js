@@ -529,7 +529,12 @@ async function nativeSearch(client, position, options) {
     scoreDetail: parsed.scoreDetail,
     wdl: parsed.wdl,
     depth: parsed.depth,
+    seldepth: parsed.seldepth,
     nodes: parsed.nodes,
+    timeMs: parsed.timeMs,
+    nps: parsed.nps,
+    hashfull: parsed.hashfull,
+    telemetry: parsed.telemetry,
     ponderMove: parsed.ponderMove,
     principalVariation: parsed.principalVariation,
     candidates: parsed.candidates,
@@ -817,7 +822,12 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     scoreDetail: nativeScoreDetail(primaryInfo),
     wdl: nativeWdl(primaryInfo),
     depth: maxInfoValue(infos, "depth"),
+    seldepth: maxInfoValue(infos, "seldepth"),
     nodes: maxInfoValue(infos, "nodes"),
+    timeMs: maxInfoValue(infos, "timeMs"),
+    nps: maxInfoValue(infos, "nps"),
+    hashfull: maxInfoValue(infos, "hashfull"),
+    telemetry: nativeTelemetry(infos),
     principalVariation,
     candidates,
     iterations: infos
@@ -826,11 +836,16 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
         depth: info.depth,
         bestMove: resolvePrincipalVariation(position, info.pv)[0] ?? null,
         score: info.score ?? 0,
+        seldepth: info.seldepth ?? 0,
         nodes: info.nodes ?? 0,
+        timeMs: info.timeMs ?? 0,
+        nps: info.nps ?? 0,
+        hashfull: info.hashfull ?? 0,
+        telemetry: nativeTelemetry([info]),
         principalVariation: resolvePrincipalVariation(position, info.pv),
         candidates: [],
         stableBestMove: null,
-        stats: createNativeStats({ nodes: info.nodes ?? 0 })
+        stats: createNativeStats(info)
       }))
   };
 }
@@ -875,7 +890,11 @@ function parseInfoLine(line) {
   const tokens = line.split(/\s+/);
   const info = {
     depth: 0,
+    seldepth: 0,
     nodes: 0,
+    timeMs: 0,
+    nps: 0,
+    hashfull: 0,
     multipv: 1,
     scoreKind: null,
     scoreValue: null,
@@ -891,8 +910,20 @@ function parseInfoLine(line) {
     if (token === "depth") {
       info.depth = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
+    } else if (token === "seldepth") {
+      info.seldepth = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
     } else if (token === "nodes") {
       info.nodes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "time") {
+      info.timeMs = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "nps") {
+      info.nps = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "hashfull") {
+      info.hashfull = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "multipv") {
       info.multipv = Number.parseInt(tokens[index + 1], 10) || 1;
@@ -982,7 +1013,12 @@ function buildNativeCandidates(position, infos, bestMove, primaryInfo, ponderMov
         principalVariation,
         native: {
           depth: info.depth,
+          seldepth: info.seldepth,
           nodes: info.nodes,
+          timeMs: info.timeMs,
+          nps: info.nps,
+          hashfull: info.hashfull,
+          telemetry: nativeTelemetry([info]),
           multipv: info.multipv,
           scoreDetail: nativeScoreDetail(info),
           wdl: nativeWdl(info)
@@ -1002,7 +1038,12 @@ function buildNativeCandidates(position, infos, bestMove, primaryInfo, ponderMov
     principalVariation: addPonderToPrincipalVariation([bestMove], bestMove, ponderMove),
     native: {
       depth: primaryInfo.depth ?? 0,
+      seldepth: primaryInfo.seldepth ?? 0,
       nodes: primaryInfo.nodes ?? 0,
+      timeMs: primaryInfo.timeMs ?? 0,
+      nps: primaryInfo.nps ?? 0,
+      hashfull: primaryInfo.hashfull ?? 0,
+      telemetry: nativeTelemetry([primaryInfo]),
       multipv: 1,
       scoreDetail: nativeScoreDetail(primaryInfo),
       wdl: nativeWdl(primaryInfo)
@@ -1076,6 +1117,23 @@ function nativeWdl(info = {}) {
   };
 }
 
+function nativeTelemetry(infos = []) {
+  const seldepth = maxInfoValue(infos, "seldepth");
+  const timeMs = maxInfoValue(infos, "timeMs");
+  const nps = maxInfoValue(infos, "nps");
+  const hashfull = maxInfoValue(infos, "hashfull");
+
+  if (seldepth <= 0 && timeMs <= 0 && nps <= 0 && hashfull <= 0) return null;
+
+  return {
+    seldepth: seldepth || null,
+    timeMs: timeMs || null,
+    nps: nps || null,
+    hashfull: hashfull || null,
+    hashfullText: hashfull > 0 ? `${(hashfull / 10).toFixed(1)}%` : null
+  };
+}
+
 function formatNativeWdl(wdl) {
   const total = wdl.total > 0 ? wdl.total : wdl.win + wdl.draw + wdl.loss;
   if (total <= 0) return `${wdl.win}/${wdl.draw}/${wdl.loss}`;
@@ -1143,6 +1201,7 @@ function explainNativeMove(position, result, backendName) {
   const reasons = [
     `${backendName} selected this move through ${protocolLabel} search.`,
     `The native search reported depth ${result.depth} and ${result.nodes} nodes.`,
+    nativeTelemetryReason(result.telemetry),
     `It reported a score of ${scoreText} for the side to move.`,
     nativeScoreBoundReason(result.scoreDetail),
     nativeWdlReason(result.wdl),
@@ -1174,6 +1233,7 @@ function explainNativeMove(position, result, backendName) {
       openingHeuristicValidation: result.openingHeuristicValidation ?? null,
       scoreDetail: result.scoreDetail ?? null,
       wdl: result.wdl ?? null,
+      telemetry: result.telemetry ?? null,
       ponderMove
     }
   };
@@ -1375,6 +1435,25 @@ function nativeScoreBoundReason(scoreDetail) {
   return null;
 }
 
+function nativeTelemetryReason(telemetry) {
+  if (!telemetry) return null;
+
+  const parts = [];
+  if (telemetry.seldepth) parts.push(`selective depth ${telemetry.seldepth}`);
+  if (telemetry.timeMs) parts.push(`${telemetry.timeMs} ms`);
+  if (telemetry.nps) parts.push(`${formatNativeNodes(telemetry.nps)}/s`);
+  if (telemetry.hashfullText) parts.push(`${telemetry.hashfullText} hash used`);
+
+  return parts.length > 0 ? `Native search telemetry: ${parts.join(", ")}.` : null;
+}
+
+function formatNativeNodes(value) {
+  const rounded = Math.round(value ?? 0);
+  if (rounded >= 1_000_000) return `${(rounded / 1_000_000).toFixed(1)}M nodes`;
+  if (rounded >= 1_000) return `${(rounded / 1_000).toFixed(1)}k nodes`;
+  return `${rounded} nodes`;
+}
+
 function nativeWdlReason(wdl) {
   if (!wdl) return null;
   return `Native WDL expectation: ${wdl.text}.`;
@@ -1545,6 +1624,10 @@ function createNativeStats(parsed) {
   return {
     ...createEmptyStats(),
     nodes: parsed.nodes ?? 0,
+    seldepth: parsed.seldepth ?? parsed.telemetry?.seldepth ?? 0,
+    timeMs: parsed.timeMs ?? parsed.telemetry?.timeMs ?? 0,
+    nps: parsed.nps ?? parsed.telemetry?.nps ?? 0,
+    hashfull: parsed.hashfull ?? parsed.telemetry?.hashfull ?? 0,
     native: true
   };
 }
