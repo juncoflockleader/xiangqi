@@ -202,8 +202,9 @@ function pawnValue(position, piece, square) {
   const riverBonus = hasCrossedRiver(piece.side, rank) ? 35 : 0;
   const centralPassedBonus = Math.max(0, 3 - Math.abs(file - 4)) * 8;
   const supportBonus = pawnSupportValue(position, piece, file, rank);
+  const invasionBonus = pawnInvasionValue(position, piece, square, file, rank);
   const lastRankPenalty = (piece.side === SIDES.RED ? rank === 0 : rank === BOARD_RANKS - 1) ? -18 : 0;
-  return riverBonus + centralPassedBonus + supportBonus + lastRankPenalty;
+  return riverBonus + centralPassedBonus + supportBonus + invasionBonus + lastRankPenalty;
 }
 
 function pawnSupportValue(position, piece, file, rank) {
@@ -228,6 +229,43 @@ function isFriendlyPawn(position, side, file, rank) {
   if (!isInside(file, rank)) return false;
   const piece = position.board[indexOf(file, rank)];
   return piece?.side === side && piece.type === PIECES.PAWN;
+}
+
+function pawnInvasionValue(position, piece, square, file, rank) {
+  if (!hasCrossedRiver(piece.side, rank)) return 0;
+
+  const enemy = opponent(piece.side);
+  const enemyKingSquare = position.board.findIndex(
+    (candidate) => candidate?.side === enemy && candidate.type === PIECES.KING
+  );
+  if (enemyKingSquare === -1) return 0;
+
+  const kingFile = fileOf(enemyKingSquare);
+  const kingRank = rankOf(enemyKingSquare);
+  const fileDistance = Math.abs(file - kingFile);
+  const rankDistance = Math.abs(rank - kingRank);
+  let score = 0;
+
+  if (palaceContains(enemy, file, rank)) {
+    score += 36;
+    if (fileDistance === 0) score += 28;
+    else if (fileDistance === 1) score += 16;
+    score += Math.max(0, 3 - rankDistance) * 8;
+  }
+
+  if (fileDistance === 0 && isPawnInFrontOfEnemyKing(piece.side, rank, kingRank)) {
+    score += Math.max(0, 32 - rankDistance * 5);
+  }
+
+  if (pawnControls(square, piece).includes(enemyKingSquare)) {
+    score += 70;
+  }
+
+  return score;
+}
+
+function isPawnInFrontOfEnemyKing(side, pawnRank, kingRank) {
+  return side === SIDES.RED ? pawnRank > kingRank : pawnRank < kingRank;
 }
 
 function coordinationValue(position, piece, square) {
@@ -851,7 +889,7 @@ function readableTerm(term) {
     placement: "piece placement",
     mobility: "mobility",
     threats: "tactical pressure",
-    pawnStructure: "pawn progress and support",
+    pawnStructure: "pawn progress, support, and palace invasion",
     kingSafety: "king safety",
     kingAttack: "pressure on the general",
     pieceSafety: "piece safety",

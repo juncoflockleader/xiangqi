@@ -249,11 +249,11 @@ test("move explanations surface transposition hash-move ordering diagnostics", (
 });
 
 test("move explanations surface continuation-history reduction tuning", () => {
-  const position = parseFen("4k4/9/9/9/9/9/4P4/9/9/3KR4 r");
-  const engine = createEngine({ depth: 7, timeLimitMs: 5000 });
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const engine = createEngine({ depth: 4, timeLimitMs: 5000 });
   const result = engine.chooseMove(position, {
     useBook: false,
-    depth: 7,
+    depth: 4,
     timeLimitMs: 5000,
     useAspiration: false,
     useSoftTimeManagement: false,

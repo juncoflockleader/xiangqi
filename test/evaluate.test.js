@@ -204,6 +204,16 @@ test("evaluation rewards connected advanced pawns as pawn structure", () => {
   assert.ok(connectedEval.difference.pawnStructure > separatedEval.difference.pawnStructure);
 });
 
+test("evaluation rewards soldiers that invade the enemy palace", () => {
+  const invading = parseFen("4k4/9/4P4/9/9/9/9/9/9/4K4 r");
+  const flank = parseFen("4k4/9/9/9/P8/9/9/9/9/4K4 r");
+  const invadingEval = evaluatePosition(invading, SIDES.RED, { detailed: true });
+  const flankEval = evaluatePosition(flank, SIDES.RED, { detailed: true });
+
+  assert.ok(invadingEval.terms.red.pawnStructure - flankEval.terms.red.pawnStructure >= 70);
+  assert.ok(invadingEval.difference.pawnStructure > flankEval.difference.pawnStructure);
+});
+
 test("evaluation descriptions surface connected pawn support", () => {
   const position = parseFen("4k4/9/9/9/2P6/3PP4/9/9/9/4K4 r");
   const next = applyLegalMove(position, {
@@ -214,5 +224,18 @@ test("evaluation descriptions surface connected pawn support", () => {
   const notes = describeEvaluationTerms(delta.delta);
 
   assert.ok(delta.delta.pawnStructure > 0);
-  assert.ok(notes.some((note) => note.term === "pawnStructure" && note.text.includes("pawn progress and support")));
+  assert.ok(notes.some((note) => note.term === "pawnStructure" && note.text.includes("pawn progress")));
+});
+
+test("evaluation descriptions surface soldier palace invasion", () => {
+  const position = parseFen("4k4/9/9/4P4/9/9/9/9/9/4K4 r");
+  const next = applyLegalMove(position, {
+    from: coordToIndex("e3"),
+    to: coordToIndex("e2")
+  });
+  const delta = evaluateMoveDelta(position, next, SIDES.RED);
+  const notes = describeEvaluationTerms(delta.delta);
+
+  assert.ok(delta.delta.pawnStructure >= 30);
+  assert.ok(notes.some((note) => note.term === "pawnStructure" && note.text.includes("palace invasion")));
 });
