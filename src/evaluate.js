@@ -73,6 +73,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     terms[side].pieceSafety += pieceSafetyValue(position, side, control[side], control[opponent(side)]);
     terms[side].kingAttack += kingAttackValue(position, side, sideMoves);
     terms[side].kingSafety += globalKingSafety(position, side, control[opponent(side)]);
+    terms[side].palaceShape += palaceShapeValue(position, side);
 
     if (isInCheck(position, opponent(side))) {
       terms[side].threats += 45;
@@ -136,6 +137,7 @@ function createTerms() {
     threats: 0,
     pawnStructure: 0,
     kingSafety: 0,
+    palaceShape: 0,
     kingAttack: 0,
     pieceSafety: 0,
     coordination: 0,
@@ -266,6 +268,39 @@ function pawnInvasionValue(position, piece, square, file, rank) {
 
 function isPawnInFrontOfEnemyKing(side, pawnRank, kingRank) {
   return side === SIDES.RED ? pawnRank > kingRank : pawnRank < kingRank;
+}
+
+function palaceShapeValue(position, side) {
+  const kingSquare = position.board.findIndex((piece) => piece?.side === side && piece.type === PIECES.KING);
+  if (kingSquare === -1) return -20000;
+
+  const centerSquare = indexOf(4, side === SIDES.RED ? BOARD_RANKS - 2 : 1);
+  const centerPiece = position.board[centerSquare];
+  if (!centerPiece || centerPiece.side !== side) return 0;
+  if (centerPiece.type === PIECES.KING || centerPiece.type === PIECES.ADVISOR) return 0;
+
+  let penalty = palaceCenterBlockPenalty(centerPiece.type);
+  if (lineAligned(centerSquare, kingSquare) && countLineBlockers(position, centerSquare, kingSquare) === 0) {
+    penalty += 10;
+  }
+
+  return -penalty;
+}
+
+function palaceCenterBlockPenalty(type) {
+  switch (type) {
+    case PIECES.HORSE:
+      return 58;
+    case PIECES.ROOK:
+    case PIECES.CANNON:
+      return 36;
+    case PIECES.PAWN:
+      return 30;
+    case PIECES.ELEPHANT:
+      return 24;
+    default:
+      return 20;
+  }
 }
 
 function coordinationValue(position, piece, square) {
@@ -429,6 +464,10 @@ function countLineBlockers(position, from, to) {
   }
 
   return blockers;
+}
+
+function lineAligned(first, second) {
+  return fileOf(first) === fileOf(second) || rankOf(first) === rankOf(second);
 }
 
 function localDefenseValue(position, piece, square) {
@@ -891,6 +930,7 @@ function readableTerm(term) {
     threats: "tactical pressure",
     pawnStructure: "pawn progress, support, and palace invasion",
     kingSafety: "king safety",
+    palaceShape: "palace shape and congestion",
     kingAttack: "pressure on the general",
     pieceSafety: "piece safety",
     coordination: "piece coordination",

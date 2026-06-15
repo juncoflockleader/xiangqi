@@ -25,6 +25,9 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(page, /中文（繁體）/);
     assert.match(page, /aria-label="象棋棋盘"/);
     assert.match(page, /data-i18n-aria-label="boardAria"/);
+    assert.match(page, /class="board-grid"/);
+    assert.match(page, /M1 0V4 M1 5V9/);
+    assert.match(page, /M3 0L5 2 M5 0L3 2/);
     assert.match(page, /file-labels-north/);
     assert.match(page, /id="selectedMoves"/);
     assert.match(page, />九</);
@@ -43,9 +46,10 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(stylesheet, /\.move-label/);
     assert.match(stylesheet, /width: var\(--board-play-width\)/);
     assert.match(stylesheet, /inset: var\(--grid-inset-y\) var\(--grid-inset-x\)/);
-    assert.match(stylesheet, /--piece-size: clamp\(26px, 70%, 40px\)/);
-    assert.match(stylesheet, /--piece-font-size: clamp\(11px, 2\.3vw, 16px\)/);
-    assert.match(stylesheet, /outline: 2px solid var\(--grid-line-strong\)/);
+    assert.match(stylesheet, /--piece-size: clamp\(27px, 68%, 42px\)/);
+    assert.match(stylesheet, /--piece-font-size: 14px/);
+    assert.match(stylesheet, /\.board-grid-major/);
+    assert.match(stylesheet, /vector-effect: non-scaling-stroke/);
     assert.match(stylesheet, /\.move-chip \.move-notation/);
     assert.match(stylesheet, /min-height: 0/);
     assert.doesNotMatch(stylesheet, /rotate\(180deg\)/);

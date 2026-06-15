@@ -908,7 +908,8 @@ function intersectionPercent(index, count) {
 
 function cellTitle(cell, coord, targetMove = null) {
   const point = localizedPoint(coord);
-  const move = targetMove ? `，${moveText(targetMove.notation, targetMove.zhNotation)}` : "";
+  const separator = isChineseLocale() ? "，" : ", ";
+  const move = targetMove ? `${separator}${moveText(targetMove.notation, targetMove.zhNotation)}` : "";
   if (!cell?.piece) return `${t("emptyPoint")} ${point}${move}`;
   return `${pieceName(cell.piece)} ${point}${move}`;
 }

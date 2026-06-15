@@ -171,6 +171,29 @@ test("evaluation descriptions surface rebuilding the fortress", () => {
   assert.ok(notes.some((note) => note.term === "kingSafety" && note.text.includes("king safety")));
 });
 
+test("evaluation penalizes palace-center horse congestion", () => {
+  const clogged = parseFen("4k4/9/9/9/9/4P4/9/9/4H4/4K4 r");
+  const clear = parseFen("4k4/9/9/9/9/H3P4/9/9/9/4K4 r");
+  const cloggedEval = evaluatePosition(clogged, SIDES.RED, { detailed: true });
+  const clearEval = evaluatePosition(clear, SIDES.RED, { detailed: true });
+
+  assert.ok(clearEval.terms.red.palaceShape - cloggedEval.terms.red.palaceShape >= 55);
+  assert.ok(clearEval.difference.palaceShape > cloggedEval.difference.palaceShape);
+});
+
+test("evaluation descriptions surface unclogging the palace center", () => {
+  const position = parseFen("4k4/9/9/9/9/4P4/9/9/4H4/4K4 r");
+  const next = applyLegalMove(position, {
+    from: coordToIndex("e8"),
+    to: coordToIndex("g7")
+  });
+  const delta = evaluateMoveDelta(position, next, SIDES.RED);
+  const notes = describeEvaluationTerms(delta.delta);
+
+  assert.ok(delta.delta.palaceShape >= 55);
+  assert.ok(notes.some((note) => note.term === "palaceShape" && note.text.includes("palace shape")));
+});
+
 test("evaluation penalizes loose attacked pieces", () => {
   const loose = parseFen("4k4/9/9/4r4/9/4R4/P8/9/9/4K4 r");
   const defended = parseFen("4k4/9/9/4r4/9/4R4/4P4/9/9/4K4 r");
