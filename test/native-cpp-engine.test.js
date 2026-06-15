@@ -43,6 +43,7 @@ test("local C++ engine builds and searches through the native UCI backend", asyn
     assert.ok(result.nps > 0);
     assert.equal(typeof result.hashfull, "number");
     assert.ok(result.raw.some((line) => /\bhashfull\b/.test(line)));
+    assert.ok(result.raw.some((line) => /\bhistory\b/.test(line)));
     assert.ok(legalMoves.some((move) => sameMove(move, result.bestMove)));
     assert.ok(result.candidates.length >= 2);
     assert.equal(result.candidates[0].move.notation, result.bestMove.notation);

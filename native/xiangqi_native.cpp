@@ -20,6 +20,8 @@ constexpr int kRed = 1;
 constexpr int kBlack = -1;
 constexpr int kInf = 1000000;
 constexpr int kMate = 100000;
+constexpr int kMaxPly = 128;
+constexpr int kHistoryMax = 200000;
 
 enum PieceType {
   Empty = 0,
@@ -63,8 +65,13 @@ struct SearchState {
   int64_t ttProbes = 0;
   int64_t ttHits = 0;
   int64_t ttCutoffs = 0;
+  int64_t killerHits = 0;
+  int64_t historyUpdates = 0;
   int ttHashfull = 0;
   TranspositionTable* tt = nullptr;
+  std::array<std::array<Move, 2>, kMaxPly> killers{};
+  std::array<std::array<int, kSquares>, kSquares> quietHistory{};
+  std::array<std::array<int, kSquares>, kSquares> captureHistory{};
 };
 
 struct TtEntry {
@@ -520,6 +527,49 @@ bool validMove(const Move& move) {
   return move.from >= 0 && move.to >= 0;
 }
 
+bool isCapture(const Move& move) {
+  return move.captured != 0;
+}
+
+bool isQuiet(const Move& move) {
+  return move.captured == 0;
+}
+
+bool isKillerMove(const SearchState& state, int ply, const Move& move) {
+  if (ply < 0 || ply >= kMaxPly || !isQuiet(move)) return false;
+  return sameMove(state.killers[ply][0], move) || sameMove(state.killers[ply][1], move);
+}
+
+void addHistoryScore(std::array<std::array<int, kSquares>, kSquares>& table, const Move& move, int bonus) {
+  int& value = table[move.from][move.to];
+  value += bonus - value * std::abs(bonus) / kHistoryMax;
+  value = std::clamp(value, -kHistoryMax, kHistoryMax);
+}
+
+void rememberKiller(SearchState& state, int ply, const Move& move) {
+  if (ply < 0 || ply >= kMaxPly || !isQuiet(move)) return;
+  if (sameMove(state.killers[ply][0], move)) return;
+  state.killers[ply][1] = state.killers[ply][0];
+  state.killers[ply][0] = move;
+}
+
+void rememberBetaCutoff(SearchState& state, int ply, int depth, const Move& bestMove, const std::vector<Move>& quiets, const std::vector<Move>& captures) {
+  const int bonus = std::clamp(depth * depth * 32, 32, 4096);
+  if (isQuiet(bestMove)) {
+    rememberKiller(state, ply, bestMove);
+    addHistoryScore(state.quietHistory, bestMove, bonus);
+    for (const Move& move : quiets) {
+      if (!sameMove(move, bestMove)) addHistoryScore(state.quietHistory, move, -bonus / 2);
+    }
+  } else if (isCapture(bestMove)) {
+    addHistoryScore(state.captureHistory, bestMove, bonus);
+  }
+  for (const Move& move : captures) {
+    if (!sameMove(move, bestMove)) addHistoryScore(state.captureHistory, move, -bonus / 2);
+  }
+  state.historyUpdates += 1;
+}
+
 int squareAdvanceBonus(int side, int rank) {
   return side == kRed ? (9 - rank) * 5 : rank * 5;
 }
@@ -654,11 +704,15 @@ int evaluateRed(const Board& board) {
   return score;
 }
 
-int moveOrderingScore(const Move& move, const Move& hashMove = {}) {
+int moveOrderingScore(const Move& move, const SearchState& state, int ply, const Move& hashMove = {}) {
   if (validMove(hashMove) && sameMove(move, hashMove)) return 10000000;
   int score = 0;
   if (move.captured != 0) {
     score += 100000 + pieceValue(move.captured) * 16 - pieceValue(move.piece);
+    score += state.captureHistory[move.from][move.to];
+  } else {
+    if (isKillerMove(state, ply, move)) score += 90000;
+    score += state.quietHistory[move.from][move.to];
   }
   const int toFile = fileOf(move.to);
   score += (4 - std::abs(toFile - 4)) * 4;
@@ -666,9 +720,9 @@ int moveOrderingScore(const Move& move, const Move& hashMove = {}) {
   return score;
 }
 
-void orderMoves(std::vector<Move>& moves, const Move& hashMove = {}) {
-  std::stable_sort(moves.begin(), moves.end(), [hashMove](const Move& left, const Move& right) {
-    return moveOrderingScore(left, hashMove) > moveOrderingScore(right, hashMove);
+void orderMoves(std::vector<Move>& moves, const SearchState& state, int ply, const Move& hashMove = {}) {
+  std::stable_sort(moves.begin(), moves.end(), [&state, ply, hashMove](const Move& left, const Move& right) {
+    return moveOrderingScore(left, state, ply, hashMove) > moveOrderingScore(right, state, ply, hashMove);
   });
 }
 
@@ -730,14 +784,17 @@ int negamax(Board& board, int depth, int alpha, int beta, int ply, SearchState& 
 
   auto moves = generateLegalMoves(board, board.side);
   if (moves.empty()) return -kMate + ply;
-  orderMoves(moves, hashMove);
+  orderMoves(moves, state, ply, hashMove);
 
   int bestScore = -kInf;
   Move bestMove;
   std::vector<Move> bestLine;
+  std::vector<Move> searchedQuiets;
+  std::vector<Move> searchedCaptures;
   int moveIndex = 0;
 
   for (Move move : moves) {
+    const bool killerCandidate = isKillerMove(state, ply, move);
     makeMove(board, move);
     std::vector<Move> childPv;
     int score;
@@ -753,6 +810,7 @@ int negamax(Board& board, int depth, int alpha, int beta, int ply, SearchState& 
     undoMove(board, move);
     if (state.stopped) break;
     moveIndex += 1;
+    if (killerCandidate) state.killerHits += 1;
 
     if (score > bestScore) {
       bestScore = score;
@@ -765,7 +823,12 @@ int negamax(Board& board, int depth, int alpha, int beta, int ply, SearchState& 
       pv.push_back(move);
       pv.insert(pv.end(), childPv.begin(), childPv.end());
     }
-    if (alpha >= beta) break;
+    if (alpha >= beta) {
+      rememberBetaCutoff(state, ply, depth, move, searchedQuiets, searchedCaptures);
+      break;
+    }
+    if (isQuiet(move)) searchedQuiets.push_back(move);
+    else if (isCapture(move)) searchedCaptures.push_back(move);
   }
 
   if (!state.stopped && state.tt && validMove(bestMove)) {
@@ -794,7 +857,7 @@ int quiescence(Board& board, int alpha, int beta, int ply, int qDepth, SearchSta
 
   auto moves = generateLegalMoves(board, board.side, !inCheck);
   if (moves.empty()) return inCheck ? -kMate + ply : alpha;
-  orderMoves(moves);
+  orderMoves(moves, state, ply);
 
   for (Move move : moves) {
     if (!inCheck && move.captured != 0 && standPat + pieceValue(move.captured) + 120 <= alpha) continue;
@@ -829,7 +892,7 @@ std::vector<RootLine> searchRoot(Board root, int maxDepth, int moveTimeMs, int m
   tt.newSearch();
 
   auto rootMoves = filterRootMoves(generateLegalMoves(root, root.side), searchMoves);
-  orderMoves(rootMoves);
+  orderMoves(rootMoves, state, 0);
   std::vector<RootLine> bestLines;
   for (const Move& move : rootMoves) bestLines.push_back({move, evaluateRed(root) * root.side, {move}});
   if (rootMoves.empty()) return bestLines;
@@ -951,6 +1014,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
     std::cout << "info depth " << depth << " score mate -1 nodes " << state.nodes << " time " << time << " nps " << nps
               << " hashfull " << state.ttHashfull
               << " string tt " << state.ttHits << "/" << state.ttProbes << " cutoffs " << state.ttCutoffs
+              << " killers " << state.killerHits << " history " << state.historyUpdates
               << " pv\n";
     std::cout << "bestmove 0000" << std::endl;
     return;
@@ -966,6 +1030,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " nps " << nps
               << " hashfull " << state.ttHashfull
               << " string tt " << state.ttHits << "/" << state.ttProbes << " cutoffs " << state.ttCutoffs
+              << " killers " << state.killerHits << " history " << state.historyUpdates
               << " pv " << formatPv(line.pv)
               << std::endl;
   }
