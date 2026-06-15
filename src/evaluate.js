@@ -63,6 +63,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     terms[piece.side].passedSoldier += passedSoldierValue(position, piece, square);
     terms[piece.side].kingSafety += localDefenseValue(position, piece, square);
     terms[piece.side].coordination += coordinationValue(position, piece, square);
+    terms[piece.side].linkedHorse += linkedHorseValue(position, piece, square);
     terms[piece.side].linePressure += linePressureValue(position, piece, square);
     terms[piece.side].cannonPlatform += cannonPlatformValue(position, piece, square);
     terms[piece.side].pinPressure += pinPressureValue(position, piece, square);
@@ -148,6 +149,7 @@ function createTerms() {
     kingAttack: 0,
     pieceSafety: 0,
     coordination: 0,
+    linkedHorse: 0,
     linePressure: 0,
     cannonPlatform: 0,
     pinPressure: 0,
@@ -419,6 +421,33 @@ function horseLegCoordination(position, piece, square) {
   }
 
   return blockedLegs === 0 ? score + 18 : score;
+}
+
+function linkedHorseValue(position, piece, square) {
+  if (piece.type !== PIECES.HORSE) return 0;
+
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  const controls = horseControls(position, square);
+  let score = 0;
+
+  for (const target of controls) {
+    if (target <= square) continue;
+    const partner = position.board[target];
+    if (partner?.side !== piece.side || partner.type !== PIECES.HORSE) continue;
+    if (!horseControls(position, target).includes(square)) continue;
+
+    const partnerFile = fileOf(target);
+    const partnerRank = rankOf(target);
+    const centrality = Math.max(0, 4 - Math.abs(file - 4)) + Math.max(0, 4 - Math.abs(partnerFile - 4));
+    const advanced = hasCrossedRiver(piece.side, rank) || hasCrossedRiver(piece.side, partnerRank);
+
+    score += 26;
+    score += centrality * 3;
+    if (advanced) score += 8;
+  }
+
+  return score;
 }
 
 function elephantEyeCoordination(position, piece, square) {
@@ -1297,6 +1326,7 @@ function readableTerm(term) {
     kingAttack: "pressure on the general",
     pieceSafety: "piece safety",
     coordination: "piece coordination",
+    linkedHorse: "linked horse coordination",
     linePressure: "rook and cannon line pressure",
     cannonPlatform: "cannon platform pressure",
     pinPressure: "palace pin pressure",

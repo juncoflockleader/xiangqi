@@ -33,6 +33,29 @@ test("evaluation descriptions surface horse unblocking as coordination", () => {
   assert.ok(notes.some((note) => note.term === "coordination" && note.text.includes("piece coordination")));
 });
 
+test("evaluation rewards linked horses that mutually protect each other", () => {
+  const linked = parseFen("4k4/9/9/3H5/9/2H6/9/9/9/4K4 r");
+  const scattered = parseFen("4k4/9/9/9/9/2H4H1/9/9/9/4K4 r");
+  const linkedEval = evaluatePosition(linked, SIDES.RED, { detailed: true });
+  const scatteredEval = evaluatePosition(scattered, SIDES.RED, { detailed: true });
+
+  assert.ok(linkedEval.terms.red.linkedHorse - scatteredEval.terms.red.linkedHorse >= 35);
+  assert.ok(linkedEval.difference.linkedHorse > scatteredEval.difference.linkedHorse);
+});
+
+test("evaluation descriptions surface linked horse coordination", () => {
+  const position = parseFen("4k4/9/9/9/9/2H1H4/4P4/9/9/4K4 r");
+  const next = applyLegalMove(position, {
+    from: coordToIndex("e5"),
+    to: coordToIndex("d3")
+  });
+  const delta = evaluateMoveDelta(position, next, SIDES.RED);
+  const notes = describeEvaluationTerms(delta.delta);
+
+  assert.ok(delta.delta.linkedHorse >= 35);
+  assert.ok(notes.some((note) => note.term === "linkedHorse" && note.text.includes("linked horse coordination")));
+});
+
 test("evaluation penalizes blocked elephant eyes as piece coordination", () => {
   const blocked = parseFen("4k4/9/9/9/9/4P4/9/9/3P5/2E1K4 r");
   const open = parseFen("4k4/9/9/9/9/4P4/9/9/P8/2E1K4 r");
