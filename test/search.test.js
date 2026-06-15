@@ -330,6 +330,30 @@ test("search uses internal iterative deepening when hash move ordering is unavai
   assert.equal(disabled.stats.iidMoveHits, 0);
 });
 
+test("search adapts late-move reductions by depth and move order", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const adaptive = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 5000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  });
+  const fixed = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 5000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    useAdaptiveLmr: false
+  });
+
+  assert.equal(adaptive.depth, 6);
+  assert.equal(adaptive.bestMove.notation, fixed.bestMove.notation);
+  assert.ok(adaptive.stats.deepReductions > 0);
+  assert.ok(adaptive.stats.reductionPlies > adaptive.stats.reductions);
+  assert.equal(fixed.stats.deepReductions, 0);
+  assert.equal(fixed.stats.reductionPlies, fixed.stats.reductions);
+});
+
 test("quiescence can include bounded quiet checking moves", () => {
   const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
   const withChecks = searchBestMove(position, {

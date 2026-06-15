@@ -1659,6 +1659,8 @@ function createEmptyStats() {
     futilityPrunes: 0,
     deltaPrunes: 0,
     reductions: 0,
+    reductionPlies: 0,
+    deepReductions: 0,
     lmrResearches: 0,
     pvsResearches: 0,
     nullMovePrunes: 0,

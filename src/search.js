@@ -53,6 +53,8 @@ const PROBCUT_CAPTURE_LIMIT = 6;
 const IID_MIN_DEPTH = 4;
 const IID_REDUCTION = 2;
 const IID_MOVE_LIMIT = 8;
+const LMR_MIN_DEPTH = 3;
+const LMR_BASE_MOVE_INDEX = 4;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -141,6 +143,8 @@ export function searchBestMove(position, options = {}) {
       useRecaptureExtensions: options.useRecaptureExtensions !== false,
       useSeePruning: options.useSeePruning !== false,
       useHistoryMalus: options.useHistoryMalus !== false,
+      useLateMoveReductions: options.useLateMoveReductions !== false,
+      useAdaptiveLmr: options.useAdaptiveLmr !== false,
       useProbCut: options.useProbCut !== false,
       useInternalIterativeDeepening: options.useInternalIterativeDeepening !== false,
       nullMoveVerificationMinDepth: Math.max(3, Math.floor(numberOption(options.nullMoveVerificationMinDepth, NULL_MOVE_VERIFICATION_MIN_DEPTH))),
@@ -630,8 +634,12 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
       continue;
     }
 
-    let reduction = shouldReduce({ depth, index, move, inCheck, givesCheck }) ? 1 : 0;
-    if (reduction > 0) context.stats.reductions += 1;
+    let reduction = lateMoveReduction({ depth, index, move, inCheck, givesCheck, extension, context, ply, previousMove });
+    if (reduction > 0) {
+      context.stats.reductions += 1;
+      context.stats.reductionPlies += reduction;
+      if (reduction > 1) context.stats.deepReductions += 1;
+    }
 
     let childDepth = depth - 1 + extension - reduction;
     let score;
@@ -904,12 +912,32 @@ function isRecapture(move, previousMove, context) {
   );
 }
 
-function shouldReduce({ depth, index, move, inCheck, givesCheck }) {
-  if (depth < 3) return false;
-  if (index < 4) return false;
-  if (inCheck || givesCheck) return false;
-  if (move.captured) return false;
-  return true;
+function lateMoveReduction({ depth, index, move, inCheck, givesCheck, extension, context, ply, previousMove }) {
+  if (!context.useLateMoveReductions) return 0;
+  if (depth < LMR_MIN_DEPTH) return 0;
+  if (index < LMR_BASE_MOVE_INDEX) return 0;
+  if (inCheck || givesCheck || extension > 0) return 0;
+  if (move.captured) return 0;
+
+  if (!context.useAdaptiveLmr) return 1;
+
+  let reduction = 1;
+  if (depth >= 5 && index >= 8) reduction += 1;
+  if (depth >= 7 && index >= 14) reduction += 1;
+
+  const historyScore = context.history.get(moveKey(move)) ?? 0;
+  if (historyScore > depth * depth) reduction -= 1;
+  if (historyScore < -depth * depth) reduction += 1;
+  if (isKiller(context.killers, ply, move)) reduction -= 1;
+  if (isStoredCountermove(context, previousMove, move)) reduction -= 1;
+
+  const maxReduction = Math.max(1, depth - 2);
+  return Math.max(0, Math.min(maxReduction, reduction));
+}
+
+function isStoredCountermove(context, previousMove, move) {
+  if (!context.useCountermoves || !previousMove) return false;
+  return sameMove(context.countermoves.get(moveKey(previousMove)), move);
 }
 
 function shouldPruneFutility({
@@ -1364,6 +1392,8 @@ function createSearchStats() {
     futilityPrunes: 0,
     deltaPrunes: 0,
     reductions: 0,
+    reductionPlies: 0,
+    deepReductions: 0,
     lmrResearches: 0,
     pvsResearches: 0,
     nullMovePrunes: 0,
@@ -1407,6 +1437,8 @@ function mergeSearchStats(total, next) {
     futilityPrunes: total.futilityPrunes + next.futilityPrunes,
     deltaPrunes: total.deltaPrunes + next.deltaPrunes,
     reductions: total.reductions + next.reductions,
+    reductionPlies: total.reductionPlies + next.reductionPlies,
+    deepReductions: total.deepReductions + next.deepReductions,
     lmrResearches: total.lmrResearches + next.lmrResearches,
     pvsResearches: total.pvsResearches + next.pvsResearches,
     nullMovePrunes: total.nullMovePrunes + next.nullMovePrunes,
