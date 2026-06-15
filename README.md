@@ -502,6 +502,7 @@ const review = engine.reviewMove(position, "e9-f9");
 console.log(review.classification);
 console.log(review.centipawnLoss);
 console.log(review.mistakes.primary);
+console.log(review.practiceFocus?.title);
 console.log(review.explanation.summary);
 console.log(review.playedScoreDetail.text);
 console.log(review.playedLinePlan.summary);
@@ -509,7 +510,7 @@ console.log(review.bestLinePlan.summary);
 console.log(review.planComparison.summary);
 ```
 
-`reviewMove` compares the played move against the searched best line and returns a practical grade: `best`, `excellent`, `good`, `inaccuracy`, `mistake`, or `blunder`. It also returns `bestLinePlan` plus `mistakes`, a structured pattern summary for learning flows, such as missed material, unsafe capture, missed check, missed threat, allowed threat, or positional drift.
+`reviewMove` compares the played move against the searched best line and returns a practical grade: `best`, `excellent`, `good`, `inaccuracy`, `mistake`, or `blunder`. It also returns `bestLinePlan`, `mistakes`, and `practiceFocus`, so a learning flow can name the pattern and recommend a drill such as material tactics, capture safety, forcing checks, or threat defense.
 `playedLinePlan` describes the continuation behind the move that was actually
 played, so a UI can compare "your idea" against the engine's preferred plan.
 `planComparison` packages that contrast into a learner-ready summary plus
@@ -808,7 +809,7 @@ review depth 1 movetime 500
 lesson depth 1 movetime 500 cards 3
 ```
 
-The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, clock controls such as `wtime`, `btime`, `winc`, `binc`, and `movestogo`, `setoption name MultiPV value N`, `setoption name HashEntries value N`, `setoption name UseBook value false`, `analyze`, `hint`/`coach`, `probe`, `pressure`, `reviewmove`, `review`, `lesson`/`lessons`, `explain`, and `quit`. `hint ... levels N` emits the progressive coach ladder up to level `N`; level 4 includes the full reveal and `bestmove`. `reviewmove <move>` reviews one candidate in the current position without changing the loaded game, returning played/best score evidence, played and preferred plans, plan comparison, reasons, and the preferred `bestmove`. `lesson ... cards N` turns the loaded move history into prompt, hint, answer, practice-focus, and best-plan card lines. `go`, `analyze`, `reviewmove`, `review`, and `lesson` emit `info string ... plan` lines so GUI clients can display preferred-line plans without re-running analysis. `go` info lines include counters such as `qnodes`, `qchecks`, `tthits`, `ttstores`, `ttevict`, `asp`, `asphi`, `asplo`, `ext`, `recext`, `soft`, `see`, `mdp`, `razor`, `pcut`, `pcsearch`, `futil`, `delta`, `nmp`, `cm`, `hmalus`, `rootord`, `rootmoves`, and `pvs` for learning-app diagnostics.
+The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, clock controls such as `wtime`, `btime`, `winc`, `binc`, and `movestogo`, `setoption name MultiPV value N`, `setoption name HashEntries value N`, `setoption name UseBook value false`, `analyze`, `hint`/`coach`, `probe`, `pressure`, `reviewmove`, `review`, `lesson`/`lessons`, `explain`, and `quit`. `hint ... levels N` emits the progressive coach ladder up to level `N`; level 4 includes the full reveal and `bestmove`. `reviewmove <move>` reviews one candidate in the current position without changing the loaded game, returning played/best score evidence, played and preferred plans, plan comparison, practice focus, reasons, and the preferred `bestmove`. `lesson ... cards N` turns the loaded move history into prompt, hint, answer, practice-focus, and best-plan card lines. `go`, `analyze`, `reviewmove`, `review`, and `lesson` emit `info string ... plan` lines so GUI clients can display preferred-line plans without re-running analysis. `go` info lines include counters such as `qnodes`, `qchecks`, `tthits`, `ttstores`, `ttevict`, `asp`, `asphi`, `asplo`, `ext`, `recext`, `soft`, `see`, `mdp`, `razor`, `pcut`, `pcsearch`, `futil`, `delta`, `nmp`, `cm`, `hmalus`, `rootord`, `rootmoves`, and `pvs` for learning-app diagnostics.
 
 When `movestogo` is omitted, the JS engine estimates remaining moves from the current phase: opening positions spend more conservatively, endgames can use a larger share, and low-clock positions cap the maximum spend. `moveOverheadMs` can reserve GUI/process overhead from every allocated move.
 

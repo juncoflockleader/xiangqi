@@ -6,6 +6,7 @@ import { analyzePressure } from "./pressure.js";
 import { buildLinePlan, explainBookMove, explainCandidateMove, explainMove, explainReviewedMove, formatScore } from "./reasoning.js";
 import { compareLinePlans } from "./plan-comparison.js";
 import { analyzeReviewMistakes } from "./mistakes.js";
+import { practiceFocusFromReview } from "./practice.js";
 import { reviewGameWithEngine } from "./review.js";
 import { coachMoveWithEngine } from "./coach.js";
 import { createLessonPlanWithEngine } from "./lesson.js";
@@ -151,6 +152,7 @@ export function createEngine(defaultOptions = {}) {
         nodes: search.nodes
       };
       reviewed.mistakes = analyzeReviewMistakes(position, reviewed);
+      reviewed.practiceFocus = practiceFocusFromReview(reviewed);
 
       return {
         ...reviewed,

@@ -113,6 +113,9 @@ test("engine reviews a player move against the best line", () => {
   assert.ok(review.explanation.summary.includes(review.classification));
   assert.equal(review.explanation.summary.includes("a excellent"), false);
   assert.ok(review.explanation.reasons.some((reason) => reason.includes("e9-e2")));
+  assert.equal(review.practiceFocus.category, "missed-material");
+  assert.equal(review.practiceFocus.title, "Material tactics");
+  assert.equal(review.practiceFocus.drill, "candidate-captures");
 });
 
 test("engine review recognizes the best move", () => {

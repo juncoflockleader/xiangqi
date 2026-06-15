@@ -208,7 +208,8 @@ function summarizeOracleReview(review, oracleBackend) {
     summary: review.explanation?.summary ?? verdict,
     reasons: [...(review.explanation?.reasons ?? [])],
     verdict,
-    mistakes: review.mistakes ?? null
+    mistakes: review.mistakes ?? null,
+    practiceFocus: review.practiceFocus ?? null
   };
 }
 
@@ -237,7 +238,8 @@ function unavailableOracleReview(error, oracleBackend) {
     reasons: [],
     verdict: `${oracleBackend.name ?? "Oracle"} review was unavailable (${message}).`,
     error: message,
-    mistakes: null
+    mistakes: null,
+    practiceFocus: null
   };
 }
 

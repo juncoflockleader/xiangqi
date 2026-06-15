@@ -230,6 +230,7 @@ function selectKeyMoments(moves, limit) {
       bestLinePlan: bestLinePlanFor(item.review),
       planComparison: planComparisonFor(item.review),
       mistakes: item.review.mistakes,
+      practiceFocus: item.review.practiceFocus ?? null,
       book: item.book,
       summary: item.review.explanation.summary,
       reasons: item.review.explanation.reasons

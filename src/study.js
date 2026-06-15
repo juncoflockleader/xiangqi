@@ -181,7 +181,9 @@ function buildPositionStudy(position, parts) {
   const searchDisagreement = summarizeSearchDisagreement(decision, candidateLines);
   const playedMoveReview = parts.review ? summarizeReview(parts.review) : null;
   const pressure = parts.pressure ? summarizePressure(parts.pressure) : null;
-  const practiceFocus = playedMoveReview ? practiceFocusFromReview(playedMoveReview) : null;
+  const practiceFocus = playedMoveReview
+    ? playedMoveReview.practiceFocus ?? practiceFocusFromReview(playedMoveReview)
+    : null;
   const bestMove = decision?.bestMove
     ?? candidateLines[0]?.move
     ?? coach?.bestMove
@@ -350,6 +352,7 @@ function summarizeReview(review) {
     summary: review.explanation?.summary ?? "",
     reasons: [...(review.explanation?.reasons ?? [])],
     mistakes: review.mistakes ?? null,
+    practiceFocus: review.practiceFocus ?? null,
     principalVariation: [...(review.principalVariation ?? [])],
     oracleReview: review.oracleReview ?? null,
     reviewBackend: review.reviewBackend ?? null

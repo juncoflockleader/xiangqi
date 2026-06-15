@@ -14,6 +14,7 @@ import { classifyMoveLoss, createEngine } from "./engine.js";
 import { analyzeReviewMistakes } from "./mistakes.js";
 import { mergeNativeEngineOptions } from "./native-presets.js";
 import { compareLinePlans } from "./plan-comparison.js";
+import { practiceFocusFromReview } from "./practice.js";
 import { assessSearchConfidence, buildLinePlan, explainBookMove, explainMoveFeatures, explainReviewedMove, formatScore } from "./reasoning.js";
 import { annotateMove, generateLegalMoves } from "./movegen.js";
 import { hasClockTimeControl, resolveSearchBudget } from "./time.js";
@@ -592,6 +593,7 @@ async function nativeReviewMove(client, position, moveOrNotation, options) {
     nodes: bestAnalysis.nodes + (playedCandidate.nodes ?? 0)
   };
   reviewed.mistakes = analyzeReviewMistakes(position, reviewed);
+  reviewed.practiceFocus = practiceFocusFromReview(reviewed);
 
   return {
     ...reviewed,

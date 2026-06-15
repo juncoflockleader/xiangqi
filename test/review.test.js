@@ -83,6 +83,9 @@ test("move review classifies tactical mistake patterns", () => {
   });
 
   assert.equal(review.mistakes.primary, "unsafe-capture");
+  assert.equal(review.practiceFocus.category, "unsafe-capture");
+  assert.equal(review.practiceFocus.title, "Capture safety");
+  assert.equal(review.practiceFocus.drill, "capture-safety");
   assert.ok(review.mistakes.tags.includes("tactics"));
   assert.ok(review.explanation.reasons.some((reason) => reason.includes("Mistake pattern")));
   assert.equal(review.explanation.mistakes.primary, "unsafe-capture");

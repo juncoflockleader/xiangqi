@@ -577,6 +577,7 @@ function formatReviewResult(result) {
 
   for (const moment of result.keyMoments.slice(0, 3)) {
     outputs.push(`info string moment ${moment.ply} ${moment.side} ${moment.notation} ${moment.classification} loss ${moment.centipawnLoss} best ${stripMoveSeparator(moment.bestMove)}: ${moment.summary}`);
+    pushPracticeFocusInfo(outputs, `moment ${moment.ply}`, moment.practiceFocus);
     pushReviewScoreInfo(outputs, `moment ${moment.ply}`, moment);
     pushPlanInfo(outputs, `moment ${moment.ply} played`, moment.playedLinePlan);
     pushPlanInfo(outputs, `moment ${moment.ply} best`, moment.bestLinePlan);
@@ -592,6 +593,7 @@ function formatReviewMoveResult(review) {
   ];
 
   pushReviewScoreInfo(outputs, "reviewmove", review);
+  pushPracticeFocusInfo(outputs, "reviewmove", review.practiceFocus);
   pushPlanInfo(outputs, "reviewmove played", review.playedLinePlan);
   pushPlanInfo(outputs, "reviewmove best", review.bestLinePlan);
   pushPlanComparisonInfo(outputs, "reviewmove", review.planComparison);
@@ -602,6 +604,11 @@ function formatReviewMoveResult(review) {
 
   outputs.push(`bestmove ${protocolMove(review.bestMove)}`);
   return outputs;
+}
+
+function pushPracticeFocusInfo(outputs, prefix, practiceFocus) {
+  if (!practiceFocus) return;
+  outputs.push(`info string ${prefix} practice ${practiceFocus.drill} ${practiceFocus.title}: ${practiceFocus.text}`);
 }
 
 function formatLessonResult(result) {
@@ -615,9 +622,7 @@ function formatLessonResult(result) {
     for (const hint of card.hints) {
       outputs.push(`info string lesson ${card.rank} hint ${hint.level} ${hint.kind}: ${hint.text}`);
     }
-    if (card.practiceFocus) {
-      outputs.push(`info string lesson ${card.rank} practice ${card.practiceFocus.drill} ${card.practiceFocus.title}: ${card.practiceFocus.text}`);
-    }
+    pushPracticeFocusInfo(outputs, `lesson ${card.rank}`, card.practiceFocus);
     pushReviewScoreInfo(outputs, `lesson ${card.rank}`, card);
     pushPlanInfo(outputs, `lesson ${card.rank} played`, card.playedLinePlan);
     pushPlanInfo(outputs, `lesson ${card.rank} best`, card.bestLinePlan);
