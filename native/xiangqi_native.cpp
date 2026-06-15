@@ -42,6 +42,7 @@ struct Move {
 struct Board {
   std::array<int, kSquares> cells{};
   int side = kRed;
+  uint64_t key = 0;
 };
 
 struct RootLine {
@@ -50,6 +51,8 @@ struct RootLine {
   std::vector<Move> pv;
 };
 
+class TranspositionTable;
+
 struct SearchState {
   std::chrono::steady_clock::time_point started;
   std::chrono::steady_clock::time_point deadline;
@@ -57,6 +60,84 @@ struct SearchState {
   bool stopped = false;
   int64_t nodes = 0;
   int completedDepth = 0;
+  int64_t ttProbes = 0;
+  int64_t ttHits = 0;
+  int64_t ttCutoffs = 0;
+  int ttHashfull = 0;
+  TranspositionTable* tt = nullptr;
+};
+
+struct TtEntry {
+  uint64_t key = 0;
+  int depth = -1;
+  int score = 0;
+  int flag = 0;
+  Move bestMove;
+  int generation = 0;
+  bool occupied = false;
+};
+
+constexpr int kTtExact = 1;
+constexpr int kTtLower = 2;
+constexpr int kTtUpper = 3;
+
+class TranspositionTable {
+ public:
+  explicit TranspositionTable(int megabytes = 32) {
+    resize(megabytes);
+  }
+
+  void resize(int megabytes) {
+    const std::size_t bytes = static_cast<std::size_t>(std::max(1, megabytes)) * 1024ULL * 1024ULL;
+    const std::size_t entries = std::max<std::size_t>(1024, bytes / sizeof(TtEntry));
+    table_.assign(entries, {});
+    generation_ = 1;
+  }
+
+  void clear() {
+    std::fill(table_.begin(), table_.end(), TtEntry{});
+    generation_ = 1;
+  }
+
+  void newSearch() {
+    generation_ += 1;
+    if (generation_ > 1000000) {
+      generation_ = 1;
+      for (TtEntry& entry : table_) entry.generation = 0;
+    }
+  }
+
+  const TtEntry* probe(uint64_t key) const {
+    if (table_.empty()) return nullptr;
+    const TtEntry& entry = table_[index(key)];
+    return entry.occupied && entry.key == key ? &entry : nullptr;
+  }
+
+  void store(uint64_t key, int depth, int score, int flag, const Move& bestMove) {
+    if (table_.empty()) return;
+    TtEntry& entry = table_[index(key)];
+    if (entry.occupied && entry.key != key && entry.depth > depth && entry.generation == generation_) return;
+    if (entry.occupied && entry.key == key && entry.depth > depth && entry.flag == kTtExact) return;
+    entry = {key, depth, score, flag, bestMove, generation_, true};
+  }
+
+  int hashfull() const {
+    if (table_.empty()) return 0;
+    const std::size_t sample = std::min<std::size_t>(1000, table_.size());
+    int used = 0;
+    for (std::size_t index = 0; index < sample; index += 1) {
+      if (table_[index].occupied && table_[index].generation == generation_) used += 1;
+    }
+    return static_cast<int>(used * 1000 / sample);
+  }
+
+ private:
+  std::size_t index(uint64_t key) const {
+    return static_cast<std::size_t>(key % table_.size());
+  }
+
+  std::vector<TtEntry> table_;
+  int generation_ = 1;
 };
 
 int indexOf(int file, int rank) {
@@ -115,6 +196,13 @@ std::string lower(std::string text) {
   return text;
 }
 
+uint64_t splitmix64(uint64_t value) {
+  value += 0x9e3779b97f4a7c15ULL;
+  value = (value ^ (value >> 30)) * 0xbf58476d1ce4e5b9ULL;
+  value = (value ^ (value >> 27)) * 0x94d049bb133111ebULL;
+  return value ^ (value >> 31);
+}
+
 int pieceValue(int pieceOrType) {
   switch (std::abs(pieceOrType)) {
     case King: return 20000;
@@ -140,6 +228,30 @@ int fenPiece(char c) {
   if (p == 'c') type = Cannon;
   if (p == 'p') type = Pawn;
   return red ? type : -type;
+}
+
+int pieceSlot(int piece) {
+  if (piece == 0) return 0;
+  return piece > 0 ? typeOf(piece) : typeOf(piece) + 7;
+}
+
+uint64_t pieceHash(int square, int piece) {
+  const uint64_t seed = 0x6a09e667f3bcc909ULL;
+  return splitmix64(seed ^ (static_cast<uint64_t>(square + 1) * 0x100000001b3ULL) ^ static_cast<uint64_t>(pieceSlot(piece) * 0x9e3779b1U));
+}
+
+uint64_t sideHash() {
+  return splitmix64(0xbb67ae8584caa73bULL);
+}
+
+uint64_t computeKey(const Board& board) {
+  uint64_t key = 0;
+  for (int square = 0; square < kSquares; square += 1) {
+    const int piece = board.cells[square];
+    if (piece != 0) key ^= pieceHash(square, piece);
+  }
+  if (board.side == kBlack) key ^= sideHash();
+  return key;
 }
 
 bool parseFen(Board& board, const std::string& fenText) {
@@ -172,6 +284,7 @@ bool parseFen(Board& board, const std::string& fenText) {
   if (rank != kRanks - 1 || file != kFiles) return false;
   const std::string side = tokens.size() > 1 ? lower(tokens[1]) : "w";
   board.side = (side == "b" || side == "black") ? kBlack : kRed;
+  board.key = computeKey(board);
   return true;
 }
 
@@ -357,6 +470,10 @@ bool generalsFace(const Board& board) {
 void makeMove(Board& board, Move& move) {
   move.piece = board.cells[move.from];
   move.captured = board.cells[move.to];
+  board.key ^= sideHash();
+  board.key ^= pieceHash(move.from, move.piece);
+  if (move.captured != 0) board.key ^= pieceHash(move.to, move.captured);
+  board.key ^= pieceHash(move.to, move.piece);
   board.cells[move.to] = move.piece;
   board.cells[move.from] = 0;
   board.side = -board.side;
@@ -364,6 +481,10 @@ void makeMove(Board& board, Move& move) {
 
 void undoMove(Board& board, const Move& move) {
   board.side = -board.side;
+  board.key ^= sideHash();
+  board.key ^= pieceHash(move.to, move.piece);
+  if (move.captured != 0) board.key ^= pieceHash(move.to, move.captured);
+  board.key ^= pieceHash(move.from, move.piece);
   board.cells[move.from] = move.piece;
   board.cells[move.to] = move.captured;
 }
@@ -393,6 +514,10 @@ std::vector<Move> generateLegalMoves(Board& board, int side, bool capturesOnly =
 
 bool sameMove(const Move& left, const Move& right) {
   return left.from == right.from && left.to == right.to;
+}
+
+bool validMove(const Move& move) {
+  return move.from >= 0 && move.to >= 0;
 }
 
 int squareAdvanceBonus(int side, int rank) {
@@ -529,7 +654,8 @@ int evaluateRed(const Board& board) {
   return score;
 }
 
-int moveOrderingScore(const Move& move) {
+int moveOrderingScore(const Move& move, const Move& hashMove = {}) {
+  if (validMove(hashMove) && sameMove(move, hashMove)) return 10000000;
   int score = 0;
   if (move.captured != 0) {
     score += 100000 + pieceValue(move.captured) * 16 - pieceValue(move.piece);
@@ -540,9 +666,9 @@ int moveOrderingScore(const Move& move) {
   return score;
 }
 
-void orderMoves(std::vector<Move>& moves) {
-  std::stable_sort(moves.begin(), moves.end(), [](const Move& left, const Move& right) {
-    return moveOrderingScore(left) > moveOrderingScore(right);
+void orderMoves(std::vector<Move>& moves, const Move& hashMove = {}) {
+  std::stable_sort(moves.begin(), moves.end(), [hashMove](const Move& left, const Move& right) {
+    return moveOrderingScore(left, hashMove) > moveOrderingScore(right, hashMove);
   });
 }
 
@@ -565,20 +691,68 @@ int negamax(Board& board, int depth, int alpha, int beta, int ply, SearchState& 
   const bool inCheck = isInCheck(board, board.side);
   if (depth <= 0) return quiescence(board, alpha, beta, ply, inCheck ? 2 : 4, state);
 
+  const int alphaOriginal = alpha;
+  const int betaOriginal = beta;
+  Move hashMove;
+  if (state.tt) {
+    state.ttProbes += 1;
+    if (const TtEntry* entry = state.tt->probe(board.key)) {
+      state.ttHits += 1;
+      hashMove = entry->bestMove;
+      if (entry->depth >= depth) {
+        if (entry->flag == kTtExact) {
+          if (validMove(entry->bestMove)) pv = {entry->bestMove};
+          return entry->score;
+        }
+        if (entry->flag == kTtLower) {
+          if (entry->score >= beta) {
+            state.ttCutoffs += 1;
+            if (validMove(entry->bestMove)) pv = {entry->bestMove};
+            return entry->score;
+          }
+          alpha = std::max(alpha, entry->score);
+        } else if (entry->flag == kTtUpper) {
+          if (entry->score <= alpha) {
+            state.ttCutoffs += 1;
+            if (validMove(entry->bestMove)) pv = {entry->bestMove};
+            return entry->score;
+          }
+          beta = std::min(beta, entry->score);
+        }
+        if (alpha >= beta) {
+          state.ttCutoffs += 1;
+          if (validMove(entry->bestMove)) pv = {entry->bestMove};
+          return entry->score;
+        }
+      }
+    }
+  }
+
   auto moves = generateLegalMoves(board, board.side);
   if (moves.empty()) return -kMate + ply;
-  orderMoves(moves);
+  orderMoves(moves, hashMove);
 
   int bestScore = -kInf;
   Move bestMove;
   std::vector<Move> bestLine;
+  int moveIndex = 0;
 
   for (Move move : moves) {
     makeMove(board, move);
     std::vector<Move> childPv;
-    const int score = -negamax(board, depth - 1, -beta, -alpha, ply + 1, state, childPv);
+    int score;
+    if (moveIndex == 0) {
+      score = -negamax(board, depth - 1, -beta, -alpha, ply + 1, state, childPv);
+    } else {
+      score = -negamax(board, depth - 1, -alpha - 1, -alpha, ply + 1, state, childPv);
+      if (score > alpha && score < beta && !state.stopped) {
+        childPv.clear();
+        score = -negamax(board, depth - 1, -beta, -alpha, ply + 1, state, childPv);
+      }
+    }
     undoMove(board, move);
     if (state.stopped) break;
+    moveIndex += 1;
 
     if (score > bestScore) {
       bestScore = score;
@@ -592,6 +766,11 @@ int negamax(Board& board, int depth, int alpha, int beta, int ply, SearchState& 
       pv.insert(pv.end(), childPv.begin(), childPv.end());
     }
     if (alpha >= beta) break;
+  }
+
+  if (!state.stopped && state.tt && validMove(bestMove)) {
+    const int flag = bestScore <= alphaOriginal ? kTtUpper : bestScore >= betaOriginal ? kTtLower : kTtExact;
+    state.tt->store(board.key, depth, bestScore, flag, bestMove);
   }
 
   if (pv.empty() && bestMove.from >= 0) {
@@ -642,10 +821,12 @@ std::vector<Move> filterRootMoves(const std::vector<Move>& legal, const std::vec
   return filtered;
 }
 
-std::vector<RootLine> searchRoot(Board root, int maxDepth, int moveTimeMs, int multiPv, const std::vector<Move>& searchMoves, SearchState& state) {
+std::vector<RootLine> searchRoot(Board root, int maxDepth, int moveTimeMs, int multiPv, const std::vector<Move>& searchMoves, TranspositionTable& tt, SearchState& state) {
   state.started = std::chrono::steady_clock::now();
   state.hasDeadline = moveTimeMs > 0;
   state.deadline = state.started + std::chrono::milliseconds(std::max(1, moveTimeMs));
+  state.tt = &tt;
+  tt.newSearch();
 
   auto rootMoves = filterRootMoves(generateLegalMoves(root, root.side), searchMoves);
   orderMoves(rootMoves);
@@ -679,6 +860,7 @@ std::vector<RootLine> searchRoot(Board root, int maxDepth, int moveTimeMs, int m
 
   const int limit = std::max(1, std::min<int>(multiPv, bestLines.size()));
   bestLines.resize(limit);
+  state.ttHashfull = tt.hashfull();
   return bestLines;
 }
 
@@ -766,7 +948,10 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
   const int depth = std::max(1, state.completedDepth);
 
   if (lines.empty()) {
-    std::cout << "info depth " << depth << " score mate -1 nodes " << state.nodes << " time " << time << " nps " << nps << " pv\n";
+    std::cout << "info depth " << depth << " score mate -1 nodes " << state.nodes << " time " << time << " nps " << nps
+              << " hashfull " << state.ttHashfull
+              << " string tt " << state.ttHits << "/" << state.ttProbes << " cutoffs " << state.ttCutoffs
+              << " pv\n";
     std::cout << "bestmove 0000" << std::endl;
     return;
   }
@@ -779,13 +964,15 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " nodes " << state.nodes
               << " time " << time
               << " nps " << nps
+              << " hashfull " << state.ttHashfull
+              << " string tt " << state.ttHits << "/" << state.ttProbes << " cutoffs " << state.ttCutoffs
               << " pv " << formatPv(line.pv)
               << std::endl;
   }
   std::cout << "bestmove " << moveToUci(lines.front().move) << std::endl;
 }
 
-int parseMultiPvOption(const std::string& line, int fallback) {
+int parseSpinOption(const std::string& line, const std::string& optionName, int fallback) {
   const auto tokens = split(line);
   int nameIndex = -1;
   int valueIndex = -1;
@@ -800,7 +987,7 @@ int parseMultiPvOption(const std::string& line, int fallback) {
     if (!name.empty()) name += " ";
     name += lower(tokens[i]);
   }
-  if (name != "multipv") return fallback;
+  if (name != optionName) return fallback;
   return std::max(1, std::stoi(tokens[valueIndex + 1]));
 }
 
@@ -810,6 +997,8 @@ int main() {
   Board board;
   parseFen(board, initialFen());
   int multiPv = 1;
+  int hashMb = 32;
+  TranspositionTable tt(hashMb);
 
   std::string line;
   while (std::getline(std::cin, line)) {
@@ -824,14 +1013,20 @@ int main() {
       std::cout << "readyok" << std::endl;
     } else if (command == "ucinewgame") {
       parseFen(board, initialFen());
+      tt.clear();
     } else if (command == "setoption") {
-      multiPv = parseMultiPvOption(line, multiPv);
+      multiPv = parseSpinOption(line, "multipv", multiPv);
+      const int requestedHash = parseSpinOption(line, "hash", hashMb);
+      if (requestedHash != hashMb) {
+        hashMb = requestedHash;
+        tt.resize(hashMb);
+      }
     } else if (command == "position") {
       handlePosition(board, line);
     } else if (command == "go") {
       const GoOptions options = parseGo(line);
       SearchState state;
-      auto lines = searchRoot(board, options.depth, options.moveTimeMs, multiPv, options.searchMoves, state);
+      auto lines = searchRoot(board, options.depth, options.moveTimeMs, multiPv, options.searchMoves, tt, state);
       writeSearchResult(lines, state);
     } else if (command == "quit") {
       break;
