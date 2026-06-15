@@ -350,6 +350,8 @@ function maybeBookResult(position, options, tableSize) {
       countermoveHits: 0,
       historyMaluses: 0,
       rootScoreOrderHits: 0,
+      iidSearches: 0,
+      iidMoveHits: 0,
       rootMovesSearched: 0,
       repetitions: 0
     },

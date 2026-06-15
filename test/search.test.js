@@ -280,6 +280,30 @@ test("search reuses previous root scores for iterative move ordering", () => {
   assert.equal(disabled.stats.rootScoreOrderHits, 0);
 });
 
+test("search uses internal iterative deepening when hash move ordering is unavailable", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const result = searchBestMove(position, {
+    depth: 5,
+    timeLimitMs: 1000,
+    maxTranspositionEntries: 1,
+    useSoftTimeManagement: false
+  });
+  const disabled = searchBestMove(position, {
+    depth: 5,
+    timeLimitMs: 1000,
+    maxTranspositionEntries: 1,
+    useSoftTimeManagement: false,
+    useInternalIterativeDeepening: false
+  });
+
+  assert.equal(result.depth, 5);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.ok(result.stats.iidSearches > 0);
+  assert.ok(result.stats.iidMoveHits > 0);
+  assert.equal(disabled.stats.iidSearches, 0);
+  assert.equal(disabled.stats.iidMoveHits, 0);
+});
+
 test("quiescence can include bounded quiet checking moves", () => {
   const position = parseFen("4k4/9/4r4/9/4p4/9/4P4/9/9/3KR4 r");
   const withChecks = searchBestMove(position, {

@@ -49,6 +49,9 @@ const DEFAULT_PROBCUT_MARGIN = 170;
 const PROBCUT_MIN_DEPTH = 4;
 const PROBCUT_REDUCTION = 2;
 const PROBCUT_CAPTURE_LIMIT = 6;
+const IID_MIN_DEPTH = 4;
+const IID_REDUCTION = 2;
+const IID_MOVE_LIMIT = 8;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -137,8 +140,13 @@ export function searchBestMove(position, options = {}) {
       useSeePruning: options.useSeePruning !== false,
       useHistoryMalus: options.useHistoryMalus !== false,
       useProbCut: options.useProbCut !== false,
+      useInternalIterativeDeepening: options.useInternalIterativeDeepening !== false,
       seePruneMargin: Math.max(0, numberOption(options.seePruneMargin, DEFAULT_SEE_PRUNE_MARGIN)),
       probCutMargin: Math.max(0, numberOption(options.probCutMargin, DEFAULT_PROBCUT_MARGIN)),
+      iidMinDepth: Math.max(2, Math.floor(numberOption(options.iidMinDepth, IID_MIN_DEPTH))),
+      iidReduction: Math.max(1, Math.floor(numberOption(options.iidReduction, IID_REDUCTION))),
+      iidMoveLimit: Math.max(1, Math.floor(numberOption(options.iidMoveLimit, IID_MOVE_LIMIT))),
+      iidActive: false,
       useSoftTimeManagement: options.useSoftTimeManagement !== false && !exactRootScores,
       softDeadline,
       softMinDepth: Math.max(1, Math.floor(numberOption(options.softMinDepth, DEFAULT_SOFT_MIN_DEPTH))),
@@ -483,7 +491,26 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
   let bestScore = -INFINITY_SCORE;
   let bestMove = null;
   let bestChildLine = [];
-  const ordered = orderMoves(position, legalMoves, tt?.bestMove, context, ply, previousMove);
+  let principalMove = tt?.bestMove ?? null;
+  if (!principalMove) {
+    principalMove = internalIterativeDeepeningMoveHint({
+      position,
+      legalMoves,
+      depth,
+      alpha,
+      beta,
+      ply,
+      context,
+      extensionsRemaining,
+      previousMove,
+      inCheck
+    });
+    if (context.timedOut) {
+      leavePosition(context, repetitionKey);
+      return evaluatePosition(position, position.turn).score;
+    }
+  }
+  const ordered = orderMoves(position, legalMoves, principalMove, context, ply, previousMove);
   const staticScore = inCheck ? null : evaluatePosition(position, position.turn).score;
   const searchedQuietMoves = [];
 
@@ -985,6 +1012,82 @@ function shouldVerifyProbCutCapture(position, move, context) {
   return capture.exchangeScore >= 0 || PIECE_VALUES[move.captured.type] >= PIECE_VALUES[PIECES.HORSE];
 }
 
+function internalIterativeDeepeningMoveHint({
+  position,
+  legalMoves,
+  depth,
+  alpha,
+  beta,
+  ply,
+  context,
+  extensionsRemaining,
+  previousMove,
+  inCheck
+}) {
+  if (!shouldUseInternalIterativeDeepening({ depth, alpha, beta, inCheck, legalMoves, context })) {
+    return null;
+  }
+
+  const reducedDepth = Math.max(1, depth - context.iidReduction);
+  const moves = orderMoves(position, legalMoves, null, context, ply, previousMove)
+    .slice(0, context.iidMoveLimit);
+  const previousIidActive = context.iidActive;
+  let bestMove = null;
+  let bestScore = -INFINITY_SCORE;
+  let localAlpha = alpha;
+
+  context.iidActive = true;
+  context.stats.iidSearches += 1;
+  try {
+    for (const move of moves) {
+      if (isTimedOut(context)) {
+        context.timedOut = true;
+        break;
+      }
+
+      const next = makeMove(position, move);
+      const score = normalizeScore(-negamax(
+        next,
+        reducedDepth - 1,
+        -beta,
+        -localAlpha,
+        ply + 1,
+        context,
+        null,
+        extensionsRemaining,
+        false,
+        move
+      ));
+
+      if (context.timedOut) break;
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = move;
+      }
+      if (score > localAlpha) {
+        localAlpha = score;
+        if (localAlpha >= beta) break;
+      }
+    }
+  } finally {
+    context.iidActive = previousIidActive;
+  }
+
+  if (!bestMove || context.timedOut) return null;
+  context.stats.iidMoveHits += 1;
+  return bestMove;
+}
+
+function shouldUseInternalIterativeDeepening({ depth, alpha, beta, inCheck, legalMoves, context }) {
+  if (!context.useInternalIterativeDeepening) return false;
+  if (context.iidActive) return false;
+  if (inCheck) return false;
+  if (depth < context.iidMinDepth) return false;
+  if (legalMoves.length < 2) return false;
+  if (beta - alpha <= 1) return false;
+  return true;
+}
+
 function futilityMargin(depth) {
   return FUTILITY_BASE_MARGIN + FUTILITY_DEPTH_MARGIN * depth;
 }
@@ -1183,6 +1286,8 @@ function createSearchStats() {
     countermoveHits: 0,
     historyMaluses: 0,
     rootScoreOrderHits: 0,
+    iidSearches: 0,
+    iidMoveHits: 0,
     rootMovesSearched: 0,
     repetitions: 0
   };
@@ -1222,6 +1327,8 @@ function mergeSearchStats(total, next) {
     countermoveHits: total.countermoveHits + next.countermoveHits,
     historyMaluses: total.historyMaluses + next.historyMaluses,
     rootScoreOrderHits: total.rootScoreOrderHits + next.rootScoreOrderHits,
+    iidSearches: total.iidSearches + next.iidSearches,
+    iidMoveHits: total.iidMoveHits + next.iidMoveHits,
     rootMovesSearched: total.rootMovesSearched + next.rootMovesSearched,
     repetitions: total.repetitions + next.repetitions
   };
