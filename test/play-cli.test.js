@@ -157,6 +157,25 @@ test("play CLI can use the Pikafish native preset", async () => {
   assert.match(result.stdout, /reported score of mate in 2/);
 });
 
+test("play CLI applies named play levels to native engine defaults", async () => {
+  const result = await runPlayCli([
+    "--side", "black",
+    "--level", "beginner",
+    "--engine-preset", "pikafish",
+    "--engine-command", process.execPath,
+    "--engine-arg", MOCK_UCCI_PATH,
+    "--engine-option", "MockDepthFromGo=true",
+    "--startup-timeout", "1000",
+    "--command-timeout", "1000",
+    "--no-book"
+  ], "quit\n");
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /Engine level: Beginner Learner/);
+  assert.match(result.stdout, /Engine played h9-g7/);
+  assert.match(result.stdout, /\(depth 1, 123 nodes\)/);
+});
+
 test("play CLI reports an unresolved native preset command", async () => {
   const result = await runPlayCli([
     "--engine-preset", "pikafish",

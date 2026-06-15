@@ -15,6 +15,7 @@ import {
   opponent,
   playGameMoveAsync,
   parseFen,
+  resolveEnginePlayLevel,
   resolveNativeEnginePreset,
   toFen
 } from "../src/index.js";
@@ -67,6 +68,10 @@ if (options.engineCommand) {
 }
 if (options.enginePresetName) {
   console.log(`Engine preset: ${options.enginePresetName}`);
+}
+if (options.playLevel) {
+  const level = resolveEnginePlayLevel(options.playLevel);
+  console.log(`Engine level: ${level?.name ?? options.playLevel}`);
 }
 if (options.oracleCommand) {
   console.log(`Oracle reviewer: ${options.oracleProtocol} ${options.oracleCommand}`);
@@ -448,6 +453,7 @@ Usage:
 Options:
   --side red|black      Choose your side. Default: red.
   --profile name        Engine profile. Default: fast.
+  --level name          Play level: beginner, casual, club, expert, or master.
   --depth n             Search depth. Default: 2.
   --time ms             Move time budget. Default: 750.
   --lines n             Candidate lines to compare. Default: 3.
@@ -487,9 +493,7 @@ Commands during play:
 
 function searchOptions() {
   return {
-    depth: options.depth,
-    timeLimitMs: options.timeLimitMs,
-    lines: options.lines,
+    ...searchBudgetOptions(options),
     useBook: options.useBook,
     ...(options.oracleCommand
       ? {
@@ -509,6 +513,10 @@ function parseArgs(args) {
     depth: 2,
     timeLimitMs: 750,
     lines: numberFromEnv(process.env.XIANGQI_ENGINE_LINES, 3),
+    playLevel: process.env.XIANGQI_PLAY_LEVEL ?? process.env.XIANGQI_ENGINE_LEVEL,
+    depthExplicit: false,
+    timeExplicit: false,
+    linesExplicit: Boolean(process.env.XIANGQI_ENGINE_LINES),
     bookPath: process.env.XIANGQI_OPENING_BOOK,
     bookFormat: process.env.XIANGQI_OPENING_BOOK_FORMAT ?? "auto",
     initialFen: process.env.XIANGQI_PLAY_FEN,
@@ -558,18 +566,26 @@ function parseArgs(args) {
       index += 1;
       continue;
     }
+    if (arg === "--level" || arg === "--play-level" || arg === "--difficulty") {
+      parsed.playLevel = requireValue(args, index, arg);
+      index += 1;
+      continue;
+    }
     if (arg === "--depth") {
       parsed.depth = parsePositiveInteger(requireValue(args, index, arg), arg);
+      parsed.depthExplicit = true;
       index += 1;
       continue;
     }
     if (arg === "--time") {
       parsed.timeLimitMs = parsePositiveInteger(requireValue(args, index, arg), arg);
+      parsed.timeExplicit = true;
       index += 1;
       continue;
     }
     if (arg === "--lines") {
       parsed.lines = parsePositiveInteger(requireValue(args, index, arg), arg);
+      parsed.linesExplicit = true;
       index += 1;
       continue;
     }
@@ -781,8 +797,8 @@ function numberFromEnv(value, fallback) {
 function createPlayBackend(options, openingBook) {
   const base = createLearningEngineBackend({
     profile: options.profile,
-    depth: options.depth,
-    timeLimitMs: options.timeLimitMs,
+    playLevel: options.playLevel,
+    ...searchBudgetOptions(options),
     ...(openingBook ? { book: openingBook } : {}),
     command: options.engineCommand,
     args: options.engineArgs,
@@ -833,6 +849,15 @@ function formatColumns(values, columns) {
     rows.push(values.slice(index, index + columns).join("  "));
   }
   return rows.join("\n");
+}
+
+function searchBudgetOptions(options) {
+  const levelControlsDefaults = Boolean(options.playLevel);
+  return {
+    ...(!levelControlsDefaults || options.depthExplicit ? { depth: options.depth } : {}),
+    ...(!levelControlsDefaults || options.timeExplicit ? { timeLimitMs: options.timeLimitMs } : {}),
+    ...(!levelControlsDefaults || options.linesExplicit ? { lines: options.lines } : {})
+  };
 }
 
 function formatMoveForDisplay(move) {

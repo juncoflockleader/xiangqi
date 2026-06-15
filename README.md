@@ -99,6 +99,7 @@ npm run install:pikafish
 
 npm run play -- \
   --side black \
+  --level club \
   --fen "4k4/9/4r4/9/9/9/9/9/9/3KR4 r" \
   --engine-preset pikafish
 
@@ -129,6 +130,9 @@ bundle layout needs a different executable.
 Use `--fen` with the play demo or native probe to start from a tactical training
 position. Player move reviews print the classification, score evidence, plan
 comparison, and a practice drill when the review detects a teachable pattern.
+Use `--level beginner|casual|club|expert|master` to calibrate the default search
+budget for a practice game; native UCI engines also receive `UCI_LimitStrength`
+and `UCI_Elo` options for levels below `master` when they support those options.
 
 Or keep the fast local engine for move choice while a stronger oracle grades
 engine picks and player move reviews:
@@ -419,6 +423,7 @@ available or when the native process cannot start during a turn:
 ```js
 const backend = createLearningEngineBackend({
   nativePreset: "pikafish",
+  playLevel: "club",
   depth: 10,
   timeLimitMs: 5000,
   javascript: {
@@ -441,6 +446,9 @@ JavaScript learning engine instead of failing app startup.
 Set `PIKAFISH_VARIANT` or `PIKAFISH_BINARY` when you want a specific executable
 from an official multi-binary bundle, such as `avx2`, `bmi2`, or
 `sse41-popcnt`.
+Set `playLevel` to `beginner`, `casual`, `club`, `expert`, or `master` to give
+the app a reusable practice-strength preset; explicit `depth`, `timeLimitMs`,
+`lines`, or native `engineOptions` still override the level defaults.
 
 `engineOptions` are sent to the native process as `setoption` commands before
 the first `isready` check after handshake. Use an object for ordinary options

@@ -254,6 +254,35 @@ test("learning backend factory selects a native preset when configured", async (
   }
 });
 
+test("learning backend factory applies play levels to native presets", async () => {
+  const backend = createLearningEngineBackend({
+    nativePreset: "pikafish",
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    playLevel: "casual",
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    env: {}
+  });
+
+  try {
+    const description = describeEngineBackend(backend);
+    const result = await backend.chooseMove(createInitialPosition(), {
+      useBook: false
+    });
+
+    assert.deepEqual(description.nativeOptions, [
+      { name: "UCI_LimitStrength", value: true },
+      { name: "UCI_Elo", value: 1600 },
+      { name: "UCI_ShowWDL", value: true }
+    ]);
+    assert.equal(result.source, "native-uci");
+    assert.equal(result.depth, 2);
+  } finally {
+    await backend.close();
+  }
+});
+
 test("learning backend factory resolves a discoverable native preset command", () => {
   const root = mkdtempSync(join(tmpdir(), "xiangqi-backend-preset-"));
 
