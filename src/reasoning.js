@@ -34,7 +34,10 @@ export function explainMove(position, searchResult) {
   }
 
   const moveStory = explainMoveFeatures(position, move);
-  const reasons = [...moveStory.reasons];
+  const reasons = [
+    ...moveStory.reasons,
+    ...searchTechniqueReasons(searchResult.stats)
+  ];
   const validation = searchResult.openingHeuristicValidation;
   if (validation?.status === "rejected") {
     reasons.push(
@@ -344,6 +347,12 @@ export function assessSearchConfidence(result, context = {}) {
     });
   }
 
+  const selectivityFactor = searchSelectivityConfidenceFactor(result.stats);
+  if (selectivityFactor) {
+    score += selectivityFactor.impact;
+    factors.push(selectivityFactor);
+  }
+
   if (Math.abs(result.score ?? 0) > 90000) {
     score += 18;
     factors.push({
@@ -363,6 +372,96 @@ export function assessSearchConfidence(result, context = {}) {
   }
 
   return buildConfidence(score, factors);
+}
+
+function searchTechniqueReasons(stats = {}) {
+  if (!stats) return [];
+
+  const reasons = [];
+  const pruneParts = [];
+  const staticPrunes = (
+    (stats.seePrunes ?? 0) +
+    (stats.futilityPrunes ?? 0) +
+    (stats.razorPrunes ?? 0) +
+    (stats.deltaPrunes ?? 0)
+  );
+  const verificationFailures = stats.nullMoveVerificationFailures ?? 0;
+
+  if ((stats.nullMovePrunes ?? 0) > 0) {
+    pruneParts.push(formatCount(stats.nullMovePrunes, "null-move cutoff"));
+  }
+  if ((stats.nullMoveVerifications ?? 0) > 0) {
+    pruneParts.push(formatCount(stats.nullMoveVerifications, "verified null-move recheck"));
+  }
+  if ((stats.probCutPrunes ?? 0) > 0) {
+    pruneParts.push(formatCount(stats.probCutPrunes, "ProbCut capture prune"));
+  }
+  if (staticPrunes > 0) {
+    pruneParts.push(`${staticPrunes} SEE/futility/razor/delta prune${staticPrunes === 1 ? "" : "s"}`);
+  }
+
+  if (pruneParts.length > 0) {
+    const suffix = verificationFailures > 0
+      ? ` ${capitalize(formatCount(verificationFailures, "null-move shortcut"))} failed verification and was searched normally.`
+      : "";
+    reasons.push(`Selective search trimmed unlikely branches with ${formatList(pruneParts)} before spending depth on the main candidates.${suffix}`);
+  } else if (verificationFailures > 0) {
+    reasons.push(`${capitalize(formatCount(verificationFailures, "null-move shortcut"))} failed verification, so the engine searched those replies instead of trusting the shortcut.`);
+  }
+
+  const orderingParts = [];
+  if ((stats.ttHits ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.ttHits, "transposition-table hit"));
+  }
+  if ((stats.iidMoveHits ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.iidMoveHits, "internal-iterative-deepening move hint"));
+  }
+  if ((stats.deepReductions ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.deepReductions, "deeper adaptive late-move reduction"));
+  }
+
+  if (orderingParts.length > 0) {
+    reasons.push(`Move ordering evidence included ${formatList(orderingParts)}, helping the search focus depth on promising replies.`);
+  }
+
+  return reasons.slice(0, 2);
+}
+
+function searchSelectivityConfidenceFactor(stats = {}) {
+  if (!stats) return null;
+
+  const staticPrunes = (
+    (stats.seePrunes ?? 0) +
+    (stats.futilityPrunes ?? 0) +
+    (stats.razorPrunes ?? 0) +
+    (stats.deltaPrunes ?? 0)
+  );
+  const supports = [];
+
+  if ((stats.ttHits ?? 0) > 0) supports.push("transposition-table reuse");
+  if ((stats.iidMoveHits ?? 0) > 0) supports.push("internal iterative deepening");
+  if ((stats.deepReductions ?? 0) > 0) supports.push("adaptive late-move reductions");
+  if ((stats.nullMovePrunes ?? 0) > 0 || (stats.nullMoveVerifications ?? 0) > 0) {
+    supports.push("null-move pruning");
+  }
+  if ((stats.probCutPrunes ?? 0) > 0) supports.push("ProbCut");
+  if (staticPrunes > 0) supports.push("static and tactical pruning");
+
+  const verificationFailures = stats.nullMoveVerificationFailures ?? 0;
+  if (supports.length === 0 && verificationFailures === 0) return null;
+
+  let impact = supports.length > 0 ? Math.min(8, 2 + supports.length) : 0;
+  impact -= Math.min(6, verificationFailures * 2);
+
+  const text = verificationFailures > 0
+    ? `Selective search used ${supports.length > 0 ? formatList(supports) : "null-move verification"} but caught ${formatCount(verificationFailures, "failed null-move shortcut")}, so confidence is tempered.`
+    : `Selective search used ${formatList(supports)} to focus depth on likely relevant lines.`;
+
+  return {
+    kind: "selectivity",
+    impact,
+    text
+  };
 }
 
 export function buildLinePlan(position, line = [], options = {}) {
@@ -787,6 +886,16 @@ function capitalize(text) {
 
 function formatSignedCentipawns(score) {
   return `${score >= 0 ? "+" : ""}${Math.round(score)} centipawns`;
+}
+
+function formatCount(count, singular, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function formatList(items) {
+  if (items.length <= 1) return items[0] ?? "";
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
 }
 
 function unique(items) {

@@ -92,6 +92,38 @@ test("move explanations contrast root alternatives", () => {
   }
 });
 
+test("move explanations surface selective-search diagnostics", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const engine = createEngine({ depth: 5, timeLimitMs: 3000 });
+  const result = engine.chooseMove(position, {
+    useBook: false,
+    depth: 5,
+    timeLimitMs: 3000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  });
+  const selectiveWork = (
+    result.stats.ttHits +
+    result.stats.nullMovePrunes +
+    result.stats.probCutPrunes +
+    result.stats.seePrunes +
+    result.stats.futilityPrunes +
+    result.stats.razorPrunes +
+    result.stats.deltaPrunes +
+    result.stats.deepReductions +
+    result.stats.iidMoveHits
+  );
+  const selectivityFactor = result.explanation.confidence.factors
+    .find((factor) => factor.kind === "selectivity");
+
+  assert.ok(selectiveWork > 0);
+  assert.ok(result.explanation.reasons.some((reason) => (
+    reason.includes("Selective search") || reason.includes("Move ordering evidence")
+  )));
+  assert.ok(selectivityFactor);
+  assert.match(selectivityFactor.text, /Selective search/);
+});
+
 test("analysis line count is clamped to a useful range", () => {
   const position = createInitialPosition();
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });
