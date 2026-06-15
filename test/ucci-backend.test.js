@@ -84,6 +84,10 @@ test("UCCI backend searches through an external process", async () => {
     assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.REVIEW), true);
     assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.EXPLANATION), true);
     assert.equal(description.kind, "native-ucci");
+    assert.equal(description.settings.profile, null);
+    assert.equal(description.settings.protocol, "ucci");
+    assert.equal(description.settings.depth, 2);
+    assert.equal(description.settings.timeLimitMs, 500);
     assert.equal(result.source, "native-ucci");
     assert.equal(result.bestMove.notation, "h9-g7");
     assert.equal(result.depth, 2);

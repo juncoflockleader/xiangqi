@@ -454,8 +454,9 @@ the app a reusable practice-strength preset; explicit `depth`, `timeLimitMs`,
 the first `isready` check after handshake. Use an object for ordinary options
 such as `{ Threads: 4, Hash: 512 }`, or an array for button-style options such
 as `[{ name: "Clear Hash" }]`. `describeEngineBackend(nativeBackend)` includes
-the normalized `nativeOptions` list so the app can show exactly how a strong
-engine was configured.
+resolved `settings` such as profile, play level, protocol, depth, time, and
+candidate-line defaults, plus the normalized `nativeOptions` list so the app can
+show exactly how a strong engine was configured.
 
 Probe a native engine before wiring it into sparring or the app:
 

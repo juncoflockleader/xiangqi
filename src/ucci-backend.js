@@ -8,7 +8,7 @@ import {
   sameMove,
   toFen
 } from "./board.js";
-import { ENGINE_BACKEND_FEATURES, createEngineBackend } from "./backend.js";
+import { ENGINE_BACKEND_FEATURES, createEngineBackend, summarizeEngineSettings } from "./backend.js";
 import { bookMoveToCandidate } from "./book.js";
 import { classifyMoveLoss, createEngine } from "./engine.js";
 import { analyzeReviewMistakes } from "./mistakes.js";
@@ -52,6 +52,7 @@ export function createUcciEngineBackend(options = {}) {
     name,
     kind: source,
     description: backendOptions.description ?? "External UCI/UCCI-compatible engine backend for stronger native or WASM search.",
+    settings: summarizeEngineSettings({ ...backendOptions, protocol }),
     features: [
       protocol === "uci" ? ENGINE_BACKEND_FEATURES.UCI_COMPATIBLE : ENGINE_BACKEND_FEATURES.UCCI_COMPATIBLE,
       ENGINE_BACKEND_FEATURES.NATIVE_READY,

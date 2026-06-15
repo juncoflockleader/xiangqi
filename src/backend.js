@@ -1,4 +1,5 @@
 import { createEngine } from "./engine.js";
+import { resolveEngineOptions } from "./profiles.js";
 
 export const ENGINE_BACKEND_FEATURES = Object.freeze({
   LOCAL_SEARCH: "local-search",
@@ -24,13 +25,15 @@ const REQUIRED_BACKEND_METHODS = Object.freeze([
 ]);
 
 export function createJavaScriptEngineBackend(options = {}) {
-  const engine = createEngine(options);
+  const engineOptions = resolveEngineOptions(options);
+  const engine = createEngine(engineOptions);
 
   return createEngineBackend({
     id: options.id ?? "javascript-reference",
     name: options.name ?? "JavaScript Reference Engine",
     kind: "javascript",
     description: "Dependency-free explainable engine used as the reference backend and learning layer.",
+    settings: summarizeEngineSettings(engineOptions),
     features: [
       ENGINE_BACKEND_FEATURES.LOCAL_SEARCH,
       ENGINE_BACKEND_FEATURES.EXPLANATION,
@@ -110,6 +113,7 @@ export function describeEngineBackend(backend) {
     features: [...(backend.features ?? [])],
     cacheSize: typeof backend.cacheSize === "number" ? backend.cacheSize : null,
     cacheCapacity: typeof backend.cacheCapacity === "number" ? backend.cacheCapacity : null,
+    settings: summarizeEngineSettings(backend.settings),
     nativeOptions: Array.isArray(backend.nativeOptions)
       ? backend.nativeOptions.map((option) => ({ ...option }))
       : [],
@@ -145,6 +149,27 @@ function summarizeBackend(backend) {
     id: backend.id,
     name: backend.name,
     kind: backend.kind,
+    settings: summarizeEngineSettings(backend.settings),
     features: [...(backend.features ?? [])]
   };
+}
+
+export function summarizeEngineSettings(settings = {}) {
+  return {
+    profile: textOrNull(settings.profile),
+    playLevel: textOrNull(settings.playLevel),
+    protocol: textOrNull(settings.protocol),
+    depth: numberOrNull(settings.depth),
+    timeLimitMs: numberOrNull(settings.timeLimitMs),
+    lines: numberOrNull(settings.lines),
+    maxTranspositionEntries: numberOrNull(settings.maxTranspositionEntries ?? settings.ttSize)
+  };
+}
+
+function textOrNull(value) {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function numberOrNull(value) {
+  return Number.isFinite(value) ? value : null;
 }

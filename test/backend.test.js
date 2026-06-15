@@ -32,6 +32,9 @@ test("javascript backend exposes the engine contract", () => {
   assert.equal(description.status.state, "primary");
   assert.equal(description.status.native, false);
   assert.equal(description.status.fallback, false);
+  assert.equal(description.settings.profile, null);
+  assert.equal(description.settings.depth, 1);
+  assert.equal(description.settings.timeLimitMs, 500);
   assert.equal(typeof backend.reviewGame, "function");
   assert.equal(typeof backend.coachMove, "function");
   assert.equal(typeof backend.lessonPlan, "function");
@@ -187,6 +190,11 @@ test("learning backend factory selects a native engine when configured", async (
     assert.equal(description.status.fallback, true);
     assert.equal(description.status.primaryBackend.kind, "native-ucci");
     assert.equal(description.status.fallbackBackend.kind, "javascript");
+    assert.equal(description.settings.profile, "native-ucci");
+    assert.equal(description.settings.protocol, "ucci");
+    assert.equal(description.settings.depth, 2);
+    assert.equal(description.status.primaryBackend.settings.depth, 2);
+    assert.equal(description.status.fallbackBackend.settings.depth, 2);
     assert.deepEqual(description.nativeOptions, [
       { name: "Threads", value: 2 },
       { name: "Hash", value: 64 }
@@ -276,6 +284,10 @@ test("learning backend factory applies play levels to native presets", async () 
       { name: "UCI_Elo", value: 1600 },
       { name: "UCI_ShowWDL", value: true }
     ]);
+    assert.equal(description.settings.playLevel, "casual");
+    assert.equal(description.settings.depth, 2);
+    assert.equal(description.settings.timeLimitMs, 500);
+    assert.equal(description.settings.lines, 2);
     assert.equal(result.source, "native-uci");
     assert.equal(result.depth, 2);
   } finally {

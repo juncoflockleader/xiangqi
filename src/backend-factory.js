@@ -1,4 +1,4 @@
-import { ENGINE_BACKEND_FEATURES, createEngineBackend, createJavaScriptEngineBackend } from "./backend.js";
+import { ENGINE_BACKEND_FEATURES, createEngineBackend, createJavaScriptEngineBackend, summarizeEngineSettings } from "./backend.js";
 import { mergeNativeEngineOptions, resolveNativeEnginePreset } from "./native-presets.js";
 import { createUcciEngineBackend } from "./ucci-backend.js";
 
@@ -119,6 +119,7 @@ export function createFallbackEngineBackend(primaryBackend, fallbackBackend, opt
     name: options.name ?? `${primaryBackend.name} with ${fallbackBackend.name} Fallback`,
     kind: options.kindName ?? "hybrid",
     description: options.description ?? `Prefers ${primaryBackend.name}; falls back to ${fallbackBackend.name} if native search is unavailable.`,
+    settings: summarizeEngineSettings(primaryBackend.settings ?? options.options),
     features: unique([
       ...(primaryBackend.features ?? []),
       ...(fallbackBackend.features ?? []),
