@@ -58,6 +58,7 @@ constexpr int kRootReductionMinDepth = 6;
 constexpr int kRootReductionMoveIndex = 6;
 constexpr int kRootDeepReductionMinDepth = 8;
 constexpr int kRootDeepReductionMoveIndex = 12;
+constexpr int kRootTrackedMultiPvLimit = 8;
 constexpr int kRootMultiPvReductionMargin = 80;
 constexpr int kQSeePruneMaxDepth = 2;
 constexpr int kQSeePruneAlphaMargin = 32;
@@ -5143,23 +5144,42 @@ int rootMoveReduction(
   return rootBaseMoveReduction(root, move, child, depth, moveIndex, rootInCheck);
 }
 
-int rootNthBestScore(const std::vector<RootLine>& lines, int lineCount) {
-  const int limit = std::max(1, lineCount);
-  if (static_cast<int>(lines.size()) < limit) return -kInf;
-
-  std::vector<int> scores;
-  scores.reserve(lines.size());
-  for (const RootLine& line : lines) scores.push_back(line.score);
-  std::nth_element(scores.begin(), scores.begin() + limit - 1, scores.end(), [](int left, int right) {
-    return left > right;
-  });
-  return scores[static_cast<std::size_t>(limit - 1)];
-}
-
 bool reducedRootMoveNeedsFullSearch(int reducedScore, int currentReportCutoff) {
   if (isMateScore(reducedScore) || isMateScore(currentReportCutoff)) return true;
   return reducedScore >= currentReportCutoff - kRootMultiPvReductionMargin;
 }
+
+struct RootReportCutoffTracker {
+  explicit RootReportCutoffTracker(int multiPv)
+      : limit(std::clamp(multiPv, 1, kRootTrackedMultiPvLimit)) {
+    topScores.fill(-kInf);
+  }
+
+  bool full() const {
+    return count >= limit;
+  }
+
+  int cutoff() const {
+    return full() ? topScores[static_cast<std::size_t>(limit - 1)] : -kInf;
+  }
+
+  void push(int score) {
+    if (count >= limit && score <= cutoff()) return;
+
+    const int oldCount = count;
+    count = std::min(limit, count + 1);
+    int index = std::min(oldCount, limit - 1);
+    while (index > 0 && score > topScores[static_cast<std::size_t>(index - 1)]) {
+      topScores[static_cast<std::size_t>(index)] = topScores[static_cast<std::size_t>(index - 1)];
+      index -= 1;
+    }
+    topScores[static_cast<std::size_t>(index)] = score;
+  }
+
+  std::array<int, kRootTrackedMultiPvLimit> topScores{};
+  int limit = 1;
+  int count = 0;
+};
 
 std::vector<RootLine> searchRootDepth(
     const Board& root,
@@ -5179,6 +5199,8 @@ std::vector<RootLine> searchRootDepth(
   std::vector<Move> childPv;
   childPv.reserve(static_cast<std::size_t>(std::max(1, depth)));
   int moveIndex = 0;
+  const bool useTrackedMultiPvCutoff = multiPv > 1 && multiPv <= kRootTrackedMultiPvLimit;
+  RootReportCutoffTracker reportCutoff(multiPv);
 
   for (const RootMove& rootMove : rootMoves) {
     Move move = rootMove.move;
@@ -5192,11 +5214,11 @@ std::vector<RootLine> searchRootDepth(
     const bool useRootPvs = useRootAlphaPruning && moveIndex > 0 && rootAlpha + 1 < beta;
     int multiPvReportCutoff = -kInf;
     const bool useMultiPvReduction = !useRootPvs
-        && multiPv > 1
-        && static_cast<int>(depthLines.size()) >= multiPv;
+        && useTrackedMultiPvCutoff
+        && reportCutoff.full();
     int reduction = rootMoveReduction(root, move, child, depth, moveIndex, rootInCheck, useRootPvs, rootAlpha, beta);
     if (useMultiPvReduction) {
-      multiPvReportCutoff = rootNthBestScore(depthLines, multiPv);
+      multiPvReportCutoff = reportCutoff.cutoff();
       if (!isMateScore(multiPvReportCutoff)) {
         reduction = rootBaseMoveReduction(root, move, child, depth, moveIndex, rootInCheck);
       }
@@ -5315,6 +5337,7 @@ std::vector<RootLine> searchRootDepth(
     line.pv.push_back(move);
     line.pv.insert(line.pv.end(), childPv.begin(), childPv.end());
     depthLines.push_back(std::move(line));
+    if (useTrackedMultiPvCutoff) reportCutoff.push(score);
     if (useRootAlphaPruning && score > rootAlpha) rootAlpha = score;
     if (useRootAlphaPruning && rootAlpha >= beta) break;
   }
