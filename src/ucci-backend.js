@@ -318,7 +318,7 @@ class UcciProcessClient {
     await this.ensureReady();
     throwIfAborted(options.signal);
 
-    this.write(`position fen ${toNativeFen(position, this.protocol)}`);
+    this.write(formatPositionCommand(position, options, this.protocol));
 
     const bannedMoves = options.bannedMoves ?? [];
     if (this.protocol === "ucci" && bannedMoves.length > 0) {
@@ -2108,6 +2108,20 @@ function normalizeNativeProtocol(value = "ucci") {
 
 function nativeSource(protocol) {
   return normalizeNativeProtocol(protocol) === "uci" ? "native-uci" : "native-ucci";
+}
+
+function formatPositionCommand(position, options = {}, protocol = "ucci") {
+  const moveHistory = normalizeMoveHistory(options.moveHistory ?? options.historyMoves);
+  if (options.initialPosition && moveHistory.length > 0) {
+    const moves = moveHistory.map((move) => compactNativeMove(move, protocol)).join(" ");
+    return `position fen ${toNativeFen(options.initialPosition, protocol)} moves ${moves}`;
+  }
+  return `position fen ${toNativeFen(position, protocol)}`;
+}
+
+function normalizeMoveHistory(value) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((move) => move !== null && move !== undefined && move !== "");
 }
 
 function toNativeFen(position, protocol) {

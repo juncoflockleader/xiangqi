@@ -18,6 +18,7 @@ import {
   lineToChineseNotation,
   moveToNotation,
   moveToChineseNotation,
+  moveHistory,
   opponent,
   parseFen,
   parseMoveNotation,
@@ -221,7 +222,9 @@ async function handleApiPost(context, url) {
     const session = requireSession(context.sessions, body.sessionId);
     const hint = await enqueueSession(session, () => context.engine.coachMove(session.game.position, {
       ...searchOptions(session),
-      history: historyKeys(session.game)
+      history: historyKeys(session.game),
+      initialPosition: session.game.initialPosition,
+      moveHistory: moveHistory(session.game)
     }));
     return sendJson(context.response, 200, {
       ok: true,

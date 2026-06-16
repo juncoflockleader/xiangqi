@@ -10,6 +10,7 @@ import {
   createLearningEngineBackend,
   gameStatus,
   historyKeys,
+  moveHistory,
   parseFen,
   playGameMove,
   playGameMoveAsync,
@@ -24,6 +25,7 @@ test("game history records moves and position keys", () => {
 
   assert.equal(game.moves.length, 2);
   assert.equal(historyKeys(game).length, 3);
+  assert.deepEqual(moveHistory(game), ["a9-a8", "a0-a1"]);
   assert.equal(gameStatus(game).state, "playing");
   assert.equal(game.moves[0].ply, 1);
   assert.equal(game.moves[0].moveNumber, 1);
@@ -31,6 +33,25 @@ test("game history records moves and position keys", () => {
   assert.equal(game.moves[0].actor, "player");
   assert.ok(game.moves[0].positionBefore.includes(" r"));
   assert.ok(game.moves[0].positionAfter.includes(" b"));
+});
+
+test("game helper forwards replayable move history for native backends", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 100 });
+  let game = createGame();
+  game = playGameMove(game, engine, "a9-a8", { review: false });
+  let capturedOptions = null;
+  const backend = {
+    chooseMove(position, options) {
+      capturedOptions = options;
+      return { bestMove: null, stats: { nodes: 0 }, position };
+    }
+  };
+
+  chooseGameMove(game, backend, { depth: 1 });
+
+  assert.equal(capturedOptions.initialPosition, game.initialPosition);
+  assert.deepEqual(capturedOptions.moveHistory, ["a9-a8"]);
+  assert.equal(capturedOptions.history.length, 2);
 });
 
 test("game helper chooses an engine move with session history", () => {

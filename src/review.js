@@ -35,7 +35,9 @@ export function reviewGameWithEngine(engine, moves, options = {}) {
     const book = classifyBookMove(engine, position, legalMove, options.bookOptions ?? {});
     const review = engine.reviewMove(position, legalMove, {
       ...reviewOptions,
-      history: positions.map((item) => positionKey(item))
+      history: positions.map((item) => positionKey(item)),
+      initialPosition,
+      moveHistory: reviewedMoves.map((move) => move.notation)
     });
     const after = engine.play(position, notation);
 
@@ -87,7 +89,9 @@ export async function reviewGameWithBackend(backend, moves, options = {}) {
     const book = classifyBookMove(backend, position, legalMove, options.bookOptions ?? {});
     const review = await backend.reviewMove(position, legalMove, {
       ...reviewOptions,
-      history: positions.map((item) => positionKey(item))
+      history: positions.map((item) => positionKey(item)),
+      initialPosition,
+      moveHistory: reviewedMoves.map((move) => move.notation)
     });
     const after = backend.play(position, notation);
 

@@ -26,6 +26,8 @@ export function playGameMove(game, engine, moveOrNotation, options = {}) {
   const legalMove = resolveGameMove(before, moveOrNotation);
   const reviewOptions = {
     history: historyKeys(game),
+    initialPosition: game.initialPosition,
+    moveHistory: moveHistory(game),
     ...(options.reviewOptions ?? {})
   };
   const review = options.review === false ? null : engine.reviewMove(before, legalMove, reviewOptions);
@@ -42,6 +44,8 @@ export async function playGameMoveAsync(game, engine, moveOrNotation, options = 
   const legalMove = resolveGameMove(before, moveOrNotation);
   const reviewOptions = {
     history: historyKeys(game),
+    initialPosition: game.initialPosition,
+    moveHistory: moveHistory(game),
     ...(options.reviewOptions ?? {})
   };
   const review = options.review === false ? null : await engine.reviewMove(before, legalMove, reviewOptions);
@@ -56,14 +60,18 @@ export async function playGameMoveAsync(game, engine, moveOrNotation, options = 
 export function chooseGameMove(game, engine, options = {}) {
   return engine.chooseMove(game.position, {
     ...options,
-    history: historyKeys(game)
+    history: historyKeys(game),
+    initialPosition: game.initialPosition,
+    moveHistory: moveHistory(game)
   });
 }
 
 export async function chooseGameMoveAsync(game, engine, options = {}) {
   return engine.chooseMove(game.position, {
     ...options,
-    history: historyKeys(game)
+    history: historyKeys(game),
+    initialPosition: game.initialPosition,
+    moveHistory: moveHistory(game)
   });
 }
 
@@ -145,6 +153,10 @@ export function gameStatus(game) {
 
 export function historyKeys(game) {
   return game.positions.map((position) => positionKey(position));
+}
+
+export function moveHistory(game) {
+  return game.moves.map((move) => move.notation);
 }
 
 export function classifyRepetition(game, key = positionKey(game.position)) {

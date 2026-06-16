@@ -4,7 +4,9 @@ import {
   createInitialPosition,
   createUcciEngineBackend,
   describeEngineBackend,
-  ENGINE_BACKEND_FEATURES
+  ENGINE_BACKEND_FEATURES,
+  generateLegalMoves,
+  makeMove
 } from "../src/index.js";
 
 const MOCK_UCCI_PATH = new URL("../fixtures/mock-ucci.mjs", import.meta.url);
@@ -358,6 +360,45 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("check-evasion ordering hint")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("check-history hit")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("internal-iterative-deepening move hint")));
+  } finally {
+    await backend.close();
+  }
+});
+
+test("native UCI backend replays move history when initial position is provided", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    protocol: "uci",
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockDepthFromGo: true
+    }
+  });
+
+  try {
+    const initialPosition = createInitialPosition();
+    const firstMove = generateLegalMoves(initialPosition)
+      .find((move) => move.notation === "b9-c7");
+    assert.ok(firstMove);
+    const afterFirst = makeMove(initialPosition, firstMove);
+    const secondMove = generateLegalMoves(afterFirst)
+      .find((move) => move.notation === "b0-c2");
+    assert.ok(secondMove);
+    const position = makeMove(afterFirst, secondMove);
+    const result = await backend.chooseMove(position, {
+      useBook: false,
+      initialPosition,
+      moveHistory: ["b9-c7", "b0-c2"]
+    });
+    const positionLine = result.raw.find((line) => line.startsWith("info string position "));
+
+    assert.ok(positionLine, result.raw.join("\n"));
+    assert.match(positionLine, /\bmoves b0c2 b9c7\b/);
   } finally {
     await backend.close();
   }
