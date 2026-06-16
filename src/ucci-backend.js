@@ -949,6 +949,7 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     qCaptureHistoryHits: maxInfoValue(infos, "qCaptureHistoryHits"),
     qCaptureHistoryStores: maxInfoValue(infos, "qCaptureHistoryStores"),
     qCaptureHistoryMaluses: maxInfoValue(infos, "qCaptureHistoryMaluses"),
+    repetitions: maxInfoValue(infos, "repetitions"),
     telemetry: nativeTelemetry(infos),
     principalVariation,
     candidates,
@@ -1105,6 +1106,7 @@ function parseInfoLine(line) {
     singularExtensionSearches: 0,
     singularExtensions: 0,
     singularExtensionRejects: 0,
+    repetitions: 0,
     qCheckHistoryHits: 0,
     qCheckHistoryStores: 0,
     qCheckHistoryMaluses: 0,
@@ -1408,6 +1410,9 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "evalskip") {
       info.checkedEvalSkips = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "rep") {
+      info.repetitions = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "multipv") {
       info.multipv = Number.parseInt(tokens[index + 1], 10) || 1;
@@ -1975,6 +1980,7 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.extensions ?? 0) > 0) parts.push(nativeCount(stats.extensions, "tactical extension"));
   if ((stats.recaptureExtensions ?? 0) > 0) parts.push(nativeCount(stats.recaptureExtensions, "recapture extension"));
   if ((stats.singularExtensions ?? 0) > 0) parts.push(nativeCount(stats.singularExtensions, "singular extension"));
+  if ((stats.repetitions ?? 0) > 0) parts.push(nativeCount(stats.repetitions, "draw-assumed repetition guard"));
   if ((stats.nullMovePrunes ?? 0) > 0) parts.push(nativeCount(stats.nullMovePrunes, "null-move cutoff"));
   if ((stats.nullMoveVerifications ?? 0) > 0) parts.push(nativeCount(stats.nullMoveVerifications, "verified null-move recheck"));
   if ((stats.nullMoveVerificationFailures ?? 0) > 0) parts.push(nativeCount(stats.nullMoveVerificationFailures, "rejected null-move shortcut"));
@@ -2300,6 +2306,7 @@ function createNativeStats(parsed) {
     singularExtensionSearches: parsed.singularExtensionSearches ?? 0,
     singularExtensions: parsed.singularExtensions ?? 0,
     singularExtensionRejects: parsed.singularExtensionRejects ?? 0,
+    repetitions: parsed.repetitions ?? 0,
     killerHits: parsed.killerHits ?? 0,
     native: true
   };

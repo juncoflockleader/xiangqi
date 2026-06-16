@@ -52,7 +52,7 @@ test("local C++ engine builds and searches through the native UCI backend", asyn
     assert.ok(result.raw.some((line) => /\bnmp\b/.test(line) && /\bnmv\b/.test(line) && /\bnmvfail\b/.test(line) && /\bnmrboost\b/.test(line) && /\bnmmguard\b/.test(line) && /\brfp\b/.test(line) && /\bmdp\b/.test(line) && /\brazor\b/.test(line) && /\bsee\b/.test(line) && /\bpcut\b/.test(line) && /\bpcsearch\b/.test(line) && /\bpcskip\b/.test(line) && /\bfutil\b/.test(line) && /\bhprune\b/.test(line) && /\bhpguard\b/.test(line) && /\bdelta\b/.test(line) && /\bqdskip\b/.test(line) && /\bqsee\b/.test(line) && /\blmp\b/.test(line) && /\blmr\b/.test(line) && /\bredply\b/.test(line) && /\bdeepred\b/.test(line) && /\bpvguard\b/.test(line) && /\bcutboost\b/.test(line) && /\bimp\b/.test(line) && /\bnimp\b/.test(line) && /\bimprd\b/.test(line) && /\bnimprd\b/.test(line) && /\bimplmp\b/.test(line) && /\bnimlmp\b/.test(line) && /\bttmove\b/.test(line) && /\bcaphist\b/.test(line) && /\bcaphstores\b/.test(line) && /\bcaphm\b/.test(line) && /\bcaphguard\b/.test(line) && /\bcm\b/.test(line) && /\bch\b/.test(line) && /\bchred\b/.test(line) && /\bchredm\b/.test(line) && /\bce\b/.test(line) && /\bcecap\b/.test(line) && /\bceblock\b/.test(line) && /\bceking\b/.test(line) && /\bcheckhist\b/.test(line) && /\bcheckhstores\b/.test(line) && /\bcheckhm\b/.test(line) && /\bcheckcache\b/.test(line) && /\biid\b/.test(line) && /\biidhit\b/.test(line) && /\brootmoves\b/.test(line) && /\brootstate\b/.test(line) && /\brootred\b/.test(line) && /\brootredply\b/.test(line) && /\broottt\b/.test(line) && /\brootttstores\b/.test(line) && /\bsingtry\b/.test(line) && /\bsingext\b/.test(line) && /\bsingrej\b/.test(line) && /\bpvs\b/.test(line) && /\basp\b/.test(line) && /\baspwide\b/.test(line)));
     assert.ok(result.raw.some((line) => /\bcrisk \d+\/\d+\b/.test(line)));
     assert.ok(result.raw.some((line) => /\bext\b/.test(line) && /\brecext\b/.test(line) && /\brecorder\b/.test(line) && /\bqnodes\b/.test(line) && /\bqchecks\b/.test(line) && /\bqcheckhist\b/.test(line) && /\bqcheckhstores\b/.test(line) && /\bqcheckhm\b/.test(line) && /\bqcapguard\b/.test(line) && /\bqcaphist\b/.test(line) && /\bqcapstores\b/.test(line) && /\bqcaphm\b/.test(line)));
-    assert.ok(result.raw.some((line) => /\bqtt\b/.test(line) && /\bqttstores\b/.test(line) && /\beval\b/.test(line) && /\bevalskip\b/.test(line)));
+    assert.ok(result.raw.some((line) => /\bqtt\b/.test(line) && /\bqttstores\b/.test(line) && /\beval\b/.test(line) && /\bevalskip\b/.test(line) && /\brep\b/.test(line)));
     assert.ok(legalMoves.some((move) => sameMove(move, result.bestMove)));
     assert.ok(result.candidates.length >= 2);
     assert.equal(result.candidates[0].move.notation, result.bestMove.notation);
@@ -200,6 +200,31 @@ test("local C++ engine keeps exposed-general forcing rook moves ahead of king mo
   } finally {
     await backend.close();
   }
+});
+
+test("local C++ engine scores projected repeated positions as draw-assumed", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const input = [
+    "uci",
+    "position startpos moves b0c2 b9c7 c2b0 c7b9 b0c2 b9c7 c2b0 c7b9",
+    "go depth 1 searchmoves b0c2",
+    "quit"
+  ].join("\n");
+  const result = spawnSync(build.output, {
+    input,
+    encoding: "utf8",
+    timeout: 3000
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /\bscore cp 0\b/);
+  assert.match(result.stdout, /\brep [1-9]\d*\b/);
+  assert.match(result.stdout, /\bbestmove b0c2\b/);
 });
 
 test("local C++ engine lets movetime-only protocol searches iterate beyond the shallow default", (t) => {

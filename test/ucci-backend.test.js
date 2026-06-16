@@ -141,6 +141,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.nps, 8200);
     assert.equal(result.stats.hashfull, 321);
     assert.equal(result.stats.memoryAge, 3);
+    assert.equal(result.stats.repetitions, 2);
     assert.equal(result.stats.qnodes, 44);
     assert.equal(result.stats.qchecks, 5);
     assert.equal(result.stats.qCheckHistoryHits, 6);
@@ -234,6 +235,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.iterations[0].telemetry.seldepth, 7);
     assert.equal(result.iterations[0].memoryAge, 3);
     assert.equal(result.iterations[0].stats.memoryAge, 3);
+    assert.equal(result.iterations[0].stats.repetitions, 2);
     assert.equal(result.iterations[0].stats.qnodes, 44);
     assert.equal(result.iterations[0].stats.qchecks, 5);
     assert.equal(result.iterations[0].stats.qCheckHistoryHits, 6);
@@ -323,6 +325,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("checked-node eval skip")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("tactical extension")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("singular extension")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("draw-assumed repetition guard")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("verified null-move recheck")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("rejected null-move shortcut")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("low-material null-move guard")));
