@@ -58,6 +58,7 @@ constexpr int kRootReductionMinDepth = 6;
 constexpr int kRootReductionMoveIndex = 6;
 constexpr int kRootDeepReductionMinDepth = 8;
 constexpr int kRootDeepReductionMoveIndex = 12;
+constexpr int kRootMultiPvReductionMargin = 80;
 constexpr int kQSeePruneMaxDepth = 2;
 constexpr int kQSeePruneAlphaMargin = 32;
 constexpr int kQSeePruneLossMargin = 120;
@@ -5110,6 +5111,23 @@ void storeRootOrderMemory(SearchState& state, uint64_t rootKey, const std::vecto
   state.rootOrderStores += state.rootOrderCount;
 }
 
+int rootBaseMoveReduction(
+    const Board& root,
+    const Move& move,
+    const KnownChildState& child,
+    int depth,
+    int moveIndex,
+    bool rootInCheck) {
+  if (rootInCheck) return 0;
+  if (depth < kRootReductionMinDepth || moveIndex < kRootReductionMoveIndex) return 0;
+  if (!isQuiet(move) || child.inCheck) return 0;
+  if (timedOpeningRootBonus(root, move) > 0) return 0;
+
+  int reduction = 1;
+  if (depth >= kRootDeepReductionMinDepth && moveIndex >= kRootDeepReductionMoveIndex) reduction += 1;
+  return std::clamp(reduction, 0, depth - 2);
+}
+
 int rootMoveReduction(
     const Board& root,
     const Move& move,
@@ -5120,15 +5138,27 @@ int rootMoveReduction(
     bool useRootPvs,
     int rootAlpha,
     int beta) {
-  if (!useRootPvs || rootInCheck) return 0;
-  if (depth < kRootReductionMinDepth || moveIndex < kRootReductionMoveIndex) return 0;
-  if (!isQuiet(move) || child.inCheck) return 0;
+  if (!useRootPvs) return 0;
   if (isMateScore(rootAlpha) || isMateScore(beta)) return 0;
-  if (timedOpeningRootBonus(root, move) > 0) return 0;
+  return rootBaseMoveReduction(root, move, child, depth, moveIndex, rootInCheck);
+}
 
-  int reduction = 1;
-  if (depth >= kRootDeepReductionMinDepth && moveIndex >= kRootDeepReductionMoveIndex) reduction += 1;
-  return std::clamp(reduction, 0, depth - 2);
+int rootNthBestScore(const std::vector<RootLine>& lines, int lineCount) {
+  const int limit = std::max(1, lineCount);
+  if (static_cast<int>(lines.size()) < limit) return -kInf;
+
+  std::vector<int> scores;
+  scores.reserve(lines.size());
+  for (const RootLine& line : lines) scores.push_back(line.score);
+  std::nth_element(scores.begin(), scores.begin() + limit - 1, scores.end(), [](int left, int right) {
+    return left > right;
+  });
+  return scores[static_cast<std::size_t>(limit - 1)];
+}
+
+bool reducedRootMoveNeedsFullSearch(int reducedScore, int currentReportCutoff) {
+  if (isMateScore(reducedScore) || isMateScore(currentReportCutoff)) return true;
+  return reducedScore >= currentReportCutoff - kRootMultiPvReductionMargin;
 }
 
 std::vector<RootLine> searchRootDepth(
@@ -5139,7 +5169,8 @@ std::vector<RootLine> searchRootDepth(
     int beta,
     SearchState& state,
     bool rootInCheck,
-    bool useRootAlphaPruning) {
+    bool useRootAlphaPruning,
+    int multiPv) {
   std::vector<RootLine> depthLines;
   depthLines.reserve(rootMoves.size());
   const int rootExtension = rootInCheck && depth > 1 ? 1 : 0;
@@ -5159,7 +5190,17 @@ std::vector<RootLine> searchRootDepth(
     const int childDepth = depth - 1 + rootExtension;
     int score;
     const bool useRootPvs = useRootAlphaPruning && moveIndex > 0 && rootAlpha + 1 < beta;
-    const int reduction = rootMoveReduction(root, move, child, depth, moveIndex, rootInCheck, useRootPvs, rootAlpha, beta);
+    int multiPvReportCutoff = -kInf;
+    const bool useMultiPvReduction = !useRootPvs
+        && multiPv > 1
+        && static_cast<int>(depthLines.size()) >= multiPv;
+    int reduction = rootMoveReduction(root, move, child, depth, moveIndex, rootInCheck, useRootPvs, rootAlpha, beta);
+    if (useMultiPvReduction) {
+      multiPvReportCutoff = rootNthBestScore(depthLines, multiPv);
+      if (!isMateScore(multiPvReportCutoff)) {
+        reduction = rootBaseMoveReduction(root, move, child, depth, moveIndex, rootInCheck);
+      }
+    }
     if (useRootPvs) {
       if (reduction > 0) {
         state.rootReductions += 1;
@@ -5212,19 +5253,54 @@ std::vector<RootLine> searchRootDepth(
             child.inCheck);
       }
     } else {
-      score = -negamax(
-          board,
-          childDepth,
-          -beta,
-          -rootAlpha,
-          1,
-          state,
-          &childPv,
-          true,
-          move,
-          kMaxExtensions - rootExtension,
-          child.ownKing,
-          child.inCheck);
+      if (reduction > 0) {
+        state.rootReductions += 1;
+        state.rootReductionPlies += reduction;
+        score = -negamax(
+            board,
+            childDepth - reduction,
+            -beta,
+            -rootAlpha,
+            1,
+            state,
+            nullptr,
+            true,
+            move,
+            kMaxExtensions - rootExtension,
+            child.ownKing,
+            child.inCheck);
+        if (!state.stopped && reducedRootMoveNeedsFullSearch(score, multiPvReportCutoff)) {
+          state.rootReductionResearches += 1;
+          childPv.clear();
+          score = -negamax(
+              board,
+              childDepth,
+              -beta,
+              -rootAlpha,
+              1,
+              state,
+              &childPv,
+              true,
+              move,
+              kMaxExtensions - rootExtension,
+              child.ownKing,
+              child.inCheck);
+        }
+      } else {
+        score = -negamax(
+            board,
+            childDepth,
+            -beta,
+            -rootAlpha,
+            1,
+            state,
+            &childPv,
+            true,
+            move,
+            kMaxExtensions - rootExtension,
+            child.ownKing,
+            child.inCheck);
+      }
     }
     undoMove(board, move);
     if (state.stopped) break;
@@ -5322,7 +5398,7 @@ std::vector<RootLine> searchRoot(
     }
 
     const bool useRootAlphaPruning = rootAlphaPruning && multiPv <= 1;
-    std::vector<RootLine> depthLines = searchRootDepth(root, orderedRootMoves, depth, alpha, beta, state, rootInCheck, useRootAlphaPruning);
+    std::vector<RootLine> depthLines = searchRootDepth(root, orderedRootMoves, depth, alpha, beta, state, rootInCheck, useRootAlphaPruning, multiPv);
     if (!state.stopped && useAspiration && !depthLines.empty()) {
       std::stable_sort(depthLines.begin(), depthLines.end(), [](const RootLine& left, const RootLine& right) {
         return left.score > right.score;
@@ -5339,13 +5415,13 @@ std::vector<RootLine> searchRoot(
             ? std::min(kInf, previousScore + kAspirationInitialWindow)
             : std::min(kInf, previousScore + kAspirationRetryWindow);
         state.aspirationWidenedSearches += 1;
-        depthLines = searchRootDepth(root, orderedRootMoves, depth, retryAlpha, retryBeta, state, rootInCheck, useRootAlphaPruning);
+        depthLines = searchRootDepth(root, orderedRootMoves, depth, retryAlpha, retryBeta, state, rootInCheck, useRootAlphaPruning, multiPv);
         if (!state.stopped && !depthLines.empty()) {
           std::stable_sort(depthLines.begin(), depthLines.end(), [](const RootLine& left, const RootLine& right) {
             return left.score > right.score;
           });
           if (depthLines.front().score <= retryAlpha || depthLines.front().score >= retryBeta) {
-            depthLines = searchRootDepth(root, orderedRootMoves, depth, -kInf, kInf, state, rootInCheck, useRootAlphaPruning);
+            depthLines = searchRootDepth(root, orderedRootMoves, depth, -kInf, kInf, state, rootInCheck, useRootAlphaPruning, multiPv);
           }
         }
       }
