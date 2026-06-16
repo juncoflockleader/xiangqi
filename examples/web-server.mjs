@@ -32,6 +32,10 @@ import {
 const WEB_ROOT = new URL("./web/", import.meta.url);
 const DEFAULT_PORT = 5175;
 const DEFAULT_HOST = "127.0.0.1";
+const DEFAULT_STARTUP_TIMEOUT_MS = 5000;
+const DEFAULT_COMMAND_TIMEOUT_MS = 30000;
+const COMMAND_TIMEOUT_DEPTH_MS = 10000;
+const COMMAND_TIMEOUT_TIME_MULTIPLIER = 4;
 const JSON_LIMIT_BYTES = 64 * 1024;
 
 const PIECE_SYMBOLS = Object.freeze({
@@ -130,6 +134,8 @@ function resolveServerOptions(options) {
   const lines = numberOrNull(options.lines) ?? 2;
   const playLevel = textOrNull(options.playLevel) ?? "casual";
   const nativePreset = options.nativePreset === false ? null : textOrNull(options.nativePreset) ?? "pikafish";
+  const startupTimeoutMs = numberOrNull(options.startupTimeoutMs) ?? DEFAULT_STARTUP_TIMEOUT_MS;
+  const commandTimeoutMs = resolveWebServerCommandTimeoutMs(options, depth, timeLimitMs);
 
   return {
     host: textOrNull(options.host) ?? DEFAULT_HOST,
@@ -154,8 +160,8 @@ function resolveServerOptions(options) {
       ...(depth ? { depth } : {}),
       ...(timeLimitMs ? { timeLimitMs } : {}),
       lines,
-      startupTimeoutMs: numberOrNull(options.startupTimeoutMs) ?? 5000,
-      commandTimeoutMs: numberOrNull(options.commandTimeoutMs) ?? 30000,
+      startupTimeoutMs,
+      commandTimeoutMs,
       javascript: {
         profile: "balanced",
         ...(depth ? { depth } : {}),
@@ -165,6 +171,15 @@ function resolveServerOptions(options) {
       env: process.env
     }
   };
+}
+
+export function resolveWebServerCommandTimeoutMs(options = {}, depth = numberOrNull(options.depth), timeLimitMs = numberOrNull(options.timeLimitMs)) {
+  const explicit = numberOrNull(options.commandTimeoutMs);
+  if (explicit) return explicit;
+
+  const depthBudget = depth ? depth * COMMAND_TIMEOUT_DEPTH_MS : 0;
+  const timeBudget = timeLimitMs ? timeLimitMs * COMMAND_TIMEOUT_TIME_MULTIPLIER : 0;
+  return Math.max(DEFAULT_COMMAND_TIMEOUT_MS, depthBudget, timeBudget);
 }
 
 async function handleRequest(context) {

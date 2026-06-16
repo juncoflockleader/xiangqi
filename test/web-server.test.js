@@ -1,6 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { startWebServer } from "../examples/web-server.mjs";
+import {
+  resolveWebServerCommandTimeoutMs,
+  startWebServer
+} from "../examples/web-server.mjs";
+
+test("web server scales native command timeout for deeper searches", () => {
+  assert.equal(resolveWebServerCommandTimeoutMs({ depth: 1, timeLimitMs: 50 }), 30000);
+  assert.equal(resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 8000 }), 70000);
+  assert.equal(resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 25000 }), 100000);
+  assert.equal(resolveWebServerCommandTimeoutMs({ commandTimeoutMs: 45000, depth: 7, timeLimitMs: 8000 }), 45000);
+});
 
 test("web server serves the browser game and starts a session", async () => {
   const app = await startWebServer({
