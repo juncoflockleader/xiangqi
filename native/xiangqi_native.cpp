@@ -2749,7 +2749,7 @@ int razorMargin(int depth) {
 }
 
 bool shouldPruneReverseFutility(int depth, bool inCheck, int alpha, int beta, int staticScore, StaticEvalTrend trend) {
-  if (inCheck || depth < 1 || depth > 3) return false;
+  if (inCheck || depth < 1 || depth > 4) return false;
   if (beta - alpha != 1) return false;
   if (isMateScore(alpha) || isMateScore(beta)) return false;
   return staticScore - reverseFutilityMargin(depth, trend) >= beta;
