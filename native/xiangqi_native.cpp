@@ -8,6 +8,7 @@
 #include <limits>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -67,6 +68,7 @@ constexpr int kQSeeCaptureHistoryGuard = 1024;
 constexpr int kAspirationInitialWindow = 80;
 constexpr int kAspirationRetryWindow = 320;
 constexpr int kDefaultHashMb = 64;
+constexpr int kHistoryCountLookupThreshold = 64;
 constexpr int64_t kTimeCheckNodeMask = 16383;
 constexpr std::size_t kTtBucketSize = 4;
 constexpr std::size_t kEvalBucketSize = 4;
@@ -777,6 +779,7 @@ struct SearchState {
   TranspositionTable* qtt = nullptr;
   EvalCache* evalCache = nullptr;
   const std::vector<uint64_t>* rootHistoryKeys = nullptr;
+  const std::unordered_map<uint64_t, int>* rootHistoryCounts = nullptr;
   std::array<std::array<Move, 2>, kMaxPly> killers{};
   std::array<std::array<int, kSquares>, kSquares> quietHistory{};
   std::array<std::array<int, kSquares>, kSquares> captureHistory{};
@@ -910,6 +913,7 @@ struct SearchState {
     qtt = nullptr;
     evalCache = nullptr;
     rootHistoryKeys = nullptr;
+    rootHistoryCounts = nullptr;
     killers = {};
     staticEvalStack.fill(0);
     staticEvalKnown.fill(false);
@@ -930,6 +934,7 @@ struct SearchState {
     rootOrderKey = 0;
     rootOrderCount = 0;
     rootHistoryKeys = nullptr;
+    rootHistoryCounts = nullptr;
     rootOrderMoves = {};
     checkCache = {};
     leastAttackerCache = {};
@@ -4084,7 +4089,11 @@ bool timeExpired(SearchState& state) {
 }
 
 int countRootHistoryOccurrences(const SearchState& state, uint64_t key) {
-  if (!state.rootHistoryKeys) return 0;
+  if (!state.rootHistoryKeys || state.rootHistoryKeys->empty()) return 0;
+  if (state.rootHistoryCounts && state.rootHistoryKeys->size() > kHistoryCountLookupThreshold) {
+    const auto found = state.rootHistoryCounts->find(key);
+    return found == state.rootHistoryCounts->end() ? 0 : found->second;
+  }
   return static_cast<int>(std::count(state.rootHistoryKeys->begin(), state.rootHistoryKeys->end(), key));
 }
 
@@ -5395,6 +5404,7 @@ std::vector<RootLine> searchRoot(
     int multiPv,
     const std::vector<Move>& searchMoves,
     const std::vector<uint64_t>& historyKeys,
+    const std::unordered_map<uint64_t, int>& historyCounts,
     TranspositionTable& tt,
     TranspositionTable& qtt,
     EvalCache& evalCache,
@@ -5408,6 +5418,7 @@ std::vector<RootLine> searchRoot(
   state.qtt = &qtt;
   state.evalCache = &evalCache;
   state.rootHistoryKeys = &historyKeys;
+  state.rootHistoryCounts = &historyCounts;
   state.rootPieceCount = root.totalPieceCount;
   state.pathKeys[0] = root.key;
   state.pathKeyKnown[0] = true;
@@ -5538,6 +5549,7 @@ int elapsedMs(const SearchState& state) {
 struct PositionState {
   Board board;
   std::vector<uint64_t> historyKeys;
+  std::unordered_map<uint64_t, int> historyCounts;
 };
 
 bool applyMoveIfLegal(Board& board, const Move& requested) {
@@ -5552,7 +5564,10 @@ bool applyMoveIfLegal(Board& board, const Move& requested) {
 
 void applyMoveWithHistory(PositionState& position, const Move& requested) {
   const uint64_t beforeMoveKey = position.board.key;
-  if (applyMoveIfLegal(position.board, requested)) position.historyKeys.push_back(beforeMoveKey);
+  if (applyMoveIfLegal(position.board, requested)) {
+    position.historyKeys.push_back(beforeMoveKey);
+    position.historyCounts[beforeMoveKey] += 1;
+  }
 }
 
 void handlePosition(PositionState& position, const std::string& line) {
@@ -5560,6 +5575,7 @@ void handlePosition(PositionState& position, const std::string& line) {
   if (tokens.size() >= 2 && tokens[1] == "startpos") {
     parseFen(position.board, initialFen());
     position.historyKeys.clear();
+    position.historyCounts.clear();
     auto movesIt = std::find(tokens.begin(), tokens.end(), "moves");
     if (movesIt != tokens.end()) {
       for (++movesIt; movesIt != tokens.end(); ++movesIt) applyMoveWithHistory(position, parseUciMove(*movesIt));
@@ -5577,6 +5593,7 @@ void handlePosition(PositionState& position, const std::string& line) {
   }
   parseFen(position.board, fen);
   position.historyKeys.clear();
+  position.historyCounts.clear();
   if (movesIt != tokens.end()) {
     for (++movesIt; movesIt != tokens.end(); ++movesIt) applyMoveWithHistory(position, parseUciMove(*movesIt));
   }
@@ -5838,6 +5855,7 @@ int main() {
     } else if (command == "ucinewgame") {
       parseFen(position.board, initialFen());
       position.historyKeys.clear();
+      position.historyCounts.clear();
       clearEngineMemory();
     } else if (command == "setoption") {
       if (parseButtonOption(line, "clear hash")) {
@@ -5863,6 +5881,7 @@ int main() {
           multiPv,
           options.searchMoves,
           position.historyKeys,
+          position.historyCounts,
           tt,
           qtt,
           evalCache,
