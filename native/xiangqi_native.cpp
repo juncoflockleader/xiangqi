@@ -2622,14 +2622,20 @@ StaticEvalTrend staticEvalTrend(SearchState& state, int ply, int staticScore) {
   return TrendStable;
 }
 
+int trendAdjustedMargin(int margin, StaticEvalTrend trend, int improvingSlack, int worseningTighten, int floor) {
+  if (isImprovingTrend(trend)) return margin + improvingSlack;
+  if (isWorseningTrend(trend)) return std::max(floor, margin - worseningTighten);
+  return margin;
+}
+
 int futilityMargin(int depth, StaticEvalTrend trend) {
-  (void)trend;
-  return 140 + depth * 120;
+  const int margin = 140 + depth * 120;
+  return trendAdjustedMargin(margin, trend, 30 + depth * 20, 25 + depth * 15, 120);
 }
 
 int reverseFutilityMargin(int depth, StaticEvalTrend trend) {
-  (void)trend;
-  return 100 + depth * 80;
+  const int margin = 100 + depth * 80;
+  return trendAdjustedMargin(margin, trend, 25 + depth * 15, 20 + depth * 10, 80);
 }
 
 int razorMargin(int depth) {
@@ -2662,13 +2668,20 @@ int lateMovePruningThreshold(int depth, StaticEvalTrend trend) {
 }
 
 int historyPruningMoveIndex(int depth, StaticEvalTrend trend) {
-  (void)trend;
-  return kHistoryPruningBaseIndex + depth;
+  const int moveIndex = kHistoryPruningBaseIndex + depth;
+  if (isImprovingTrend(trend)) return moveIndex + 1;
+  if (isWorseningTrend(trend)) return std::max(1, moveIndex - 1);
+  return moveIndex;
 }
 
 int historyPruningMargin(int depth, StaticEvalTrend trend) {
-  (void)trend;
-  return depth * depth * kHistoryPruningMarginScale;
+  const int margin = depth * depth * kHistoryPruningMarginScale;
+  return trendAdjustedMargin(
+      margin,
+      trend,
+      depth * 24,
+      depth * 16,
+      kHistoryPruningMarginScale / 2);
 }
 
 int continuationHistoryValue(const SearchState& state, const Move& previousMove, const Move& move, bool quietMove);

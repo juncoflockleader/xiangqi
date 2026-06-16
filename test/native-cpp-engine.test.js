@@ -1043,10 +1043,10 @@ test("local C++ engine prunes bad-history quiet moves conservatively", (t) => {
   assert.match(result.stdout, /\bhpguard \d+\b/);
   assert.match(result.stdout, /\bttmove [1-9]\d*\b/);
   assert.match(result.stdout, /\bch [1-9]\d*\b/);
-  assert.match(result.stdout, /\bbestmove b2c2\b/);
+  assert.match(result.stdout, /\bbestmove b2g2\b/);
 });
 
-test("local C++ engine guards late-move pruning in improving positions", (t) => {
+test("local C++ engine tunes selective pruning in improving positions", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {
     t.skip(build.skip);
@@ -1067,10 +1067,13 @@ test("local C++ engine guards late-move pruning in improving positions", (t) => 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /\bimp [1-9]\d*\b/);
   assert.match(result.stdout, /\bnimp [1-9]\d*\b/);
+  assert.match(result.stdout, /\brfp [1-9]\d*\b/);
+  assert.match(result.stdout, /\bfutil [1-9]\d*\b/);
+  assert.match(result.stdout, /\bhprune [1-9]\d*\b/);
   assert.match(result.stdout, /\bimplmp [1-9]\d*\b/);
   assert.match(result.stdout, /\blmp [1-9]\d*\b/);
   assert.match(result.stdout, /\bch [1-9]\d*\b/);
-  assert.match(result.stdout, /\bbestmove b2c2\b/);
+  assert.match(result.stdout, /\bbestmove b2g2\b/);
 });
 
 test("local C++ engine uses continuation history for reply ordering", (t) => {
@@ -1126,7 +1129,7 @@ test("local C++ engine uses quiet-check history for checking move ordering", (t)
   assert.match(result.stdout, /\bcheckhstores [1-9]\d*\b/);
   assert.match(result.stdout, /\bcheckhm [1-9]\d*\b/);
   assert.match(result.stdout, /\bcheckcache [1-9]\d*\/[1-9]\d*\b/);
-  assert.match(result.stdout, /\bbestmove b2c2\b/);
+  assert.match(result.stdout, /\bbestmove b2g2\b/);
 });
 
 test("local C++ engine verifies ProbCut capture cutoffs", (t) => {
