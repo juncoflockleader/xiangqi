@@ -897,6 +897,8 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     qSeePrunes: maxInfoValue(infos, "qSeePrunes"),
     lateMovePrunes: maxInfoValue(infos, "lateMovePrunes"),
     reductions: maxInfoValue(infos, "reductions"),
+    reductionPlies: maxInfoValue(infos, "reductionPlies"),
+    deepReductions: maxInfoValue(infos, "deepReductions"),
     lmrResearches: maxInfoValue(infos, "lmrResearches"),
     pvReductionGuards: maxInfoValue(infos, "pvReductionGuards"),
     cutNodeReductionBoosts: maxInfoValue(infos, "cutNodeReductionBoosts"),
@@ -1214,6 +1216,12 @@ function parseInfoLine(line) {
       const [reductions, researches] = parseNativePair(tokens[index + 1]);
       info.reductions = reductions;
       info.lmrResearches = researches;
+      index += 1;
+    } else if (token === "redply") {
+      info.reductionPlies = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "deepred") {
+      info.deepReductions = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "pvguard") {
       info.pvReductionGuards = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -2221,6 +2229,8 @@ function createNativeStats(parsed) {
     qSeePrunes: parsed.qSeePrunes ?? 0,
     lateMovePrunes: parsed.lateMovePrunes ?? 0,
     reductions: parsed.reductions ?? 0,
+    reductionPlies: parsed.reductionPlies ?? 0,
+    deepReductions: parsed.deepReductions ?? 0,
     lmrResearches: parsed.lmrResearches ?? 0,
     pvReductionGuards: parsed.pvReductionGuards ?? 0,
     cutNodeReductionBoosts: parsed.cutNodeReductionBoosts ?? 0,

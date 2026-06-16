@@ -184,6 +184,8 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.qSeePrunes, 13);
     assert.equal(result.stats.lateMovePrunes, 4);
     assert.equal(result.stats.reductions, 7);
+    assert.equal(result.stats.reductionPlies, 11);
+    assert.equal(result.stats.deepReductions, 3);
     assert.equal(result.stats.lmrResearches, 2);
     assert.equal(result.stats.pvReductionGuards, 5);
     assert.equal(result.stats.cutNodeReductionBoosts, 6);

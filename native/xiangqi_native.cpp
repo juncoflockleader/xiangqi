@@ -689,6 +689,8 @@ struct SearchState {
   int64_t qSeePrunes = 0;
   int64_t lateMovePrunes = 0;
   int64_t lmrReductions = 0;
+  int64_t reductionPlies = 0;
+  int64_t deepReductions = 0;
   int64_t lmrResearches = 0;
   int64_t pvsResearches = 0;
   int64_t pvReductionGuards = 0;
@@ -814,6 +816,8 @@ struct SearchState {
     qSeePrunes = 0;
     lateMovePrunes = 0;
     lmrReductions = 0;
+    reductionPlies = 0;
+    deepReductions = 0;
     lmrResearches = 0;
     pvsResearches = 0;
     pvReductionGuards = 0;
@@ -2549,10 +2553,6 @@ bool isRecapture(const Move& move, const Move& previousMove) {
   return move.captured != 0 && previousMove.captured != 0 && move.to == previousMove.to;
 }
 
-bool hasNonPawnMaterial(const Board& board, int side) {
-  return side == kRed ? board.redNonPawnMaterial > 0 : board.blackNonPawnMaterial > 0;
-}
-
 bool hasNullMoveMaterial(const Board& board, int side) {
   return side == kRed ? board.redNullMoveMaterial > 0 : board.blackNullMoveMaterial > 0;
 }
@@ -2932,6 +2932,7 @@ int lateMoveReduction(
   if (depth < 3 || moveIndex < 4 || inCheck || killerCandidate || !quietMove) return 0;
   int reduction = 1;
   if (depth >= 5 && moveIndex >= 8) reduction += 1;
+  if (depth >= 7 && moveIndex >= 14 && !isImprovingTrend(trend)) reduction += 1;
 
   const int historyScore = state.quietHistory[move.from][move.to];
   const int continuationScore = continuationHistoryValue(state, previousMove, move, quietMove);
@@ -4662,7 +4663,11 @@ int negamax(
       score = -negamax(board, depth - 1 + extension, -beta, -alpha, ply + 1, state, childPvSink, true, move, childExtensions, childOwnKing, childInCheck);
     } else {
       const int reduction = extension > 0 ? 0 : lateMoveReduction(state, depth, moveIndex, move, inCheck, killerCandidate, counterCandidate, quietMove, previousMove, alpha, beta, trend);
-      if (reduction > 0) state.lmrReductions += 1;
+      if (reduction > 0) {
+        state.lmrReductions += 1;
+        state.reductionPlies += reduction;
+        if (reduction > 1) state.deepReductions += 1;
+      }
       score = -negamax(board, depth - 1 + extension - reduction, -alpha - 1, -alpha, ply + 1, state, nullptr, true, move, childExtensions, childOwnKing, childInCheck);
       if (reduction > 0 && score > alpha && !state.stopped) {
         state.lmrResearches += 1;
@@ -5404,6 +5409,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " qdskip " << state.qDeltaPrefilterSkips
               << " qsee " << state.qSeePrunes
               << " lmp " << state.lateMovePrunes << " lmr " << state.lmrReductions << "/" << state.lmrResearches
+              << " redply " << state.reductionPlies << " deepred " << state.deepReductions
               << " pvguard " << state.pvReductionGuards << " cutboost " << state.cutNodeReductionBoosts
               << " imp " << state.improvingNodes << " nimp " << state.nonImprovingNodes
               << " imprd " << state.improvingReductionGuards << " nimprd " << state.nonImprovingReductionBoosts
@@ -5469,6 +5475,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " qdskip " << state.qDeltaPrefilterSkips
               << " qsee " << state.qSeePrunes
               << " lmp " << state.lateMovePrunes << " lmr " << state.lmrReductions << "/" << state.lmrResearches
+              << " redply " << state.reductionPlies << " deepred " << state.deepReductions
               << " pvguard " << state.pvReductionGuards << " cutboost " << state.cutNodeReductionBoosts
               << " imp " << state.improvingNodes << " nimp " << state.nonImprovingNodes
               << " imprd " << state.improvingReductionGuards << " nimprd " << state.nonImprovingReductionBoosts
