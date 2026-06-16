@@ -489,18 +489,8 @@ constexpr std::array<int, kPieceCodeCount> makePieceTypeLookup() {
   return values;
 }
 
-constexpr std::array<int, kPieceCodeCount> makePieceSlotLookup() {
-  std::array<int, kPieceCodeCount> values{};
-  for (int piece = -7; piece <= 7; piece += 1) {
-    const int type = piece < 0 ? -piece : piece;
-    values[static_cast<std::size_t>(piece + kPieceCodeOffset)] = piece == 0 ? 0 : piece > 0 ? type : type + 7;
-  }
-  return values;
-}
-
 constexpr auto kSideByPieceCode = makePieceSideLookup();
 constexpr auto kTypeByPieceCode = makePieceTypeLookup();
-constexpr auto kSlotByPieceCode = makePieceSlotLookup();
 constexpr auto kValueByPieceCode = makePieceValueLookup();
 
 enum PieceType {
@@ -1386,12 +1376,40 @@ std::string lower(std::string text) {
   return text;
 }
 
-uint64_t splitmix64(uint64_t value) {
+constexpr uint64_t splitmix64(uint64_t value) {
   value += 0x9e3779b97f4a7c15ULL;
   value = (value ^ (value >> 30)) * 0xbf58476d1ce4e5b9ULL;
   value = (value ^ (value >> 27)) * 0x94d049bb133111ebULL;
   return value ^ (value >> 31);
 }
+
+constexpr int rawPieceSlotForHash(int piece) {
+  if (piece == 0) return 0;
+  const int type = piece < 0 ? -piece : piece;
+  return piece > 0 ? type : type + 7;
+}
+
+constexpr uint64_t rawPieceHash(int square, int piece) {
+  constexpr uint64_t seed = 0x6a09e667f3bcc909ULL;
+  return splitmix64(
+      seed
+      ^ (static_cast<uint64_t>(square + 1) * 0x100000001b3ULL)
+      ^ static_cast<uint64_t>(rawPieceSlotForHash(piece) * 0x9e3779b1U));
+}
+
+constexpr std::array<std::array<uint64_t, kPieceCodeCount>, kSquares> makePieceHashLookup() {
+  std::array<std::array<uint64_t, kPieceCodeCount>, kSquares> values{};
+  for (int square = 0; square < kSquares; square += 1) {
+    for (int piece = -7; piece <= 7; piece += 1) {
+      values[static_cast<std::size_t>(square)][static_cast<std::size_t>(piece + kPieceCodeOffset)] =
+          rawPieceHash(square, piece);
+    }
+  }
+  return values;
+}
+
+constexpr auto kPieceHashBySquareCode = makePieceHashLookup();
+constexpr uint64_t kSideHash = splitmix64(0xbb67ae8584caa73bULL);
 
 int pieceValue(int pieceOrType) {
   if (pieceOrType >= -7 && pieceOrType <= 7) {
@@ -1416,21 +1434,12 @@ int fenPiece(char c) {
   return red ? type : -type;
 }
 
-int pieceSlot(int piece) {
-  if (piece < -7 || piece > 7) {
-    if (piece == 0) return 0;
-    return piece > 0 ? typeOf(piece) : typeOf(piece) + 7;
-  }
-  return kSlotByPieceCode[static_cast<std::size_t>(piece + kPieceCodeOffset)];
-}
-
 uint64_t pieceHash(int square, int piece) {
-  const uint64_t seed = 0x6a09e667f3bcc909ULL;
-  return splitmix64(seed ^ (static_cast<uint64_t>(square + 1) * 0x100000001b3ULL) ^ static_cast<uint64_t>(pieceSlot(piece) * 0x9e3779b1U));
+  return kPieceHashBySquareCode[static_cast<std::size_t>(square)][static_cast<std::size_t>(piece + kPieceCodeOffset)];
 }
 
 uint64_t sideHash() {
-  return splitmix64(0xbb67ae8584caa73bULL);
+  return kSideHash;
 }
 
 uint64_t computeKey(const Board& board) {
