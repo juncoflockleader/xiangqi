@@ -856,11 +856,17 @@ function formatColumns(values, columns) {
 
 function searchBudgetOptions(options) {
   const levelControlsDefaults = Boolean(options.playLevel);
+  const nativeTimedDefaults = hasNativeEngine(options) && !levelControlsDefaults;
+  const includeDefaultBudgets = !nativeTimedDefaults && !levelControlsDefaults;
   return {
-    ...(!levelControlsDefaults || options.depthExplicit ? { depth: options.depth } : {}),
-    ...(!levelControlsDefaults || options.timeExplicit ? { timeLimitMs: options.timeLimitMs } : {}),
+    ...(includeDefaultBudgets || options.depthExplicit ? { depth: options.depth } : {}),
+    ...(includeDefaultBudgets || options.timeExplicit ? { timeLimitMs: options.timeLimitMs } : {}),
     ...(!levelControlsDefaults || options.linesExplicit ? { lines: options.lines } : {})
   };
+}
+
+function hasNativeEngine(options) {
+  return Boolean(options.engineCommand || options.enginePreset);
 }
 
 function formatMoveForDisplay(move) {

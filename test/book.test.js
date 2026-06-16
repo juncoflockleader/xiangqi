@@ -67,9 +67,10 @@ test("opening book handles the next move in a known line", () => {
 
   assert.equal(result.source, "opening-book");
   assert.equal(result.bestMove.notation, "h0-g2");
+  assert.equal(result.book.name, "Pikafish best: h0-g2");
 });
 
-test("opening book follows named deeper central cannon lines", () => {
+test("opening book follows oracle-generated deeper central cannon lines", () => {
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });
   let position = createInitialPosition();
   for (const move of ["h7-e7", "h0-g2", "h9-g7"]) {
@@ -79,8 +80,30 @@ test("opening book follows named deeper central cannon lines", () => {
   const result = engine.chooseMove(position);
 
   assert.equal(result.source, "opening-book");
-  assert.equal(result.bestMove.notation, "b0-c2");
-  assert.equal(result.book.name, "Double Screen Horses");
+  assert.equal(result.bestMove.notation, "g3-g4");
+  assert.equal(result.book.name, "Pikafish best: g3-g4");
+  assert.ok(result.book.tags.includes("pikafish"));
+  assert.equal(result.book.database.source, "Pikafish");
+  assert.ok(result.book.idea.includes("depth 8"));
+  assert.deepEqual(
+    result.bookAlternatives.slice(0, 4).map((entry) => entry.move.notation),
+    ["g3-g4", "i0-h0", "c3-c4", "b0-c2"]
+  );
+});
+
+test("opening book covers the c3-c4 central cannon candidate branch", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  let position = createInitialPosition();
+  for (const move of ["h7-e7", "h0-g2", "h9-g7", "c3-c4"]) {
+    position = engine.play(position, move);
+  }
+
+  const result = engine.chooseMove(position);
+
+  assert.equal(result.source, "opening-book");
+  assert.equal(result.bestMove.notation, "b9-a7");
+  assert.equal(result.book.name, "Pikafish best: b9-a7");
+  assert.equal(result.book.database.engineScore, 27);
 });
 
 test("opening heuristics cover early positions outside exact book when requested raw", () => {
@@ -110,8 +133,8 @@ test("opening heuristic validation rejects immediate tactical losses", () => {
   assert.ok(result.openingHeuristicValidation.centipawnLoss > result.openingHeuristicValidation.maxCentipawnLoss);
 });
 
-test("opening heuristic validation avoids the Hu bot central cannon trap", () => {
-  const engine = createEngine({ depth: 3, timeLimitMs: 4000 });
+test("opening heuristic validation avoids the Hu bot central cannon trap with no exact book", () => {
+  const engine = createEngine({ book: {}, depth: 3, timeLimitMs: 4000 });
   let position = createInitialPosition();
   for (const move of ["h7-e7", "h0-g2", "h9-g7", "g3-g4", "b9-c7", "i0-h0"]) {
     position = engine.play(position, move);

@@ -183,19 +183,19 @@ test("search restores mate distance when probing the transposition table", () =>
 test("search prunes mate-distance windows after finding a forced mate", () => {
   const position = parseFen("4k4/9/9/9/9/9/9/9/9/3KR4 r");
   const withPruning = searchBestMove(position, {
-    depth: 2,
+    depth: 3,
     timeLimitMs: 1000,
     useAspiration: false
   });
   const withoutPruning = searchBestMove(position, {
-    depth: 2,
+    depth: 3,
     timeLimitMs: 1000,
     useAspiration: false,
     useMateDistancePruning: false
   });
 
-  assert.equal(withPruning.bestMove.notation, "e9-e0");
-  assert.equal(withPruning.score, MATE_SCORE - 1);
+  assert.equal(withPruning.bestMove.notation, "e9-e8");
+  assert.equal(withPruning.score, MATE_SCORE - 3);
   assert.equal(withPruning.score, withoutPruning.score);
   assert.ok(withPruning.stats.mateDistancePrunes > 0);
   assert.equal(withoutPruning.stats.mateDistancePrunes, 0);

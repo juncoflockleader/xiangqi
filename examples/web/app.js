@@ -2,10 +2,6 @@ const files = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
 const ranks = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 const chineseNumerals = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
 const blackFileLabels = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
-const pointCount = {
-  files: files.length,
-  ranks: ranks.length
-};
 
 const pieceNames = {
   "zh-CN": {
@@ -167,6 +163,72 @@ const simplifiedChineseMap = Object.freeze({
   "對": "对"
 });
 
+const traditionalChineseMap = Object.freeze({
+  "与": "與",
+  "帅": "帥",
+  "将": "將",
+  "马": "馬",
+  "车": "車",
+  "进": "進",
+  "后": "後",
+  "着": "著",
+  "红": "紅",
+  "汉": "漢",
+  "语": "語",
+  "体": "體",
+  "启": "啟",
+  "动": "動",
+  "级": "級",
+  "备": "備",
+  "暂": "暫",
+  "无": "無",
+  "选": "選",
+  "择": "擇",
+  "复": "覆",
+  "损": "損",
+  "开": "開",
+  "库": "庫",
+  "预": "預",
+  "应": "應",
+  "续": "續",
+  "题": "題",
+  "荐": "薦",
+  "评": "評",
+  "为": "為",
+  "战": "戰",
+  "术": "術",
+  "状": "狀",
+  "态": "態",
+  "没": "沒",
+  "压": "壓",
+  "线": "線",
+  "点": "點",
+  "权": "權",
+  "较": "較",
+  "领": "領",
+  "计": "計",
+  "画": "畫",
+  "实": "實",
+  "议": "議",
+  "虑": "慮",
+  "强": "強",
+  "协": "協",
+  "调": "調",
+  "关": "關",
+  "系": "係",
+  "制": "製",
+  "胁": "脅",
+  "静": "靜",
+  "势": "勢",
+  "护": "護",
+  "跃": "躍",
+  "练": "練",
+  "扫": "掃",
+  "么": "麼",
+  "双": "雙",
+  "对": "對"
+});
+
 const practiceFocusTranslations = Object.freeze({
   "zh-CN": {
     "missed-material": ["子力战术", "练习在走安静棋前先扫描强制吃子。"],
@@ -275,12 +337,15 @@ const zhCnTranslations = {
   branchPoint: "分岔点",
   currentPosition: "当前",
   expand: "展开",
+  fold: "收起",
+  selectedNode: "已选",
   restorePoint: "回到此处",
   variationPreview: "预览局面",
   askPrompt: "可查看最佳着法、提示，或直接走棋。",
   redToMove: "红方走棋",
   blackToMove: "黑方走棋",
   inCheck: "（被将军）",
+  gameOver: "终局",
   repetition: "重复局面和棋",
   wins: "胜",
   level: "级别",
@@ -580,8 +645,8 @@ function renderBoard() {
       button.type = "button";
       button.className = "cell";
       button.dataset.coord = coord;
-      button.style.left = intersectionPercent(point.file, pointCount.files);
-      button.style.top = intersectionPercent(point.rank, pointCount.ranks);
+      button.style.setProperty("--file", point.file);
+      button.style.setProperty("--rank", point.rank);
       button.disabled = state.pending || previewing || !game.playerTurn;
       button.title = cellTitle(cell, coord, targetMove);
       button.setAttribute("aria-label", cellTitle(cell, coord, targetMove));
@@ -591,14 +656,17 @@ function renderBoard() {
       if (cell?.piece) {
         const piece = document.createElement("span");
         piece.className = `piece ${cell.piece.side}`;
-        piece.textContent = pieceSymbol(cell.piece);
         piece.title = cellTitle(cell, coord);
+        const glyph = document.createElement("span");
+        glyph.className = "piece-glyph";
+        glyph.textContent = pieceSymbol(cell.piece);
+        piece.append(glyph);
         button.append(piece);
       }
       if (targetMove) {
         const moveLabel = document.createElement("span");
         moveLabel.className = `move-label ${point.file % 2 === 0 ? "move-label-high" : "move-label-low"}`;
-        moveLabel.textContent = moveText(targetMove.notation, targetMove.zhNotation);
+        moveLabel.textContent = moveLabelText(targetMove.notation, targetMove.zhNotation);
         button.append(moveLabel);
       }
 
@@ -1098,9 +1166,10 @@ function renderSelectedMoves() {
   panel.hidden = false;
   const selectedName = pieceName(selectedCell.piece);
   const selectedHeading = `${selectedName}${t("legalMovesSuffix")}`;
-  const chips = moves.map((move) => (
-    `<button class="move-chip" type="button" data-move="${escapeHtml(move.notation)}">${formatMoveHtml(move.notation, move.zhNotation)}</button>`
-  ));
+  const chips = moves.map((move) => {
+    const label = moveTitleText(move.notation, move.zhNotation);
+    return `<button class="move-chip" type="button" data-move="${escapeHtml(move.notation)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${formatMoveHtml(move.notation, move.zhNotation)}</button>`;
+  });
   panel.innerHTML = [
     `<div class="selected-moves-heading">${escapeHtml(selectedHeading)}</div>`,
     `<div class="selected-moves-grid">${chips.join("")}</div>`
@@ -1203,6 +1272,7 @@ function renderFileLabels(selector, side, viewSide) {
 
 function fileLabel(side, file) {
   if (side === "black") return blackFileLabels[file] ?? String(file + 1);
+  if (!isChineseLocale()) return String(files.length - file);
   return chineseNumerals[files.length - 1 - file] ?? String(files.length - file);
 }
 
@@ -1220,15 +1290,10 @@ function visualPoint(coord, playerSide) {
   };
 }
 
-function intersectionPercent(index, count) {
-  if (count <= 1) return "50%";
-  return `${(index * 100) / (count - 1)}%`;
-}
-
 function cellTitle(cell, coord, targetMove = null) {
   const point = localizedPoint(coord);
   const separator = isChineseLocale() ? "，" : ", ";
-  const move = targetMove ? `${separator}${moveText(targetMove.notation, targetMove.zhNotation)}` : "";
+  const move = targetMove ? `${separator}${moveTitleText(targetMove.notation, targetMove.zhNotation)}` : "";
   if (!cell?.piece) return `${t("emptyPoint")} ${point}${move}`;
   return `${pieceName(cell.piece)} ${point}${move}`;
 }
@@ -1290,6 +1355,18 @@ function moveText(notation, zhNotation) {
   return notation ?? zhNotation ?? "";
 }
 
+function moveLabelText(notation, zhNotation) {
+  if (zhNotation) return localizedChineseNotation(zhNotation);
+  return notation ?? "";
+}
+
+function moveTitleText(notation, zhNotation) {
+  const primary = moveText(notation, zhNotation);
+  const secondary = isChineseLocale() ? notation : localizedChineseNotation(zhNotation);
+  if (!secondary || secondary === primary) return primary;
+  return `${primary} / ${secondary}`;
+}
+
 function localizedChineseNotation(text) {
   return localizedChineseText(text);
 }
@@ -1329,8 +1406,9 @@ function localizedPracticeFocus(focus) {
 
 function localizedChineseText(text) {
   const value = String(text ?? "");
-  if (state.locale !== "zh-CN") return value;
-  return value.replace(/[\u3400-\u9fff]/g, (char) => simplifiedChineseMap[char] ?? char);
+  if (state.locale === "zh-CN") return value.replace(/[\u3400-\u9fff]/g, (char) => simplifiedChineseMap[char] ?? char);
+  if (state.locale === "zh-TW") return value.replace(/[\u3400-\u9fff]/g, (char) => traditionalChineseMap[char] ?? char);
+  return value;
 }
 
 function confidenceLabel(confidence) {
@@ -1345,7 +1423,7 @@ function confidenceLabel(confidence) {
 
 function formatMoveHtml(notation, zhNotation) {
   const primary = moveText(notation, zhNotation);
-  const secondary = isChineseLocale() ? notation : zhNotation;
+  const secondary = isChineseLocale() ? notation : localizedChineseNotation(zhNotation);
   if (!primary) return "";
   const secondaryHtml = secondary && secondary !== primary
     ? `<span class="notation-secondary">${escapeHtml(secondary)}</span>`

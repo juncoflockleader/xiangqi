@@ -41,10 +41,43 @@ async function buildNativeEngine(options) {
   const output = resolve(options.output);
   await mkdir(dirname(output), { recursive: true });
 
-  const flags = [
+  const ltoRequested = !options.debug && options.lto;
+  let flags = buildFlags(options, source, output, { lto: ltoRequested });
+  let lto = ltoRequested;
+  let ltoFallback = false;
+
+  try {
+    await runCommand(options.compiler, flags);
+  } catch (error) {
+    if (!ltoRequested) throw error;
+
+    console.error(`LTO build failed; retrying without -flto.\n${error.message}`);
+    flags = buildFlags(options, source, output, { lto: false });
+    lto = false;
+    ltoFallback = true;
+    await runCommand(options.compiler, flags);
+  }
+
+  return {
+    ok: true,
+    compiler: options.compiler,
+    source,
+    output,
+    debug: options.debug,
+    portable: options.portable,
+    lto,
+    ltoFallback,
+    flags
+  };
+}
+
+function buildFlags(options, source, output, { lto }) {
+  return [
     "-std=c++20",
     options.debug ? "-O0" : "-O3",
     ...(options.debug ? ["-g"] : ["-DNDEBUG"]),
+    ...(!options.debug && !options.portable ? ["-march=native"] : []),
+    ...(lto ? ["-flto"] : []),
     "-Wall",
     "-Wextra",
     "-pedantic",
@@ -52,16 +85,6 @@ async function buildNativeEngine(options) {
     "-o",
     output
   ];
-
-  await runCommand(options.compiler, flags);
-
-  return {
-    ok: true,
-    compiler: options.compiler,
-    source,
-    output,
-    debug: options.debug
-  };
 }
 
 function parseArgs(args) {
@@ -70,6 +93,8 @@ function parseArgs(args) {
     source: DEFAULT_SOURCE,
     output: DEFAULT_OUTPUT,
     debug: false,
+    portable: false,
+    lto: true,
     json: false,
     help: false
   };
@@ -86,6 +111,14 @@ function parseArgs(args) {
     }
     if (arg === "--debug") {
       parsed.debug = true;
+      continue;
+    }
+    if (arg === "--portable") {
+      parsed.portable = true;
+      continue;
+    }
+    if (arg === "--no-lto") {
+      parsed.lto = false;
       continue;
     }
     if (arg === "--compiler" || arg === "--cxx") {
@@ -151,6 +184,8 @@ Options:
   --source file    C++ source file. Defaults to native/xiangqi_native.cpp.
   --out file       Output executable. Defaults to build/xiangqi-native.
   --debug          Build with -O0 -g instead of optimized release flags.
+  --portable       Omit local CPU tuning flags such as -march=native.
+  --no-lto         Disable link-time optimization for release builds.
   --json           Print machine-readable output.
 `.trim());
 }

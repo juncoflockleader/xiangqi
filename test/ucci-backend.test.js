@@ -46,8 +46,8 @@ test("UCCI backend validates and rejects unsafe opening heuristics with native s
   }
 
   try {
-    const raw = await backend.chooseMove(position, { validateOpeningHeuristics: false });
-    const result = await backend.chooseMove(position, { lines: 2 });
+    const raw = await backend.chooseMove(position, { book: {}, validateOpeningHeuristics: false });
+    const result = await backend.chooseMove(position, { book: {}, lines: 2 });
 
     assert.equal(raw.source, "opening-heuristic");
     assert.equal(raw.bestMove.notation, "e7-e3");
@@ -128,6 +128,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.timeMs, 15);
     assert.equal(result.nps, 8200);
     assert.equal(result.hashfull, 321);
+    assert.equal(result.memoryAge, 3);
     assert.deepEqual(result.telemetry, {
       seldepth: 7,
       timeMs: 15,
@@ -139,11 +140,239 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.timeMs, 15);
     assert.equal(result.stats.nps, 8200);
     assert.equal(result.stats.hashfull, 321);
+    assert.equal(result.stats.memoryAge, 3);
+    assert.equal(result.stats.qnodes, 44);
+    assert.equal(result.stats.qchecks, 5);
+    assert.equal(result.stats.qCheckHistoryHits, 6);
+    assert.equal(result.stats.qCheckHistoryStores, 9);
+    assert.equal(result.stats.qCheckHistoryMaluses, 4);
+    assert.equal(result.stats.qCaptureHistoryPruneGuards, 3);
+    assert.equal(result.stats.qCaptureHistoryHits, 10);
+    assert.equal(result.stats.qCaptureHistoryStores, 11);
+    assert.equal(result.stats.qCaptureHistoryMaluses, 12);
+    assert.equal(result.stats.qttHits, 11);
+    assert.equal(result.stats.qttStores, 17);
+    assert.equal(result.stats.qttMoveHits, 2);
+    assert.equal(result.stats.evalCacheHits, 19);
+    assert.equal(result.stats.evalCacheStores, 29);
+    assert.equal(result.stats.checkedEvalSkips, 31);
+    assert.equal(result.stats.ttHits, 5);
+    assert.equal(result.stats.ttMoveHits, 6);
+    assert.equal(result.stats.cutoffs, 2);
+    assert.equal(result.stats.captureHistoryHits, 12);
+    assert.equal(result.stats.captureHistoryStores, 5);
+    assert.equal(result.stats.captureHistoryMaluses, 7);
+    assert.equal(result.stats.captureHistoryPruneGuards, 2);
+    assert.equal(result.stats.killerHits, 3);
+    assert.equal(result.stats.nullMovePrunes, 1);
+    assert.equal(result.stats.nullMoveVerifications, 2);
+    assert.equal(result.stats.nullMoveVerificationFailures, 1);
+    assert.equal(result.stats.nullMoveMaterialGuards, 6);
+    assert.equal(result.stats.reverseFutilityPrunes, 9);
+    assert.equal(result.stats.mateDistancePrunes, 2);
+    assert.equal(result.stats.razorPrunes, 4);
+    assert.equal(result.stats.razorResearches, 1);
+    assert.equal(result.stats.seePrunes, 3);
+    assert.equal(result.stats.probCutPrunes, 2);
+    assert.equal(result.stats.probCutSearches, 7);
+    assert.equal(result.stats.probCutCaptureSkips, 8);
+    assert.equal(result.stats.futilityPrunes, 6);
+    assert.equal(result.stats.badHistoryPrunes, 5);
+    assert.equal(result.stats.badHistoryPruneGuards, 2);
+    assert.equal(result.stats.deltaPrunes, 12);
+    assert.equal(result.stats.qDeltaPrefilterSkips, 15);
+    assert.equal(result.stats.qSeePrunes, 13);
+    assert.equal(result.stats.lateMovePrunes, 4);
+    assert.equal(result.stats.reductions, 7);
+    assert.equal(result.stats.lmrResearches, 2);
+    assert.equal(result.stats.pvReductionGuards, 5);
+    assert.equal(result.stats.cutNodeReductionBoosts, 6);
+    assert.equal(result.stats.improvingNodes, 10);
+    assert.equal(result.stats.nonImprovingNodes, 4);
+    assert.equal(result.stats.improvingReductionGuards, 2);
+    assert.equal(result.stats.nonImprovingReductionBoosts, 3);
+    assert.equal(result.stats.improvingLateMoveGuards, 1);
+    assert.equal(result.stats.nonImprovingLateMovePrunes, 2);
+    assert.equal(result.stats.countermoveHits, 6);
+    assert.equal(result.stats.continuationHistoryHits, 8);
+    assert.equal(result.stats.continuationReductionBoosts, 3);
+    assert.equal(result.stats.continuationReductionMaluses, 1);
+    assert.equal(result.stats.checkEvasionOrderHits, 18);
+    assert.equal(result.stats.checkEvasionCaptures, 4);
+    assert.equal(result.stats.checkEvasionBlocks, 9);
+    assert.equal(result.stats.checkEvasionKingMoves, 5);
+    assert.equal(result.stats.checkHistoryHits, 14);
+    assert.equal(result.stats.checkHistoryStores, 9);
+    assert.equal(result.stats.checkHistoryMaluses, 2);
+    assert.equal(result.stats.checkCacheHits, 21);
+    assert.equal(result.stats.checkCacheStores, 34);
+    assert.equal(result.stats.iidSearches, 4);
+    assert.equal(result.stats.iidMoveHits, 3);
+    assert.equal(result.stats.rootMovesSearched, 12);
+    assert.equal(result.stats.rootChildStateReuses, 24);
+    assert.equal(result.stats.rootTtHits, 1);
+    assert.equal(result.stats.rootTtStores, 3);
+    assert.equal(result.stats.rootOrderHits, 7);
+    assert.equal(result.stats.rootOrderStores, 8);
+    assert.equal(result.stats.pvsResearches, 3);
+    assert.equal(result.stats.aspirationSearches, 5);
+    assert.equal(result.stats.aspirationFailHigh, 1);
+    assert.equal(result.stats.aspirationFailLow, 2);
+    assert.equal(result.stats.extensions, 8);
+    assert.equal(result.stats.recaptureExtensions, 1);
+    assert.equal(result.stats.singularExtensionSearches, 4);
+    assert.equal(result.stats.singularExtensions, 2);
+    assert.equal(result.stats.singularExtensionRejects, 1);
+    assert.equal(result.candidates[0].native.memoryAge, 3);
     assert.equal(result.candidates[0].native.telemetry.hashfullText, "32.1%");
     assert.equal(result.iterations[0].telemetry.seldepth, 7);
+    assert.equal(result.iterations[0].memoryAge, 3);
+    assert.equal(result.iterations[0].stats.memoryAge, 3);
+    assert.equal(result.iterations[0].stats.qnodes, 44);
+    assert.equal(result.iterations[0].stats.qchecks, 5);
+    assert.equal(result.iterations[0].stats.qCheckHistoryHits, 6);
+    assert.equal(result.iterations[0].stats.qCheckHistoryStores, 9);
+    assert.equal(result.iterations[0].stats.qCheckHistoryMaluses, 4);
+    assert.equal(result.iterations[0].stats.qCaptureHistoryPruneGuards, 3);
+    assert.equal(result.iterations[0].stats.qCaptureHistoryHits, 10);
+    assert.equal(result.iterations[0].stats.qCaptureHistoryStores, 11);
+    assert.equal(result.iterations[0].stats.qCaptureHistoryMaluses, 12);
+    assert.equal(result.iterations[0].stats.qttHits, 11);
+    assert.equal(result.iterations[0].stats.evalCacheHits, 19);
+    assert.equal(result.iterations[0].stats.checkedEvalSkips, 31);
+    assert.equal(result.iterations[0].stats.ttMoveHits, 6);
+    assert.equal(result.iterations[0].stats.captureHistoryHits, 12);
+    assert.equal(result.iterations[0].stats.captureHistoryStores, 5);
+    assert.equal(result.iterations[0].stats.captureHistoryMaluses, 7);
+    assert.equal(result.iterations[0].stats.captureHistoryPruneGuards, 2);
+    assert.equal(result.iterations[0].stats.extensions, 8);
+    assert.equal(result.iterations[0].stats.nullMoveVerifications, 2);
+    assert.equal(result.iterations[0].stats.nullMoveVerificationFailures, 1);
+    assert.equal(result.iterations[0].stats.nullMoveMaterialGuards, 6);
+    assert.equal(result.iterations[0].stats.reverseFutilityPrunes, 9);
+    assert.equal(result.iterations[0].stats.mateDistancePrunes, 2);
+    assert.equal(result.iterations[0].stats.razorPrunes, 4);
+    assert.equal(result.iterations[0].stats.seePrunes, 3);
+    assert.equal(result.iterations[0].stats.probCutPrunes, 2);
+    assert.equal(result.iterations[0].stats.probCutCaptureSkips, 8);
+    assert.equal(result.iterations[0].stats.badHistoryPrunes, 5);
+    assert.equal(result.iterations[0].stats.badHistoryPruneGuards, 2);
+    assert.equal(result.iterations[0].stats.deltaPrunes, 12);
+    assert.equal(result.iterations[0].stats.qDeltaPrefilterSkips, 15);
+    assert.equal(result.iterations[0].stats.qSeePrunes, 13);
+    assert.equal(result.iterations[0].stats.lateMovePrunes, 4);
+    assert.equal(result.iterations[0].stats.pvReductionGuards, 5);
+    assert.equal(result.iterations[0].stats.cutNodeReductionBoosts, 6);
+    assert.equal(result.iterations[0].stats.improvingNodes, 10);
+    assert.equal(result.iterations[0].stats.nonImprovingNodes, 4);
+    assert.equal(result.iterations[0].stats.checkCacheHits, 21);
+    assert.equal(result.iterations[0].stats.checkCacheStores, 34);
+    assert.equal(result.iterations[0].stats.improvingReductionGuards, 2);
+    assert.equal(result.iterations[0].stats.nonImprovingReductionBoosts, 3);
+    assert.equal(result.iterations[0].stats.improvingLateMoveGuards, 1);
+    assert.equal(result.iterations[0].stats.nonImprovingLateMovePrunes, 2);
+    assert.equal(result.iterations[0].stats.countermoveHits, 6);
+    assert.equal(result.iterations[0].stats.continuationHistoryHits, 8);
+    assert.equal(result.iterations[0].stats.continuationReductionBoosts, 3);
+    assert.equal(result.iterations[0].stats.continuationReductionMaluses, 1);
+    assert.equal(result.iterations[0].stats.checkEvasionOrderHits, 18);
+    assert.equal(result.iterations[0].stats.checkEvasionCaptures, 4);
+    assert.equal(result.iterations[0].stats.checkEvasionBlocks, 9);
+    assert.equal(result.iterations[0].stats.checkEvasionKingMoves, 5);
+    assert.equal(result.iterations[0].stats.checkHistoryHits, 14);
+    assert.equal(result.iterations[0].stats.checkHistoryStores, 9);
+    assert.equal(result.iterations[0].stats.checkHistoryMaluses, 2);
+    assert.equal(result.iterations[0].stats.iidMoveHits, 3);
+    assert.equal(result.iterations[0].stats.rootMovesSearched, 12);
+    assert.equal(result.iterations[0].stats.rootChildStateReuses, 24);
+    assert.equal(result.iterations[0].stats.rootTtHits, 1);
+    assert.equal(result.iterations[0].stats.rootTtStores, 3);
+    assert.equal(result.iterations[0].stats.rootOrderHits, 7);
+    assert.equal(result.iterations[0].stats.rootOrderStores, 8);
+    assert.equal(result.iterations[0].stats.pvsResearches, 3);
+    assert.equal(result.iterations[0].stats.aspirationSearches, 5);
+    assert.equal(result.iterations[0].stats.singularExtensions, 2);
     assert.equal(result.explanation.search.telemetry.hashfullText, "32.1%");
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("Native search telemetry")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("8.2k nodes/s")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("ordering memory")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("quiescence nodes")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("forcing quiet checks")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("quiet-check history hit")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("quiet-check history update")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("quiet-check history malus")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("qsearch capture-history prune guard")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("qsearch capture-history hit")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("qsearch capture-history update")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("qsearch capture-history malus")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("quiescence-table hits")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("evaluation-cache hits")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("root child-state reuse")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("root transposition-table ordering hint")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("persisted root-order hint")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("checked-node eval skip")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("tactical extension")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("singular extension")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("verified null-move recheck")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("rejected null-move shortcut")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("low-material null-move guard")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("reverse-futility prune")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("razoring cutoff")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("static-exchange prune")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("ProbCut capture prune")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("ProbCut capture prefilter")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("bad-history prune")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("late-move prune")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("PV-node reduction guard")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("cut-node reduction boost")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("PVS re-search")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("aspiration-window search")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("mate-distance prune")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("delta prune")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("qsearch delta prefilter")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("quiescence SEE prune")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("improving-position reduction guard")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("worsening-position reduction boost")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("transposition hash-move ordering hint")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("capture-history hit")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("capture-history update")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("capture-history malus")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("capture-history prune guard")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("check-cache hit")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("countermove-order hit")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("continuation-history hit")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("check-evasion ordering hint")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("check-history hit")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("internal-iterative-deepening move hint")));
+  } finally {
+    await backend.close();
+  }
+});
+
+test("UCCI backend can reset native search memory for a new game", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockMemoryAge: true
+    }
+  });
+
+  try {
+    const first = await backend.chooseMove(createInitialPosition(), { useBook: false });
+    const second = await backend.chooseMove(createInitialPosition(), { useBook: false });
+    await backend.newGame();
+    const afterReset = await backend.chooseMove(createInitialPosition(), { useBook: false });
+
+    assert.equal(first.stats.memoryAge, 1);
+    assert.equal(second.stats.memoryAge, 2);
+    assert.equal(afterReset.stats.memoryAge, 1);
+    assert.ok(second.explanation.reasons.some((reason) => reason.includes("ordering memory")));
   } finally {
     await backend.close();
   }
@@ -697,6 +926,56 @@ test("UCCI backend forwards clock controls to native engines", async () => {
     assert.equal(result.score, 55);
     assert.equal(result.nodes, 321);
     assert.ok(result.raw.some((line) => line.includes("command go depth 2 wtime 60000 btime 20000 winc 1000 binc 500 movestogo 20")));
+  } finally {
+    await backend.close();
+  }
+});
+
+test("UCCI backend omits synthetic depth for timed-only native searches", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), {
+      useBook: false,
+      wtime: 60000,
+      btime: 20000
+    });
+
+    assert.equal(result.source, "native-ucci");
+    const commandLine = result.raw.find((line) => line.includes("command go "));
+    assert.ok(commandLine, result.raw.join("\n"));
+    assert.ok(commandLine.includes("command go wtime 60000 btime 20000"), commandLine);
+    assert.ok(!/\bdepth\b/.test(commandLine), commandLine);
+  } finally {
+    await backend.close();
+  }
+});
+
+test("UCI native analysis profile uses timed search without a profile depth cap", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-uci",
+    protocol: "uci",
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockDepthFromGo: true
+    }
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), {
+      useBook: false
+    });
+
+    assert.equal(result.source, "native-uci");
+    assert.equal(result.depth, 2);
   } finally {
     await backend.close();
   }

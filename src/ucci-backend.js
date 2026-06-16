@@ -182,6 +182,7 @@ export function createUcciEngineBackend(options = {}) {
     pressure: (position, pressureOptions = {}) => referenceEngine.pressure(position, pressureOptions),
     play: (position, notation) => referenceEngine.play(position, notation),
     legalMoves: (position) => referenceEngine.legalMoves(position),
+    newGame: (resetOptions = {}) => client.newGame(resetOptions),
     ready: () => client.ensureReady(),
     close: () => client.close(),
     get nativeOptions() {
@@ -265,10 +266,38 @@ class UcciProcessClient {
     return this.enqueueSearch(() => this.searchWithRestart(position, options));
   }
 
+  async newGame(options = {}) {
+    return this.enqueueSearch(() => this.newGameWithRestart(options));
+  }
+
   enqueueSearch(task) {
     const run = this.searchQueue.catch(() => null).then(task);
     this.searchQueue = run.catch(() => null);
     return run;
+  }
+
+  async newGameWithRestart(options = {}) {
+    try {
+      return await this.newGameOnce(options);
+    } catch (error) {
+      if (options.restartOnExit === false || !isRecoverableNativeProcessError(error)) {
+        throw error;
+      }
+
+      await this.close();
+      return this.newGameOnce(options);
+    }
+  }
+
+  async newGameOnce(options = {}) {
+    throwIfAborted(options.signal);
+    await this.ensureReady();
+    throwIfAborted(options.signal);
+
+    this.write("ucinewgame");
+    return this.commandUntil("isready", (lines) => lines.some((line) => line === "readyok"), this.startupTimeoutMs, {
+      signal: options.signal
+    });
   }
 
   async searchWithRestart(position, options = {}) {
@@ -534,6 +563,7 @@ async function nativeSearch(client, position, options) {
     timeMs: parsed.timeMs,
     nps: parsed.nps,
     hashfull: parsed.hashfull,
+    memoryAge: parsed.memoryAge,
     telemetry: parsed.telemetry,
     ponderMove: parsed.ponderMove,
     principalVariation: parsed.principalVariation,
@@ -796,7 +826,7 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
   if (!bestLine) throw new Error("UCCI search did not return bestmove.");
 
   const { bestToken, ponderToken } = parseBestMoveLine(bestLine, protocol);
-  const bestMove = bestToken === "0000" ? null : resolveLegalMove(position, bestToken);
+  const bestMove = isNullBestMove(bestToken) ? null : resolveLegalMove(position, bestToken);
   const ponderMove = resolvePonderMove(position, bestMove, ponderToken);
   const infos = lines
     .filter((line) => line.startsWith("info "))
@@ -827,6 +857,92 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     timeMs: maxInfoValue(infos, "timeMs"),
     nps: maxInfoValue(infos, "nps"),
     hashfull: maxInfoValue(infos, "hashfull"),
+    memoryAge: maxInfoValue(infos, "memoryAge"),
+    qnodes: maxInfoValue(infos, "qnodes"),
+    qchecks: maxInfoValue(infos, "qchecks"),
+    qttHits: maxInfoValue(infos, "qttHits"),
+    qttProbes: maxInfoValue(infos, "qttProbes"),
+    qttStores: maxInfoValue(infos, "qttStores"),
+    qttCutoffs: maxInfoValue(infos, "qttCutoffs"),
+    qttMoveHits: maxInfoValue(infos, "qttMoveHits"),
+    evalCacheHits: maxInfoValue(infos, "evalCacheHits"),
+    evalCacheProbes: maxInfoValue(infos, "evalCacheProbes"),
+    evalCacheStores: maxInfoValue(infos, "evalCacheStores"),
+    checkedEvalSkips: maxInfoValue(infos, "checkedEvalSkips"),
+    ttHits: maxInfoValue(infos, "ttHits"),
+    ttMoveHits: maxInfoValue(infos, "ttMoveHits"),
+    cutoffs: maxInfoValue(infos, "cutoffs"),
+    killerHits: maxInfoValue(infos, "killerHits"),
+    captureHistoryHits: maxInfoValue(infos, "captureHistoryHits"),
+    captureHistoryStores: maxInfoValue(infos, "captureHistoryStores"),
+    captureHistoryMaluses: maxInfoValue(infos, "captureHistoryMaluses"),
+    captureHistoryPruneGuards: maxInfoValue(infos, "captureHistoryPruneGuards"),
+    nullMovePrunes: maxInfoValue(infos, "nullMovePrunes"),
+    nullMoveVerifications: maxInfoValue(infos, "nullMoveVerifications"),
+    nullMoveVerificationFailures: maxInfoValue(infos, "nullMoveVerificationFailures"),
+    nullMoveMaterialGuards: maxInfoValue(infos, "nullMoveMaterialGuards"),
+    reverseFutilityPrunes: maxInfoValue(infos, "reverseFutilityPrunes"),
+    mateDistancePrunes: maxInfoValue(infos, "mateDistancePrunes"),
+    razorPrunes: maxInfoValue(infos, "razorPrunes"),
+    razorResearches: maxInfoValue(infos, "razorResearches"),
+    seePrunes: maxInfoValue(infos, "seePrunes"),
+    probCutPrunes: maxInfoValue(infos, "probCutPrunes"),
+    probCutSearches: maxInfoValue(infos, "probCutSearches"),
+    probCutCaptureSkips: maxInfoValue(infos, "probCutCaptureSkips"),
+    futilityPrunes: maxInfoValue(infos, "futilityPrunes"),
+    badHistoryPrunes: maxInfoValue(infos, "badHistoryPrunes"),
+    badHistoryPruneGuards: maxInfoValue(infos, "badHistoryPruneGuards"),
+    deltaPrunes: maxInfoValue(infos, "deltaPrunes"),
+    qDeltaPrefilterSkips: maxInfoValue(infos, "qDeltaPrefilterSkips"),
+    qSeePrunes: maxInfoValue(infos, "qSeePrunes"),
+    lateMovePrunes: maxInfoValue(infos, "lateMovePrunes"),
+    reductions: maxInfoValue(infos, "reductions"),
+    lmrResearches: maxInfoValue(infos, "lmrResearches"),
+    pvReductionGuards: maxInfoValue(infos, "pvReductionGuards"),
+    cutNodeReductionBoosts: maxInfoValue(infos, "cutNodeReductionBoosts"),
+    improvingNodes: maxInfoValue(infos, "improvingNodes"),
+    nonImprovingNodes: maxInfoValue(infos, "nonImprovingNodes"),
+    improvingReductionGuards: maxInfoValue(infos, "improvingReductionGuards"),
+    nonImprovingReductionBoosts: maxInfoValue(infos, "nonImprovingReductionBoosts"),
+    improvingLateMoveGuards: maxInfoValue(infos, "improvingLateMoveGuards"),
+    nonImprovingLateMovePrunes: maxInfoValue(infos, "nonImprovingLateMovePrunes"),
+    countermoveHits: maxInfoValue(infos, "countermoveHits"),
+    continuationHistoryHits: maxInfoValue(infos, "continuationHistoryHits"),
+    continuationReductionBoosts: maxInfoValue(infos, "continuationReductionBoosts"),
+    continuationReductionMaluses: maxInfoValue(infos, "continuationReductionMaluses"),
+    checkEvasionOrderHits: maxInfoValue(infos, "checkEvasionOrderHits"),
+    checkEvasionCaptures: maxInfoValue(infos, "checkEvasionCaptures"),
+    checkEvasionBlocks: maxInfoValue(infos, "checkEvasionBlocks"),
+    checkEvasionKingMoves: maxInfoValue(infos, "checkEvasionKingMoves"),
+    checkHistoryHits: maxInfoValue(infos, "checkHistoryHits"),
+    checkHistoryStores: maxInfoValue(infos, "checkHistoryStores"),
+    checkHistoryMaluses: maxInfoValue(infos, "checkHistoryMaluses"),
+    checkCacheHits: maxInfoValue(infos, "checkCacheHits"),
+    checkCacheStores: maxInfoValue(infos, "checkCacheStores"),
+    iidSearches: maxInfoValue(infos, "iidSearches"),
+    iidMoveHits: maxInfoValue(infos, "iidMoveHits"),
+    rootMovesSearched: maxInfoValue(infos, "rootMovesSearched"),
+    rootChildStateReuses: maxInfoValue(infos, "rootChildStateReuses"),
+    rootTtHits: maxInfoValue(infos, "rootTtHits"),
+    rootTtStores: maxInfoValue(infos, "rootTtStores"),
+    rootOrderHits: maxInfoValue(infos, "rootOrderHits"),
+    rootOrderStores: maxInfoValue(infos, "rootOrderStores"),
+    pvsResearches: maxInfoValue(infos, "pvsResearches"),
+    aspirationSearches: maxInfoValue(infos, "aspirationSearches"),
+    aspirationFailHigh: maxInfoValue(infos, "aspirationFailHigh"),
+    aspirationFailLow: maxInfoValue(infos, "aspirationFailLow"),
+    extensions: maxInfoValue(infos, "extensions"),
+    recaptureExtensions: maxInfoValue(infos, "recaptureExtensions"),
+    singularExtensionSearches: maxInfoValue(infos, "singularExtensionSearches"),
+    singularExtensions: maxInfoValue(infos, "singularExtensions"),
+    singularExtensionRejects: maxInfoValue(infos, "singularExtensionRejects"),
+    qCheckHistoryHits: maxInfoValue(infos, "qCheckHistoryHits"),
+    qCheckHistoryStores: maxInfoValue(infos, "qCheckHistoryStores"),
+    qCheckHistoryMaluses: maxInfoValue(infos, "qCheckHistoryMaluses"),
+    qCaptureHistoryPruneGuards: maxInfoValue(infos, "qCaptureHistoryPruneGuards"),
+    qCaptureHistoryHits: maxInfoValue(infos, "qCaptureHistoryHits"),
+    qCaptureHistoryStores: maxInfoValue(infos, "qCaptureHistoryStores"),
+    qCaptureHistoryMaluses: maxInfoValue(infos, "qCaptureHistoryMaluses"),
     telemetry: nativeTelemetry(infos),
     principalVariation,
     candidates,
@@ -841,6 +957,7 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
         timeMs: info.timeMs ?? 0,
         nps: info.nps ?? 0,
         hashfull: info.hashfull ?? 0,
+        memoryAge: info.memoryAge ?? 0,
         telemetry: nativeTelemetry([info]),
         principalVariation: resolvePrincipalVariation(position, info.pv),
         candidates: [],
@@ -895,6 +1012,7 @@ function parseInfoLine(line) {
     timeMs: 0,
     nps: 0,
     hashfull: 0,
+    memoryAge: 0,
     multipv: 1,
     scoreKind: null,
     scoreValue: null,
@@ -902,7 +1020,86 @@ function parseInfoLine(line) {
     mate: null,
     wdl: null,
     score: null,
-    pv: []
+    pv: [],
+    qnodes: 0,
+    qchecks: 0,
+    qttHits: 0,
+    qttProbes: 0,
+    qttStores: 0,
+    qttCutoffs: 0,
+    qttMoveHits: 0,
+    evalCacheHits: 0,
+    evalCacheProbes: 0,
+    evalCacheStores: 0,
+    checkedEvalSkips: 0,
+    ttHits: 0,
+    ttProbes: 0,
+    ttMoveHits: 0,
+    cutoffs: 0,
+    killerHits: 0,
+    captureHistoryHits: 0,
+    captureHistoryStores: 0,
+    captureHistoryMaluses: 0,
+    captureHistoryPruneGuards: 0,
+    historyUpdates: 0,
+    nullMovePrunes: 0,
+    nullMoveVerifications: 0,
+    nullMoveVerificationFailures: 0,
+    nullMoveMaterialGuards: 0,
+    razorPrunes: 0,
+    razorResearches: 0,
+    seePrunes: 0,
+    probCutPrunes: 0,
+    probCutSearches: 0,
+    probCutCaptureSkips: 0,
+    futilityPrunes: 0,
+    badHistoryPrunes: 0,
+    badHistoryPruneGuards: 0,
+    deltaPrunes: 0,
+    qDeltaPrefilterSkips: 0,
+    qSeePrunes: 0,
+    reductions: 0,
+    lmrResearches: 0,
+    pvReductionGuards: 0,
+    cutNodeReductionBoosts: 0,
+    improvingNodes: 0,
+    nonImprovingNodes: 0,
+    improvingReductionGuards: 0,
+    nonImprovingReductionBoosts: 0,
+    improvingLateMoveGuards: 0,
+    nonImprovingLateMovePrunes: 0,
+    iidSearches: 0,
+    iidMoveHits: 0,
+    rootMovesSearched: 0,
+    rootChildStateReuses: 0,
+    rootTtHits: 0,
+    rootTtStores: 0,
+    rootOrderHits: 0,
+    rootOrderStores: 0,
+    continuationHistoryHits: 0,
+    continuationReductionBoosts: 0,
+    continuationReductionMaluses: 0,
+    checkEvasionOrderHits: 0,
+    checkEvasionCaptures: 0,
+    checkEvasionBlocks: 0,
+    checkEvasionKingMoves: 0,
+    checkHistoryHits: 0,
+    checkHistoryStores: 0,
+    checkHistoryMaluses: 0,
+    checkCacheHits: 0,
+    checkCacheStores: 0,
+    extensions: 0,
+    recaptureExtensions: 0,
+    singularExtensionSearches: 0,
+    singularExtensions: 0,
+    singularExtensionRejects: 0,
+    qCheckHistoryHits: 0,
+    qCheckHistoryStores: 0,
+    qCheckHistoryMaluses: 0,
+    qCaptureHistoryPruneGuards: 0,
+    qCaptureHistoryHits: 0,
+    qCaptureHistoryStores: 0,
+    qCaptureHistoryMaluses: 0
   };
 
   for (let index = 1; index < tokens.length; index += 1) {
@@ -924,6 +1121,264 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "hashfull") {
       info.hashfull = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "memage") {
+      info.memoryAge = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "tt") {
+      const [hits, probes] = parseNativePair(tokens[index + 1]);
+      info.ttHits = hits;
+      info.ttProbes = probes;
+      index += 1;
+    } else if (token === "cutoffs") {
+      info.cutoffs = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "ttmove") {
+      info.ttMoveHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "killers") {
+      info.killerHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "caphist") {
+      info.captureHistoryHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "caphstores") {
+      info.captureHistoryStores = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "caphm") {
+      info.captureHistoryMaluses = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "caphguard") {
+      info.captureHistoryPruneGuards = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "history") {
+      info.historyUpdates = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "nmp") {
+      info.nullMovePrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "nmv") {
+      info.nullMoveVerifications = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "nmvfail") {
+      info.nullMoveVerificationFailures = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "nmmguard") {
+      info.nullMoveMaterialGuards = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "rfp") {
+      info.reverseFutilityPrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "mdp") {
+      info.mateDistancePrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "razor") {
+      const [prunes, researches] = parseNativePair(tokens[index + 1]);
+      info.razorPrunes = prunes;
+      info.razorResearches = researches;
+      index += 1;
+    } else if (token === "see") {
+      info.seePrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "pcut") {
+      info.probCutPrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "pcsearch") {
+      info.probCutSearches = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "pcskip") {
+      info.probCutCaptureSkips = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "futil") {
+      info.futilityPrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "hprune") {
+      info.badHistoryPrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "hpguard") {
+      info.badHistoryPruneGuards = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "delta") {
+      info.deltaPrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qdskip") {
+      info.qDeltaPrefilterSkips = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qsee") {
+      info.qSeePrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "lmp") {
+      info.lateMovePrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "lmr") {
+      const [reductions, researches] = parseNativePair(tokens[index + 1]);
+      info.reductions = reductions;
+      info.lmrResearches = researches;
+      index += 1;
+    } else if (token === "pvguard") {
+      info.pvReductionGuards = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "cutboost") {
+      info.cutNodeReductionBoosts = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "imp") {
+      info.improvingNodes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "nimp") {
+      info.nonImprovingNodes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "imprd") {
+      info.improvingReductionGuards = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "nimprd") {
+      info.nonImprovingReductionBoosts = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "implmp") {
+      info.improvingLateMoveGuards = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "nimlmp") {
+      info.nonImprovingLateMovePrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "cm") {
+      info.countermoveHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "ch") {
+      info.continuationHistoryHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "chred") {
+      info.continuationReductionBoosts = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "chredm") {
+      info.continuationReductionMaluses = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "ce") {
+      info.checkEvasionOrderHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "cecap") {
+      info.checkEvasionCaptures = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "ceblock") {
+      info.checkEvasionBlocks = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "ceking") {
+      info.checkEvasionKingMoves = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "checkhist") {
+      info.checkHistoryHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "checkhstores") {
+      info.checkHistoryStores = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "checkhm") {
+      info.checkHistoryMaluses = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "checkcache") {
+      const [hits, stores] = parseNativePair(tokens[index + 1]);
+      info.checkCacheHits = hits;
+      info.checkCacheStores = stores;
+      index += 1;
+    } else if (token === "iid") {
+      info.iidSearches = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "iidhit") {
+      info.iidMoveHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "rootmoves") {
+      info.rootMovesSearched = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "rootstate") {
+      info.rootChildStateReuses = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "roottt") {
+      info.rootTtHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "rootttstores") {
+      info.rootTtStores = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "rootord") {
+      info.rootOrderHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "rootordstores") {
+      info.rootOrderStores = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "pvs") {
+      info.pvsResearches = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "asp") {
+      info.aspirationSearches = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "asphi") {
+      info.aspirationFailHigh = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "asplo") {
+      info.aspirationFailLow = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "ext") {
+      info.extensions = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "recext") {
+      info.recaptureExtensions = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "singtry") {
+      info.singularExtensionSearches = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "singext") {
+      info.singularExtensions = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "singrej") {
+      info.singularExtensionRejects = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qchecks") {
+      info.qchecks = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qnodes") {
+      info.qnodes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qcheckhist") {
+      info.qCheckHistoryHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qcheckhstores") {
+      info.qCheckHistoryStores = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qcheckhm") {
+      info.qCheckHistoryMaluses = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qcapguard") {
+      info.qCaptureHistoryPruneGuards = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qcaphist") {
+      info.qCaptureHistoryHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qcapstores") {
+      info.qCaptureHistoryStores = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qcaphm") {
+      info.qCaptureHistoryMaluses = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qtt") {
+      const [hits, probes] = parseNativePair(tokens[index + 1]);
+      info.qttHits = hits;
+      info.qttProbes = probes;
+      index += 1;
+    } else if (token === "qttstores") {
+      info.qttStores = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qttcut") {
+      info.qttCutoffs = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qttmove") {
+      info.qttMoveHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "eval") {
+      const [hits, probes] = parseNativePair(tokens[index + 1]);
+      info.evalCacheHits = hits;
+      info.evalCacheProbes = probes;
+      index += 1;
+    } else if (token === "evalstores") {
+      info.evalCacheStores = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "evalskip") {
+      info.checkedEvalSkips = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "multipv") {
       info.multipv = Number.parseInt(tokens[index + 1], 10) || 1;
@@ -965,6 +1420,14 @@ function parseInfoLine(line) {
   }
 
   return info;
+}
+
+function parseNativePair(token) {
+  const [left, right] = String(token ?? "").split("/");
+  return [
+    Number.parseInt(left, 10) || 0,
+    Number.parseInt(right, 10) || 0
+  ];
 }
 
 function normalizeNativeScoreBound(token) {
@@ -1018,6 +1481,7 @@ function buildNativeCandidates(position, infos, bestMove, primaryInfo, ponderMov
           timeMs: info.timeMs,
           nps: info.nps,
           hashfull: info.hashfull,
+          memoryAge: info.memoryAge,
           telemetry: nativeTelemetry([info]),
           multipv: info.multipv,
           scoreDetail: nativeScoreDetail(info),
@@ -1043,6 +1507,7 @@ function buildNativeCandidates(position, infos, bestMove, primaryInfo, ponderMov
       timeMs: primaryInfo.timeMs ?? 0,
       nps: primaryInfo.nps ?? 0,
       hashfull: primaryInfo.hashfull ?? 0,
+      memoryAge: primaryInfo.memoryAge ?? 0,
       telemetry: nativeTelemetry([primaryInfo]),
       multipv: 1,
       scoreDetail: nativeScoreDetail(primaryInfo),
@@ -1156,6 +1621,10 @@ function resolveLegalMove(position, notation) {
   return annotateMove(position, legalMove);
 }
 
+function isNullBestMove(moveText) {
+  return !moveText || moveText === "0000" || moveText === "(none)";
+}
+
 function resolvePrincipalVariation(position, moveTexts) {
   let current = position;
   const line = [];
@@ -1202,6 +1671,8 @@ function explainNativeMove(position, result, backendName) {
     `${backendName} selected this move through ${protocolLabel} search.`,
     `The native search reported depth ${result.depth} and ${result.nodes} nodes.`,
     nativeTelemetryReason(result.telemetry),
+    nativeSearchMemoryReason(result.stats),
+    nativeSelectiveSearchReason(result.stats),
     `It reported a score of ${scoreText} for the side to move.`,
     nativeScoreBoundReason(result.scoreDetail),
     nativeWdlReason(result.wdl),
@@ -1447,6 +1918,80 @@ function nativeTelemetryReason(telemetry) {
   return parts.length > 0 ? `Native search telemetry: ${parts.join(", ")}.` : null;
 }
 
+function nativeSearchMemoryReason(stats = {}) {
+  const age = Math.max(0, Math.round(stats.memoryAge ?? 0));
+  if (age <= 1) return null;
+
+  const prior = age - 1;
+  return `Native search reused ordering memory warmed by ${prior} earlier search${prior === 1 ? "" : "es"}.`;
+}
+
+function nativeSelectiveSearchReason(stats = {}) {
+  if (!stats) return null;
+
+  const parts = [];
+  if ((stats.qnodes ?? 0) > 0) parts.push(nativeCount(stats.qnodes, "quiescence node"));
+  if ((stats.qchecks ?? 0) > 0) parts.push(nativeCount(stats.qchecks, "forcing quiet check"));
+  if ((stats.qCheckHistoryHits ?? 0) > 0) parts.push(nativeCount(stats.qCheckHistoryHits, "quiet-check history hit"));
+  if ((stats.qCheckHistoryStores ?? 0) > 0) parts.push(nativeCount(stats.qCheckHistoryStores, "quiet-check history update"));
+  if ((stats.qCheckHistoryMaluses ?? 0) > 0) parts.push(nativeCount(stats.qCheckHistoryMaluses, "quiet-check history malus"));
+  if ((stats.qCaptureHistoryPruneGuards ?? 0) > 0) parts.push(nativeCount(stats.qCaptureHistoryPruneGuards, "qsearch capture-history prune guard"));
+  if ((stats.qCaptureHistoryHits ?? 0) > 0) parts.push(nativeCount(stats.qCaptureHistoryHits, "qsearch capture-history hit"));
+  if ((stats.qCaptureHistoryStores ?? 0) > 0) parts.push(nativeCount(stats.qCaptureHistoryStores, "qsearch capture-history update"));
+  if ((stats.qCaptureHistoryMaluses ?? 0) > 0) parts.push(nativeCount(stats.qCaptureHistoryMaluses, "qsearch capture-history malus"));
+  if ((stats.qttHits ?? 0) > 0) parts.push(nativeCount(stats.qttHits, "quiescence-table hit"));
+  if ((stats.evalCacheHits ?? 0) > 0) parts.push(nativeCount(stats.evalCacheHits, "evaluation-cache hit"));
+  if ((stats.checkCacheHits ?? 0) > 0) parts.push(nativeCount(stats.checkCacheHits, "check-cache hit"));
+  if ((stats.checkedEvalSkips ?? 0) > 0) parts.push(nativeCount(stats.checkedEvalSkips, "checked-node eval skip"));
+  if ((stats.extensions ?? 0) > 0) parts.push(nativeCount(stats.extensions, "tactical extension"));
+  if ((stats.recaptureExtensions ?? 0) > 0) parts.push(nativeCount(stats.recaptureExtensions, "recapture extension"));
+  if ((stats.singularExtensions ?? 0) > 0) parts.push(nativeCount(stats.singularExtensions, "singular extension"));
+  if ((stats.nullMovePrunes ?? 0) > 0) parts.push(nativeCount(stats.nullMovePrunes, "null-move cutoff"));
+  if ((stats.nullMoveVerifications ?? 0) > 0) parts.push(nativeCount(stats.nullMoveVerifications, "verified null-move recheck"));
+  if ((stats.nullMoveVerificationFailures ?? 0) > 0) parts.push(nativeCount(stats.nullMoveVerificationFailures, "rejected null-move shortcut"));
+  if ((stats.nullMoveMaterialGuards ?? 0) > 0) parts.push(nativeCount(stats.nullMoveMaterialGuards, "low-material null-move guard"));
+  if ((stats.reverseFutilityPrunes ?? 0) > 0) parts.push(nativeCount(stats.reverseFutilityPrunes, "reverse-futility prune"));
+  if ((stats.mateDistancePrunes ?? 0) > 0) parts.push(nativeCount(stats.mateDistancePrunes, "mate-distance prune"));
+  if ((stats.razorPrunes ?? 0) > 0) parts.push(nativeCount(stats.razorPrunes, "razoring cutoff"));
+  if ((stats.seePrunes ?? 0) > 0) parts.push(nativeCount(stats.seePrunes, "static-exchange prune"));
+  if ((stats.probCutPrunes ?? 0) > 0) parts.push(nativeCount(stats.probCutPrunes, "ProbCut capture prune"));
+  if ((stats.probCutCaptureSkips ?? 0) > 0) parts.push(nativeCount(stats.probCutCaptureSkips, "ProbCut capture prefilter"));
+  if ((stats.futilityPrunes ?? 0) > 0) parts.push(nativeCount(stats.futilityPrunes, "futility prune"));
+  if ((stats.badHistoryPrunes ?? 0) > 0) parts.push(nativeCount(stats.badHistoryPrunes, "bad-history prune"));
+  if ((stats.deltaPrunes ?? 0) > 0) parts.push(nativeCount(stats.deltaPrunes, "delta prune"));
+  if ((stats.qDeltaPrefilterSkips ?? 0) > 0) parts.push(nativeCount(stats.qDeltaPrefilterSkips, "qsearch delta prefilter"));
+  if ((stats.qSeePrunes ?? 0) > 0) parts.push(nativeCount(stats.qSeePrunes, "quiescence SEE prune"));
+  if ((stats.lateMovePrunes ?? 0) > 0) parts.push(nativeCount(stats.lateMovePrunes, "late-move prune"));
+  if ((stats.pvReductionGuards ?? 0) > 0) parts.push(nativeCount(stats.pvReductionGuards, "PV-node reduction guard"));
+  if ((stats.cutNodeReductionBoosts ?? 0) > 0) parts.push(nativeCount(stats.cutNodeReductionBoosts, "cut-node reduction boost"));
+  if ((stats.improvingReductionGuards ?? 0) > 0) parts.push(nativeCount(stats.improvingReductionGuards, "improving-position reduction guard"));
+  if ((stats.nonImprovingReductionBoosts ?? 0) > 0) parts.push(nativeCount(stats.nonImprovingReductionBoosts, "worsening-position reduction boost"));
+  if ((stats.rootChildStateReuses ?? 0) > 0) parts.push(nativeCount(stats.rootChildStateReuses, "root child-state reuse"));
+  if ((stats.rootTtHits ?? 0) > 0) parts.push(nativeCount(stats.rootTtHits, "root transposition-table ordering hint"));
+  if ((stats.rootOrderHits ?? 0) > 0) parts.push(nativeCount(stats.rootOrderHits, "persisted root-order hint"));
+  if ((stats.rootTtStores ?? 0) > 0) parts.push(nativeCount(stats.rootTtStores, "root transposition-table store"));
+  if ((stats.ttMoveHits ?? 0) > 0) parts.push(nativeCount(stats.ttMoveHits, "transposition hash-move ordering hint"));
+  if ((stats.captureHistoryHits ?? 0) > 0) parts.push(nativeCount(stats.captureHistoryHits, "capture-history hit"));
+  if ((stats.captureHistoryStores ?? 0) > 0) parts.push(nativeCount(stats.captureHistoryStores, "capture-history update"));
+  if ((stats.captureHistoryMaluses ?? 0) > 0) parts.push(nativeCount(stats.captureHistoryMaluses, "capture-history malus"));
+  if ((stats.captureHistoryPruneGuards ?? 0) > 0) parts.push(nativeCount(stats.captureHistoryPruneGuards, "capture-history prune guard"));
+  if ((stats.countermoveHits ?? 0) > 0) parts.push(nativeCount(stats.countermoveHits, "countermove-order hit"));
+  if ((stats.continuationHistoryHits ?? 0) > 0) parts.push(nativeCount(stats.continuationHistoryHits, "continuation-history hit"));
+  if ((stats.checkEvasionOrderHits ?? 0) > 0) parts.push(nativeCount(stats.checkEvasionOrderHits, "check-evasion ordering hint"));
+  if ((stats.checkHistoryHits ?? 0) > 0) parts.push(nativeCount(stats.checkHistoryHits, "check-history hit"));
+  if ((stats.iidMoveHits ?? 0) > 0) parts.push(nativeCount(stats.iidMoveHits, "internal-iterative-deepening move hint"));
+  if ((stats.pvsResearches ?? 0) > 0) parts.push(nativeCount(stats.pvsResearches, "PVS re-search"));
+  if ((stats.aspirationSearches ?? 0) > 0) parts.push(nativeCount(stats.aspirationSearches, "aspiration-window search"));
+  if ((stats.killerHits ?? 0) > 0) parts.push(nativeCount(stats.killerHits, "killer-move hit"));
+
+  return parts.length > 0 ? `Native selective search used ${parts.join(", ")}.` : null;
+}
+
+function nativeCount(value, singular) {
+  const count = Math.max(0, Math.round(value ?? 0));
+  return `${count} ${singular}${count === 1 ? "" : "s"}`;
+}
+
 function formatNativeNodes(value) {
   const rounded = Math.round(value ?? 0);
   if (rounded >= 1_000_000) return `${(rounded / 1_000_000).toFixed(1)}M nodes`;
@@ -1460,11 +2005,12 @@ function nativeWdlReason(wdl) {
 }
 
 function formatGoCommand(options) {
-  const depth = Math.max(1, Number.parseInt(options.depth ?? 4, 10) || 4);
+  const depth = parseOptionalPositiveInteger(options.depth);
   const lines = normalizeLineCount(options.lines ?? options.multiPv ?? options.multipv ?? 1);
   const explicitMoveTime = numberOption(options.timeLimitMs, options.movetime, options.moveTimeMs, options.moveTime);
   const protocol = normalizeNativeProtocol(options.protocol);
-  const parts = ["go", "depth", depth];
+  const parts = ["go"];
+  if (depth !== null) parts.push("depth", depth);
 
   if (hasClockTimeControl(options) && explicitMoveTime === null) {
     addGoNumber(parts, "wtime", options.wtime ?? options.redTimeMs ?? options.redTime);
@@ -1483,6 +2029,12 @@ function formatGoCommand(options) {
 
   if (lines > 1 && protocol !== "uci") parts.push("multipv", lines);
   return parts.join(" ");
+}
+
+function parseOptionalPositiveInteger(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 function mergeNativeOptions(baseOptions, searchOptions, extras) {
@@ -1624,10 +2176,93 @@ function createNativeStats(parsed) {
   return {
     ...createEmptyStats(),
     nodes: parsed.nodes ?? 0,
+    qnodes: parsed.qnodes ?? 0,
     seldepth: parsed.seldepth ?? parsed.telemetry?.seldepth ?? 0,
     timeMs: parsed.timeMs ?? parsed.telemetry?.timeMs ?? 0,
     nps: parsed.nps ?? parsed.telemetry?.nps ?? 0,
     hashfull: parsed.hashfull ?? parsed.telemetry?.hashfull ?? 0,
+    memoryAge: parsed.memoryAge ?? 0,
+    qchecks: parsed.qchecks ?? 0,
+    qCheckHistoryHits: parsed.qCheckHistoryHits ?? 0,
+    qCheckHistoryStores: parsed.qCheckHistoryStores ?? 0,
+    qCheckHistoryMaluses: parsed.qCheckHistoryMaluses ?? 0,
+    qCaptureHistoryPruneGuards: parsed.qCaptureHistoryPruneGuards ?? 0,
+    qCaptureHistoryHits: parsed.qCaptureHistoryHits ?? 0,
+    qCaptureHistoryStores: parsed.qCaptureHistoryStores ?? 0,
+    qCaptureHistoryMaluses: parsed.qCaptureHistoryMaluses ?? 0,
+    qttHits: parsed.qttHits ?? 0,
+    qttStores: parsed.qttStores ?? 0,
+    qttMoveHits: parsed.qttMoveHits ?? 0,
+    evalCacheHits: parsed.evalCacheHits ?? 0,
+    evalCacheStores: parsed.evalCacheStores ?? 0,
+    checkedEvalSkips: parsed.checkedEvalSkips ?? 0,
+    ttHits: parsed.ttHits ?? 0,
+    ttMoveHits: parsed.ttMoveHits ?? 0,
+    cutoffs: parsed.cutoffs ?? 0,
+    captureHistoryHits: parsed.captureHistoryHits ?? 0,
+    captureHistoryStores: parsed.captureHistoryStores ?? 0,
+    captureHistoryMaluses: parsed.captureHistoryMaluses ?? 0,
+    captureHistoryPruneGuards: parsed.captureHistoryPruneGuards ?? 0,
+    extensions: parsed.extensions ?? 0,
+    recaptureExtensions: parsed.recaptureExtensions ?? 0,
+    reverseFutilityPrunes: parsed.reverseFutilityPrunes ?? 0,
+    mateDistancePrunes: parsed.mateDistancePrunes ?? 0,
+    razorPrunes: parsed.razorPrunes ?? 0,
+    razorResearches: parsed.razorResearches ?? 0,
+    seePrunes: parsed.seePrunes ?? 0,
+    probCutPrunes: parsed.probCutPrunes ?? 0,
+    probCutSearches: parsed.probCutSearches ?? 0,
+    probCutCaptureSkips: parsed.probCutCaptureSkips ?? 0,
+    futilityPrunes: parsed.futilityPrunes ?? 0,
+    badHistoryPrunes: parsed.badHistoryPrunes ?? 0,
+    badHistoryPruneGuards: parsed.badHistoryPruneGuards ?? 0,
+    deltaPrunes: parsed.deltaPrunes ?? 0,
+    qDeltaPrefilterSkips: parsed.qDeltaPrefilterSkips ?? 0,
+    qSeePrunes: parsed.qSeePrunes ?? 0,
+    lateMovePrunes: parsed.lateMovePrunes ?? 0,
+    reductions: parsed.reductions ?? 0,
+    lmrResearches: parsed.lmrResearches ?? 0,
+    pvReductionGuards: parsed.pvReductionGuards ?? 0,
+    cutNodeReductionBoosts: parsed.cutNodeReductionBoosts ?? 0,
+    improvingNodes: parsed.improvingNodes ?? 0,
+    nonImprovingNodes: parsed.nonImprovingNodes ?? 0,
+    improvingReductionGuards: parsed.improvingReductionGuards ?? 0,
+    nonImprovingReductionBoosts: parsed.nonImprovingReductionBoosts ?? 0,
+    improvingLateMoveGuards: parsed.improvingLateMoveGuards ?? 0,
+    nonImprovingLateMovePrunes: parsed.nonImprovingLateMovePrunes ?? 0,
+    countermoveHits: parsed.countermoveHits ?? 0,
+    continuationHistoryHits: parsed.continuationHistoryHits ?? 0,
+    continuationReductionBoosts: parsed.continuationReductionBoosts ?? 0,
+    continuationReductionMaluses: parsed.continuationReductionMaluses ?? 0,
+    checkEvasionOrderHits: parsed.checkEvasionOrderHits ?? 0,
+    checkEvasionCaptures: parsed.checkEvasionCaptures ?? 0,
+    checkEvasionBlocks: parsed.checkEvasionBlocks ?? 0,
+    checkEvasionKingMoves: parsed.checkEvasionKingMoves ?? 0,
+    checkHistoryHits: parsed.checkHistoryHits ?? 0,
+    checkHistoryStores: parsed.checkHistoryStores ?? 0,
+    checkHistoryMaluses: parsed.checkHistoryMaluses ?? 0,
+    checkCacheHits: parsed.checkCacheHits ?? 0,
+    checkCacheStores: parsed.checkCacheStores ?? 0,
+    iidSearches: parsed.iidSearches ?? 0,
+    iidMoveHits: parsed.iidMoveHits ?? 0,
+    rootMovesSearched: parsed.rootMovesSearched ?? 0,
+    rootChildStateReuses: parsed.rootChildStateReuses ?? 0,
+    rootTtHits: parsed.rootTtHits ?? 0,
+    rootTtStores: parsed.rootTtStores ?? 0,
+    rootOrderHits: parsed.rootOrderHits ?? 0,
+    rootOrderStores: parsed.rootOrderStores ?? 0,
+    pvsResearches: parsed.pvsResearches ?? 0,
+    aspirationSearches: parsed.aspirationSearches ?? 0,
+    aspirationFailHigh: parsed.aspirationFailHigh ?? 0,
+    aspirationFailLow: parsed.aspirationFailLow ?? 0,
+    nullMovePrunes: parsed.nullMovePrunes ?? 0,
+    nullMoveVerifications: parsed.nullMoveVerifications ?? 0,
+    nullMoveVerificationFailures: parsed.nullMoveVerificationFailures ?? 0,
+    nullMoveMaterialGuards: parsed.nullMoveMaterialGuards ?? 0,
+    singularExtensionSearches: parsed.singularExtensionSearches ?? 0,
+    singularExtensions: parsed.singularExtensions ?? 0,
+    singularExtensionRejects: parsed.singularExtensionRejects ?? 0,
+    killerHits: parsed.killerHits ?? 0,
     native: true
   };
 }
@@ -1636,7 +2271,15 @@ function createEmptyStats() {
   return {
     nodes: 0,
     qnodes: 0,
+    memoryAge: 0,
     qchecks: 0,
+    qCheckHistoryHits: 0,
+    qCheckHistoryStores: 0,
+    qCheckHistoryMaluses: 0,
+    qCaptureHistoryPruneGuards: 0,
+    qCaptureHistoryHits: 0,
+    qCaptureHistoryStores: 0,
+    qCaptureHistoryMaluses: 0,
     qttHits: 0,
     qttStores: 0,
     qttReplacements: 0,
@@ -1645,6 +2288,7 @@ function createEmptyStats() {
     qttMoveHits: 0,
     evalCacheHits: 0,
     evalCacheStores: 0,
+    checkedEvalSkips: 0,
     tacticalCacheHits: 0,
     tacticalCacheStores: 0,
     ttHits: 0,
@@ -1671,11 +2315,14 @@ function createEmptyStats() {
     razorResearches: 0,
     probCutPrunes: 0,
     probCutSearches: 0,
+    probCutCaptureSkips: 0,
     futilityPrunes: 0,
     badHistoryPrunes: 0,
     badHistoryPruneGuards: 0,
     lateMovePrunes: 0,
     deltaPrunes: 0,
+    qDeltaPrefilterSkips: 0,
+    qSeePrunes: 0,
     reductions: 0,
     reductionPlies: 0,
     deepReductions: 0,
@@ -1693,14 +2340,18 @@ function createEmptyStats() {
     nullMovePrunes: 0,
     nullMoveVerifications: 0,
     nullMoveVerificationFailures: 0,
+    nullMoveMaterialGuards: 0,
     killerStores: 0,
     killerHits: 0,
     captureHistoryStores: 0,
     captureHistoryHits: 0,
     captureHistoryMaluses: 0,
+    captureHistoryPruneGuards: 0,
     checkHistoryStores: 0,
     checkHistoryHits: 0,
     checkHistoryMaluses: 0,
+    checkCacheHits: 0,
+    checkCacheStores: 0,
     countermoveStores: 0,
     countermoveHits: 0,
     continuationHistoryStores: 0,
@@ -1715,9 +2366,14 @@ function createEmptyStats() {
     historyGravityUpdates: 0,
     rootScoreOrderHits: 0,
     rootRankOrderHits: 0,
+    rootOrderHits: 0,
+    rootOrderStores: 0,
     iidSearches: 0,
     iidMoveHits: 0,
     rootMovesSearched: 0,
+    rootChildStateReuses: 0,
+    rootTtHits: 0,
+    rootTtStores: 0,
     repetitions: 0
   };
 }
@@ -1780,12 +2436,12 @@ function compactNativeMove(move, protocol) {
 
 function nativeMoveTokenToInternal(moveText, protocol) {
   if (normalizeNativeProtocol(protocol) !== "uci") return moveText;
-  if (!moveText || moveText === "0000") return moveText;
+  if (isNullBestMove(moveText)) return moveText;
   return translateMoveTokenRanks(moveText);
 }
 
 function internalMoveTokenToNative(moveText) {
-  if (!moveText || moveText === "0000") return moveText;
+  if (isNullBestMove(moveText)) return moveText;
   return translateMoveTokenRanks(moveText);
 }
 
@@ -1808,7 +2464,7 @@ function toMoveKey(move) {
 
 function moveKeyMatches(left, right) {
   if (!left || !right) return false;
-  if (left === "0000" || right === "0000") return false;
+  if (isNullBestMove(left) || isNullBestMove(right)) return false;
   return moveKey(parseMoveNotation(left)) === moveKey(parseMoveNotation(right));
 }
 

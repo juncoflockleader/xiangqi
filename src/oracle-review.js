@@ -61,6 +61,10 @@ export function createOracleReviewEngineBackend(candidateBackend, oracleBackend,
     pressure: (...args) => candidateBackend.pressure?.(...args),
     play: (...args) => candidateBackend.play(...args),
     legalMoves: (...args) => candidateBackend.legalMoves(...args),
+    newGame: async (...args) => {
+      await candidateBackend.newGame?.(...args);
+      await oracleBackend.newGame?.(...args);
+    },
     resetCache: () => candidateBackend.resetCache?.(),
     ready: async () => {
       await candidateBackend.ready?.();

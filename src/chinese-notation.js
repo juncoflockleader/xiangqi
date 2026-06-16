@@ -13,7 +13,7 @@ const RED_NUMERALS = ["一", "二", "三", "四", "五", "六", "七", "八", "�
 const BLACK_NUMERALS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 const CHINESE_MOVE_PATTERN = /^[帥帅將将仕士相象傌馬马俥車车炮砲兵卒][一二三四五六七八九１２３４５６７８９1-9前中後后][平進进退][一二三四五六七八九１２３４５６７８９1-9]$|^[前中後后][帥帅將将仕士相象傌馬马俥車车炮砲兵卒][平進进退][一二三四五六七八九１２３４５６７８９1-9]$/;
 
-const PIECE_NAMES_ZH = Object.freeze({
+const PIECE_NAMES_ZH_TW = Object.freeze({
   [SIDES.RED]: Object.freeze({
     [PIECES.KING]: "帥",
     [PIECES.ADVISOR]: "仕",
@@ -32,6 +32,34 @@ const PIECE_NAMES_ZH = Object.freeze({
     [PIECES.CANNON]: "砲",
     [PIECES.PAWN]: "卒"
   })
+});
+
+const PIECE_NAMES_ZH_CN = Object.freeze({
+  [SIDES.RED]: Object.freeze({
+    [PIECES.KING]: "帅",
+    [PIECES.ADVISOR]: "仕",
+    [PIECES.ELEPHANT]: "相",
+    [PIECES.HORSE]: "马",
+    [PIECES.ROOK]: "车",
+    [PIECES.CANNON]: "炮",
+    [PIECES.PAWN]: "兵"
+  }),
+  [SIDES.BLACK]: Object.freeze({
+    [PIECES.KING]: "将",
+    [PIECES.ADVISOR]: "士",
+    [PIECES.ELEPHANT]: "象",
+    [PIECES.HORSE]: "马",
+    [PIECES.ROOK]: "车",
+    [PIECES.CANNON]: "炮",
+    [PIECES.PAWN]: "卒"
+  })
+});
+
+const PIECE_NAMES_BY_LOCALE = Object.freeze({
+  "zh-CN": PIECE_NAMES_ZH_CN,
+  "zh-Hans": PIECE_NAMES_ZH_CN,
+  "zh-TW": PIECE_NAMES_ZH_TW,
+  "zh-Hant": PIECE_NAMES_ZH_TW
 });
 
 const FRONT_LABELS = Object.freeze(["前", "中", "後"]);
@@ -56,7 +84,9 @@ export function parseChineseMoveNotation(position, text) {
   return candidates[0];
 }
 
-export function moveToChineseNotation(position, moveOrNotation) {
+export function moveToChineseNotation(position, moveOrNotation, options = {}) {
+  const locale = normalizeNotationLocale(options);
+  const pieceNames = PIECE_NAMES_BY_LOCALE[locale] ?? PIECE_NAMES_ZH_TW;
   const move = normalizeMove(moveOrNotation);
   const piece = move.piece ?? position.board[move.from];
   if (!piece) return notationFromMove(moveOrNotation);
@@ -65,24 +95,24 @@ export function moveToChineseNotation(position, moveOrNotation) {
   const fromRank = rankOf(move.from);
   const toFile = fileOf(move.to);
   const toRank = rankOf(move.to);
-  const direction = moveDirection(piece.side, fromRank, toRank);
+  const direction = moveDirection(piece.side, fromRank, toRank, locale);
   const destination = destinationText(piece, fromFile, fromRank, toFile, toRank, direction);
 
   return [
-    PIECE_NAMES_ZH[piece.side]?.[piece.type] ?? "?",
+    pieceNames[piece.side]?.[piece.type] ?? "?",
     originText(position, piece, fromFile, fromRank),
     direction,
     destination
   ].join("");
 }
 
-export function lineToChineseNotation(position, moves) {
+export function lineToChineseNotation(position, moves, options = {}) {
   const result = [];
   let current = position;
 
   for (const moveOrNotation of moves ?? []) {
     const move = normalizeMove(moveOrNotation);
-    const text = moveToChineseNotation(current, move);
+    const text = moveToChineseNotation(current, move, options);
     result.push(text);
 
     try {
@@ -163,9 +193,10 @@ function originText(position, piece, fromFile, fromRank) {
   return numberText(piece.side, index + 1);
 }
 
-function moveDirection(side, fromRank, toRank) {
+function moveDirection(side, fromRank, toRank, locale) {
   if (fromRank === toRank) return "平";
   const forward = side === SIDES.RED ? toRank < fromRank : toRank > fromRank;
+  if (locale === "zh-CN" || locale === "zh-Hans") return forward ? "进" : "退";
   return forward ? "進" : "退";
 }
 
@@ -184,4 +215,10 @@ function fileText(side, file) {
 function numberText(side, number) {
   const values = side === SIDES.RED ? RED_NUMERALS : BLACK_NUMERALS;
   return values[number - 1] ?? String(number);
+}
+
+function normalizeNotationLocale(options) {
+  const locale = typeof options === "string" ? options : options?.locale;
+  if (locale === "zh-CN" || locale === "zh-Hans" || locale === "zh") return "zh-CN";
+  return "zh-TW";
 }

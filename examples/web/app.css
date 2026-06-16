@@ -130,16 +130,23 @@ h2 {
 }
 
 .board-wrap {
-  --board-padding: clamp(10px, 2vw, 18px);
-  --board-play-width: calc(100% - var(--board-padding) - var(--board-padding));
+  --board-padding: clamp(16px, 2vw, 24px);
+  --board-frame-width: calc(100% - var(--board-padding) - var(--board-padding));
+  --board-play-width: var(--board-frame-width);
   --grid-line: rgba(74, 44, 18, 0.72);
   --grid-line-strong: rgba(61, 35, 13, 0.9);
-  --grid-inset-x: calc(100% / (9 * 2));
-  --grid-inset-y: calc(100% / (10 * 2));
-  --point-size: clamp(36px, 10.75%, 54px);
-  --piece-size: clamp(30px, 84%, 44px);
-  --piece-font-size: 15px;
-  width: min(100%, 760px);
+  --grid-files: 8;
+  --grid-ranks: 9;
+  --grid-inset-x: calc(100% / 18);
+  --grid-inset-y: calc(100% / 20);
+  --edge-label-offset: clamp(14px, 3.6%, 20px);
+  --point-size: clamp(31px, 8.7%, 43px);
+  --piece-size: clamp(30px, 88%, 38px);
+  --piece-font-size: 12.5px;
+  --piece-inner-inset: clamp(5px, 15%, 7px);
+  --marker-size: clamp(15px, 3.4%, 22px);
+  --marker-arm: clamp(5px, 1.35%, 7px);
+  width: min(100%, 700px, calc((100vh - 112px) * 0.9));
   margin: 0 auto;
   aspect-ratio: 9 / 10;
   padding: var(--board-padding);
@@ -148,6 +155,15 @@ h2 {
   background: linear-gradient(135deg, #e6bc65, var(--board));
   box-shadow: 0 22px 50px rgba(42, 32, 16, 0.18);
   position: relative;
+}
+
+.board-wrap::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--board-padding) * 0.44);
+  border: 1px solid rgba(61, 35, 13, 0.42);
+  border-radius: 5px;
+  pointer-events: none;
 }
 
 .board-wrap.tree-preview {
@@ -173,6 +189,17 @@ h2 {
   box-shadow: inset 0 0 0 1px rgba(255, 239, 179, 0.22);
 }
 
+.board-lines::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(400% / 9);
+  height: calc(100% / 9);
+  background: linear-gradient(90deg, rgba(255, 242, 185, 0.2), rgba(255, 230, 148, 0.34), rgba(255, 242, 185, 0.2));
+  pointer-events: none;
+}
+
 .board-grid {
   position: absolute;
   inset: 0;
@@ -184,7 +211,8 @@ h2 {
 }
 
 .board-grid-line,
-.board-grid-major {
+.board-grid-major,
+.board-palace-line {
   fill: none;
   stroke-linecap: square;
   vector-effect: non-scaling-stroke;
@@ -192,27 +220,33 @@ h2 {
 
 .board-grid-line {
   stroke: var(--grid-line);
-  stroke-width: 1.35px;
+  stroke-width: 1.2px;
 }
 
 .board-grid-major {
   stroke: var(--grid-line-strong);
-  stroke-width: 2px;
+  stroke-width: 1.65px;
+}
+
+.board-palace-line {
+  stroke: var(--grid-line-strong);
+  stroke-width: 1.35px;
 }
 
 .river-label {
   position: absolute;
-  top: calc(400% / 9 + 1px);
-  height: calc(100% / 9 - 1px);
+  top: calc(400% / 9 + 2px);
+  height: calc(100% / 9 - 4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #e6bc65, var(--board));
   color: rgba(68, 40, 16, 0.82);
-  font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
+  font-family: "STKaiti", "Kaiti SC", "KaiTi", "Songti SC", "STSong", "Noto Serif CJK SC", serif;
   font-size: 24px;
   font-weight: 760;
   letter-spacing: 0;
+  line-height: 1;
+  pointer-events: none;
   z-index: 3;
 }
 
@@ -222,7 +256,7 @@ h2 {
   right: 0;
   height: calc(100% / 18);
   color: rgba(68, 40, 16, 0.84);
-  font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
+  font-family: "STKaiti", "Kaiti SC", "KaiTi", "Songti SC", "STSong", "Noto Serif CJK SC", serif;
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0;
@@ -230,16 +264,16 @@ h2 {
 }
 
 .file-labels-north {
-  top: calc(-100% / 18);
+  top: calc(-100% / 18 - var(--edge-label-offset));
 }
 
 .file-labels-south {
-  bottom: calc(-100% / 18);
+  bottom: calc(-100% / 18 - var(--edge-label-offset));
 }
 
 .file-label {
   position: absolute;
-  left: calc(var(--file) * 100% / 8);
+  left: calc(var(--file) * 100% / var(--grid-files));
   top: 50%;
   transform: translate(-50%, -50%);
 }
@@ -256,37 +290,37 @@ h2 {
 
 .point-mark {
   position: absolute;
-  left: calc(var(--file) * 100% / 8);
-  top: calc(var(--rank) * 100% / 9);
-  width: clamp(14px, 3%, 22px);
-  height: clamp(14px, 3%, 22px);
+  left: calc(var(--file) * 100% / var(--grid-files));
+  top: calc(var(--rank) * 100% / var(--grid-ranks));
+  width: var(--marker-size);
+  aspect-ratio: 1;
   transform: translate(-50%, -50%);
   z-index: 2;
   background:
-    linear-gradient(var(--grid-line) 0 0) left 1px top 1px / 6px 1px no-repeat,
-    linear-gradient(var(--grid-line) 0 0) left 1px top 1px / 1px 6px no-repeat,
-    linear-gradient(var(--grid-line) 0 0) right 1px top 1px / 6px 1px no-repeat,
-    linear-gradient(var(--grid-line) 0 0) right 1px top 1px / 1px 6px no-repeat,
-    linear-gradient(var(--grid-line) 0 0) left 1px bottom 1px / 6px 1px no-repeat,
-    linear-gradient(var(--grid-line) 0 0) left 1px bottom 1px / 1px 6px no-repeat,
-    linear-gradient(var(--grid-line) 0 0) right 1px bottom 1px / 6px 1px no-repeat,
-    linear-gradient(var(--grid-line) 0 0) right 1px bottom 1px / 1px 6px no-repeat;
+    linear-gradient(var(--grid-line) 0 0) left 1px top 1px / var(--marker-arm) 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) left 1px top 1px / 1px var(--marker-arm) no-repeat,
+    linear-gradient(var(--grid-line) 0 0) right 1px top 1px / var(--marker-arm) 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) right 1px top 1px / 1px var(--marker-arm) no-repeat,
+    linear-gradient(var(--grid-line) 0 0) left 1px bottom 1px / var(--marker-arm) 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) left 1px bottom 1px / 1px var(--marker-arm) no-repeat,
+    linear-gradient(var(--grid-line) 0 0) right 1px bottom 1px / var(--marker-arm) 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) right 1px bottom 1px / 1px var(--marker-arm) no-repeat;
 }
 
 .point-edge-left {
   background:
-    linear-gradient(var(--grid-line) 0 0) right 1px top 1px / 6px 1px no-repeat,
-    linear-gradient(var(--grid-line) 0 0) right 1px top 1px / 1px 6px no-repeat,
-    linear-gradient(var(--grid-line) 0 0) right 1px bottom 1px / 6px 1px no-repeat,
-    linear-gradient(var(--grid-line) 0 0) right 1px bottom 1px / 1px 6px no-repeat;
+    linear-gradient(var(--grid-line) 0 0) right 1px top 1px / var(--marker-arm) 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) right 1px top 1px / 1px var(--marker-arm) no-repeat,
+    linear-gradient(var(--grid-line) 0 0) right 1px bottom 1px / var(--marker-arm) 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) right 1px bottom 1px / 1px var(--marker-arm) no-repeat;
 }
 
 .point-edge-right {
   background:
-    linear-gradient(var(--grid-line) 0 0) left 1px top 1px / 6px 1px no-repeat,
-    linear-gradient(var(--grid-line) 0 0) left 1px top 1px / 1px 6px no-repeat,
-    linear-gradient(var(--grid-line) 0 0) left 1px bottom 1px / 6px 1px no-repeat,
-    linear-gradient(var(--grid-line) 0 0) left 1px bottom 1px / 1px 6px no-repeat;
+    linear-gradient(var(--grid-line) 0 0) left 1px top 1px / var(--marker-arm) 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) left 1px top 1px / 1px var(--marker-arm) no-repeat,
+    linear-gradient(var(--grid-line) 0 0) left 1px bottom 1px / var(--marker-arm) 1px no-repeat,
+    linear-gradient(var(--grid-line) 0 0) left 1px bottom 1px / 1px var(--marker-arm) no-repeat;
 }
 
 .board {
@@ -298,11 +332,16 @@ h2 {
 }
 
 .cell {
+  appearance: none;
+  -webkit-appearance: none;
   position: absolute;
   z-index: 1;
+  left: calc(var(--file) * (100% / var(--grid-files)));
+  top: calc(var(--rank) * (100% / var(--grid-ranks)));
   width: var(--point-size);
-  height: var(--point-size);
+  height: auto;
   min-height: 0;
+  aspect-ratio: 1;
   transform: translate3d(-50%, -50%, 0);
   border: 0;
   border-radius: 999px;
@@ -344,23 +383,35 @@ h2 {
   border: 1.5px solid currentColor;
   border-radius: 999px;
   background: radial-gradient(circle at 35% 30%, #fff9e6 0%, #f6e0a9 62%, #d7af5b 100%);
-  box-shadow: 0 3px 7px rgba(52, 34, 13, 0.2);
-  font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
+  box-shadow: 0 1px 4px rgba(52, 34, 13, 0.18);
+  font-family: "STKaiti", "Kaiti SC", "KaiTi", "Songti SC", "STSong", "Noto Serif CJK SC", serif;
   font-size: var(--piece-font-size);
-  font-weight: 800;
+  font-weight: 680;
   font-variant-east-asian: traditional;
   letter-spacing: 0;
   line-height: 1;
   text-align: center;
   text-rendering: optimizeLegibility;
+  text-size-adjust: 100%;
   overflow: hidden;
   white-space: nowrap;
+}
+
+.piece-glyph {
+  position: relative;
+  z-index: 1;
+  width: 62%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  transform: translateY(0.015em);
 }
 
 .piece::before {
   content: "";
   position: absolute;
-  inset: clamp(3px, 9%, 5px);
+  inset: var(--piece-inner-inset);
   border: 1px solid currentColor;
   border-radius: inherit;
   opacity: 0.48;
@@ -731,10 +782,12 @@ h2 {
   }
 
   .board-wrap {
-    --board-padding: 8px;
-    --point-size: clamp(34px, 10.75%, 46px);
-    --piece-size: clamp(29px, 84%, 39px);
-    --piece-font-size: 13px;
+    --board-padding: 14px;
+    --edge-label-offset: 12px;
+    --point-size: clamp(29px, 8.6%, 39px);
+    --piece-size: clamp(27px, 86%, 33px);
+    --piece-font-size: 11.5px;
+    --piece-inner-inset: 4px;
   }
 
   .river-label {

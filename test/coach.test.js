@@ -41,7 +41,7 @@ test("coach move can use pure search for tactical positions", () => {
 });
 
 test("coach move validates heuristic openings before teaching them", () => {
-  const engine = createEngine({ depth: 3, timeLimitMs: 4000 });
+  const engine = createEngine({ book: {}, depth: 3, timeLimitMs: 4000 });
   let position = createInitialPosition();
   for (const move of ["h7-e7", "h0-g2", "h9-g7", "g3-g4", "b9-c7", "i0-h0"]) {
     position = engine.play(position, move);

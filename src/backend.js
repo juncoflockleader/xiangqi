@@ -54,6 +54,7 @@ export function createJavaScriptEngineBackend(options = {}) {
     pressure: (position, pressureOptions = {}) => engine.pressure(position, pressureOptions),
     play: (position, notation) => engine.play(position, notation),
     legalMoves: (position) => engine.legalMoves(position),
+    newGame: () => engine.resetCache(),
     resetCache: () => engine.resetCache(),
     get cacheSize() {
       return engine.cacheSize;

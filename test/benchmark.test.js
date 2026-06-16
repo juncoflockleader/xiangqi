@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   ENGINE_BENCHMARKS,
+  ENGINE_OPENING_ORACLE_BENCHMARKS,
   compareEngineToOracle,
   compareEngineBackends,
   createBenchmarkSuite,
@@ -10,6 +11,8 @@ import {
   formatBenchmarkReport,
   formatEngineComparisonReport,
   formatOracleComparisonReport,
+  listBenchmarkSuiteNames,
+  resolveBenchmarkSuite,
   runBenchmarkSuite
 } from "../src/index.js";
 
@@ -34,17 +37,42 @@ test("benchmark suite can filter by tag", async () => {
 
   assert.equal(report.total, 1);
   assert.equal(report.results[0].id, "rook-delivers-face-capture");
-  assert.equal(report.results[0].actualMove, "e9-e0");
+  assert.equal(report.results[0].actualMove, "e9-e8");
+});
+
+test("benchmark suite can filter by id", async () => {
+  const report = await runBenchmarkSuite(null, { id: "book-central-cannon" });
+
+  assert.equal(report.total, 1);
+  assert.equal(report.results[0].id, "book-central-cannon");
+  assert.equal(report.results[0].actualMove, "h7-e7");
+});
+
+test("named opening oracle suite captures native regression positions", () => {
+  const suite = resolveBenchmarkSuite("opening-oracle");
+  const aliases = listBenchmarkSuiteNames();
+
+  assert.equal(suite, ENGINE_OPENING_ORACLE_BENCHMARKS);
+  assert.ok(aliases.includes("starter"));
+  assert.ok(aliases.includes("opening-oracle"));
+  assert.equal(suite.length, 6);
+  assert.ok(suite.every((benchmark) => benchmark.tags.includes("oracle")));
+  assert.ok(suite.every((benchmark) => benchmark.options.useBook === false));
+  assert.ok(suite.every((benchmark) => benchmark.options.lines === 5));
+  assert.ok(suite.some((benchmark) => benchmark.id === "oracle-opening-left-screen-central-cannon"));
+  assert.equal(resolveBenchmarkSuite("starter"), ENGINE_BENCHMARKS);
+  assert.throws(() => resolveBenchmarkSuite("missing-suite"), /Unknown benchmark suite/);
 });
 
 test("benchmark report is readable", async () => {
   const report = await runBenchmarkSuite(null, { tag: "opening" });
   const text = formatBenchmarkReport(report);
 
-  assert.ok(text.includes("Benchmarks: 1/1 solved"));
+  assert.ok(text.includes("Benchmarks: 3/3 solved"));
   assert.ok(text.includes("nodes"));
   assert.ok(text.includes("depth"));
   assert.ok(text.includes("PASS book-central-cannon"));
+  assert.ok(text.includes("PASS book-central-cannon-oracle-continuation"));
   assert.ok(text.includes("opening-book"));
 });
 
@@ -64,6 +92,7 @@ test("custom benchmark suites can be normalized and run", async () => {
         name: "Custom Rook Win",
         fen: "4k4/9/4r4/9/9/9/9/9/9/3KR4 r",
         expectedMove: "e9-e2",
+        lines: 3,
         lesson: "Custom suites can capture lesson positions from sparring."
       }
     ]
@@ -73,6 +102,7 @@ test("custom benchmark suites can be normalized and run", async () => {
   assert.equal(suite[0].id, "custom-rook-win");
   assert.deepEqual(suite[0].tags, ["custom", "learning"]);
   assert.equal(suite[0].options.useBook, false);
+  assert.equal(suite[0].options.lines, 3);
   assert.equal(report.total, 1);
   assert.equal(report.failed, 0);
   assert.equal(report.results[0].actualMove, "e9-e2");
@@ -107,9 +137,9 @@ test("engine comparison reports multiple sync and async backends", async () => {
   const text = formatEngineComparisonReport(comparison);
 
   assert.equal(comparison.totalBackends, 2);
-  assert.equal(comparison.benchmarkTotal, 1);
-  assert.equal(comparison.backends[0].solved, 1);
-  assert.equal(comparison.backends[1].solved, 1);
+  assert.equal(comparison.benchmarkTotal, 3);
+  assert.equal(comparison.backends[0].solved, 3);
+  assert.equal(comparison.backends[1].solved, 3);
   assert.equal(comparison.backends[1].id, "async-reference");
   assert.equal(comparison.backends[0].status.state, "primary");
   assert.equal(comparison.backends[0].fallbackCount, 0);
@@ -117,7 +147,7 @@ test("engine comparison reports multiple sync and async backends", async () => {
   assert.ok(text.includes("JavaScript Reference Engine"));
   assert.ok(text.includes("Async Reference"));
   assert.ok(text.includes("status primary"));
-  assert.ok(text.includes("1/1 solved"));
+  assert.ok(text.includes("3/3 solved"));
 });
 
 test("engine comparison reports fallback backend usage", async () => {
@@ -162,9 +192,9 @@ test("oracle comparison grades candidate moves with oracle review", async () => 
   });
   const text = formatOracleComparisonReport(comparison);
 
-  assert.equal(comparison.total, 1);
-  assert.equal(comparison.exactMatches, 1);
-  assert.equal(comparison.acceptable, 1);
+  assert.equal(comparison.total, 3);
+  assert.equal(comparison.exactMatches, 3);
+  assert.equal(comparison.acceptable, 3);
   assert.equal(comparison.results[0].candidateMove, "h7-e7");
   assert.equal(comparison.results[0].oracleMove, "h7-e7");
   assert.equal(comparison.results[0].oracleReview.classification, "best");
@@ -181,7 +211,7 @@ test("oracle comparison surfaces review-needed disagreements", async () => {
     centipawnLoss: 180
   });
   const comparison = await compareEngineToOracle(candidate, oracle, {
-    tag: "opening",
+    benchmarks: ENGINE_BENCHMARKS.filter((benchmark) => benchmark.id === "book-central-cannon"),
     acceptableLossCp: 60
   });
   const text = formatOracleComparisonReport(comparison);

@@ -41,6 +41,14 @@ test("flying general check is detected and legal moves must resolve it", () => {
   );
 });
 
+test("legal moves do not include literal king captures", () => {
+  const position = parseFen("4k4/9/9/9/9/9/9/9/9/3KR4 r");
+  const moves = generateLegalMoves(position).map((move) => move.notation);
+
+  assert.equal(moves.includes("e9-e0"), false);
+  assert.ok(moves.includes("e9-e8"));
+});
+
 test("horse leg blocking is enforced", () => {
   const position = parseFen("4k4/9/9/9/9/9/4P4/9/9/4H4 r");
   const moves = generateLegalMoves(position);

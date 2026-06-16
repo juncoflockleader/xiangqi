@@ -32,6 +32,19 @@ test("Chinese notation localizes file numbers for red horizontal cannon moves", 
   const position = parseFen("4k4/9/9/9/9/9/9/2C6/9/4K4 r");
 
   assert.equal(moveToChineseNotation(position, "c7-e7"), "炮七平五");
+  assert.equal(parseChineseMoveNotation(position, "炮七平五").notation, "c7-e7");
+});
+
+test("Chinese notation can emit simplified or traditional glyphs", () => {
+  const position = createInitialPosition();
+
+  assert.equal(moveToChineseNotation(position, "h0-g2", { locale: "zh-CN" }), "马8进7");
+  assert.equal(moveToChineseNotation(position, "h0-g2", { locale: "zh-TW" }), "馬8進7");
+  assert.equal(moveToChineseNotation(position, "h9-g7", "zh-CN"), "马二进三");
+  assert.deepEqual(
+    lineToChineseNotation(position, ["h7-e7", "h0-g2"], { locale: "zh-CN" }),
+    ["炮二平五", "马8进7"]
+  );
 });
 
 test("Chinese notation resolves legal moves from traditional and simplified text", () => {

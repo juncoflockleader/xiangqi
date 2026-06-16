@@ -392,7 +392,9 @@ function searchTechniqueReasons(stats = {}) {
     (stats.futilityPrunes ?? 0) +
     (stats.lateMovePrunes ?? 0) +
     (stats.razorPrunes ?? 0) +
-    (stats.deltaPrunes ?? 0)
+    (stats.deltaPrunes ?? 0) +
+    (stats.qDeltaPrefilterSkips ?? 0) +
+    (stats.qSeePrunes ?? 0)
   );
   const verificationFailures = stats.nullMoveVerificationFailures ?? 0;
 
@@ -405,11 +407,14 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.probCutPrunes ?? 0) > 0) {
     pruneParts.push(formatCount(stats.probCutPrunes, "ProbCut capture prune"));
   }
+  if ((stats.probCutCaptureSkips ?? 0) > 0) {
+    pruneParts.push(formatCount(stats.probCutCaptureSkips, "ProbCut capture prefilter"));
+  }
   if ((stats.badHistoryPrunes ?? 0) > 0) {
     pruneParts.push(formatCount(stats.badHistoryPrunes, "bad-history quiet prune"));
   }
   if (staticPrunes > 0) {
-    pruneParts.push(`${staticPrunes} SEE/reverse-futility/futility/late-move/razor/delta prune${staticPrunes === 1 ? "" : "s"}`);
+    pruneParts.push(`${staticPrunes} SEE/reverse-futility/futility/late-move/razor/delta/qsearch prune${staticPrunes === 1 ? "" : "s"}`);
   }
 
   if (pruneParts.length > 0) {
@@ -437,6 +442,9 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.evalCacheHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.evalCacheHits, "evaluation-cache hit"));
   }
+  if ((stats.checkCacheHits ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.checkCacheHits, "check-cache hit"));
+  }
   if ((stats.tacticalCacheHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.tacticalCacheHits, "static-exchange cache hit"));
   }
@@ -445,6 +453,12 @@ function searchTechniqueReasons(stats = {}) {
   }
   if ((stats.rootRankOrderHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.rootRankOrderHits, "previous-root-rank ordering hint"));
+  }
+  if ((stats.rootChildStateReuses ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.rootChildStateReuses, "root child-state reuse"));
+  }
+  if ((stats.rootTtHits ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.rootTtHits, "root transposition-table ordering hint"));
   }
   if ((stats.historyGravityUpdates ?? 0) > 0) {
     orderingParts.push(formatCount(stats.historyGravityUpdates, "history-gravity update"));
@@ -487,6 +501,12 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.checkEvasionOrderHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.checkEvasionOrderHits, "check-evasion ordering hint"));
   }
+  if ((stats.extensions ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.extensions, "tactical extension"));
+  }
+  if ((stats.recaptureExtensions ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.recaptureExtensions, "recapture extension"));
+  }
   if ((stats.singularExtensions ?? 0) > 0) {
     orderingParts.push(formatCount(stats.singularExtensions, "singular extension"));
   }
@@ -507,7 +527,9 @@ function searchSelectivityConfidenceFactor(stats = {}) {
     (stats.futilityPrunes ?? 0) +
     (stats.lateMovePrunes ?? 0) +
     (stats.razorPrunes ?? 0) +
-    (stats.deltaPrunes ?? 0)
+    (stats.deltaPrunes ?? 0) +
+    (stats.qDeltaPrefilterSkips ?? 0) +
+    (stats.qSeePrunes ?? 0)
   );
   const supports = [];
 
@@ -516,9 +538,12 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   if ((stats.qttHits ?? 0) > 0) supports.push("quiescence-table reuse");
   if ((stats.qttMoveHits ?? 0) > 0) supports.push("quiescence hash-move ordering");
   if ((stats.evalCacheHits ?? 0) > 0) supports.push("evaluation-cache reuse");
+  if ((stats.checkCacheHits ?? 0) > 0) supports.push("check-cache reuse");
   if ((stats.tacticalCacheHits ?? 0) > 0) supports.push("static-exchange cache reuse");
   if ((stats.tacticalMoveOrderHits ?? 0) > 0) supports.push("tactical-motif ordering");
   if ((stats.rootRankOrderHits ?? 0) > 0) supports.push("previous-root-rank ordering");
+  if ((stats.rootChildStateReuses ?? 0) > 0) supports.push("root child-state reuse");
+  if ((stats.rootTtHits ?? 0) > 0) supports.push("root transposition-table ordering");
   if ((stats.historyGravityUpdates ?? 0) > 0) supports.push("history-gravity learning");
   if ((stats.captureHistoryHits ?? 0) > 0) supports.push("capture-history ordering");
   if ((stats.checkHistoryHits ?? 0) > 0) supports.push("check-history ordering");
@@ -529,6 +554,8 @@ function searchSelectivityConfidenceFactor(stats = {}) {
     supports.push("continuation-history reduction tuning");
   }
   if ((stats.checkEvasionOrderHits ?? 0) > 0) supports.push("check-evasion ordering");
+  if ((stats.extensions ?? 0) > 0) supports.push("tactical extensions");
+  if ((stats.recaptureExtensions ?? 0) > 0) supports.push("recapture extensions");
   if ((stats.deepReductions ?? 0) > 0) supports.push("adaptive late-move reductions");
   if ((stats.pvReductionGuards ?? 0) > 0 || (stats.cutNodeReductionBoosts ?? 0) > 0) {
     supports.push("node-type LMR tuning");

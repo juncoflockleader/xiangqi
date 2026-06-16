@@ -34,6 +34,22 @@ test("profile options can be resolved and explicitly overridden", () => {
   assert.equal(options.maxTranspositionEntries, 150_000);
 });
 
+test("native profiles default to timed search without fixed depth caps", () => {
+  const uci = resolveEngineOptions({ profile: "native-uci" });
+  const ucci = resolveEngineOptions({ profile: "native-ucci" });
+
+  assert.equal(uci.profile, "native-uci");
+  assert.equal(uci.protocol, "uci");
+  assert.equal(uci.depth, undefined);
+  assert.equal(uci.timeLimitMs, 5000);
+  assert.equal(uci.lines, 3);
+  assert.equal(ucci.profile, "native-ucci");
+  assert.equal(ucci.protocol, "ucci");
+  assert.equal(ucci.depth, undefined);
+  assert.equal(ucci.timeLimitMs, 3000);
+  assert.equal(ucci.lines, 3);
+});
+
 test("play levels are listed with safe option copies", () => {
   const levels = listEnginePlayLevels();
   const club = levels.find((level) => level.id === "club");

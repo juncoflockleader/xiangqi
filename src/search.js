@@ -335,6 +335,7 @@ function searchDepthRoot(position, depth, previousBest, previousScore, context, 
 function searchRoot(position, depth, previousBest, context, rootMoves, alpha, beta) {
   let bestMove = null;
   let bestScore = -INFINITY_SCORE;
+  let bestTieBreak = -INFINITY_SCORE;
   let bestLine = [];
   const candidates = [];
   const checkInfo = isInCheck(position, position.turn) ? checkEvasionInfo(position) : null;
@@ -354,16 +355,19 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
     context.stats.rootMovesSearched += 1;
     const score = normalizeScore(-negamax(next, depth - 1, childAlpha, childBeta, 1, context, line, context.maxExtensions, true, move));
     const annotated = annotateMove(position, move);
+    const tieBreak = rootTieBreakScore(annotated);
 
     candidates.push({
       move: annotated,
       score,
+      tieBreak,
       repetition,
       principalVariation: [annotated, ...line]
     });
 
-    if (score > bestScore) {
+    if (score > bestScore || (score === bestScore && tieBreak > bestTieBreak)) {
       bestScore = score;
+      bestTieBreak = tieBreak;
       bestMove = move;
       bestLine = [annotated, ...line];
     }
@@ -375,7 +379,7 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
     }
   }
 
-  candidates.sort((a, b) => b.score - a.score);
+  candidates.sort((a, b) => (b.score - a.score) || (b.tieBreak - a.tieBreak));
 
   return {
     bestMove: bestMove ?? moves[0],
@@ -384,6 +388,14 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
     candidates: candidates.slice(0, context.candidateLimit),
     rootMoveScores: createRootMoveScoreMap(candidates)
   };
+}
+
+function rootTieBreakScore(move) {
+  let score = 0;
+  if (move.givesCheck) score += 1000;
+  if (move.piece?.type !== PIECES.KING) score += 100;
+  if (move.captured) score += 10;
+  return score;
 }
 
 function shouldUseAspiration(depth, previousScore, context) {

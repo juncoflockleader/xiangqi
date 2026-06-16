@@ -21,9 +21,10 @@
             <div class="board-lines" aria-hidden="true">
               <svg class="board-grid" viewBox="0 0 8 9" preserveAspectRatio="none" focusable="false" aria-hidden="true">
                 <path class="board-grid-major" d="M0 0H8V9H0Z"></path>
-                <path class="board-grid-line" d="M0 1H8 M0 2H8 M0 3H8 M0 4H8 M0 5H8 M0 6H8 M0 7H8 M0 8H8"></path>
+                <path class="board-grid-line" d="M0 1H8 M0 2H8 M0 3H8 M0 6H8 M0 7H8 M0 8H8"></path>
+                <path class="board-grid-major" d="M0 4H8 M0 5H8"></path>
                 <path class="board-grid-line" d="M1 0V4 M1 5V9 M2 0V4 M2 5V9 M3 0V4 M3 5V9 M4 0V4 M4 5V9 M5 0V4 M5 5V9 M6 0V4 M6 5V9 M7 0V4 M7 5V9"></path>
-                <path class="board-grid-line" d="M3 0L5 2 M5 0L3 2 M3 7L5 9 M5 7L3 9"></path>
+                <path class="board-palace-line" d="M3 0L5 2 M5 0L3 2 M3 7L5 9 M5 7L3 9"></path>
               </svg>
               <div class="file-labels file-labels-north" aria-hidden="true">
                 <span class="file-label" style="--file: 0">1</span>
@@ -81,7 +82,7 @@
             </select>
           </div>
           <div class="control-row">
-            <label for="sideSelect" data-i18n="side">方位</label>
+            <label for="sideSelect" data-i18n="side">执方</label>
             <select id="sideSelect">
               <option value="red">红方</option>
               <option value="black">黑方</option>

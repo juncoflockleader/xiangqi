@@ -149,6 +149,67 @@ const OPENING_LINES = Object.freeze([
   ])
 ]);
 
+const PIKAFISH_OPENING_POSITIONS = Object.freeze([
+  Object.freeze({
+    fen: AFTER_RED_CENTRAL_CANNON,
+    entries: Object.freeze([
+      pikafishEntry("h0-g2", 1, 100, -30, "h0-g2 h9-g7 i0-h0 i9-h9 c3-c4"),
+      pikafishEntry("b0-c2", 2, 93, -32, "b0-c2 h9-g7 h0-g2 i9-h9 i0-h0"),
+      pikafishEntry("h2-e2", 3, 92, -33, "h2-e2 h9-g7 h0-g2 i9-h9 b0-c2")
+    ])
+  }),
+  Object.freeze({
+    fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR r",
+    entries: Object.freeze([
+      pikafishEntry("h9-g7", 1, 100, 25, "h9-g7 c3-c4 i9-h9 i0-h0 h9-h5"),
+      pikafishEntry("b7-d7", 2, 92, 22, "b7-d7 b0-c2 b9-c7 c3-c4 a9-b9"),
+      pikafishEntry("g6-g5", 3, 83, 13, "g6-g5 c3-c4 b9-a7 b0-c2 h9-g7")
+    ])
+  }),
+  Object.freeze({
+    fen: "r1eakaehr/9/1ch4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR r",
+    entries: Object.freeze([
+      pikafishEntry("h9-g7", 1, 100, 31, "h9-g7 h0-g2 c6-c5"),
+      pikafishEntry("c6-c5", 2, 90, 26, "c6-c5 h2-e2 h9-g7 h0-g2 i9-h9"),
+      pikafishEntry("g6-g5", 3, 80, 16, "g6-g5 c3-c4 b9-a7 h0-g2 b7-d7")
+    ])
+  }),
+  Object.freeze({
+    fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R b",
+    entries: Object.freeze([
+      pikafishEntry("g3-g4", 1, 100, -19, "g3-g4 i9-h9 i0-h0 h9-h5 h2-i2"),
+      pikafishEntry("i0-h0", 2, 98, -21, "i0-h0 i9-h9 b0-c2 c6-c5 g3-g4"),
+      pikafishEntry("c3-c4", 3, 97, -28, "c3-c4 i9-h9 i0-h0 h9-h5 h2-i2"),
+      pikafishEntry("b0-c2", 4, 95, -25, "b0-c2 i9-h9 i0-h0 c6-c5 g3-g4")
+    ])
+  }),
+  Object.freeze({
+    fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b",
+    entries: Object.freeze([
+      pikafishEntry("b0-c2", 1, 100, -15, "b0-c2 b9-c7 a0-b0 h9-g7 c3-c4"),
+      pikafishEntry("b2-d2", 2, 92, -18, "b2-d2 b9-c7 b0-c2 a9-b9 g3-g4"),
+      pikafishEntry("g3-g4", 3, 92, -18, "g3-g4 b9-c7 b2-d2 a9-b9 b0-c2")
+    ])
+  }),
+  Object.freeze({
+    fen: "rheakae1r/9/1c4hc1/p3p1p1p/2p6/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R r",
+    entries: Object.freeze([
+      pikafishEntry("b9-a7", 1, 100, 27, "b9-a7 b0-c2 i9-h9 i0-h0 g6-g5"),
+      pikafishEntry("i9-h9", 2, 92, 24, "i9-h9 i0-h0 h9-h5 h2-i2 h5-h0"),
+      pikafishEntry("g6-g5", 3, 91, 23, "g6-g5 b0-c2 i9-h9 i0-h0 b9-a7")
+    ])
+  }),
+  Object.freeze({
+    fen: "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r",
+    entries: Object.freeze([
+      pikafishEntry("i9-h9", 1, 100, 24, "i9-h9 b0-c2 g6-g5 c3-c4 b9-a7"),
+      pikafishEntry("b7-a7", 2, 92, 21, "b7-a7 b2-e2 h9-g7 g3-g4 i9-h9"),
+      pikafishEntry("c6-c5", 3, 79, 8, "c6-c5 b0-c2 i9-h9 i0-h0 h9-h5"),
+      pikafishEntry("b7-b8", 4, 62, -9, "b7-b8 b0-c2 h9-g7 i0-h0 i9-h9")
+    ])
+  })
+]);
+
 export const DEFAULT_OPENING_BOOK = buildDefaultOpeningBook();
 
 export function createOpeningBook(data = {}, options = {}) {
@@ -364,7 +425,27 @@ function buildDefaultOpeningBook() {
     addOpeningLine(positions, line);
   }
 
+  for (const position of PIKAFISH_OPENING_POSITIONS) {
+    addEntries(positions, position.fen, position.entries);
+  }
+
   return freezeOpeningPositions(positions);
+}
+
+function pikafishEntry(move, rank, weight, engineScore, pv) {
+  const scoreText = engineScore >= 0 ? `+${engineScore}` : String(engineScore);
+  const label = rank === 1 ? "best" : `candidate ${rank}`;
+  return freezeBookEntry({
+    move,
+    name: `Pikafish ${label}: ${move}`,
+    weight,
+    idea: `Pikafish ranks ${move} as ${label} in this central-cannon branch at depth 8, score ${scoreText} cp. Principal variation: ${pv}.`,
+    tags: ["oracle", "pikafish", "generated", "opening", rank === 1 ? "best" : "alternative"],
+    database: {
+      source: "Pikafish",
+      engineScore
+    }
+  });
 }
 
 function addOpeningLine(positions, line, options = {}) {

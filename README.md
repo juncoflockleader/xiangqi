@@ -25,7 +25,7 @@ built locally for faster native search. Together they include:
 - Position-study bundles that combine best move, candidate lines, hints, pressure, optional move review, and oracle evidence for UI screens.
 - Game-history helpers for play sessions, reviewed move logs, engine decision logs, position history, repeated-position detection with cycle/check diagnostics, and async native-backend play.
 - A backend adapter contract and async UCI/UCCI process wrapper so the JS reference engine can sit beside a native C++/WASM engine without changing the learning-app API.
-- A local C++ UCI engine (`native/xiangqi_native.cpp`) with legal Xiangqi move generation, alpha-beta/PVS search, quiescence, Zobrist-keyed transposition reuse with hash-move ordering, killer/history/capture-history move ordering, guarded null-move pruning, shallow futility pruning, late-move reductions, MultiPV telemetry, and a `local-cpp` preset for native search without downloading another engine.
+- A local C++ UCI engine (`native/xiangqi_native.cpp`) with legal Xiangqi move generation, cached king-square/direct-attack legality checks, alpha-beta/PVS search, root aspiration windows with full-width fallback, bounded quiet-check quiescence with check-aware delta pruning, Zobrist-keyed transposition reuse with hash-move ordering, quiescence-table reuse, static-evaluation caching, pre-scored check-aware killer/history/capture-history/countermove ordering, mate-distance pruning, guarded null-move pruning, shallow reverse-futility/futility/late-move pruning, history-aware late-move reductions, bounded check/recapture extensions, tactical-search telemetry, MultiPV output, and a `local-cpp` preset for native search without downloading another engine.
 - Native-engine score details for forced mate scores and UCI WDL triplets, so tactical lessons can explain "mate in N" and win/draw/loss expectations instead of only normalized centipawns.
 - Named engine profiles for fast play, balanced play, deeper analysis, and native UCI/UCCI analysis setups.
 - Shared time-control budgeting for fixed movetime and clock-based `wtime`/`btime`/increment searches, with phase-aware moves-to-go estimates, soft-stop management, low-clock caps, and configurable move overhead.
@@ -64,10 +64,11 @@ when it wanted a different move, the engine's preferred plan.
 For a browser board, run `npm run web` and open `http://127.0.0.1:5175`. It uses
 the same learning backend as the CLI, prefers the local Pikafish preset when
 available, and falls back to the JavaScript engine. The browser UI includes
-reference-board details such as palace diagonals, river text, cannon/soldier
-point marks, red/black file labels, one-character Chinese piece glyphs, and
-localized move notation in target tooltips, the selected-move tray, and move
-history, such as `炮二平五` or `炮七平五`.
+reference-board details such as a fitted 9-file/10-rank intersection grid,
+palace diagonals, river text, cannon/soldier point marks, red/black file labels,
+one-character Chinese piece glyphs, and localized move notation in target
+tooltips, the selected-move tray, and move history, such as `炮二平五` or
+`炮七平五`.
 
 For a one-position learning report, run `npm run study`. It prints the best move,
 candidate lines, progressive hints, pressure, and an optional review of a move
@@ -159,6 +160,17 @@ npm run play -- \
   --level club
 ```
 
+Release native builds use local CPU tuning (`-march=native`) and link-time
+optimization (`-flto`) by default for stronger local play. Use
+`node scripts/build-native.mjs --portable` when you need a binary intended for
+another machine, or `node scripts/build-native.mjs --no-lto` if your compiler
+has trouble with LTO.
+The native UCI engine defaults to a 64 MB hash table; pass
+`--engine-option Hash=128` or a UCI `setoption name Hash value N` command when
+you want to spend more memory on deeper analysis. It keeps search-ordering
+memory warm across consecutive `go` commands for game play, and resets that
+memory with `ucinewgame` or `setoption name Clear Hash`.
+
 The C++ engine is intentionally smaller than Pikafish, but it is the migration
 target for making this learning app's own engine faster. The JavaScript layer
 still supplies the opening book, explanations, review artifacts, and fallback
@@ -197,7 +209,7 @@ console.log(result.explanation.confidence.level);
 console.log(result.explanation.linePlan.summary);
 ```
 
-`chooseMove` returns the selected legal move, search score, principal variation, root candidates, selective-search stats, per-depth iteration trace, and a learning-friendly explanation. The explanation is based on engine-visible facts such as search score, tactical features, evaluation deltas, best-move stability across depths, selective-search diagnostics, and comparison against alternatives. `explanation.alternatives` includes verdicts, centipawn loss, expected replies, motifs, concise reasons, and per-candidate `planComparison` evidence explaining why each candidate is better or worse than the top line. `explanation.confidence` gives the UI a structured score, level, label, and factor list derived from depth, candidate gaps, stability, timeout status, opening-database evidence, and selective-search evidence such as transposition-table reuse, transposition hash-move ordering, quiescence-table reuse, quiescence hash-move ordering, evaluation-cache reuse, static-exchange cache reuse, tactical-motif root ordering, previous-root-rank ordering, history-gravity learning, bad-history pruning, killer-move ordering, capture-history ordering, check-history ordering, continuation-history ordering, continuation-history reduction tuning, improving-position search tuning, node-type LMR tuning, check-evasion ordering, null-move pruning, ProbCut, IID, singular extensions, and adaptive reductions. `explanation.linePlan` turns the principal variation into a teaching plan with the first move, expected reply, continuation moves, tactical motifs, and score-by-ply annotations from the root side's perspective.
+`chooseMove` returns the selected legal move, search score, principal variation, root candidates, selective-search stats, per-depth iteration trace, and a learning-friendly explanation. The explanation is based on engine-visible facts such as search score, tactical features, evaluation deltas, best-move stability across depths, selective-search diagnostics, and comparison against alternatives. `explanation.alternatives` includes verdicts, centipawn loss, expected replies, motifs, concise reasons, and per-candidate `planComparison` evidence explaining why each candidate is better or worse than the top line. `explanation.confidence` gives the UI a structured score, level, label, and factor list derived from depth, candidate gaps, stability, timeout status, opening-database evidence, and selective-search evidence such as transposition-table reuse, transposition hash-move ordering, quiescence-table reuse, quiescence node counts, quiescence hash-move ordering, quiet-check history updates and maluses, isolated qsearch capture-history ordering, evaluation-cache reuse, static-exchange cache reuse, tactical-motif root ordering, previous-root-rank ordering, history-gravity learning, bad-history pruning, killer-move ordering, capture-history ordering, check-history ordering, continuation-history ordering, continuation-history reduction tuning, improving-position search tuning, node-type LMR tuning, check-evasion ordering, null-move pruning, ProbCut, IID, singular extensions, and adaptive reductions. `explanation.linePlan` turns the principal variation into a teaching plan with the first move, expected reply, continuation moves, tactical motifs, and score-by-ply annotations from the root side's perspective.
 
 For a learning-app screen, ask for a position study instead of stitching several
 engine calls together:
@@ -495,7 +507,9 @@ such as `{ Threads: 4, Hash: 512 }`, or an array for button-style options such
 as `[{ name: "Clear Hash" }]`. `describeEngineBackend(nativeBackend)` includes
 resolved `settings` such as profile, play level, protocol, depth, time, and
 candidate-line defaults, plus the normalized `nativeOptions` list so the app can
-show exactly how a strong engine was configured.
+show exactly how a strong engine was configured. Native backends also expose
+`await backend.newGame()` to send `ucinewgame` through the serialized engine
+queue before starting a fresh game.
 
 Probe a native engine before wiring it into sparring or the app:
 
@@ -614,12 +628,26 @@ const report = await runBenchmarkSuite();
 console.log(formatBenchmarkReport(report));
 ```
 
-The benchmark suite is intentionally small for now: it checks the opening layer,
-a clean tactical capture, an immediate forcing win, and the Hu-bot central
-cannon trap where opening heuristics must defer to search. It reports aggregate
-nodes, nodes per second, average depth, timeout count, and summed search stats,
-making it a regression guardrail for search changes and a foundation for
-comparing the JS reference backend with stronger native engines later.
+The starter benchmark suite is intentionally small for now: it checks the
+opening layer, a clean tactical capture, an immediate forcing win, and the
+Hu-bot central cannon trap where opening heuristics must defer to search. It
+reports aggregate nodes, nodes per second, average depth, timeout count, and
+summed search stats, making it a regression guardrail for search changes.
+
+The built-in `opening-oracle` suite tracks the native engine against a compact
+set of Pikafish-derived opening branches. Run it directly against the local C++
+engine when tuning native strength and speed:
+
+```sh
+npm run bench -- --suite opening-oracle \
+  --engine-preset local-cpp \
+  --depth 8 \
+  --time 1000
+```
+
+Use `--id oracle-opening-left-screen-central-cannon` for one focused branch, or
+`--engine-command`, `--engine-protocol`, and `--engine-option` to benchmark a
+different UCI/UCCI engine with the same suite.
 
 Save sparring or lesson positions as a custom JSON suite when you want repeatable
 engine checks:
@@ -665,7 +693,8 @@ keeps lesson-ready artifacts such as the played-vs-oracle plan comparison,
 played and best line plans, practice focus, and native candidate alternatives.
 Use `--benchmarks ./benchmarks.json` for custom positions; oracle-only suites
 can omit `expectedMove` because the oracle supplies the reference. Use
-`--tag opening`, `--tag tactic`, or `--json` for focused regression runs.
+`--suite opening-oracle`, `--id book-central-cannon`, `--tag tactic`, or `--json`
+for focused regression runs.
 
 Compare backends on the same benchmark suite:
 
@@ -871,7 +900,7 @@ review depth 1 movetime 500
 lesson depth 1 movetime 500 cards 3
 ```
 
-The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, clock controls such as `wtime`, `btime`, `winc`, `binc`, and `movestogo`, `setoption name MultiPV value N`, `setoption name HashEntries value N`, `setoption name UseBook value false`, `analyze`, `hint`/`coach`, `probe`, `pressure`, `reviewmove`, `review`, `lesson`/`lessons`, `explain`, and `quit`. `hint ... levels N` emits the progressive coach ladder up to level `N`; level 4 includes the full reveal and `bestmove`. `reviewmove <move>` reviews one candidate in the current position without changing the loaded game, returning played/best score evidence, played and preferred plans, plan comparison, practice focus, reasons, and the preferred `bestmove`. `lesson ... cards N` turns the loaded move history into prompt, hint, answer, practice-focus, and best-plan card lines. `go`, `analyze`, `reviewmove`, `review`, and `lesson` emit `info string ... plan` lines so GUI clients can display preferred-line plans without re-running analysis. `go` info lines include counters such as `qnodes`, `qchecks`, `qtthits`, `qttstores`, `qttevict`, `qttmove`, `evalhits`, `evalstores`, `tacthits`, `tactstores`, `tactord`, `tthits`, `ttmove`, `ttstores`, `ttevict`, `asp`, `asphi`, `asplo`, `ext`, `recext`, `singtry`, `singext`, `soft`, `see`, `rfp`, `mdp`, `razor`, `pcut`, `pcsearch`, `futil`, `hprune`, `hpguard`, `lmp`, `delta`, `nmp`, `nmv`, `nmvfail`, `killer`, `killerhit`, `caphist`, `checkhist`, `checkhm`, `red`, `redply`, `deepred`, `pvguard`, `cutred`, `imp`, `nimp`, `imprd`, `nimprd`, `implmp`, `nimlmp`, `cm`, `ch`, `chred`, `chredm`, `ce`, `cecap`, `ceblock`, `ceking`, `hmalus`, `hgrav`, `rootord`, `rootrank`, `iid`, `iidhit`, `rootmoves`, and `pvs` for learning-app diagnostics.
+The adapter supports `ucci`, `isready`, `setoption`, `position`, `banmoves`, `book`, `go`, `go ... multipv N`, clock controls such as `wtime`, `btime`, `winc`, `binc`, and `movestogo`, `setoption name MultiPV value N`, `setoption name HashEntries value N`, `setoption name UseBook value false`, `analyze`, `hint`/`coach`, `probe`, `pressure`, `reviewmove`, `review`, `lesson`/`lessons`, `explain`, and `quit`. `hint ... levels N` emits the progressive coach ladder up to level `N`; level 4 includes the full reveal and `bestmove`. `reviewmove <move>` reviews one candidate in the current position without changing the loaded game, returning played/best score evidence, played and preferred plans, plan comparison, practice focus, reasons, and the preferred `bestmove`. `lesson ... cards N` turns the loaded move history into prompt, hint, answer, practice-focus, and best-plan card lines. `go`, `analyze`, `reviewmove`, `review`, and `lesson` emit `info string ... plan` lines so GUI clients can display preferred-line plans without re-running analysis. `go` info lines include counters such as `qnodes`, `qchecks`, `qcheckhist`, `qcheckhstores`, `qcheckhm`, `qcapguard`, `qcaphist`, `qcapstores`, `qcaphm`, `qtthits`, `qttstores`, `qttevict`, `qttmove`, `evalhits`, `evalstores`, `tacthits`, `tactstores`, `tactord`, `tthits`, `ttmove`, `ttstores`, `ttevict`, `asp`, `asphi`, `asplo`, `ext`, `recext`, `singtry`, `singext`, `soft`, `see`, `rfp`, `mdp`, `razor`, `pcut`, `pcsearch`, `futil`, `hprune`, `hpguard`, `lmp`, `delta`, `nmp`, `nmv`, `nmvfail`, `nmmguard`, `killer`, `killerhit`, `caphist`, `caphstores`, `caphm`, `caphguard`, `checkhist`, `checkhm`, `red`, `redply`, `deepred`, `pvguard`, `cutred`, `imp`, `nimp`, `imprd`, `nimprd`, `implmp`, `nimlmp`, `cm`, `ch`, `chred`, `chredm`, `ce`, `cecap`, `ceblock`, `ceking`, `hmalus`, `hgrav`, `rootord`, `rootrank`, `iid`, `iidhit`, `rootmoves`, and `pvs` for learning-app diagnostics.
 
 When `movestogo` is omitted, the JS engine estimates remaining moves from the current phase: opening positions spend more conservatively, endgames can use a larger share, and low-clock positions cap the maximum spend. `moveOverheadMs` can reserve GUI/process overhead from every allocated move.
 

@@ -24,6 +24,19 @@ export const ENGINE_BENCHMARKS = Object.freeze([
     lesson: "The opening layer should prefer the central cannon from the initial position."
   }),
   Object.freeze({
+    id: "book-central-cannon-oracle-continuation",
+    name: "Opening: Pikafish Central Cannon Continuation",
+    fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R b",
+    expectedMoves: Object.freeze(["g3-g4"]),
+    expectedSource: "opening-book",
+    tags: Object.freeze(["opening", "book", "oracle", "learning"]),
+    options: Object.freeze({
+      depth: 2,
+      timeLimitMs: 500
+    }),
+    lesson: "The opening layer should follow the Pikafish-generated central-cannon continuation instead of relying on the older hand-authored line."
+  }),
+  Object.freeze({
     id: "rook-wins-central-rook",
     name: "Tactic: Win the Central Rook",
     fen: "4k4/9/4r4/9/9/9/9/9/9/3KR4 r",
@@ -38,32 +51,140 @@ export const ENGINE_BENCHMARKS = Object.freeze([
   }),
   Object.freeze({
     id: "rook-delivers-face-capture",
-    name: "Tactic: Capture the Exposed General",
+    name: "Tactic: Force the Exposed General",
     fen: "4k4/9/9/9/9/9/9/9/9/3KR4 r",
-    expectedMoves: Object.freeze(["e9-e0"]),
+    expectedMoves: Object.freeze(["e9-e8", "e9-e7", "e9-e6", "e9-e5", "e9-e4", "e9-e3", "e9-e2", "e9-e1"]),
     tags: Object.freeze(["mate", "forcing", "search"]),
     options: Object.freeze({
-      depth: 2,
+      depth: 3,
       timeLimitMs: 1000,
       useBook: false
     }),
-    lesson: "The engine should recognize an immediate winning general capture."
+    lesson: "The engine should force mate against the exposed general without relying on a literal king capture."
   }),
   Object.freeze({
     id: "hu-central-cannon-trap",
-    name: "Opening Trap: Validate the Central Cannon Heuristic",
+    name: "Opening Trap: Pikafish Quiet Rook Prior",
     fen: "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r",
-    expectedMoves: Object.freeze(["b7-b0", "b7-b3"]),
-    tags: Object.freeze(["trap", "learning", "search"]),
+    expectedMoves: Object.freeze(["i9-h9"]),
+    expectedSource: "opening-book",
+    tags: Object.freeze(["trap", "learning", "search", "opening", "book", "oracle"]),
     options: Object.freeze({
       depth: 3,
       timeLimitMs: 3000,
       openingHeuristicValidationDepth: 2,
       openingHeuristicValidationTimeMs: 4000
     }),
-    lesson: "Heuristic opening moves must be rejected when search shows a tactical refutation."
+    lesson: "In this central-cannon trap structure, the oracle prefers improving the rook before forcing immediate cannon tactics."
   })
 ]);
+
+export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
+  Object.freeze({
+    id: "oracle-opening-initial",
+    name: "Oracle Opening: Initial Position",
+    fen: INITIAL_FEN,
+    expectedMoves: Object.freeze(["h7-e7", "b7-e7"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "Track the native engine against Pikafish's preferred first-move family without relying on the JS opening book."
+  }),
+  Object.freeze({
+    id: "oracle-opening-central-cannon-horse-reply",
+    name: "Oracle Opening: Central Cannon Horse Reply",
+    fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR r",
+    expectedMoves: Object.freeze(["h9-g7"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "central-cannon"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "After black's screen-horse reply, Pikafish develops the red horse behind the central cannon."
+  }),
+  Object.freeze({
+    id: "oracle-opening-central-cannon-double-horse",
+    name: "Oracle Opening: Central Cannon Double Horse",
+    fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R b",
+    expectedMoves: Object.freeze(["g3-g4"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "central-cannon"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "In the double-horse central-cannon branch, the native engine should keep the central pawn break in view."
+  }),
+  Object.freeze({
+    id: "oracle-opening-shifted-central-cannons",
+    name: "Oracle Opening: Shifted Central Cannons",
+    fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b",
+    expectedMoves: Object.freeze(["b0-c2", "b2-d2", "g3-g4"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "central-cannon"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "The shifted-cannon structure should prefer development or close Pikafish alternatives over shallow cannon chasing."
+  }),
+  Object.freeze({
+    id: "oracle-opening-left-screen-central-cannon",
+    name: "Oracle Opening: Left Screen Central Cannon",
+    fen: "r1eakaehr/9/1ch4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR r",
+    expectedMoves: Object.freeze(["h9-g7", "c6-c5"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "central-cannon"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "The left-screen branch guards the recent Pikafish-aligned h9-g7 native prior in MultiPV app mode."
+  }),
+  Object.freeze({
+    id: "oracle-opening-hu-central-cannon-trap",
+    name: "Oracle Opening: Hu Central Cannon Trap",
+    fen: "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r",
+    expectedMoves: Object.freeze(["i9-h9", "b7-a7"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "central-cannon", "trap"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "The Hu trap structure should keep the quiet rook improvement and close oracle cannon alternative both recognized."
+  })
+]);
+
+export const ENGINE_BENCHMARK_SUITES = Object.freeze({
+  starter: ENGINE_BENCHMARKS,
+  default: ENGINE_BENCHMARKS,
+  "opening-oracle": ENGINE_OPENING_ORACLE_BENCHMARKS,
+  opening: ENGINE_OPENING_ORACLE_BENCHMARKS
+});
+
+export function listBenchmarkSuiteNames() {
+  return Object.freeze(["starter", "opening-oracle"]);
+}
+
+export function resolveBenchmarkSuite(name = "starter") {
+  const key = String(name ?? "starter").trim().toLowerCase();
+  const suite = ENGINE_BENCHMARK_SUITES[key];
+  if (!suite) {
+    throw new Error(`Unknown benchmark suite "${name}". Available suites: ${listBenchmarkSuiteNames().join(", ")}.`);
+  }
+  return suite;
+}
 
 export function createBenchmarkSuite(data = {}, options = {}) {
   const spec = normalizeBenchmarkSpec(data);
@@ -473,8 +594,17 @@ function normalizeBackendEntries(backends) {
 
 function filterBenchmarks(benchmarks, options) {
   const tag = options.tag ?? null;
-  if (!tag) return [...benchmarks];
-  return benchmarks.filter((benchmark) => benchmark.tags?.includes(tag));
+  const ids = normalizeFilterValues(options.id ?? options.ids ?? options.benchmarkId);
+  let selected = [...benchmarks];
+  if (tag) selected = selected.filter((benchmark) => benchmark.tags?.includes(tag));
+  if (ids.length > 0) selected = selected.filter((benchmark) => ids.includes(benchmark.id));
+  return selected;
+}
+
+function normalizeFilterValues(value) {
+  if (value === undefined || value === null || value === "") return [];
+  const values = Array.isArray(value) ? value : String(value).split(/[,\s]+/);
+  return values.map((entry) => String(entry).trim()).filter(Boolean);
 }
 
 function normalizeBenchmarkSpec(data) {
@@ -537,6 +667,9 @@ function pickSearchOptions(record) {
     "depth",
     "timeLimitMs",
     "useBook",
+    "lines",
+    "multiPv",
+    "multipv",
     "openingHeuristicValidationDepth",
     "openingHeuristicValidationTimeMs",
     "openingHeuristicMaxCentipawnLoss"

@@ -11,6 +11,7 @@ let currentMultiPv = 1;
 let currentProtocol = "ucci";
 let pendingStopResponse = null;
 let mockWaitForStopOnceUsed = false;
+let mockMemoryAge = 0;
 const appliedOptions = [];
 
 function write(line) {
@@ -33,6 +34,10 @@ rl.on("line", (line) => {
     write("uciok");
   } else if (command === "isready") {
     write("readyok");
+  } else if (command === "ucinewgame") {
+    currentPosition = "";
+    pendingStopResponse = null;
+    mockMemoryAge = 0;
   } else if (command === "setoption") {
     appliedOptions.push(trimmed);
     const match = trimmed.match(/\bname\s+MultiPV\s+value\s+(\d+)/i);
@@ -77,7 +82,11 @@ rl.on("line", (line) => {
         write(`info depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")}`);
         write(`bestmove ${nativeMove("h9g7")} ponder ${nativeMove("h0g2")}`);
       } else if (hasOption("MockTelemetry")) {
-        write(`info depth ${depth} seldepth ${depth + 4} score cp 42 nodes 123 time 15 nps 8200 hashfull 321 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+        write(`info depth ${depth} seldepth ${depth + 4} score cp 42 nodes 123 qnodes 44 time 15 nps 8200 hashfull 321 string tt 5/9 cutoffs 2 ttmove 6 killers 3 history 4 caphist 12 caphstores 5 caphm 7 caphguard 2 nmp 1 nmv 2 nmvfail 1 nmmguard 6 rfp 9 mdp 2 razor 4/1 see 3 pcut 2 pcsearch 7 pcskip 8 futil 6 hprune 5 hpguard 2 delta 12 qdskip 15 qsee 13 lmp 4 lmr 7/2 pvguard 5 cutboost 6 imp 10 nimp 4 imprd 2 nimprd 3 implmp 1 nimlmp 2 cm 6 ch 8 chred 3 chredm 1 ce 18 cecap 4 ceblock 9 ceking 5 checkhist 14 checkhstores 9 checkhm 2 checkcache 21/34 iid 4 iidhit 3 rootmoves 12 rootstate 24 roottt 1 rootttstores 3 rootord 7 rootordstores 8 pvs 3 asp 5 asphi 1 asplo 2 ext 8 recext 1 singtry 4 singext 2 singrej 1 qchecks 5 qcheckhist 6 qcheckhstores 9 qcheckhm 4 qcapguard 3 qcaphist 10 qcapstores 11 qcaphm 12 qtt 11/13 qttstores 17 qttcut 3 qttmove 2 eval 19/23 evalstores 29 evalskip 31 memage 3 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
+        write(`bestmove ${nativeMove("h9g7")}`);
+      } else if (hasOption("MockMemoryAge")) {
+        mockMemoryAge += 1;
+        write(`info depth ${depth} score cp 42 nodes 123 memage ${mockMemoryAge} pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
         write(`bestmove ${nativeMove("h9g7")}`);
       } else if (hasOption("MockScoreBounds")) {
         write(`info multipv 1 depth ${depth} score cp 80 lowerbound nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
@@ -135,7 +144,8 @@ function isRookTacticAfterQuietMove() {
 
 function depthFromGo(command) {
   const match = command.match(/\bdepth\s+(\d+)/i);
-  return match ? Number.parseInt(match[1], 10) : 2;
+  if (match) return Number.parseInt(match[1], 10);
+  return hasOption("MockNoDepthDepth64") ? 64 : 2;
 }
 
 function nativeMove(moveText) {

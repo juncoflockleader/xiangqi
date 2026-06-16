@@ -62,8 +62,8 @@ test("pressure describes attacks on the general without material language", () =
   const position = parseFen("4k4/9/4R4/9/9/9/9/9/9/3K5 r");
   const threat = topThreat(position);
 
-  assert.equal(threat.notation, "e2-e0");
-  assert.ok(threat.summary.includes("opposing general"));
+  assert.equal(threat.notation, "d9-d8");
+  assert.ok(threat.summary.includes("gives check"));
   assert.equal(threat.summary.includes("wins a general"), false);
 });
 

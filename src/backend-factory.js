@@ -139,6 +139,16 @@ export function createFallbackEngineBackend(primaryBackend, fallbackBackend, opt
     pressure: (...args) => auxiliaryWithFallback("pressure", args),
     play: (...args) => auxiliaryWithFallback("play", args),
     legalMoves: (...args) => auxiliaryWithFallback("legalMoves", args),
+    newGame: async (...args) => {
+      if (!state.error) {
+        try {
+          await primaryBackend.newGame?.(...args);
+        } catch (error) {
+          rememberNativeFailure(error);
+        }
+      }
+      await fallbackBackend.newGame?.(...args);
+    },
     resetCache: () => {
       primaryBackend.resetCache?.();
       fallbackBackend.resetCache?.();

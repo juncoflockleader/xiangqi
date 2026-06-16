@@ -41,6 +41,7 @@ const HORSE_DELTAS = Object.freeze([
 
 export function generateLegalMoves(position, side = position.turn) {
   return generatePseudoMoves(position, side).filter((move) => {
+    if (move.captured?.type === PIECES.KING) return false;
     const next = makeMoveWithTurn(position, move, side);
     return !isInCheck(next, side);
   });

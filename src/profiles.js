@@ -37,10 +37,9 @@ export const ENGINE_PROFILES = Object.freeze({
     id: "native-ucci",
     name: "Native UCCI Analysis",
     kind: "native-ucci",
-    description: "External UCCI engine profile for stronger play and review.",
+    description: "External UCCI engine profile for stronger timed play and review.",
     options: {
       protocol: "ucci",
-      depth: 8,
       timeLimitMs: 3000,
       lines: 3
     }
@@ -49,10 +48,9 @@ export const ENGINE_PROFILES = Object.freeze({
     id: "native-uci",
     name: "Native UCI Analysis",
     kind: "native-uci",
-    description: "External UCI engine profile for engines such as Pikafish.",
+    description: "External UCI engine profile for timed analysis with engines such as Pikafish.",
     options: {
       protocol: "uci",
-      depth: 10,
       timeLimitMs: 5000,
       lines: 3
     }

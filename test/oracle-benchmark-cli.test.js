@@ -20,7 +20,7 @@ test("oracle benchmark CLI compares JavaScript candidate to native oracle", asyn
     "--oracle-time", "100",
     "--candidate-depth", "1",
     "--candidate-time", "100",
-    "--tag", "opening",
+    "--id", "book-central-cannon",
     "--oracle-option", "Threads=2",
     "--json"
   ], {
@@ -53,7 +53,7 @@ test("oracle benchmark CLI prints learning evidence in text reports", async () =
     "--oracle-time", "100",
     "--candidate-depth", "1",
     "--candidate-time", "100",
-    "--tag", "opening"
+    "--id", "book-central-cannon"
   ], {
     cwd: root,
     timeout: 5000
@@ -73,7 +73,7 @@ test("oracle benchmark CLI applies the Pikafish oracle preset", async () => {
     "--oracle-time", "100",
     "--candidate-depth", "1",
     "--candidate-time", "100",
-    "--tag", "opening",
+    "--id", "book-central-cannon",
     "--oracle-option", "Threads=2",
     "--json"
   ], {
@@ -86,6 +86,69 @@ test("oracle benchmark CLI applies the Pikafish oracle preset", async () => {
   assert.equal(report.oracle.kind, "native-uci");
   assert.equal(report.results[0].oracleMove, "h9-g7");
   assert.match(report.results[0].oracleSummary, /Pikafish/);
+});
+
+test("oracle benchmark CLI can compare a native candidate to a native oracle", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "examples/oracle-benchmark.mjs",
+    "--candidate-command", process.execPath,
+    "--candidate-arg", "fixtures/mock-ucci.mjs",
+    "--candidate-protocol", "uci",
+    "--candidate-name", "Mock Candidate",
+    "--no-candidate-book",
+    "--oracle-command", process.execPath,
+    "--oracle-arg", "fixtures/mock-ucci.mjs",
+    "--oracle-protocol", "uci",
+    "--oracle-depth", "2",
+    "--oracle-time", "100",
+    "--candidate-depth", "2",
+    "--candidate-time", "100",
+    "--id", "book-central-cannon",
+    "--json"
+  ], {
+    cwd: root,
+    timeout: 8000
+  });
+  const report = JSON.parse(stdout);
+
+  assert.equal(report.total, 1);
+  assert.equal(report.candidate.name, "Mock Candidate");
+  assert.equal(report.candidate.kind, "native-uci");
+  assert.equal(report.oracle.kind, "native-uci");
+  assert.equal(report.results[0].candidateMove, "h9-g7");
+  assert.equal(report.results[0].oracleMove, "h9-g7");
+  assert.equal(report.results[0].exactMatch, true);
+  assert.equal(report.results[0].oracleReview.classification, "best");
+});
+
+test("oracle benchmark CLI summarizes repeated cold oracle comparisons", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "examples/oracle-benchmark.mjs",
+    "--oracle-command", process.execPath,
+    "--oracle-arg", "fixtures/mock-ucci.mjs",
+    "--oracle-protocol", "uci",
+    "--oracle-depth", "2",
+    "--oracle-time", "100",
+    "--candidate-depth", "1",
+    "--candidate-time", "100",
+    "--id", "book-central-cannon",
+    "--repeat", "2",
+    "--json"
+  ], {
+    cwd: root,
+    timeout: 10000
+  });
+  const report = JSON.parse(stdout);
+
+  assert.equal(report.total, 1);
+  assert.equal(report.repeat.count, 2);
+  assert.equal(report.repeat.failedRuns, 0);
+  assert.equal(report.repeat.samples.length, 2);
+  assert.deepEqual(report.repeat.samples.map((sample) => sample.iteration), [1, 2]);
+  assert.equal(report.repeat.aggregate.acceptableMin, 1);
+  assert.equal(report.repeat.aggregate.acceptableMax, 1);
+  assert.ok(report.repeat.aggregate.elapsedMsAvg > 0);
+  assert.equal(report.results[0].id, "book-central-cannon");
 });
 
 test("oracle benchmark CLI can load custom positions without expected moves", async () => {
@@ -129,6 +192,30 @@ test("oracle benchmark CLI can load custom positions without expected moves", as
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("oracle benchmark CLI can select the built-in opening oracle suite", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "examples/oracle-benchmark.mjs",
+    "--suite", "opening-oracle",
+    "--id", "oracle-opening-initial",
+    "--oracle-command", process.execPath,
+    "--oracle-arg", "fixtures/mock-ucci.mjs",
+    "--oracle-protocol", "uci",
+    "--oracle-depth", "2",
+    "--oracle-time", "100",
+    "--candidate-depth", "1",
+    "--candidate-time", "100",
+    "--json"
+  ], {
+    cwd: root,
+    timeout: 8000
+  });
+  const report = JSON.parse(stdout);
+
+  assert.equal(report.total, 1);
+  assert.equal(report.results[0].id, "oracle-opening-initial");
+  assert.equal(report.results[0].oracleMove, "h9-g7");
 });
 
 test("oracle benchmark CLI explains missing oracle command configuration", async () => {
