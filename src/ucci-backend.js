@@ -925,6 +925,9 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     iidMoveHits: maxInfoValue(infos, "iidMoveHits"),
     rootMovesSearched: maxInfoValue(infos, "rootMovesSearched"),
     rootChildStateReuses: maxInfoValue(infos, "rootChildStateReuses"),
+    rootReductions: maxInfoValue(infos, "rootReductions"),
+    rootReductionPlies: maxInfoValue(infos, "rootReductionPlies"),
+    rootReductionResearches: maxInfoValue(infos, "rootReductionResearches"),
     rootTtHits: maxInfoValue(infos, "rootTtHits"),
     rootTtStores: maxInfoValue(infos, "rootTtStores"),
     rootOrderHits: maxInfoValue(infos, "rootOrderHits"),
@@ -1061,6 +1064,8 @@ function parseInfoLine(line) {
     qDeltaPrefilterSkips: 0,
     qSeePrunes: 0,
     reductions: 0,
+    reductionPlies: 0,
+    deepReductions: 0,
     lmrResearches: 0,
     pvReductionGuards: 0,
     cutNodeReductionBoosts: 0,
@@ -1074,6 +1079,9 @@ function parseInfoLine(line) {
     iidMoveHits: 0,
     rootMovesSearched: 0,
     rootChildStateReuses: 0,
+    rootReductions: 0,
+    rootReductionPlies: 0,
+    rootReductionResearches: 0,
     rootTtHits: 0,
     rootTtStores: 0,
     rootOrderHits: 0,
@@ -1296,6 +1304,14 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "rootstate") {
       info.rootChildStateReuses = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "rootred") {
+      const [reductions, researches] = parseNativePair(tokens[index + 1]);
+      info.rootReductions = reductions;
+      info.rootReductionResearches = researches;
+      index += 1;
+    } else if (token === "rootredply") {
+      info.rootReductionPlies = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "roottt") {
       info.rootTtHits = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -1975,6 +1991,8 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.improvingReductionGuards ?? 0) > 0) parts.push(nativeCount(stats.improvingReductionGuards, "improving-position reduction guard"));
   if ((stats.nonImprovingReductionBoosts ?? 0) > 0) parts.push(nativeCount(stats.nonImprovingReductionBoosts, "worsening-position reduction boost"));
   if ((stats.rootChildStateReuses ?? 0) > 0) parts.push(nativeCount(stats.rootChildStateReuses, "root child-state reuse"));
+  if ((stats.rootReductions ?? 0) > 0) parts.push(nativeCount(stats.rootReductions, "root late-move reduction"));
+  if ((stats.rootReductionResearches ?? 0) > 0) parts.push(nativeCount(stats.rootReductionResearches, "root reduction re-search"));
   if ((stats.rootTtHits ?? 0) > 0) parts.push(nativeCount(stats.rootTtHits, "root transposition-table ordering hint"));
   if ((stats.rootOrderHits ?? 0) > 0) parts.push(nativeCount(stats.rootOrderHits, "persisted root-order hint"));
   if ((stats.rootTtStores ?? 0) > 0) parts.push(nativeCount(stats.rootTtStores, "root transposition-table store"));
@@ -2257,6 +2275,9 @@ function createNativeStats(parsed) {
     iidMoveHits: parsed.iidMoveHits ?? 0,
     rootMovesSearched: parsed.rootMovesSearched ?? 0,
     rootChildStateReuses: parsed.rootChildStateReuses ?? 0,
+    rootReductions: parsed.rootReductions ?? 0,
+    rootReductionPlies: parsed.rootReductionPlies ?? 0,
+    rootReductionResearches: parsed.rootReductionResearches ?? 0,
     rootTtHits: parsed.rootTtHits ?? 0,
     rootTtStores: parsed.rootTtStores ?? 0,
     rootOrderHits: parsed.rootOrderHits ?? 0,
@@ -2382,6 +2403,9 @@ function createEmptyStats() {
     iidMoveHits: 0,
     rootMovesSearched: 0,
     rootChildStateReuses: 0,
+    rootReductions: 0,
+    rootReductionPlies: 0,
+    rootReductionResearches: 0,
     rootTtHits: 0,
     rootTtStores: 0,
     repetitions: 0

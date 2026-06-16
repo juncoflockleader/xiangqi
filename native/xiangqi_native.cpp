@@ -54,6 +54,10 @@ constexpr int kHistoryPruningMarginScale = 32;
 constexpr int kImprovingEvalMargin = 12;
 constexpr int kTimedOpeningPriorMaxLoss = 100;
 constexpr int kTimedSearchDepthLimit = 64;
+constexpr int kRootReductionMinDepth = 6;
+constexpr int kRootReductionMoveIndex = 6;
+constexpr int kRootDeepReductionMinDepth = 8;
+constexpr int kRootDeepReductionMoveIndex = 12;
 constexpr int kDefaultHashMb = 64;
 constexpr int64_t kTimeCheckNodeMask = 16383;
 constexpr std::size_t kTtBucketSize = 4;
@@ -726,6 +730,9 @@ struct SearchState {
   int64_t aspirationFailLow = 0;
   int64_t rootMovesSearched = 0;
   int64_t rootChildStateReuses = 0;
+  int64_t rootReductions = 0;
+  int64_t rootReductionPlies = 0;
+  int64_t rootReductionResearches = 0;
   int64_t rootOrderHits = 0;
   int64_t rootOrderStores = 0;
   int64_t extensions = 0;
@@ -853,6 +860,9 @@ struct SearchState {
     aspirationFailLow = 0;
     rootMovesSearched = 0;
     rootChildStateReuses = 0;
+    rootReductions = 0;
+    rootReductionPlies = 0;
+    rootReductionResearches = 0;
     rootOrderHits = 0;
     rootOrderStores = 0;
     extensions = 0;
@@ -5086,6 +5096,27 @@ void storeRootOrderMemory(SearchState& state, uint64_t rootKey, const std::vecto
   state.rootOrderStores += state.rootOrderCount;
 }
 
+int rootMoveReduction(
+    const Board& root,
+    const Move& move,
+    const KnownChildState& child,
+    int depth,
+    int moveIndex,
+    bool rootInCheck,
+    bool useRootPvs,
+    int rootAlpha,
+    int beta) {
+  if (!useRootPvs || rootInCheck) return 0;
+  if (depth < kRootReductionMinDepth || moveIndex < kRootReductionMoveIndex) return 0;
+  if (!isQuiet(move) || child.inCheck) return 0;
+  if (isMateScore(rootAlpha) || isMateScore(beta)) return 0;
+  if (timedOpeningRootBonus(root, move) > 0) return 0;
+
+  int reduction = 1;
+  if (depth >= kRootDeepReductionMinDepth && moveIndex >= kRootDeepReductionMoveIndex) reduction += 1;
+  return std::clamp(reduction, 0, depth - 2);
+}
+
 std::vector<RootLine> searchRootDepth(
     const Board& root,
     std::vector<RootMove>& rootMoves,
@@ -5114,10 +5145,15 @@ std::vector<RootLine> searchRootDepth(
     const int childDepth = depth - 1 + rootExtension;
     int score;
     const bool useRootPvs = useRootAlphaPruning && moveIndex > 0 && rootAlpha + 1 < beta;
+    const int reduction = rootMoveReduction(root, move, child, depth, moveIndex, rootInCheck, useRootPvs, rootAlpha, beta);
     if (useRootPvs) {
+      if (reduction > 0) {
+        state.rootReductions += 1;
+        state.rootReductionPlies += reduction;
+      }
       score = -negamax(
           board,
-          childDepth,
+          childDepth - reduction,
           -rootAlpha - 1,
           -rootAlpha,
           1,
@@ -5128,6 +5164,22 @@ std::vector<RootLine> searchRootDepth(
           kMaxExtensions - rootExtension,
           child.ownKing,
           child.inCheck);
+      if (reduction > 0 && !state.stopped && score > rootAlpha) {
+        state.rootReductionResearches += 1;
+        score = -negamax(
+            board,
+            childDepth,
+            -rootAlpha - 1,
+            -rootAlpha,
+            1,
+            state,
+            nullptr,
+            true,
+            move,
+            kMaxExtensions - rootExtension,
+            child.ownKing,
+            child.inCheck);
+      }
       if (!state.stopped && score > rootAlpha && score < beta) {
         state.pvsResearches += 1;
         childPv.clear();
@@ -5424,6 +5476,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " iid " << state.iidSearches << " iidhit " << state.iidMoveHits
               << " rootmoves " << state.rootMovesSearched
               << " rootstate " << state.rootChildStateReuses
+              << " rootred " << state.rootReductions << "/" << state.rootReductionResearches
+              << " rootredply " << state.rootReductionPlies
               << " roottt " << state.rootTtHits << " rootttstores " << state.rootTtStores
               << " rootord " << state.rootOrderHits << " rootordstores " << state.rootOrderStores
               << " pvs " << state.pvsResearches
@@ -5490,6 +5544,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " iid " << state.iidSearches << " iidhit " << state.iidMoveHits
               << " rootmoves " << state.rootMovesSearched
               << " rootstate " << state.rootChildStateReuses
+              << " rootred " << state.rootReductions << "/" << state.rootReductionResearches
+              << " rootredply " << state.rootReductionPlies
               << " roottt " << state.rootTtHits << " rootttstores " << state.rootTtStores
               << " rootord " << state.rootOrderHits << " rootordstores " << state.rootOrderStores
               << " pvs " << state.pvsResearches

@@ -49,7 +49,7 @@ test("local C++ engine builds and searches through the native UCI backend", asyn
     assert.equal(typeof result.hashfull, "number");
     assert.ok(result.raw.some((line) => /\bhashfull\b/.test(line)));
     assert.ok(result.raw.some((line) => /\bhistory\b/.test(line)));
-    assert.ok(result.raw.some((line) => /\bnmp\b/.test(line) && /\bnmv\b/.test(line) && /\bnmvfail\b/.test(line) && /\bnmrboost\b/.test(line) && /\bnmmguard\b/.test(line) && /\brfp\b/.test(line) && /\bmdp\b/.test(line) && /\brazor\b/.test(line) && /\bsee\b/.test(line) && /\bpcut\b/.test(line) && /\bpcsearch\b/.test(line) && /\bpcskip\b/.test(line) && /\bfutil\b/.test(line) && /\bhprune\b/.test(line) && /\bhpguard\b/.test(line) && /\bdelta\b/.test(line) && /\bqdskip\b/.test(line) && /\bqsee\b/.test(line) && /\blmp\b/.test(line) && /\blmr\b/.test(line) && /\bredply\b/.test(line) && /\bdeepred\b/.test(line) && /\bpvguard\b/.test(line) && /\bcutboost\b/.test(line) && /\bimp\b/.test(line) && /\bnimp\b/.test(line) && /\bimprd\b/.test(line) && /\bnimprd\b/.test(line) && /\bimplmp\b/.test(line) && /\bnimlmp\b/.test(line) && /\bttmove\b/.test(line) && /\bcaphist\b/.test(line) && /\bcaphstores\b/.test(line) && /\bcaphm\b/.test(line) && /\bcaphguard\b/.test(line) && /\bcm\b/.test(line) && /\bch\b/.test(line) && /\bchred\b/.test(line) && /\bchredm\b/.test(line) && /\bce\b/.test(line) && /\bcecap\b/.test(line) && /\bceblock\b/.test(line) && /\bceking\b/.test(line) && /\bcheckhist\b/.test(line) && /\bcheckhstores\b/.test(line) && /\bcheckhm\b/.test(line) && /\bcheckcache\b/.test(line) && /\biid\b/.test(line) && /\biidhit\b/.test(line) && /\brootmoves\b/.test(line) && /\brootstate\b/.test(line) && /\broottt\b/.test(line) && /\brootttstores\b/.test(line) && /\bsingtry\b/.test(line) && /\bsingext\b/.test(line) && /\bsingrej\b/.test(line) && /\bpvs\b/.test(line) && /\basp\b/.test(line)));
+    assert.ok(result.raw.some((line) => /\bnmp\b/.test(line) && /\bnmv\b/.test(line) && /\bnmvfail\b/.test(line) && /\bnmrboost\b/.test(line) && /\bnmmguard\b/.test(line) && /\brfp\b/.test(line) && /\bmdp\b/.test(line) && /\brazor\b/.test(line) && /\bsee\b/.test(line) && /\bpcut\b/.test(line) && /\bpcsearch\b/.test(line) && /\bpcskip\b/.test(line) && /\bfutil\b/.test(line) && /\bhprune\b/.test(line) && /\bhpguard\b/.test(line) && /\bdelta\b/.test(line) && /\bqdskip\b/.test(line) && /\bqsee\b/.test(line) && /\blmp\b/.test(line) && /\blmr\b/.test(line) && /\bredply\b/.test(line) && /\bdeepred\b/.test(line) && /\bpvguard\b/.test(line) && /\bcutboost\b/.test(line) && /\bimp\b/.test(line) && /\bnimp\b/.test(line) && /\bimprd\b/.test(line) && /\bnimprd\b/.test(line) && /\bimplmp\b/.test(line) && /\bnimlmp\b/.test(line) && /\bttmove\b/.test(line) && /\bcaphist\b/.test(line) && /\bcaphstores\b/.test(line) && /\bcaphm\b/.test(line) && /\bcaphguard\b/.test(line) && /\bcm\b/.test(line) && /\bch\b/.test(line) && /\bchred\b/.test(line) && /\bchredm\b/.test(line) && /\bce\b/.test(line) && /\bcecap\b/.test(line) && /\bceblock\b/.test(line) && /\bceking\b/.test(line) && /\bcheckhist\b/.test(line) && /\bcheckhstores\b/.test(line) && /\bcheckhm\b/.test(line) && /\bcheckcache\b/.test(line) && /\biid\b/.test(line) && /\biidhit\b/.test(line) && /\brootmoves\b/.test(line) && /\brootstate\b/.test(line) && /\brootred\b/.test(line) && /\brootredply\b/.test(line) && /\broottt\b/.test(line) && /\brootttstores\b/.test(line) && /\bsingtry\b/.test(line) && /\bsingext\b/.test(line) && /\bsingrej\b/.test(line) && /\bpvs\b/.test(line) && /\basp\b/.test(line)));
     assert.ok(result.raw.some((line) => /\bcrisk \d+\/\d+\b/.test(line)));
     assert.ok(result.raw.some((line) => /\bext\b/.test(line) && /\brecext\b/.test(line) && /\brecorder\b/.test(line) && /\bqnodes\b/.test(line) && /\bqchecks\b/.test(line) && /\bqcheckhist\b/.test(line) && /\bqcheckhstores\b/.test(line) && /\bqcheckhm\b/.test(line) && /\bqcapguard\b/.test(line) && /\bqcaphist\b/.test(line) && /\bqcapstores\b/.test(line) && /\bqcaphm\b/.test(line)));
     assert.ok(result.raw.some((line) => /\bqtt\b/.test(line) && /\bqttstores\b/.test(line) && /\beval\b/.test(line) && /\bevalskip\b/.test(line)));
@@ -936,7 +936,7 @@ test("local C++ engine boosts reductions in deep cut nodes", (t) => {
   const input = [
     "uci",
     "position fen 2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r",
-    "go depth 8",
+    "go depth 8 movetime 2000",
     "quit"
   ].join("\n");
   const result = spawnSync(build.output, {
@@ -948,6 +948,8 @@ test("local C++ engine boosts reductions in deep cut nodes", (t) => {
   assert.match(result.stdout, /\bcutboost [1-9]\d*\b/);
   assert.match(result.stdout, /\bredply [1-9]\d*\b/);
   assert.match(result.stdout, /\bdeepred [1-9]\d*\b/);
+  assert.match(result.stdout, /\brootred [1-9]\d*\/\d+\b/);
+  assert.match(result.stdout, /\brootredply [1-9]\d*\b/);
   assert.match(result.stdout, /\bnmrboost [1-9]\d*\b/);
   assert.match(result.stdout, /bestmove [a-i][0-9][a-i][0-9]/);
 });
