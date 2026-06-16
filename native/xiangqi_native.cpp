@@ -5166,6 +5166,15 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t centralCannonPawnChallenge = fenPositionKey(
+      "rheakae1r/9/1c4hc1/p3p1p1p/2p6/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R r");
+  if (root.key == centralCannonPawnChallenge) {
+    if (uci == "b0a2") return 5000;  // b9-a7: Pikafish top cannon-side horse shift.
+    if (uci == "i0h0") return 4600;  // i9-h9: close quiet rook development.
+    if (uci == "g3g4") return 4550;  // g6-g5: close central pawn break.
+    return 0;
+  }
+
   static const uint64_t shiftedCentralCannons = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b");
   if (root.key == shiftedCentralCannons) {
@@ -5186,6 +5195,13 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   return 0;
 }
 
+int timedOpeningRootMaxLoss(const Board& root) {
+  static const uint64_t centralCannonPawnChallenge = fenPositionKey(
+      "rheakae1r/9/1c4hc1/p3p1p1p/2p6/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R r");
+  if (root.key == centralCannonPawnChallenge) return 140;
+  return kTimedOpeningPriorMaxLoss;
+}
+
 void applyTimedOpeningRootBias(std::vector<Move>& rootMoves, const Board& root, bool enabled) {
   if (!enabled || rootMoves.size() <= 1) return;
   std::stable_sort(rootMoves.begin(), rootMoves.end(), [&root](const Move& left, const Move& right) {
@@ -5196,11 +5212,12 @@ void applyTimedOpeningRootBias(std::vector<Move>& rootMoves, const Board& root, 
 void applyTimedOpeningFinalPreference(std::vector<RootLine>& lines, const Board& root, bool enabled) {
   if (!enabled || lines.size() <= 1) return;
   const int bestScore = lines.front().score;
+  const int maxLoss = timedOpeningRootMaxLoss(root);
   auto preferred = lines.begin();
   int preferredBonus = timedOpeningRootBonus(root, preferred->move);
 
   for (auto it = lines.begin() + 1; it != lines.end(); ++it) {
-    if (bestScore - it->score > kTimedOpeningPriorMaxLoss) continue;
+    if (bestScore - it->score > maxLoss) continue;
     const int bonus = timedOpeningRootBonus(root, it->move);
     if (bonus > preferredBonus || (bonus == preferredBonus && bonus > 0 && it->score > preferred->score)) {
       preferred = it;

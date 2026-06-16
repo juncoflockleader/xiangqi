@@ -55,10 +55,11 @@ test("named opening oracle suite captures native regression positions", () => {
   assert.equal(suite, ENGINE_OPENING_ORACLE_BENCHMARKS);
   assert.ok(aliases.includes("starter"));
   assert.ok(aliases.includes("opening-oracle"));
-  assert.equal(suite.length, 6);
+  assert.equal(suite.length, 7);
   assert.ok(suite.every((benchmark) => benchmark.tags.includes("oracle")));
   assert.ok(suite.every((benchmark) => benchmark.options.useBook === false));
   assert.ok(suite.every((benchmark) => benchmark.options.lines === 5));
+  assert.ok(suite.some((benchmark) => benchmark.id === "oracle-opening-central-cannon-pawn-challenge"));
   assert.ok(suite.some((benchmark) => benchmark.id === "oracle-opening-left-screen-central-cannon"));
   assert.equal(resolveBenchmarkSuite("starter"), ENGINE_BENCHMARKS);
   assert.throws(() => resolveBenchmarkSuite("missing-suite"), /Unknown benchmark suite/);

@@ -123,6 +123,20 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     lesson: "In the double-horse central-cannon branch, the native engine should keep the central pawn break in view."
   }),
   Object.freeze({
+    id: "oracle-opening-central-cannon-pawn-challenge",
+    name: "Oracle Opening: Central Cannon Pawn Challenge",
+    fen: "rheakae1r/9/1c4hc1/p3p1p1p/2p6/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R r",
+    expectedMoves: Object.freeze(["b9-a7", "i9-h9", "g6-g5"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "central-cannon"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "After Black challenges with the c-pawn, the native engine should prefer Pikafish's cannon-side horse shift or close development alternatives."
+  }),
+  Object.freeze({
     id: "oracle-opening-shifted-central-cannons",
     name: "Oracle Opening: Shifted Central Cannons",
     fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b",
