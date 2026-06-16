@@ -1363,6 +1363,23 @@ int positionalScoreForSideTypeSquare(int side, int type, int square) {
   return (side == kRed ? 1 : -1) * score;
 }
 
+std::array<std::array<int, kSquares>, kPieceCodeCount> makePositionalScoreLookup() {
+  std::array<std::array<int, kSquares>, kPieceCodeCount> values{};
+  for (int piece = -7; piece <= 7; piece += 1) {
+    for (int square = 0; square < kSquares; square += 1) {
+      values[static_cast<std::size_t>(piece + kPieceCodeOffset)][static_cast<std::size_t>(square)] =
+          piece == 0 ? 0 : positionalScoreForSideTypeSquare(sideOf(piece), typeOf(piece), square);
+    }
+  }
+  return values;
+}
+
+const auto kPositionalScoreByPieceSquare = makePositionalScoreLookup();
+
+int positionalScoreForPieceSquare(int piece, int square) {
+  return kPositionalScoreByPieceSquare[static_cast<std::size_t>(piece + kPieceCodeOffset)][static_cast<std::size_t>(square)];
+}
+
 std::vector<std::string> split(const std::string& text) {
   std::istringstream in(text);
   std::vector<std::string> tokens;
@@ -1507,7 +1524,7 @@ bool parseFen(Board& board, const std::string& fenText) {
       else board.blackNullMoveMaterial += 1;
     }
     board.materialScore += materialScoreForSideType(sideOf(piece), typeOf(piece));
-    board.positionalScore += positionalScoreForSideTypeSquare(sideOf(piece), typeOf(piece), square);
+    board.positionalScore += positionalScoreForPieceSquare(piece, square);
     addGuardPairCountBySideType(board, sideOf(piece), typeOf(piece), 1);
     file += 1;
   }
@@ -1721,8 +1738,8 @@ void makeMove(Board& board, Move& move) {
   board.key ^= pieceHash(move.from, move.piece);
   if (captured != 0) board.key ^= pieceHash(move.to, captured);
   board.key ^= pieceHash(move.to, move.piece);
-  board.positionalScore -= positionalScoreForSideTypeSquare(movingSide, movingType, move.from);
-  board.positionalScore += positionalScoreForSideTypeSquare(movingSide, movingType, move.to);
+  board.positionalScore -= positionalScoreForPieceSquare(move.piece, move.from);
+  board.positionalScore += positionalScoreForPieceSquare(move.piece, move.to);
   if (captured != 0) {
     const int capturedSide = captured > 0 ? kRed : kBlack;
     const int capturedType = captured > 0 ? captured : -captured;
@@ -1732,7 +1749,7 @@ void makeMove(Board& board, Move& move) {
     addNonPawnMaterialBySideType(board, capturedSide, capturedType, -1);
     addNullMoveMaterialBySideType(board, capturedSide, capturedType, -1);
     addMaterialBySideType(board, capturedSide, capturedType, -1);
-    board.positionalScore -= positionalScoreForSideTypeSquare(capturedSide, capturedType, move.to);
+    board.positionalScore -= positionalScoreForPieceSquare(captured, move.to);
     addGuardPairCountBySideType(board, capturedSide, capturedType, -1);
   }
   movePieceSquare(board, movingSide, move.from, move.to);
@@ -1751,8 +1768,8 @@ void undoMove(Board& board, const Move& move) {
   board.key ^= pieceHash(move.to, move.piece);
   if (captured != 0) board.key ^= pieceHash(move.to, captured);
   board.key ^= pieceHash(move.from, move.piece);
-  board.positionalScore -= positionalScoreForSideTypeSquare(movingSide, movingType, move.to);
-  board.positionalScore += positionalScoreForSideTypeSquare(movingSide, movingType, move.from);
+  board.positionalScore -= positionalScoreForPieceSquare(move.piece, move.to);
+  board.positionalScore += positionalScoreForPieceSquare(move.piece, move.from);
   movePieceSquare(board, movingSide, move.to, move.from);
   if (captured != 0) {
     const int capturedSide = captured > 0 ? kRed : kBlack;
@@ -1763,7 +1780,7 @@ void undoMove(Board& board, const Move& move) {
     addNonPawnMaterialBySideType(board, capturedSide, capturedType, 1);
     addNullMoveMaterialBySideType(board, capturedSide, capturedType, 1);
     addMaterialBySideType(board, capturedSide, capturedType, 1);
-    board.positionalScore += positionalScoreForSideTypeSquare(capturedSide, capturedType, move.to);
+    board.positionalScore += positionalScoreForPieceSquare(captured, move.to);
     addGuardPairCountBySideType(board, capturedSide, capturedType, 1);
   }
   board.cells[move.from] = move.piece;
