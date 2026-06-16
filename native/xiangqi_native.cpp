@@ -62,6 +62,8 @@ constexpr int kQSeePruneMaxDepth = 2;
 constexpr int kQSeePruneAlphaMargin = 32;
 constexpr int kQSeePruneLossMargin = 120;
 constexpr int kQSeeCaptureHistoryGuard = 1024;
+constexpr int kAspirationInitialWindow = 80;
+constexpr int kAspirationRetryWindow = 320;
 constexpr int kDefaultHashMb = 64;
 constexpr int64_t kTimeCheckNodeMask = 16383;
 constexpr std::size_t kTtBucketSize = 4;
@@ -730,6 +732,7 @@ struct SearchState {
   int64_t rootTtHits = 0;
   int64_t rootTtStores = 0;
   int64_t aspirationSearches = 0;
+  int64_t aspirationWidenedSearches = 0;
   int64_t aspirationFailHigh = 0;
   int64_t aspirationFailLow = 0;
   int64_t rootMovesSearched = 0;
@@ -860,6 +863,7 @@ struct SearchState {
     rootTtHits = 0;
     rootTtStores = 0;
     aspirationSearches = 0;
+    aspirationWidenedSearches = 0;
     aspirationFailHigh = 0;
     aspirationFailLow = 0;
     rootMovesSearched = 0;
@@ -5307,9 +5311,8 @@ std::vector<RootLine> searchRoot(
     int alpha = -kInf;
     int beta = kInf;
     if (useAspiration) {
-      constexpr int kAspirationWindow = 80;
-      alpha = std::max(-kInf, previousScore - kAspirationWindow);
-      beta = std::min(kInf, previousScore + kAspirationWindow);
+      alpha = std::max(-kInf, previousScore - kAspirationInitialWindow);
+      beta = std::min(kInf, previousScore + kAspirationInitialWindow);
       state.aspirationSearches += 1;
     }
 
@@ -5320,9 +5323,26 @@ std::vector<RootLine> searchRoot(
         return left.score > right.score;
       });
       if (depthLines.front().score <= alpha || depthLines.front().score >= beta) {
-        if (depthLines.front().score <= alpha) state.aspirationFailLow += 1;
+        const bool failLow = depthLines.front().score <= alpha;
+        if (failLow) state.aspirationFailLow += 1;
         else state.aspirationFailHigh += 1;
-        depthLines = searchRootDepth(root, orderedRootMoves, depth, -kInf, kInf, state, rootInCheck, useRootAlphaPruning);
+
+        const int retryAlpha = failLow
+            ? std::max(-kInf, previousScore - kAspirationRetryWindow)
+            : std::max(-kInf, previousScore - kAspirationInitialWindow);
+        const int retryBeta = failLow
+            ? std::min(kInf, previousScore + kAspirationInitialWindow)
+            : std::min(kInf, previousScore + kAspirationRetryWindow);
+        state.aspirationWidenedSearches += 1;
+        depthLines = searchRootDepth(root, orderedRootMoves, depth, retryAlpha, retryBeta, state, rootInCheck, useRootAlphaPruning);
+        if (!state.stopped && !depthLines.empty()) {
+          std::stable_sort(depthLines.begin(), depthLines.end(), [](const RootLine& left, const RootLine& right) {
+            return left.score > right.score;
+          });
+          if (depthLines.front().score <= retryAlpha || depthLines.front().score >= retryBeta) {
+            depthLines = searchRootDepth(root, orderedRootMoves, depth, -kInf, kInf, state, rootInCheck, useRootAlphaPruning);
+          }
+        }
       }
     }
 
@@ -5486,7 +5506,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " roottt " << state.rootTtHits << " rootttstores " << state.rootTtStores
               << " rootord " << state.rootOrderHits << " rootordstores " << state.rootOrderStores
               << " pvs " << state.pvsResearches
-              << " asp " << state.aspirationSearches << " asphi " << state.aspirationFailHigh << " asplo " << state.aspirationFailLow
+              << " asp " << state.aspirationSearches << " aspwide " << state.aspirationWidenedSearches
+              << " asphi " << state.aspirationFailHigh << " asplo " << state.aspirationFailLow
               << " ext " << state.extensions << " recext " << state.recaptureExtensions << " recorder " << state.recaptureOrderHits
               << " singtry " << state.singularExtensionSearches << " singext " << state.singularExtensions
               << " singrej " << state.singularExtensionRejects
@@ -5554,7 +5575,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " roottt " << state.rootTtHits << " rootttstores " << state.rootTtStores
               << " rootord " << state.rootOrderHits << " rootordstores " << state.rootOrderStores
               << " pvs " << state.pvsResearches
-              << " asp " << state.aspirationSearches << " asphi " << state.aspirationFailHigh << " asplo " << state.aspirationFailLow
+              << " asp " << state.aspirationSearches << " aspwide " << state.aspirationWidenedSearches
+              << " asphi " << state.aspirationFailHigh << " asplo " << state.aspirationFailLow
               << " ext " << state.extensions << " recext " << state.recaptureExtensions << " recorder " << state.recaptureOrderHits
               << " singtry " << state.singularExtensionSearches << " singext " << state.singularExtensions
               << " singrej " << state.singularExtensionRejects

@@ -934,6 +934,7 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     rootOrderStores: maxInfoValue(infos, "rootOrderStores"),
     pvsResearches: maxInfoValue(infos, "pvsResearches"),
     aspirationSearches: maxInfoValue(infos, "aspirationSearches"),
+    aspirationWidenedSearches: maxInfoValue(infos, "aspirationWidenedSearches"),
     aspirationFailHigh: maxInfoValue(infos, "aspirationFailHigh"),
     aspirationFailLow: maxInfoValue(infos, "aspirationFailLow"),
     extensions: maxInfoValue(infos, "extensions"),
@@ -1086,6 +1087,7 @@ function parseInfoLine(line) {
     rootTtStores: 0,
     rootOrderHits: 0,
     rootOrderStores: 0,
+    aspirationWidenedSearches: 0,
     continuationHistoryHits: 0,
     continuationReductionBoosts: 0,
     continuationReductionMaluses: 0,
@@ -1330,6 +1332,9 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "asp") {
       info.aspirationSearches = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "aspwide") {
+      info.aspirationWidenedSearches = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "asphi") {
       info.aspirationFailHigh = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -2008,6 +2013,7 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.iidMoveHits ?? 0) > 0) parts.push(nativeCount(stats.iidMoveHits, "internal-iterative-deepening move hint"));
   if ((stats.pvsResearches ?? 0) > 0) parts.push(nativeCount(stats.pvsResearches, "PVS re-search"));
   if ((stats.aspirationSearches ?? 0) > 0) parts.push(nativeCount(stats.aspirationSearches, "aspiration-window search"));
+  if ((stats.aspirationWidenedSearches ?? 0) > 0) parts.push(nativeCount(stats.aspirationWidenedSearches, "widened aspiration-window re-search"));
   if ((stats.killerHits ?? 0) > 0) parts.push(nativeCount(stats.killerHits, "killer-move hit"));
 
   return parts.length > 0 ? `Native selective search used ${parts.join(", ")}.` : null;
@@ -2284,6 +2290,7 @@ function createNativeStats(parsed) {
     rootOrderStores: parsed.rootOrderStores ?? 0,
     pvsResearches: parsed.pvsResearches ?? 0,
     aspirationSearches: parsed.aspirationSearches ?? 0,
+    aspirationWidenedSearches: parsed.aspirationWidenedSearches ?? 0,
     aspirationFailHigh: parsed.aspirationFailHigh ?? 0,
     aspirationFailLow: parsed.aspirationFailLow ?? 0,
     nullMovePrunes: parsed.nullMovePrunes ?? 0,
@@ -2330,6 +2337,7 @@ function createEmptyStats() {
     ttMoveHits: 0,
     cutoffs: 0,
     aspirationSearches: 0,
+    aspirationWidenedSearches: 0,
     aspirationFailHigh: 0,
     aspirationFailLow: 0,
     extensions: 0,

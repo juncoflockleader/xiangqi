@@ -221,6 +221,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.rootOrderStores, 8);
     assert.equal(result.stats.pvsResearches, 3);
     assert.equal(result.stats.aspirationSearches, 5);
+    assert.equal(result.stats.aspirationWidenedSearches, 2);
     assert.equal(result.stats.aspirationFailHigh, 1);
     assert.equal(result.stats.aspirationFailLow, 2);
     assert.equal(result.stats.extensions, 8);
@@ -299,6 +300,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.iterations[0].stats.rootOrderStores, 8);
     assert.equal(result.iterations[0].stats.pvsResearches, 3);
     assert.equal(result.iterations[0].stats.aspirationSearches, 5);
+    assert.equal(result.iterations[0].stats.aspirationWidenedSearches, 2);
     assert.equal(result.iterations[0].stats.singularExtensions, 2);
     assert.equal(result.explanation.search.telemetry.hashfullText, "32.1%");
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("Native search telemetry")));
@@ -335,6 +337,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("cut-node reduction boost")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("PVS re-search")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("aspiration-window search")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("widened aspiration-window re-search")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("mate-distance prune")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("delta prune")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("qsearch delta prefilter")));
