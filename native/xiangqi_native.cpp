@@ -62,6 +62,7 @@ constexpr int kRootDeepReductionMoveIndex = 12;
 constexpr int kRootTrackedMultiPvLimit = 8;
 constexpr int kRootMultiPvReductionMargin = 80;
 constexpr int kQSeePruneMaxDepth = 2;
+constexpr int kQSeePruneMaxRootPieces = 32;
 constexpr int kQSeePruneAlphaMargin = 32;
 constexpr int kQSeePruneLossMargin = 120;
 constexpr int kQSeeCaptureHistoryGuard = 1024;
@@ -2580,6 +2581,7 @@ MoveList generateQuietChecks(Board& board, int side, int enemyKing, int limit, S
   std::size_t checkCount = 0;
   for (std::size_t index = 0; index < moves.size(); index += 1) {
     Move& move = moves[index];
+    if (!maybeMoveCanGiveCheck(move, enemyKing)) continue;
     if (!moveGivesCheck(board, move, enemyKing, state)) continue;
 
     if (currentlyInCheck || moveMayAffectOwnKingSafety(board, move, side, ownKing)) {
@@ -4963,7 +4965,7 @@ int quiescenceKnownCheck(
     if (!inCheck
         && qDepth <= kQSeePruneMaxDepth
         && state.rootPieceCount > 0
-        && state.rootPieceCount < 28
+        && state.rootPieceCount <= kQSeePruneMaxRootPieces
         && alpha > standPat + kQSeePruneAlphaMargin
         && move.captured != 0
         && !givesCheck
