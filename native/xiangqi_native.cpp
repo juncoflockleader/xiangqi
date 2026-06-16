@@ -2428,8 +2428,11 @@ int badCaptureLossForCapture(const Board& board, const Move& move, SearchState& 
   return movingValue - capturedValue;
 }
 
-MoveList filterLegalMoves(Board& board, MoveList moves, int side, int ownKing, bool currentlyInCheck) {
-  if (ownKing < 0) return {};
+void filterLegalMovesInPlace(Board& board, MoveList& moves, int side, int ownKing, bool currentlyInCheck) {
+  if (ownKing < 0) {
+    moves.resize(0);
+    return;
+  }
 
   std::size_t legalCount = 0;
   for (std::size_t index = 0; index < moves.size(); index += 1) {
@@ -2444,7 +2447,6 @@ MoveList filterLegalMoves(Board& board, MoveList moves, int side, int ownKing, b
     if (!illegal) moves[legalCount++] = move;
   }
   moves.resize(legalCount);
-  return moves;
 }
 
 bool hasLegalMove(Board& board, int side, int ownKing, bool currentlyInCheck) {
@@ -2461,13 +2463,15 @@ bool hasLegalMove(Board& board, int side, int ownKing, bool currentlyInCheck) {
 
 MoveList generateLegalMoves(Board& board, int side, bool capturesOnly, int ownKing, bool currentlyInCheck) {
   auto moves = generatePseudoMoves(board, side, capturesOnly ? GenerateCapturesOnly : GenerateAllMoves);
-  return filterLegalMoves(board, moves, side, ownKing, currentlyInCheck);
+  filterLegalMovesInPlace(board, moves, side, ownKing, currentlyInCheck);
+  return moves;
 }
 
 MoveList generateLegalMoves(Board& board, int side, bool capturesOnly = false) {
   auto moves = generatePseudoMoves(board, side, capturesOnly ? GenerateCapturesOnly : GenerateAllMoves);
   const int ownKing = findKing(board, side);
-  return filterLegalMoves(board, moves, side, ownKing, isInCheckKnownKing(board, side, ownKing));
+  filterLegalMovesInPlace(board, moves, side, ownKing, isInCheckKnownKing(board, side, ownKing));
+  return moves;
 }
 
 MoveList generateLegalQsearchMoves(
@@ -2496,7 +2500,8 @@ MoveList generateLegalQsearchMoves(
     moves[kept++] = move;
   }
   moves.resize(kept);
-  return filterLegalMoves(board, moves, side, ownKing, false);
+  filterLegalMovesInPlace(board, moves, side, ownKing, false);
+  return moves;
 }
 
 int quietCheckOrderingScore(const Board& board, const Move& move, SearchState& state, int enemyKing) {
