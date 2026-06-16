@@ -361,7 +361,11 @@ test("local C++ timed opening priors guide pure native central cannon branches",
     const huTrap = parseFen("rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r");
     const centralCannon = parseFen("rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R b");
     const pawnChallenge = parseFen("rheakae1r/9/1c4hc1/p3p1p1p/2p6/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R r");
+    const pawnChallengeDoubleHorse = parseFen("r1eakae1r/9/1ch3hc1/p3p1p1p/2p6/9/P1P1P1P1P/HC2C1H2/9/R1EAKAE1R r");
     const shiftedCannons = parseFen("rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b");
+    const shiftedCannonsDoubleHorse = parseFen("r1eakae1r/9/1ch3hc1/p1p1p1p1p/9/9/P1P1P1P1P/2HCC4/9/R1EAKAEHR b");
+    const doubleHorseRedRook = parseFen("rheakae1r/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 b");
+    const doubleHorseBothRooks = parseFen("rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 r");
     const leftScreen = parseFen("r1eakaehr/9/1ch4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR r");
 
     const huResult = await backend.chooseMove(huTrap, {
@@ -381,10 +385,34 @@ test("local C++ timed opening priors guide pure native central cannon branches",
       timeLimitMs: 200,
       lines: 5
     });
+    const pawnChallengeDoubleHorseResult = await backend.chooseMove(pawnChallengeDoubleHorse, {
+      useBook: false,
+      depth: 4,
+      timeLimitMs: 200,
+      lines: 5
+    });
     const shiftedResult = await backend.chooseMove(shiftedCannons, {
       useBook: false,
       depth: 4,
       timeLimitMs: 200
+    });
+    const shiftedDoubleHorseResult = await backend.chooseMove(shiftedCannonsDoubleHorse, {
+      useBook: false,
+      depth: 4,
+      timeLimitMs: 200,
+      lines: 5
+    });
+    const doubleHorseRedRookResult = await backend.chooseMove(doubleHorseRedRook, {
+      useBook: false,
+      depth: 4,
+      timeLimitMs: 200,
+      lines: 5
+    });
+    const doubleHorseBothRooksResult = await backend.chooseMove(doubleHorseBothRooks, {
+      useBook: false,
+      depth: 4,
+      timeLimitMs: 200,
+      lines: 5
     });
     const leftScreenResult = await backend.chooseMove(leftScreen, {
       useBook: false,
@@ -396,12 +424,20 @@ test("local C++ timed opening priors guide pure native central cannon branches",
     assert.equal(moveToNotation(huResult.bestMove), "i9-h9");
     assert.equal(moveToNotation(centralResult.bestMove), "g3-g4");
     assert.equal(moveToNotation(pawnChallengeResult.bestMove), "b9-a7");
+    assert.equal(moveToNotation(pawnChallengeDoubleHorseResult.bestMove), "i9-h9");
     assert.equal(moveToNotation(shiftedResult.bestMove), "b0-c2");
+    assert.equal(moveToNotation(shiftedDoubleHorseResult.bestMove), "a0-b0");
+    assert.equal(moveToNotation(doubleHorseRedRookResult.bestMove), "i0-h0");
+    assert.equal(moveToNotation(doubleHorseBothRooksResult.bestMove), "h9-h5");
     assert.equal(moveToNotation(leftScreenResult.bestMove), "h9-g7");
     assert.ok(huResult.nodes > 0);
     assert.ok(centralResult.nodes > 0);
     assert.ok(pawnChallengeResult.nodes > 0);
+    assert.ok(pawnChallengeDoubleHorseResult.nodes > 0);
     assert.ok(shiftedResult.nodes > 0);
+    assert.ok(shiftedDoubleHorseResult.nodes > 0);
+    assert.ok(doubleHorseRedRookResult.nodes > 0);
+    assert.ok(doubleHorseBothRooksResult.nodes > 0);
     assert.ok(leftScreenResult.nodes > 0);
   } finally {
     await backend.close();

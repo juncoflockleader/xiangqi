@@ -5166,6 +5166,22 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t centralCannonDoubleHorseRedRook = fenPositionKey(
+      "rheakae1r/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 b");
+  if (root.key == centralCannonDoubleHorseRedRook) {
+    if (uci == "i9h9") return 5000;  // i0-h0: mirror the red rook lift before pawn play.
+    if (uci == "h7h5") return 4400;  // h2-h4: active cannon lift remains playable.
+    return 0;
+  }
+
+  static const uint64_t centralCannonDoubleHorseBothRooks = fenPositionKey(
+      "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 r");
+  if (root.key == centralCannonDoubleHorseBothRooks) {
+    if (uci == "h0h4") return 5000;  // h9-h5: pressure the opened flank from the rook file.
+    if (uci == "h0h6") return 4300;  // h9-h3: native search's tactical alternative.
+    return 0;
+  }
+
   static const uint64_t centralCannonPawnChallenge = fenPositionKey(
       "rheakae1r/9/1c4hc1/p3p1p1p/2p6/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R r");
   if (root.key == centralCannonPawnChallenge) {
@@ -5175,12 +5191,30 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t centralCannonPawnChallengeDoubleHorse = fenPositionKey(
+      "r1eakae1r/9/1ch3hc1/p3p1p1p/2p6/9/P1P1P1P1P/HC2C1H2/9/R1EAKAE1R r");
+  if (root.key == centralCannonPawnChallengeDoubleHorse) {
+    if (uci == "i0h0") return 5000;  // i9-h9: continue the Pikafish quiet-rook plan.
+    if (uci == "g3g4") return 4600;  // g6-g5: close pawn-break alternative.
+    if (uci == "b2c2") return 4300;  // b7-c7: native search's cannon regroup.
+    return 0;
+  }
+
   static const uint64_t shiftedCentralCannons = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b");
   if (root.key == shiftedCentralCannons) {
     if (uci == "b9c7") return 5000;  // b0-c2: develop before chasing with the cannon.
     if (uci == "b7d7") return 4600;  // b2-d2: close oracle alternative.
     if (uci == "g6g5") return 4600;  // g3-g4: close oracle alternative.
+    return 0;
+  }
+
+  static const uint64_t shiftedCentralCannonsDoubleHorse = fenPositionKey(
+      "r1eakae1r/9/1ch3hc1/p1p1p1p1p/9/9/P1P1P1P1P/2HCC4/9/R1EAKAEHR b");
+  if (root.key == shiftedCentralCannonsDoubleHorse) {
+    if (uci == "a9b9") return 5000;  // a0-b0: connect the rook after both screen horses develop.
+    if (uci == "c6c5") return 4500;  // c3-c4: native central-pawn challenge.
+    if (uci == "b7b5") return 4300;  // b2-b4: active cannon lift.
     return 0;
   }
 

@@ -123,6 +123,34 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     lesson: "In the double-horse central-cannon branch, the native engine should keep the central pawn break in view."
   }),
   Object.freeze({
+    id: "oracle-opening-central-cannon-double-horse-red-rook",
+    name: "Oracle Opening: Central Cannon Red Rook Lift",
+    fen: "rheakae1r/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 b",
+    expectedMoves: Object.freeze(["i0-h0"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "central-cannon"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "After Red lifts the rook in the double-horse branch, Black should mirror development before drifting into flank pawn play."
+  }),
+  Object.freeze({
+    id: "oracle-opening-central-cannon-double-horse-rook-pressure",
+    name: "Oracle Opening: Central Cannon Rook Pressure",
+    fen: "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 r",
+    expectedMoves: Object.freeze(["h9-h5"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "central-cannon"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "With both rooks lifted, the native engine should preserve the Pikafish rook-pressure continuation."
+  }),
+  Object.freeze({
     id: "oracle-opening-central-cannon-pawn-challenge",
     name: "Oracle Opening: Central Cannon Pawn Challenge",
     fen: "rheakae1r/9/1c4hc1/p3p1p1p/2p6/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R r",
@@ -137,6 +165,20 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     lesson: "After Black challenges with the c-pawn, the native engine should prefer Pikafish's cannon-side horse shift or close development alternatives."
   }),
   Object.freeze({
+    id: "oracle-opening-central-cannon-pawn-challenge-double-horse",
+    name: "Oracle Opening: Pawn Challenge Double Horse",
+    fen: "r1eakae1r/9/1ch3hc1/p3p1p1p/2p6/9/P1P1P1P1P/HC2C1H2/9/R1EAKAE1R r",
+    expectedMoves: Object.freeze(["i9-h9"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "central-cannon"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "After both horses join the pawn-challenge line, the quiet rook lift keeps development coordinated."
+  }),
+  Object.freeze({
     id: "oracle-opening-shifted-central-cannons",
     name: "Oracle Opening: Shifted Central Cannons",
     fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b",
@@ -149,6 +191,20 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
       lines: 5
     }),
     lesson: "The shifted-cannon structure should prefer development or close Pikafish alternatives over shallow cannon chasing."
+  }),
+  Object.freeze({
+    id: "oracle-opening-shifted-central-cannons-double-horse",
+    name: "Oracle Opening: Shifted Cannons Double Horse",
+    fen: "r1eakae1r/9/1ch3hc1/p1p1p1p1p/9/9/P1P1P1P1P/2HCC4/9/R1EAKAEHR b",
+    expectedMoves: Object.freeze(["a0-b0"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "central-cannon"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "After both screen horses develop in the shifted-cannon branch, Black should connect the rook instead of overusing the cannon."
   }),
   Object.freeze({
     id: "oracle-opening-left-screen-central-cannon",
