@@ -473,6 +473,37 @@ constexpr std::array<int, kPieceCodeCount> makePieceValueLookup() {
   return values;
 }
 
+constexpr std::array<int, kPieceCodeCount> makePieceMaterialScoreLookup() {
+  std::array<int, kPieceCodeCount> values{};
+  for (int piece = -7; piece <= 7; piece += 1) {
+    const int type = piece < 0 ? -piece : piece;
+    if (type == 0 || type == 1) continue;
+    values[static_cast<std::size_t>(piece + kPieceCodeOffset)] =
+        (piece > 0 ? 1 : -1) * kPieceValues[static_cast<std::size_t>(type)];
+  }
+  return values;
+}
+
+constexpr std::array<int, kPieceCodeCount> makeNonPawnMaterialLookup() {
+  std::array<int, kPieceCodeCount> values{};
+  for (int piece = -7; piece <= 7; piece += 1) {
+    const int type = piece < 0 ? -piece : piece;
+    values[static_cast<std::size_t>(piece + kPieceCodeOffset)] =
+        type != 0 && type != 1 && type != 7 ? 1 : 0;
+  }
+  return values;
+}
+
+constexpr std::array<int, kPieceCodeCount> makeNullMoveMaterialLookup() {
+  std::array<int, kPieceCodeCount> values{};
+  for (int piece = -7; piece <= 7; piece += 1) {
+    const int type = piece < 0 ? -piece : piece;
+    values[static_cast<std::size_t>(piece + kPieceCodeOffset)] =
+        type == 4 || type == 5 || type == 6 ? 1 : 0;
+  }
+  return values;
+}
+
 constexpr std::array<int, kPieceCodeCount> makePieceSideLookup() {
   std::array<int, kPieceCodeCount> values{};
   for (int piece = -7; piece <= 7; piece += 1) {
@@ -492,6 +523,9 @@ constexpr std::array<int, kPieceCodeCount> makePieceTypeLookup() {
 constexpr auto kSideByPieceCode = makePieceSideLookup();
 constexpr auto kTypeByPieceCode = makePieceTypeLookup();
 constexpr auto kValueByPieceCode = makePieceValueLookup();
+constexpr auto kMaterialScoreByPieceCode = makePieceMaterialScoreLookup();
+constexpr auto kNonPawnMaterialByPieceCode = makeNonPawnMaterialLookup();
+constexpr auto kNullMoveMaterialByPieceCode = makeNullMoveMaterialLookup();
 
 enum PieceType {
   Empty = 0,
@@ -1170,18 +1204,15 @@ int typeOf(int piece) {
 }
 
 bool countsAsNonPawnMaterial(int piece) {
-  const int type = typeOf(piece);
-  return type != Empty && type != King && type != Pawn;
+  return kNonPawnMaterialByPieceCode[static_cast<std::size_t>(piece + kPieceCodeOffset)] != 0;
 }
 
 bool countsAsNullMoveMaterial(int piece) {
-  const int type = typeOf(piece);
-  return type == Horse || type == Rook || type == Cannon;
+  return kNullMoveMaterialByPieceCode[static_cast<std::size_t>(piece + kPieceCodeOffset)] != 0;
 }
 
-int materialScoreForSideType(int side, int type) {
-  if (type <= Empty || type >= static_cast<int>(kPieceValues.size()) || type == King) return 0;
-  return (side == kRed ? 1 : -1) * kPieceValues[static_cast<std::size_t>(type)];
+int materialScoreForPiece(int piece) {
+  return kMaterialScoreByPieceCode[static_cast<std::size_t>(piece + kPieceCodeOffset)];
 }
 
 int guardPairScoreForSideTypeCount(int side, int type, int count) {
@@ -1523,7 +1554,7 @@ bool parseFen(Board& board, const std::string& fenText) {
       if (sideOf(piece) == kRed) board.redNullMoveMaterial += 1;
       else board.blackNullMoveMaterial += 1;
     }
-    board.materialScore += materialScoreForSideType(sideOf(piece), typeOf(piece));
+    board.materialScore += materialScoreForPiece(piece);
     board.positionalScore += positionalScoreForPieceSquare(piece, square);
     addGuardPairCountBySideType(board, sideOf(piece), typeOf(piece), 1);
     file += 1;
@@ -1712,20 +1743,20 @@ void setKingSquare(Board& board, int side, int square) {
   else if (side == kBlack) board.blackKing = square;
 }
 
-void addNonPawnMaterialBySideType(Board& board, int side, int type, int delta) {
-  if (type == Empty || type == King || type == Pawn) return;
-  if (side == kRed) board.redNonPawnMaterial += delta;
-  else if (side == kBlack) board.blackNonPawnMaterial += delta;
+void addNonPawnMaterialByPiece(Board& board, int piece, int delta) {
+  if (!countsAsNonPawnMaterial(piece)) return;
+  if (piece > 0) board.redNonPawnMaterial += delta;
+  else if (piece < 0) board.blackNonPawnMaterial += delta;
 }
 
-void addNullMoveMaterialBySideType(Board& board, int side, int type, int delta) {
-  if (type != Horse && type != Rook && type != Cannon) return;
-  if (side == kRed) board.redNullMoveMaterial += delta;
-  else if (side == kBlack) board.blackNullMoveMaterial += delta;
+void addNullMoveMaterialByPiece(Board& board, int piece, int delta) {
+  if (!countsAsNullMoveMaterial(piece)) return;
+  if (piece > 0) board.redNullMoveMaterial += delta;
+  else if (piece < 0) board.blackNullMoveMaterial += delta;
 }
 
-void addMaterialBySideType(Board& board, int side, int type, int delta) {
-  board.materialScore += materialScoreForSideType(side, type) * delta;
+void addMaterialByPiece(Board& board, int piece, int delta) {
+  board.materialScore += materialScoreForPiece(piece) * delta;
 }
 
 void makeMove(Board& board, Move& move) {
@@ -1746,9 +1777,9 @@ void makeMove(Board& board, Move& move) {
     removePieceSquare(board, capturedSide, move.to);
     board.totalPieceCount -= 1;
     if (capturedType == King) setKingSquare(board, capturedSide, -1);
-    addNonPawnMaterialBySideType(board, capturedSide, capturedType, -1);
-    addNullMoveMaterialBySideType(board, capturedSide, capturedType, -1);
-    addMaterialBySideType(board, capturedSide, capturedType, -1);
+    addNonPawnMaterialByPiece(board, captured, -1);
+    addNullMoveMaterialByPiece(board, captured, -1);
+    addMaterialByPiece(board, captured, -1);
     board.positionalScore -= positionalScoreForPieceSquare(captured, move.to);
     addGuardPairCountBySideType(board, capturedSide, capturedType, -1);
   }
@@ -1777,9 +1808,9 @@ void undoMove(Board& board, const Move& move) {
     addPieceSquare(board, capturedSide, move.to);
     board.totalPieceCount += 1;
     if (capturedType == King) setKingSquare(board, capturedSide, move.to);
-    addNonPawnMaterialBySideType(board, capturedSide, capturedType, 1);
-    addNullMoveMaterialBySideType(board, capturedSide, capturedType, 1);
-    addMaterialBySideType(board, capturedSide, capturedType, 1);
+    addNonPawnMaterialByPiece(board, captured, 1);
+    addNullMoveMaterialByPiece(board, captured, 1);
+    addMaterialByPiece(board, captured, 1);
     board.positionalScore += positionalScoreForPieceSquare(captured, move.to);
     addGuardPairCountBySideType(board, capturedSide, capturedType, 1);
   }
