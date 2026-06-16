@@ -58,6 +58,10 @@ constexpr int kRootReductionMinDepth = 6;
 constexpr int kRootReductionMoveIndex = 6;
 constexpr int kRootDeepReductionMinDepth = 8;
 constexpr int kRootDeepReductionMoveIndex = 12;
+constexpr int kQSeePruneMaxDepth = 2;
+constexpr int kQSeePruneAlphaMargin = 32;
+constexpr int kQSeePruneLossMargin = 120;
+constexpr int kQSeeCaptureHistoryGuard = 1024;
 constexpr int kDefaultHashMb = 64;
 constexpr int64_t kTimeCheckNodeMask = 16383;
 constexpr std::size_t kTtBucketSize = 4;
@@ -4859,19 +4863,20 @@ int quiescenceKnownCheck(
     const bool quietCheckMove = !inCheck && move.captured == 0 && givesCheck;
     const int alphaBeforeMove = alpha;
     if (!inCheck
-        && qDepth <= 1
+        && qDepth <= kQSeePruneMaxDepth
         && state.rootPieceCount > 0
         && state.rootPieceCount < 28
-        && alpha > standPat + 32
+        && alpha > standPat + kQSeePruneAlphaMargin
         && move.captured != 0
         && !givesCheck
-        && pieceValue(move.piece) > capturedValue + 120) {
+        && pieceValue(move.piece) > capturedValue + kQSeePruneLossMargin) {
       const int badCaptureLoss = badCaptureLossForCapture(board, move, state);
-      if (badCaptureLoss > 120 && standPat + capturedValue - badCaptureLoss + 120 <= alpha) {
+      if (badCaptureLoss > kQSeePruneLossMargin
+          && standPat + capturedValue - badCaptureLoss + kQSeePruneLossMargin <= alpha) {
         const int captureHistoryScore = state.captureHistory[move.from][move.to];
-        if (captureHistoryScore > 1024
-            && badCaptureLoss <= 240
-            && standPat + capturedValue - badCaptureLoss + 240 > alpha) {
+        if (captureHistoryScore > kQSeeCaptureHistoryGuard
+            && badCaptureLoss <= kQSeePruneLossMargin * 2
+            && standPat + capturedValue - badCaptureLoss + kQSeePruneLossMargin * 2 > alpha) {
           state.qCaptureHistoryPruneGuards += 1;
         } else {
           state.qSeePrunes += 1;

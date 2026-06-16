@@ -948,6 +948,7 @@ test("local C++ engine boosts reductions in deep cut nodes", (t) => {
   assert.match(result.stdout, /\bcutboost [1-9]\d*\b/);
   assert.match(result.stdout, /\bredply [1-9]\d*\b/);
   assert.match(result.stdout, /\bdeepred [1-9]\d*\b/);
+  assert.match(result.stdout, /\bqsee [1-9]\d{2,}\b/);
   assert.match(result.stdout, /\brootred [1-9]\d*\/\d+\b/);
   assert.match(result.stdout, /\brootredply [1-9]\d*\b/);
   assert.match(result.stdout, /\bnmrboost [1-9]\d*\b/);
