@@ -4783,7 +4783,7 @@ int negamax(
     const int extension = (singular || givesCheck || recapture || checkEvasion) ? 1 : 0;
     const int childExtensions = extensionsRemaining - extension;
     if (!inCheck
-        && depth <= 2
+        && depth <= 3
         && moveIndex > 0
         && quietMove
         && !killerCandidate
