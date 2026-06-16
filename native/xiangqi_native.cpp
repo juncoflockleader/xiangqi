@@ -780,6 +780,8 @@ struct SearchState {
   EvalCache* evalCache = nullptr;
   const std::vector<uint64_t>* rootHistoryKeys = nullptr;
   const std::unordered_map<uint64_t, int>* rootHistoryCounts = nullptr;
+  bool rootHistoryHasPositions = false;
+  bool rootHistoryHasRepeatedPositions = false;
   std::array<std::array<Move, 2>, kMaxPly> killers{};
   std::array<std::array<int, kSquares>, kSquares> quietHistory{};
   std::array<std::array<int, kSquares>, kSquares> captureHistory{};
@@ -914,6 +916,8 @@ struct SearchState {
     evalCache = nullptr;
     rootHistoryKeys = nullptr;
     rootHistoryCounts = nullptr;
+    rootHistoryHasPositions = false;
+    rootHistoryHasRepeatedPositions = false;
     killers = {};
     staticEvalStack.fill(0);
     staticEvalKnown.fill(false);
@@ -935,6 +939,8 @@ struct SearchState {
     rootOrderCount = 0;
     rootHistoryKeys = nullptr;
     rootHistoryCounts = nullptr;
+    rootHistoryHasPositions = false;
+    rootHistoryHasRepeatedPositions = false;
     rootOrderMoves = {};
     checkCache = {};
     leastAttackerCache = {};
@@ -4097,6 +4103,12 @@ int countRootHistoryOccurrences(const SearchState& state, uint64_t key) {
   return static_cast<int>(std::count(state.rootHistoryKeys->begin(), state.rootHistoryKeys->end(), key));
 }
 
+int lookupRootHistoryCount(const SearchState& state, uint64_t key) {
+  if (!state.rootHistoryCounts) return countRootHistoryOccurrences(state, key);
+  const auto found = state.rootHistoryCounts->find(key);
+  return found == state.rootHistoryCounts->end() ? 0 : found->second;
+}
+
 int countSearchPathOccurrences(const SearchState& state, int ply, uint64_t key) {
   if (ply <= 0) return 0;
   int count = 0;
@@ -4112,6 +4124,27 @@ bool recordSearchPathPosition(SearchState& state, int ply, uint64_t key) {
   const auto pathIndex = static_cast<std::size_t>(ply);
   const int previousOccurrences = countRootHistoryOccurrences(state, key)
       + countSearchPathOccurrences(state, ply, key);
+  if (previousOccurrences >= 2) {
+    state.repetitions += 1;
+    return true;
+  }
+  state.pathKeys[pathIndex] = key;
+  state.pathKeyKnown[pathIndex] = true;
+  return false;
+}
+
+bool recordQuiescencePathPosition(SearchState& state, int ply, uint64_t key) {
+  if (ply < 0 || ply >= kMaxPly) return false;
+  const auto pathIndex = static_cast<std::size_t>(ply);
+  const int pathOccurrences = countSearchPathOccurrences(state, ply, key);
+  int previousOccurrences = pathOccurrences;
+  if (pathOccurrences >= 2) {
+    state.repetitions += 1;
+    return true;
+  }
+  if (state.rootHistoryHasRepeatedPositions || (pathOccurrences > 0 && state.rootHistoryHasPositions)) {
+    previousOccurrences += lookupRootHistoryCount(state, key);
+  }
   if (previousOccurrences >= 2) {
     state.repetitions += 1;
     return true;
@@ -4828,6 +4861,8 @@ int quiescenceKnownCheck(
   state.nodes += 1;
   state.qnodes += 1;
 
+  if (state.rootHistoryHasRepeatedPositions && recordQuiescencePathPosition(state, ply, board.key)) return 0;
+
   alpha = std::max(alpha, -kMate + ply);
   beta = std::min(beta, kMate - ply - 1);
   if (alpha >= beta) {
@@ -5419,6 +5454,10 @@ std::vector<RootLine> searchRoot(
   state.evalCache = &evalCache;
   state.rootHistoryKeys = &historyKeys;
   state.rootHistoryCounts = &historyCounts;
+  state.rootHistoryHasPositions = !historyKeys.empty();
+  state.rootHistoryHasRepeatedPositions = std::any_of(historyCounts.begin(), historyCounts.end(), [](const auto& entry) {
+    return entry.second >= 2;
+  });
   state.rootPieceCount = root.totalPieceCount;
   state.pathKeys[0] = root.key;
   state.pathKeyKnown[0] = true;
