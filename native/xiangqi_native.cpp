@@ -4541,7 +4541,7 @@ int moveOrderingScore(
       score += kPawnPressureOrderingBonus;
       state.pawnThreatOrderHits += 1;
     }
-    if (board && isKingLinePressureExtensionMove(*board, move, enemyKing, state.rootPieceCount)) {
+    if (scoreChecks && board && isKingLinePressureExtensionMove(*board, move, enemyKing, state.rootPieceCount)) {
       score += kKingLinePressureOrderingBonus;
       state.kingLinePressureOrderHits += 1;
     }
