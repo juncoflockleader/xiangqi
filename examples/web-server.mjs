@@ -195,7 +195,12 @@ export function resolveWebServerCommandTimeoutMs(options = {}, depth = numberOrN
 export function resolveWebServerRequestTimeoutMs(options = {}, commandTimeoutMs = resolveWebServerCommandTimeoutMs(options)) {
   const explicit = numberOrNull(options.requestTimeoutMs);
   if (explicit) return explicit;
-  return Math.max(DEFAULT_REQUEST_TIMEOUT_MS, commandTimeoutMs + REQUEST_TIMEOUT_BUFFER_MS);
+  const timeLimitMs = numberOrNull(options.timeLimitMs);
+  const reviewTimeLimitMs = timeLimitMs
+    ? Math.min(timeLimitMs, PLAYER_REVIEW_TIME_CAP_MS)
+    : PLAYER_REVIEW_TIME_CAP_MS;
+  const reviewCommandTimeoutMs = resolveWebPlayerReviewCommandTimeoutMs(reviewTimeLimitMs);
+  return Math.max(DEFAULT_REQUEST_TIMEOUT_MS, commandTimeoutMs + reviewCommandTimeoutMs + REQUEST_TIMEOUT_BUFFER_MS);
 }
 
 async function handleRequest(context) {
@@ -370,8 +375,14 @@ export function resolveWebPlayerReviewOptions(session) {
   return {
     ...searchOptions(session),
     depth: reviewDepth,
-    timeLimitMs: reviewTimeLimitMs
+    timeLimitMs: reviewTimeLimitMs,
+    commandTimeoutMs: resolveWebPlayerReviewCommandTimeoutMs(reviewTimeLimitMs)
   };
+}
+
+export function resolveWebPlayerReviewCommandTimeoutMs(timeLimitMs = PLAYER_REVIEW_TIME_CAP_MS) {
+  const timeBudget = (numberOrNull(timeLimitMs) ?? 0) * COMMAND_TIMEOUT_TIME_MULTIPLIER;
+  return Math.max(DEFAULT_COMMAND_TIMEOUT_MS, timeBudget);
 }
 
 function parsePly(value, maxPly) {
