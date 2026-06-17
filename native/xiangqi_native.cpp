@@ -4281,6 +4281,7 @@ int countRootHistoryOccurrences(const SearchState& state, uint64_t key) {
 }
 
 int lookupRootHistoryCount(const SearchState& state, uint64_t key) {
+  if (!state.rootHistoryHasPositions) return 0;
   if (!state.rootHistoryCounts) return countRootHistoryOccurrences(state, key);
   const auto found = state.rootHistoryCounts->find(key);
   return found == state.rootHistoryCounts->end() ? 0 : found->second;
