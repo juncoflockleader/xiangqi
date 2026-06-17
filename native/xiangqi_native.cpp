@@ -1669,8 +1669,8 @@ uint64_t sideHash() {
 }
 
 uint64_t keyAfterMove(const Board& board, const Move& move) {
-  const int movingPiece = move.piece != 0 ? move.piece : board.cells[move.from];
-  const int capturedPiece = move.captured != 0 ? move.captured : board.cells[move.to];
+  const int movingPiece = board.cells[move.from];
+  const int capturedPiece = board.cells[move.to];
   uint64_t key = board.key ^ sideHash();
   key ^= pieceHash(move.from, movingPiece);
   if (capturedPiece != 0) key ^= pieceHash(move.to, capturedPiece);
@@ -1951,16 +1951,21 @@ void addMaterialByPiece(Board& board, int piece, int delta) {
   board.materialScore += materialScoreForPiece(piece) * delta;
 }
 
-void makeMove(Board& board, Move& move) {
+template <bool hasKnownKey>
+void makeMoveImpl(Board& board, Move& move, uint64_t knownKey) {
   move.piece = board.cells[move.from];
   move.captured = board.cells[move.to];
   const int movingSide = move.piece > 0 ? kRed : kBlack;
   const int movingType = move.piece > 0 ? move.piece : -move.piece;
   const int captured = move.captured;
-  board.key ^= sideHash();
-  board.key ^= pieceHash(move.from, move.piece);
-  if (captured != 0) board.key ^= pieceHash(move.to, captured);
-  board.key ^= pieceHash(move.to, move.piece);
+  if constexpr (hasKnownKey) {
+    board.key = knownKey;
+  } else {
+    board.key ^= sideHash();
+    board.key ^= pieceHash(move.from, move.piece);
+    if (captured != 0) board.key ^= pieceHash(move.to, captured);
+    board.key ^= pieceHash(move.to, move.piece);
+  }
   board.positionalScore -= positionalScoreForPieceSquare(move.piece, move.from);
   board.positionalScore += positionalScoreForPieceSquare(move.piece, move.to);
   if (captured != 0) {
@@ -1980,6 +1985,14 @@ void makeMove(Board& board, Move& move) {
   board.cells[move.from] = 0;
   if (movingType == King) setKingSquare(board, movingSide, move.to);
   board.side = -board.side;
+}
+
+void makeMove(Board& board, Move& move) {
+  makeMoveImpl<false>(board, move, 0);
+}
+
+void makeMoveWithKnownKey(Board& board, Move& move, uint64_t knownKey) {
+  makeMoveImpl<true>(board, move, knownKey);
 }
 
 void undoMove(Board& board, const Move& move) {
@@ -4621,9 +4634,10 @@ bool tryProbCut(
 
     state.probCutSearches += 1;
     const KnownChildState child = knownChildStateAfterMove(board, move, enemyKing, state);
-    prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
+    const uint64_t childKey = keyAfterMove(board, move);
+    prefetchMainSearchCaches(state, childKey, -board.side);
     recordSearchPathMove(state, ply, move);
-    makeMove(board, move);
+    makeMoveWithKnownKey(board, move, childKey);
     const int score = -negamax(
         board,
         reducedDepth,
@@ -4730,9 +4744,10 @@ Move internalIterativeDeepeningMoveHint(
     if (timeExpired(state)) return true;
 
     const KnownChildState child = knownChildStateAfterMove(board, move, enemyKing, state);
-    prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
+    const uint64_t childKey = keyAfterMove(board, move);
+    prefetchMainSearchCaches(state, childKey, -board.side);
     recordSearchPathMove(state, ply, move);
-    makeMove(board, move);
+    makeMoveWithKnownKey(board, move, childKey);
     const int score = -negamax(
         board,
         reducedDepth - 1,
@@ -4830,9 +4845,10 @@ int verifyNullMoveCutoff(
     if (timeExpired(state)) break;
 
     const KnownChildState child = knownChildStateAfterMove(board, move, enemyKing, state);
-    prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
+    const uint64_t childKey = keyAfterMove(board, move);
+    prefetchMainSearchCaches(state, childKey, -board.side);
     recordSearchPathMove(state, ply, move);
-    makeMove(board, move);
+    makeMoveWithKnownKey(board, move, childKey);
     const int score = -negamax(
         board,
         std::max(0, verificationDepth - 1),
@@ -4874,9 +4890,10 @@ int searchExcludedMoveBestScore(
     if (timeExpired(state)) break;
 
     const KnownChildState child = knownChildStateAfterMove(board, move, enemyKing, state);
-    prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
+    const uint64_t childKey = keyAfterMove(board, move);
+    prefetchMainSearchCaches(state, childKey, -board.side);
     recordSearchPathMove(state, ply, move);
-    makeMove(board, move);
+    makeMoveWithKnownKey(board, move, childKey);
     const int score = -negamax(
         board,
         childDepth,
@@ -5262,9 +5279,10 @@ int negamax(
     const int childOwnKing = (move.captured > 0 ? move.captured : -move.captured) == King ? -1 : enemyKing;
     const bool childInCheck = childOwnKing < 0 || givesCheck;
     std::vector<Move>* childPvSink = pv ? &childPv : nullptr;
-    prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
+    const uint64_t childKey = keyAfterMove(board, move);
+    prefetchMainSearchCaches(state, childKey, -board.side);
     recordSearchPathMove(state, ply, move);
-    makeMove(board, move);
+    makeMoveWithKnownKey(board, move, childKey);
     if (childPvSink) childPv.clear();
     int score;
     if (moveIndex == 0) {
@@ -5490,8 +5508,9 @@ int quiescenceKnownCheck(
     const int childOwnKing = (move.captured > 0 ? move.captured : -move.captured) == King ? -1 : enemyKing;
     const int childEnemyKing = (move.piece > 0 ? move.piece : -move.piece) == King ? move.to : ownKing;
     const bool childInCheck = childOwnKing < 0 || givesCheck;
-    prefetchQuiescenceCaches(state, keyAfterMove(board, move), -board.side);
-    makeMove(board, move);
+    const uint64_t childKey = keyAfterMove(board, move);
+    prefetchQuiescenceCaches(state, childKey, -board.side);
+    makeMoveWithKnownKey(board, move, childKey);
     const int score = -quiescenceKnownCheck(board, -beta, -alpha, ply + 1, qDepth - 1, state, childOwnKing, childInCheck, childEnemyKing);
     undoMove(board, move);
     if (state.stopped) break;
@@ -5965,9 +5984,10 @@ std::vector<RootLine> searchRootDepth(
       if (pawnPressure) state.pawnThreatExtensions += 1;
     }
     state.rootChildStateReuses += 1;
-    prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
+    const uint64_t childKey = keyAfterMove(board, move);
+    prefetchMainSearchCaches(state, childKey, -board.side);
     recordSearchPathMove(state, 0, move);
-    makeMove(board, move);
+    makeMoveWithKnownKey(board, move, childKey);
     childPv.clear();
     const int childDepth = depth - 1 + moveExtension;
     int score;
