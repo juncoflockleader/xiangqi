@@ -1985,6 +1985,20 @@ void addPawnMoves(const Board& board, MoveList& moves, int from, int piece, int 
 }
 
 template <MoveGenerationMode mode>
+void addPieceMoves(const Board& board, MoveList& moves, int square, int piece, int pieceSide) {
+  switch (pieceCodeType(piece)) {
+    case King: addKingMoves<mode>(board, moves, square, piece, pieceSide); break;
+    case Advisor: addAdvisorMoves<mode>(board, moves, square, piece, pieceSide); break;
+    case Elephant: addElephantMoves<mode>(board, moves, square, piece, pieceSide); break;
+    case Horse: addHorseMoves<mode>(board, moves, square, piece, pieceSide); break;
+    case Rook: addSlidingMoves<mode>(board, moves, square, piece, pieceSide, false); break;
+    case Cannon: addSlidingMoves<mode>(board, moves, square, piece, pieceSide, true); break;
+    case Pawn: addPawnMoves<mode>(board, moves, square, piece, pieceSide); break;
+    default: break;
+  }
+}
+
+template <MoveGenerationMode mode>
 MoveList generatePseudoMovesFor(const Board& board, int side) {
   MoveList moves;
   const auto& squares = pieceSquares(board, side);
@@ -1995,16 +2009,7 @@ MoveList generatePseudoMovesFor(const Board& board, int side) {
     const int piece = board.cells[square];
     if (pieceCodeSide(piece) != side) continue;
     const int pieceSide = side;
-    switch (pieceCodeType(piece)) {
-      case King: addKingMoves<mode>(board, moves, square, piece, pieceSide); break;
-      case Advisor: addAdvisorMoves<mode>(board, moves, square, piece, pieceSide); break;
-      case Elephant: addElephantMoves<mode>(board, moves, square, piece, pieceSide); break;
-      case Horse: addHorseMoves<mode>(board, moves, square, piece, pieceSide); break;
-      case Rook: addSlidingMoves<mode>(board, moves, square, piece, pieceSide, false); break;
-      case Cannon: addSlidingMoves<mode>(board, moves, square, piece, pieceSide, true); break;
-      case Pawn: addPawnMoves<mode>(board, moves, square, piece, pieceSide); break;
-      default: break;
-    }
+    addPieceMoves<mode>(board, moves, square, piece, pieceSide);
   }
   return moves;
 }
@@ -2016,6 +2021,97 @@ MoveList generatePseudoMoves(const Board& board, int side, MoveGenerationMode mo
     case GenerateAllMoves:
     default: return generatePseudoMovesFor<GenerateAllMoves>(board, side);
   }
+}
+
+template <std::size_t MaxTargets>
+bool quietTargetMayReachKingLine(const Board& board, const TargetLookup<MaxTargets>& lookup, int from, int enemyKing) {
+  const int count = lookup.counts[static_cast<std::size_t>(from)];
+  const auto& targets = lookup.targets[static_cast<std::size_t>(from)];
+  for (int index = 0; index < count; index += 1) {
+    const int target = targets[static_cast<std::size_t>(index)];
+    if (board.cells[target] == 0 && kSameLineBySquare[static_cast<std::size_t>(target)][static_cast<std::size_t>(enemyKing)]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+template <std::size_t MaxTargets>
+bool quietBlockedTargetMayReachKingLine(
+    const Board& board,
+    const TargetBlockerLookup<MaxTargets>& lookup,
+    int from,
+    int enemyKing) {
+  const int count = lookup.counts[static_cast<std::size_t>(from)];
+  const auto& targets = lookup.targets[static_cast<std::size_t>(from)];
+  const auto& blockers = lookup.blockers[static_cast<std::size_t>(from)];
+  for (int index = 0; index < count; index += 1) {
+    const std::size_t slot = static_cast<std::size_t>(index);
+    const int target = targets[slot];
+    if (board.cells[blockers[slot]] == 0
+        && board.cells[target] == 0
+        && kSameLineBySquare[static_cast<std::size_t>(target)][static_cast<std::size_t>(enemyKing)]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool horseQuietTargetMayCheck(const Board& board, int from, int enemyKing) {
+  const int count = kHorseTargets.counts[static_cast<std::size_t>(from)];
+  const auto& targets = kHorseTargets.targets[static_cast<std::size_t>(from)];
+  const auto& blockers = kHorseTargets.blockers[static_cast<std::size_t>(from)];
+  for (int index = 0; index < count; index += 1) {
+    const std::size_t slot = static_cast<std::size_t>(index);
+    const int target = targets[slot];
+    if (board.cells[blockers[slot]] != 0 || board.cells[target] != 0) continue;
+    if (kSameLineBySquare[static_cast<std::size_t>(target)][static_cast<std::size_t>(enemyKing)]) return true;
+    if (kHorseLegSquareBySourceTarget[static_cast<std::size_t>(target)][static_cast<std::size_t>(enemyKing)] >= 0) return true;
+  }
+  return false;
+}
+
+bool pieceMayHaveQuietCheckCandidate(const Board& board, int square, int piece, int side, int enemyKing) {
+  if (enemyKing < 0) return false;
+  const auto from = static_cast<std::size_t>(square);
+  const auto king = static_cast<std::size_t>(enemyKing);
+  if (kSameLineBySquare[from][king] || kHorseLegBlockerByTarget[from][king]) return true;
+
+  const int sideIndex = sideLookupIndex(side);
+  switch (pieceCodeType(piece)) {
+    case King:
+      return quietTargetMayReachKingLine(board, kKingTargets[static_cast<std::size_t>(sideIndex)], square, enemyKing);
+    case Advisor:
+      return quietTargetMayReachKingLine(board, kAdvisorTargets[static_cast<std::size_t>(sideIndex)], square, enemyKing);
+    case Elephant:
+      return quietBlockedTargetMayReachKingLine(board, kElephantTargets[static_cast<std::size_t>(sideIndex)], square, enemyKing);
+    case Horse:
+      return horseQuietTargetMayCheck(board, square, enemyKing);
+    case Rook:
+    case Cannon:
+      return true;
+    case Pawn:
+      return quietTargetMayReachKingLine(board, kPawnTargets[static_cast<std::size_t>(sideIndex)], square, enemyKing);
+    default:
+      return false;
+  }
+}
+
+MoveList generatePseudoQuietCheckCandidates(const Board& board, int side, int enemyKing) {
+  MoveList moves;
+  if (enemyKing < 0) return moves;
+
+  const auto& squares = pieceSquares(board, side);
+  const int count = pieceCount(board, side);
+  for (int listIndex = 0; listIndex < count; listIndex += 1) {
+    const int square = squares[listIndex];
+    if (square < 0 || square >= kSquares) continue;
+    const int piece = board.cells[square];
+    if (pieceCodeSide(piece) != side) continue;
+    if (!pieceMayHaveQuietCheckCandidate(board, square, piece, side, enemyKing)) continue;
+    addPieceMoves<GenerateQuietsOnly>(board, moves, square, piece, side);
+  }
+  return moves;
 }
 
 int findKing(const Board& board, int side) {
@@ -3058,10 +3154,9 @@ void keepBestQuietChecks(MoveList& moves, const Board& board, SearchState& state
 }
 
 MoveList generateQuietChecks(Board& board, int side, int enemyKing, int limit, SearchState& state, int ownKing, bool currentlyInCheck) {
-  if (enemyKing < 0 || limit <= 0) return {};
+  if (enemyKing < 0 || limit <= 0 || ownKing < 0) return {};
 
-  auto moves = generatePseudoMoves(board, side, GenerateQuietsOnly);
-  if (ownKing < 0) return {};
+  auto moves = generatePseudoQuietCheckCandidates(board, side, enemyKing);
 
   std::size_t checkCount = 0;
   for (std::size_t index = 0; index < moves.size(); index += 1) {
@@ -6239,8 +6334,9 @@ int quiescenceKnownCheck(
     return score;
   }
   ScoredMovePicker movePicker(moves);
-  if (!movePicker.tryHashMoveFirst(state, ply, hashMove, {}, &board, enemyKing, {}, inCheck, false, false, true)) {
-    movePicker.score(state, ply, hashMove, {}, &board, enemyKing, {}, inCheck, false, false, true);
+  const Move orderingHashMove = hashMoveHandled ? Move{} : hashMove;
+  if (!movePicker.tryHashMoveFirst(state, ply, orderingHashMove, {}, &board, enemyKing, {}, inCheck, false, false, true)) {
+    movePicker.score(state, ply, orderingHashMove, {}, &board, enemyKing, {}, inCheck, false, false, true);
   }
 
   while (Move* pickedMove = movePicker.next()) {
