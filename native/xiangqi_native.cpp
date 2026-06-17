@@ -4181,6 +4181,9 @@ int pawnStructureBonus(const Board& board, int square, int side, int file, int r
       && pieceCodeType(forwardBlocker) == Pawn;
   if (!pawnControlsSquare(board, enemy, square) && !enemyPawnAhead) bonus += 12;
 
+  const int targetRank = rank + forwardDelta(side);
+  if (inside(file, targetRank) && palaceContains(enemy, file, targetRank)) bonus += 14;
+
   if (palaceContains(enemy, file, rank)) {
     bonus += 36;
     if (fileDistance == 0) bonus += 28;

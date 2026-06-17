@@ -1897,6 +1897,21 @@ test("local C++ engine rewards uncontested passed pawn lanes", async (t) => {
   assert.ok(scores[0] >= scores[1] + 24, JSON.stringify(scores));
 });
 
+test("local C++ engine rewards passed pawns ready to enter the palace", async (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const scores = staticEvalScores(build.output, [
+    "4k4/9/9/4P4/9/9/9/9/9/3K5 r",
+    "4k4/9/9/9/4P4/9/9/9/9/3K5 r"
+  ]);
+
+  assert.ok(scores[0] >= scores[1] + 32, JSON.stringify(scores));
+});
+
 test("local C++ engine extends late-game pawn pressure at the root", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {
