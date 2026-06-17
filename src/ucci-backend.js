@@ -871,13 +871,16 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     qttStores: maxInfoValue(infos, "qttStores"),
     qttCutoffs: maxInfoValue(infos, "qttCutoffs"),
     qttMoveHits: maxInfoValue(infos, "qttMoveHits"),
+    qttPrefetches: maxInfoValue(infos, "qttPrefetches"),
     evalCacheHits: maxInfoValue(infos, "evalCacheHits"),
     evalCacheProbes: maxInfoValue(infos, "evalCacheProbes"),
     evalCacheStores: maxInfoValue(infos, "evalCacheStores"),
+    evalCachePrefetches: maxInfoValue(infos, "evalCachePrefetches"),
     checkedEvalSkips: maxInfoValue(infos, "checkedEvalSkips"),
     staticEvalTrendClears: maxInfoValue(infos, "staticEvalTrendClears"),
     ttHits: maxInfoValue(infos, "ttHits"),
     ttMoveHits: maxInfoValue(infos, "ttMoveHits"),
+    ttPrefetches: maxInfoValue(infos, "ttPrefetches"),
     cutoffs: maxInfoValue(infos, "cutoffs"),
     killerHits: maxInfoValue(infos, "killerHits"),
     captureHistoryHits: maxInfoValue(infos, "captureHistoryHits"),
@@ -1173,6 +1176,9 @@ function parseInfoLine(line) {
     } else if (token === "ttmove") {
       info.ttMoveHits = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
+    } else if (token === "ttpref") {
+      info.ttPrefetches = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
     } else if (token === "killers") {
       info.killerHits = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
@@ -1449,6 +1455,9 @@ function parseInfoLine(line) {
     } else if (token === "qttmove") {
       info.qttMoveHits = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
+    } else if (token === "qttpref") {
+      info.qttPrefetches = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
     } else if (token === "eval") {
       const [hits, probes] = parseNativePair(tokens[index + 1]);
       info.evalCacheHits = hits;
@@ -1456,6 +1465,9 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "evalstores") {
       info.evalCacheStores = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "evalpref") {
+      info.evalCachePrefetches = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "evalskip") {
       info.checkedEvalSkips = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -2076,7 +2088,10 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.qCaptureHistoryStores ?? 0) > 0) parts.push(nativeCount(stats.qCaptureHistoryStores, "qsearch capture-history update"));
   if ((stats.qCaptureHistoryMaluses ?? 0) > 0) parts.push(nativeCount(stats.qCaptureHistoryMaluses, "qsearch capture-history malus"));
   if ((stats.qttHits ?? 0) > 0) parts.push(nativeCount(stats.qttHits, "quiescence-table hit"));
+  if ((stats.qttPrefetches ?? 0) > 0) parts.push(nativeCount(stats.qttPrefetches, "quiescence-table prefetch request"));
   if ((stats.evalCacheHits ?? 0) > 0) parts.push(nativeCount(stats.evalCacheHits, "evaluation-cache hit"));
+  if ((stats.evalCachePrefetches ?? 0) > 0) parts.push(nativeCount(stats.evalCachePrefetches, "evaluation-cache prefetch request"));
+  if ((stats.ttPrefetches ?? 0) > 0) parts.push(nativeCount(stats.ttPrefetches, "transposition-table prefetch request"));
   if ((stats.checkCacheHits ?? 0) > 0) parts.push(nativeCount(stats.checkCacheHits, "check-cache hit"));
   if ((stats.leastAttackerCacheHits ?? 0) > 0) parts.push(nativeCount(stats.leastAttackerCacheHits, "least-attacker cache hit"));
   if ((stats.checkedEvalSkips ?? 0) > 0) parts.push(nativeCount(stats.checkedEvalSkips, "checked-node eval skip"));
@@ -2355,12 +2370,15 @@ function createNativeStats(parsed) {
     qttHits: parsed.qttHits ?? 0,
     qttStores: parsed.qttStores ?? 0,
     qttMoveHits: parsed.qttMoveHits ?? 0,
+    qttPrefetches: parsed.qttPrefetches ?? 0,
     evalCacheHits: parsed.evalCacheHits ?? 0,
     evalCacheStores: parsed.evalCacheStores ?? 0,
+    evalCachePrefetches: parsed.evalCachePrefetches ?? 0,
     checkedEvalSkips: parsed.checkedEvalSkips ?? 0,
     staticEvalTrendClears: parsed.staticEvalTrendClears ?? 0,
     ttHits: parsed.ttHits ?? 0,
     ttMoveHits: parsed.ttMoveHits ?? 0,
+    ttPrefetches: parsed.ttPrefetches ?? 0,
     cutoffs: parsed.cutoffs ?? 0,
     captureHistoryHits: parsed.captureHistoryHits ?? 0,
     captureHistoryStores: parsed.captureHistoryStores ?? 0,
@@ -2465,8 +2483,10 @@ function createEmptyStats() {
     qttEvictions: 0,
     qttSkips: 0,
     qttMoveHits: 0,
+    qttPrefetches: 0,
     evalCacheHits: 0,
     evalCacheStores: 0,
+    evalCachePrefetches: 0,
     checkedEvalSkips: 0,
     staticEvalTrendClears: 0,
     tacticalCacheHits: 0,
@@ -2477,6 +2497,7 @@ function createEmptyStats() {
     ttEvictions: 0,
     ttSkips: 0,
     ttMoveHits: 0,
+    ttPrefetches: 0,
     cutoffs: 0,
     aspirationSearches: 0,
     aspirationWidenedSearches: 0,

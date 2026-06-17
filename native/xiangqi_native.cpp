@@ -735,6 +735,14 @@ std::size_t floorPowerOfTwo(std::size_t value) {
   return power;
 }
 
+void prefetchForRead(const void* address) {
+#if defined(__GNUC__) || defined(__clang__)
+  __builtin_prefetch(address, 0, 1);
+#else
+  (void)address;
+#endif
+}
+
 struct SearchState {
   std::chrono::steady_clock::time_point started;
   std::chrono::steady_clock::time_point deadline;
@@ -749,6 +757,7 @@ struct SearchState {
   int64_t ttHits = 0;
   int64_t ttCutoffs = 0;
   int64_t ttMoveHits = 0;
+  int64_t ttPrefetches = 0;
   int64_t killerHits = 0;
   int64_t historyUpdates = 0;
   int64_t captureHistoryHits = 0;
@@ -851,9 +860,11 @@ struct SearchState {
   int64_t qttStores = 0;
   int64_t qttCutoffs = 0;
   int64_t qttMoveHits = 0;
+  int64_t qttPrefetches = 0;
   int64_t evalCacheProbes = 0;
   int64_t evalCacheHits = 0;
   int64_t evalCacheStores = 0;
+  int64_t evalCachePrefetches = 0;
   int64_t checkedEvalSkips = 0;
   int64_t staticEvalTrendClears = 0;
   int memoryAge = 0;
@@ -897,6 +908,7 @@ struct SearchState {
     ttHits = 0;
     ttCutoffs = 0;
     ttMoveHits = 0;
+    ttPrefetches = 0;
     killerHits = 0;
     historyUpdates = 0;
     captureHistoryHits = 0;
@@ -999,9 +1011,11 @@ struct SearchState {
     qttStores = 0;
     qttCutoffs = 0;
     qttMoveHits = 0;
+    qttPrefetches = 0;
     evalCacheProbes = 0;
     evalCacheHits = 0;
     evalCacheStores = 0;
+    evalCachePrefetches = 0;
     checkedEvalSkips = 0;
     staticEvalTrendClears = 0;
     memoryAge += 1;
@@ -1102,6 +1116,12 @@ class TranspositionTable {
       if (entry.occupied && entry.key == key) return &entry;
     }
     return nullptr;
+  }
+
+  bool prefetch(uint64_t key) const {
+    if (table_.empty()) return false;
+    prefetchForRead(&table_[bucketIndex(key)]);
+    return true;
   }
 
   void store(uint64_t key, int depth, int score, int flag, const Move& bestMove) {
@@ -1209,6 +1229,12 @@ class EvalCache {
       if (entry.occupied && entry.key == key) return &entry;
     }
     return nullptr;
+  }
+
+  bool prefetch(uint64_t key) const {
+    if (table_.empty()) return false;
+    prefetchForRead(&table_[bucketIndex(key)]);
+    return true;
   }
 
   void store(uint64_t key, int score) {
@@ -1564,6 +1590,20 @@ uint64_t pieceHash(int square, int piece) {
 
 uint64_t sideHash() {
   return kSideHash;
+}
+
+uint64_t keyAfterMove(const Board& board, const Move& move) {
+  const int movingPiece = move.piece != 0 ? move.piece : board.cells[move.from];
+  const int capturedPiece = move.captured != 0 ? move.captured : board.cells[move.to];
+  uint64_t key = board.key ^ sideHash();
+  key ^= pieceHash(move.from, movingPiece);
+  if (capturedPiece != 0) key ^= pieceHash(move.to, capturedPiece);
+  key ^= pieceHash(move.to, movingPiece);
+  return key;
+}
+
+uint64_t evalCacheKeyFor(uint64_t boardKey, int sideToMove) {
+  return sideToMove == kBlack ? boardKey ^ sideHash() : boardKey;
 }
 
 uint64_t computeKey(const Board& board) {
@@ -4314,6 +4354,16 @@ void storeQtt(SearchState& state, const Board& board, int depth, int ply, int sc
   state.qttStores += 1;
 }
 
+void prefetchMainSearchCaches(SearchState& state, uint64_t key, int sideToMove) {
+  if (state.tt && state.tt->prefetch(key)) state.ttPrefetches += 1;
+  if (state.evalCache && state.evalCache->prefetch(evalCacheKeyFor(key, sideToMove))) state.evalCachePrefetches += 1;
+}
+
+void prefetchQuiescenceCaches(SearchState& state, uint64_t key, int sideToMove) {
+  if (state.qtt && state.qtt->prefetch(key)) state.qttPrefetches += 1;
+  if (state.evalCache && state.evalCache->prefetch(evalCacheKeyFor(key, sideToMove))) state.evalCachePrefetches += 1;
+}
+
 bool timeExpired(SearchState& state) {
   if (!state.hasDeadline) return false;
   if ((state.nodes & kTimeCheckNodeMask) != 0) return false;
@@ -4451,6 +4501,7 @@ bool tryProbCut(
 
     state.probCutSearches += 1;
     const KnownChildState child = knownChildStateAfterMove(board, move, enemyKing, state);
+    prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
     makeMove(board, move);
     const int score = -negamax(
         board,
@@ -4509,6 +4560,7 @@ Move internalIterativeDeepeningMoveHint(
     if (timeExpired(state)) break;
 
     const KnownChildState child = knownChildStateAfterMove(board, move, enemyKing, state);
+    prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
     makeMove(board, move);
     const int score = -negamax(
         board,
@@ -4594,6 +4646,7 @@ int verifyNullMoveCutoff(
     if (timeExpired(state)) break;
 
     const KnownChildState child = knownChildStateAfterMove(board, move, enemyKing, state);
+    prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
     makeMove(board, move);
     const int score = -negamax(
         board,
@@ -4635,6 +4688,7 @@ int searchExcludedMoveBestScore(
     if (timeExpired(state)) break;
 
     const KnownChildState child = knownChildStateAfterMove(board, move, enemyKing, state);
+    prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
     makeMove(board, move);
     const int score = -negamax(
         board,
@@ -4816,6 +4870,7 @@ int negamax(
     const int reduction = nullMoveReduction(state, depth, staticScore, beta, trend);
     const int nullChildKing = resolveEnemyKing();
     const bool nullChildInCheck = nullChildKing < 0;
+    prefetchMainSearchCaches(state, board.key ^ sideHash(), -board.side);
     makeNullMove(board);
     const int nullScore = -negamax(
         board,
@@ -5018,6 +5073,7 @@ int negamax(
     const int childOwnKing = (move.captured > 0 ? move.captured : -move.captured) == King ? -1 : enemyKing;
     const bool childInCheck = childOwnKing < 0 || givesCheck;
     std::vector<Move>* childPvSink = pv ? &childPv : nullptr;
+    prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
     makeMove(board, move);
     if (childPvSink) childPv.clear();
     int score;
@@ -5242,6 +5298,7 @@ int quiescenceKnownCheck(
     const int childOwnKing = (move.captured > 0 ? move.captured : -move.captured) == King ? -1 : enemyKing;
     const int childEnemyKing = (move.piece > 0 ? move.piece : -move.piece) == King ? move.to : ownKing;
     const bool childInCheck = childOwnKing < 0 || givesCheck;
+    prefetchQuiescenceCaches(state, keyAfterMove(board, move), -board.side);
     makeMove(board, move);
     const int score = -quiescenceKnownCheck(board, -beta, -alpha, ply + 1, qDepth - 1, state, childOwnKing, childInCheck, childEnemyKing);
     undoMove(board, move);
@@ -5644,6 +5701,7 @@ std::vector<RootLine> searchRootDepth(
       if (pawnPressure) state.pawnThreatExtensions += 1;
     }
     state.rootChildStateReuses += 1;
+    prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
     makeMove(board, move);
     childPv.clear();
     const int childDepth = depth - 1 + moveExtension;
@@ -6047,7 +6105,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
     std::cout << "info depth " << depth << " score mate -1 nodes " << state.nodes << " time " << time << " nps " << nps
               << " hashfull " << state.ttHashfull
               << " string tt " << state.ttHits << "/" << state.ttProbes << " cutoffs " << state.ttCutoffs
-              << " ttmove " << state.ttMoveHits
+              << " ttmove " << state.ttMoveHits << " ttpref " << state.ttPrefetches
               << " killers " << state.killerHits << " history " << state.historyUpdates
               << " caphist " << state.captureHistoryHits << " caphstores " << state.captureHistoryStores
               << " caphm " << state.captureHistoryMaluses << " caphguard " << state.captureHistoryPruneGuards
@@ -6104,8 +6162,9 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " qcaphist " << state.qCaptureHistoryHits << " qcapstores " << state.qCaptureHistoryStores
               << " qcaphm " << state.qCaptureHistoryMaluses
               << " qtt " << state.qttHits << "/" << state.qttProbes << " qttstores " << state.qttStores
-              << " qttcut " << state.qttCutoffs << " qttmove " << state.qttMoveHits
+              << " qttcut " << state.qttCutoffs << " qttmove " << state.qttMoveHits << " qttpref " << state.qttPrefetches
               << " eval " << state.evalCacheHits << "/" << state.evalCacheProbes << " evalstores " << state.evalCacheStores
+              << " evalpref " << state.evalCachePrefetches
               << " evalskip " << state.checkedEvalSkips << " evalguard " << state.staticEvalTrendClears
               << " rep " << state.repetitions
               << " memage " << state.memoryAge
@@ -6124,7 +6183,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " nps " << nps
               << " hashfull " << state.ttHashfull
               << " string tt " << state.ttHits << "/" << state.ttProbes << " cutoffs " << state.ttCutoffs
-              << " ttmove " << state.ttMoveHits
+              << " ttmove " << state.ttMoveHits << " ttpref " << state.ttPrefetches
               << " killers " << state.killerHits << " history " << state.historyUpdates
               << " caphist " << state.captureHistoryHits << " caphstores " << state.captureHistoryStores
               << " caphm " << state.captureHistoryMaluses << " caphguard " << state.captureHistoryPruneGuards
@@ -6181,8 +6240,9 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " qcaphist " << state.qCaptureHistoryHits << " qcapstores " << state.qCaptureHistoryStores
               << " qcaphm " << state.qCaptureHistoryMaluses
               << " qtt " << state.qttHits << "/" << state.qttProbes << " qttstores " << state.qttStores
-              << " qttcut " << state.qttCutoffs << " qttmove " << state.qttMoveHits
+              << " qttcut " << state.qttCutoffs << " qttmove " << state.qttMoveHits << " qttpref " << state.qttPrefetches
               << " eval " << state.evalCacheHits << "/" << state.evalCacheProbes << " evalstores " << state.evalCacheStores
+              << " evalpref " << state.evalCachePrefetches
               << " evalskip " << state.checkedEvalSkips << " evalguard " << state.staticEvalTrendClears
               << " rep " << state.repetitions
               << " memage " << state.memoryAge
