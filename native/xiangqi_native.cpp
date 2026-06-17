@@ -1656,6 +1656,22 @@ constexpr std::array<std::array<uint64_t, kPieceCodeCount>, kSquares> makePieceH
 constexpr auto kPieceHashBySquareCode = makePieceHashLookup();
 constexpr uint64_t kSideHash = splitmix64(0xbb67ae8584caa73bULL);
 
+int pieceCodeSide(int piece) {
+  return kSideByPieceCode[static_cast<std::size_t>(piece + kPieceCodeOffset)];
+}
+
+int pieceCodeType(int piece) {
+  return kTypeByPieceCode[static_cast<std::size_t>(piece + kPieceCodeOffset)];
+}
+
+int pieceCodeValue(int piece) {
+  return kValueByPieceCode[static_cast<std::size_t>(piece + kPieceCodeOffset)];
+}
+
+int pieceTypeValue(int type) {
+  return kPieceValues[static_cast<std::size_t>(type)];
+}
+
 int pieceValue(int pieceOrType) {
   if (pieceOrType >= -7 && pieceOrType <= 7) {
     return kValueByPieceCode[static_cast<std::size_t>(pieceOrType + kPieceCodeOffset)];
@@ -2196,7 +2212,7 @@ bool maybeMoveCanGiveCheck(const Move& move, int kingSquare) {
   if (kSameLineBySquare[from][king] || kSameLineBySquare[to][king]) return true;
   if (kHorseLegBlockerByTarget[from][king]) return true;
 
-  const int type = typeOf(move.piece);
+  const int type = pieceCodeType(move.piece);
   if (type == Horse && kHorseLegSquareBySourceTarget[to][king] >= 0) return true;
 
   return false;
@@ -2745,10 +2761,10 @@ int captureRiskPenaltyForCapture(
 }
 
 int badCaptureLossForCapture(const Board& board, const Move& move, SearchState& state) {
-  if ((move.captured > 0 ? move.captured : -move.captured) == King) return 0;
+  if (pieceCodeType(move.captured) == King) return 0;
 
-  const int movingValue = pieceValue(move.piece);
-  const int capturedValue = pieceValue(move.captured);
+  const int movingValue = pieceCodeValue(move.piece);
+  const int capturedValue = pieceCodeValue(move.captured);
   if (movingValue <= capturedValue + 120) return 0;
 
   const int leastRecapturer = cachedLeastAttackerValueAfterMove(
@@ -2770,7 +2786,7 @@ void filterLegalMovesInPlace(Board& board, MoveList& moves, int side, int ownKin
   std::size_t legalCount = 0;
   for (std::size_t index = 0; index < moves.size(); index += 1) {
     Move& move = moves[index];
-    if ((move.captured > 0 ? move.captured : -move.captured) == King) continue;
+    if (pieceCodeType(move.captured) == King) continue;
     if (!currentlyInCheck && !moveMayAffectOwnKingSafety(board, move, side, ownKing)) {
       moves[legalCount++] = move;
       continue;
@@ -2828,7 +2844,7 @@ MoveList generateLegalQsearchMoves(
     Move& move = moves[index];
     if ((move.captured > 0 ? move.captured : -move.captured) == King) continue;
 
-    const int capturedValue = pieceValue(move.captured);
+    const int capturedValue = pieceCodeValue(move.captured);
     if (standPat + capturedValue + kQDeltaPruneMargin <= alpha
         && !shouldGuardQDeltaCapture(state, move, standPat, capturedValue, alpha)) {
       const bool possibleCheck = maybeMoveCanGiveCheck(move, enemyKing);
@@ -2874,10 +2890,10 @@ int quietCheckOrderingScore(const Board& board, const Move& move, SearchState& s
   score += qCheckHistoryScore(state, move) * 2;
   score += state.checkHistory[move.from][move.to] / 4;
   if (movedPieceDirectlyChecksAfterMove(board, move, enemyKing, move.piece)) score += 200000;
-  score += pieceValue(move.piece) / 2;
+  score += pieceCodeValue(move.piece) / 2;
   score += fileCentrality(fileOf(move.to)) * 8;
-  if ((move.piece > 0 ? move.piece : -move.piece) == Pawn
-      && crossedRiver(move.piece > 0 ? kRed : kBlack, rankOf(move.to))) {
+  if (pieceCodeType(move.piece) == Pawn
+      && crossedRiver(pieceCodeSide(move.piece), rankOf(move.to))) {
     score += 80;
   }
   return score;
@@ -3249,11 +3265,11 @@ bool shouldUseProbCut(int depth, bool inCheck, int alpha, int beta) {
 }
 
 bool isProbCutCaptureCandidate(const Move& move) {
-  if ((move.captured > 0 ? move.captured : -move.captured) == King) return false;
+  if (pieceCodeType(move.captured) == King) return false;
 
-  const int movingValue = pieceValue(move.piece);
-  const int capturedValue = pieceValue(move.captured);
-  return capturedValue >= pieceValue(Horse) || capturedValue >= movingValue;
+  const int movingValue = pieceCodeValue(move.piece);
+  const int capturedValue = pieceCodeValue(move.captured);
+  return capturedValue >= pieceTypeValue(Horse) || capturedValue >= movingValue;
 }
 
 bool shouldVerifyProbCutCaptureCandidate(const Board& board, const Move& move, SearchState& state) {
@@ -4207,8 +4223,8 @@ int moveOrderingScore(
   }
   int score = 0;
   const bool quietMove = move.captured == 0;
-  const int pieceType = typeOf(move.piece);
-  const int pieceSide = sideOf(move.piece);
+  const int pieceType = pieceCodeType(move.piece);
+  const int pieceSide = pieceCodeSide(move.piece);
   if (inCheck) {
     state.checkEvasionOrderHits += 1;
     if (!quietMove) {
@@ -4223,8 +4239,8 @@ int moveOrderingScore(
     }
   }
   if (!quietMove) {
-    const int movingValue = pieceValue(pieceType);
-    const int capturedValue = pieceValue(move.captured);
+    const int movingValue = pieceTypeValue(pieceType);
+    const int capturedValue = pieceCodeValue(move.captured);
     score += 100000 + capturedValue * 16 - movingValue;
     if (isRecapture(move, previousMove)) {
       score += 70000;
@@ -5512,7 +5528,7 @@ int quiescenceKnownCheck(
     const bool possibleCheck = maybeMoveCanGiveCheck(move, enemyKing);
     const bool captureMove = move.captured != 0;
     bool givesCheck = !inCheck && !captureMove;
-    const int capturedValue = captureMove ? pieceValue(move.captured) : 0;
+    const int capturedValue = captureMove ? pieceCodeValue(move.captured) : 0;
     if (!inCheck && captureMove && standPat + capturedValue + kQDeltaPruneMargin <= alpha) {
       if (shouldGuardQDeltaCapture(state, move, standPat, capturedValue, alpha)) {
         if (possibleCheck) givesCheck = moveGivesCheckAssumingPossible(board, move, enemyKing, state);
@@ -5534,7 +5550,7 @@ int quiescenceKnownCheck(
         && alpha > standPat + kQSeePruneAlphaMargin
         && captureMove
         && !givesCheck
-        && pieceValue(move.piece) > capturedValue + kQSeePruneLossMargin) {
+        && pieceCodeValue(move.piece) > capturedValue + kQSeePruneLossMargin) {
       const int badCaptureLoss = badCaptureLossForCapture(board, move, state);
       if (badCaptureLoss > kQSeePruneLossMargin
           && standPat + capturedValue - badCaptureLoss + kQSeePruneLossMargin <= alpha) {
