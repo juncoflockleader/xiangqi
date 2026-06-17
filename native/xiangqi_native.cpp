@@ -72,6 +72,7 @@ constexpr int kQSeeCaptureHistoryGuard = 1024;
 constexpr int kQDeltaPruneMargin = 90;
 constexpr int kQDeltaCaptureHistoryGuard = 32768;
 constexpr int kQDeltaCaptureHistoryMargin = 120;
+constexpr int kQQuietCheckSecondLayerMargin = 220;
 constexpr int kAspirationInitialWindow = 80;
 constexpr int kAspirationRetryWindow = 320;
 constexpr int kRootTimeGuardMinMs = 8;
@@ -4614,6 +4615,12 @@ int quietCheckLimitForQDepth(int qDepth) {
   return 4;
 }
 
+bool shouldSearchQuietChecksInQsearch(int qDepth, bool inCheck, int standPat, int alpha) {
+  if (inCheck || qDepth <= 2) return false;
+  if (qDepth >= 4) return true;
+  return standPat + kQQuietCheckSecondLayerMargin >= alpha;
+}
+
 bool tryProbCut(
     Board& board,
     const MoveList& legalMoves,
@@ -5445,7 +5452,7 @@ int quiescenceKnownCheck(
 
   const int enemyKing = knownEnemyKing == kUnknownKingSquare ? findKing(board, -board.side) : knownEnemyKing;
   auto moves = generateLegalQsearchMoves(board, board.side, ownKing, inCheck, enemyKing, standPat, alpha, state);
-  if (!inCheck && qDepth > 2) {
+  if (shouldSearchQuietChecksInQsearch(qDepth, inCheck, standPat, alpha)) {
     auto quietChecks = generateQuietChecks(board, board.side, enemyKing, quietCheckLimitForQDepth(qDepth), state, ownKing, inCheck);
     for (const Move& move : quietChecks) {
       moves.push_back(move);
