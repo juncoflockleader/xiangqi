@@ -176,6 +176,9 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.razorPrunes, 4);
     assert.equal(result.stats.razorResearches, 1);
     assert.equal(result.stats.seePrunes, 3);
+    assert.equal(result.stats.leastAttackerCacheHits, 13);
+    assert.equal(result.stats.leastAttackerCacheProbes, 21);
+    assert.equal(result.stats.leastAttackerCacheStores, 8);
     assert.equal(result.stats.probCutPrunes, 2);
     assert.equal(result.stats.probCutSearches, 7);
     assert.equal(result.stats.probCutCaptureSkips, 8);
@@ -266,6 +269,9 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.iterations[0].stats.mateDistancePrunes, 2);
     assert.equal(result.iterations[0].stats.razorPrunes, 4);
     assert.equal(result.iterations[0].stats.seePrunes, 3);
+    assert.equal(result.iterations[0].stats.leastAttackerCacheHits, 13);
+    assert.equal(result.iterations[0].stats.leastAttackerCacheProbes, 21);
+    assert.equal(result.iterations[0].stats.leastAttackerCacheStores, 8);
     assert.equal(result.iterations[0].stats.probCutPrunes, 2);
     assert.equal(result.iterations[0].stats.probCutCaptureSkips, 8);
     assert.equal(result.iterations[0].stats.badHistoryPrunes, 5);

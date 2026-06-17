@@ -886,6 +886,9 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     razorPrunes: maxInfoValue(infos, "razorPrunes"),
     razorResearches: maxInfoValue(infos, "razorResearches"),
     seePrunes: maxInfoValue(infos, "seePrunes"),
+    leastAttackerCacheHits: maxInfoValue(infos, "leastAttackerCacheHits"),
+    leastAttackerCacheProbes: maxInfoValue(infos, "leastAttackerCacheProbes"),
+    leastAttackerCacheStores: maxInfoValue(infos, "leastAttackerCacheStores"),
     probCutPrunes: maxInfoValue(infos, "probCutPrunes"),
     probCutSearches: maxInfoValue(infos, "probCutSearches"),
     probCutCaptureSkips: maxInfoValue(infos, "probCutCaptureSkips"),
@@ -1059,6 +1062,9 @@ function parseInfoLine(line) {
     razorPrunes: 0,
     razorResearches: 0,
     seePrunes: 0,
+    leastAttackerCacheHits: 0,
+    leastAttackerCacheProbes: 0,
+    leastAttackerCacheStores: 0,
     probCutPrunes: 0,
     probCutSearches: 0,
     probCutCaptureSkips: 0,
@@ -1200,6 +1206,14 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "see") {
       info.seePrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "lacache") {
+      const [hits, probes] = parseNativePair(tokens[index + 1]);
+      info.leastAttackerCacheHits = hits;
+      info.leastAttackerCacheProbes = probes;
+      index += 1;
+    } else if (token === "lastores") {
+      info.leastAttackerCacheStores = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "pcut") {
       info.probCutPrunes = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -2042,6 +2056,7 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.qttHits ?? 0) > 0) parts.push(nativeCount(stats.qttHits, "quiescence-table hit"));
   if ((stats.evalCacheHits ?? 0) > 0) parts.push(nativeCount(stats.evalCacheHits, "evaluation-cache hit"));
   if ((stats.checkCacheHits ?? 0) > 0) parts.push(nativeCount(stats.checkCacheHits, "check-cache hit"));
+  if ((stats.leastAttackerCacheHits ?? 0) > 0) parts.push(nativeCount(stats.leastAttackerCacheHits, "least-attacker cache hit"));
   if ((stats.checkedEvalSkips ?? 0) > 0) parts.push(nativeCount(stats.checkedEvalSkips, "checked-node eval skip"));
   if ((stats.extensions ?? 0) > 0) parts.push(nativeCount(stats.extensions, "tactical extension"));
   if ((stats.recaptureExtensions ?? 0) > 0) parts.push(nativeCount(stats.recaptureExtensions, "recapture extension"));
@@ -2331,6 +2346,9 @@ function createNativeStats(parsed) {
     razorPrunes: parsed.razorPrunes ?? 0,
     razorResearches: parsed.razorResearches ?? 0,
     seePrunes: parsed.seePrunes ?? 0,
+    leastAttackerCacheHits: parsed.leastAttackerCacheHits ?? 0,
+    leastAttackerCacheProbes: parsed.leastAttackerCacheProbes ?? 0,
+    leastAttackerCacheStores: parsed.leastAttackerCacheStores ?? 0,
     probCutPrunes: parsed.probCutPrunes ?? 0,
     probCutSearches: parsed.probCutSearches ?? 0,
     probCutCaptureSkips: parsed.probCutCaptureSkips ?? 0,
@@ -2440,6 +2458,9 @@ function createEmptyStats() {
     singularExtensionRejects: 0,
     softStops: 0,
     seePrunes: 0,
+    leastAttackerCacheHits: 0,
+    leastAttackerCacheProbes: 0,
+    leastAttackerCacheStores: 0,
     reverseFutilityPrunes: 0,
     mateDistancePrunes: 0,
     mateDistanceWindows: 0,

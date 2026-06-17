@@ -541,6 +541,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   if ((stats.qttMoveHits ?? 0) > 0) supports.push("quiescence hash-move ordering");
   if ((stats.evalCacheHits ?? 0) > 0) supports.push("evaluation-cache reuse");
   if ((stats.checkCacheHits ?? 0) > 0) supports.push("check-cache reuse");
+  if ((stats.leastAttackerCacheHits ?? 0) > 0) supports.push("least-attacker cache reuse");
   if ((stats.tacticalCacheHits ?? 0) > 0) supports.push("static-exchange cache reuse");
   if ((stats.tacticalMoveOrderHits ?? 0) > 0) supports.push("tactical-motif ordering");
   if ((stats.rootRankOrderHits ?? 0) > 0) supports.push("previous-root-rank ordering");

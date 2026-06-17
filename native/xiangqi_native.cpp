@@ -81,7 +81,7 @@ constexpr std::size_t kEvalBucketSize = 4;
 constexpr std::size_t kCheckCacheBucketSize = 4;
 constexpr std::size_t kLeastAttackerCacheBucketSize = 4;
 constexpr std::size_t kCheckCacheSize = 65536;
-constexpr std::size_t kLeastAttackerCacheSize = 16384;
+constexpr std::size_t kLeastAttackerCacheSize = 32768;
 static_assert((kTtBucketSize & (kTtBucketSize - 1)) == 0, "TT bucket size must be a power of two");
 static_assert((kEvalBucketSize & (kEvalBucketSize - 1)) == 0, "eval bucket size must be a power of two");
 static_assert((kCheckCacheBucketSize & (kCheckCacheBucketSize - 1)) == 0, "check cache bucket size must be a power of two");
@@ -722,6 +722,9 @@ struct SearchState {
   int64_t seePrunes = 0;
   int64_t captureRiskProbes = 0;
   int64_t favorableCaptureRiskSkips = 0;
+  int64_t leastAttackerCacheProbes = 0;
+  int64_t leastAttackerCacheHits = 0;
+  int64_t leastAttackerCacheStores = 0;
   int64_t probCutPrunes = 0;
   int64_t probCutSearches = 0;
   int64_t probCutCaptureSkips = 0;
@@ -863,6 +866,9 @@ struct SearchState {
     seePrunes = 0;
     captureRiskProbes = 0;
     favorableCaptureRiskSkips = 0;
+    leastAttackerCacheProbes = 0;
+    leastAttackerCacheHits = 0;
+    leastAttackerCacheStores = 0;
     probCutPrunes = 0;
     probCutSearches = 0;
     probCutCaptureSkips = 0;
@@ -2461,6 +2467,7 @@ std::size_t leastAttackerCacheReplacementOffset(uint64_t mix) {
 }
 
 int cachedLeastAttackerValueAfterMove(const Board& board, const Move& move, int side, int target, SearchState& state) {
+  state.leastAttackerCacheProbes += 1;
   const uint64_t mix = leastAttackerCacheMix(board, move, side, target);
   const std::size_t bucket = leastAttackerCacheBucketIndex(mix);
   LeastAttackerCacheEntry* replacement =
@@ -2473,6 +2480,7 @@ int cachedLeastAttackerValueAfterMove(const Board& board, const Move& move, int 
         && entry.to == move.to
         && entry.side == side
         && entry.target == target) {
+      state.leastAttackerCacheHits += 1;
       return entry.value;
     }
     if (!entry.occupied) replacement = &entry;
@@ -2480,6 +2488,7 @@ int cachedLeastAttackerValueAfterMove(const Board& board, const Move& move, int 
 
   const int value = leastAttackerValueAfterMove(board, move, side, target);
   *replacement = {board.key, move.from, move.to, side, target, value, true};
+  state.leastAttackerCacheStores += 1;
   return value;
 }
 
@@ -5873,6 +5882,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " rfp " << state.reverseFutilityPrunes
               << " mdp " << state.mateDistancePrunes << " razor " << state.razorPrunes << "/" << state.razorResearches
               << " see " << state.seePrunes << " crisk " << state.captureRiskProbes << "/" << state.favorableCaptureRiskSkips
+              << " lacache " << state.leastAttackerCacheHits << "/" << state.leastAttackerCacheProbes
+              << " lastores " << state.leastAttackerCacheStores
               << " pcut " << state.probCutPrunes << " pcsearch " << state.probCutSearches
               << " pcskip " << state.probCutCaptureSkips
               << " futil " << state.futilityPrunes << " hprune " << state.badHistoryPrunes
@@ -5946,6 +5957,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " rfp " << state.reverseFutilityPrunes
               << " mdp " << state.mateDistancePrunes << " razor " << state.razorPrunes << "/" << state.razorResearches
               << " see " << state.seePrunes << " crisk " << state.captureRiskProbes << "/" << state.favorableCaptureRiskSkips
+              << " lacache " << state.leastAttackerCacheHits << "/" << state.leastAttackerCacheProbes
+              << " lastores " << state.leastAttackerCacheStores
               << " pcut " << state.probCutPrunes << " pcsearch " << state.probCutSearches
               << " pcskip " << state.probCutCaptureSkips
               << " futil " << state.futilityPrunes << " hprune " << state.badHistoryPrunes
