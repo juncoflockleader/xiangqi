@@ -1939,9 +1939,9 @@ MoveList generatePseudoMovesFor(const Board& board, int side) {
     const int square = squares[listIndex];
     if (square < 0 || square >= kSquares) continue;
     const int piece = board.cells[square];
-    if (piece * side <= 0) continue;
+    if (pieceCodeSide(piece) != side) continue;
     const int pieceSide = side;
-    switch (typeOf(piece)) {
+    switch (pieceCodeType(piece)) {
       case King: addKingMoves<mode>(board, moves, square, piece, pieceSide); break;
       case Advisor: addAdvisorMoves<mode>(board, moves, square, piece, pieceSide); break;
       case Elephant: addElephantMoves<mode>(board, moves, square, piece, pieceSide); break;
@@ -2148,13 +2148,13 @@ bool lineCheckAfterMove(
       }
 
       if (blockers == 0) {
-        if (piece * side > 0) {
-          const int pieceType = piece > 0 ? piece : -piece;
+        if (pieceCodeSide(piece) == side) {
+          const int pieceType = pieceCodeType(piece);
           if (pieceType == Rook || (pieceType == King && (direction == 0 || direction == 2))) return true;
         }
         blockers = 1;
       } else {
-        if (piece * side > 0 && (piece > 0 ? piece : -piece) == Cannon) return true;
+        if (pieceCodeSide(piece) == side && pieceCodeType(piece) == Cannon) return true;
         break;
       }
     }
@@ -2381,7 +2381,7 @@ bool vacatingLineMayExposeKing(const Board& board, int side, int from, int kingS
     for (int step = fromStep + 1; step < length; step += 1) {
       const int piece = board.cells[ray[static_cast<std::size_t>(step)]];
       if (piece == 0) continue;
-      return piece * attacker > 0 && (piece > 0 ? piece : -piece) == Cannon;
+      return pieceCodeSide(piece) == attacker && pieceCodeType(piece) == Cannon;
     }
     return false;
   }
@@ -2391,8 +2391,8 @@ bool vacatingLineMayExposeKing(const Board& board, int side, int from, int kingS
     const int piece = board.cells[ray[static_cast<std::size_t>(step)]];
     if (piece == 0) continue;
     if (!screenSeen) {
-      if (piece * attacker > 0) {
-        const int pieceType = piece > 0 ? piece : -piece;
+      if (pieceCodeSide(piece) == attacker) {
+        const int pieceType = pieceCodeType(piece);
         if (pieceType == Rook || (pieceType == King && (direction == 0 || direction == 2))) {
           return true;
         }
@@ -2400,7 +2400,7 @@ bool vacatingLineMayExposeKing(const Board& board, int side, int from, int kingS
       screenSeen = true;
       continue;
     }
-    return piece * attacker > 0 && (piece > 0 ? piece : -piece) == Cannon;
+    return pieceCodeSide(piece) == attacker && pieceCodeType(piece) == Cannon;
   }
 
   return false;
@@ -2435,7 +2435,7 @@ bool movingOntoLineMayCreateCannonCheck(const Board& board, const Move& move, in
     if (square == move.to) piece = move.piece;
     if (piece == 0) continue;
 
-    if (piece * attacker > 0 && (piece > 0 ? piece : -piece) == Cannon) return blockers == 1;
+    if (pieceCodeSide(piece) == attacker && pieceCodeType(piece) == Cannon) return blockers == 1;
     blockers += 1;
     if (blockers > 1) return false;
   }
@@ -2770,7 +2770,7 @@ int badCaptureLossForCapture(const Board& board, const Move& move, SearchState& 
   const int leastRecapturer = cachedLeastAttackerValueAfterMove(
       board,
       move,
-      move.piece > 0 ? kBlack : kRed,
+      -pieceCodeSide(move.piece),
       move.to,
       state);
   if (leastRecapturer >= kInf || leastRecapturer > movingValue) return 0;
