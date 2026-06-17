@@ -235,6 +235,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.aspirationFailLow, 2);
     assert.equal(result.stats.extensions, 8);
     assert.equal(result.stats.recaptureExtensions, 1);
+    assert.equal(result.stats.pawnThreatExtensions, 2);
     assert.equal(result.stats.singularExtensionSearches, 4);
     assert.equal(result.stats.singularExtensions, 2);
     assert.equal(result.stats.singularExtensionRejects, 1);
@@ -262,6 +263,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.iterations[0].stats.captureHistoryMaluses, 7);
     assert.equal(result.iterations[0].stats.captureHistoryPruneGuards, 2);
     assert.equal(result.iterations[0].stats.extensions, 8);
+    assert.equal(result.iterations[0].stats.pawnThreatExtensions, 2);
     assert.equal(result.iterations[0].stats.nullMoveVerifications, 2);
     assert.equal(result.iterations[0].stats.nullMoveVerificationFailures, 1);
     assert.equal(result.iterations[0].stats.nullMoveMaterialGuards, 6);
@@ -340,6 +342,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("opening/root preference promotion")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("checked-node eval skip")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("tactical extension")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("late pawn-pressure extension")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("singular extension")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("draw-assumed repetition guard")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("verified null-move recheck")));

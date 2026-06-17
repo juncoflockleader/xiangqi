@@ -78,6 +78,7 @@ constexpr int kRootTimeGuardMaxMs = 250;
 constexpr int kRootTimeGuardDivisor = 3;
 constexpr int kDefaultHashMb = 64;
 constexpr int kHistoryCountLookupThreshold = 64;
+constexpr int kPawnPressureExtensionMaxPieces = 10;
 constexpr int64_t kTimeCheckNodeMask = 16383;
 constexpr std::size_t kTtBucketSize = 4;
 constexpr std::size_t kEvalBucketSize = 4;
@@ -825,6 +826,7 @@ struct SearchState {
   int64_t rootOrderStores = 0;
   int64_t extensions = 0;
   int64_t recaptureExtensions = 0;
+  int64_t pawnThreatExtensions = 0;
   int64_t recaptureOrderHits = 0;
   int64_t singularExtensionSearches = 0;
   int64_t singularExtensions = 0;
@@ -969,6 +971,7 @@ struct SearchState {
     rootOrderStores = 0;
     extensions = 0;
     recaptureExtensions = 0;
+    pawnThreatExtensions = 0;
     recaptureOrderHits = 0;
     singularExtensionSearches = 0;
     singularExtensions = 0;
@@ -2755,6 +2758,23 @@ MoveList generateQuietChecks(Board& board, int side, int enemyKing, int limit, S
 
 bool isRecapture(const Move& move, const Move& previousMove) {
   return move.captured != 0 && previousMove.captured != 0 && move.to == previousMove.to;
+}
+
+bool isPawnPressureExtensionMove(const Move& move, int enemyKing, int rootPieceCount) {
+  if (rootPieceCount > kPawnPressureExtensionMaxPieces) return false;
+  if (enemyKing < 0 || move.captured != 0) return false;
+  if ((move.piece > 0 ? move.piece : -move.piece) != Pawn) return false;
+
+  const int side = move.piece > 0 ? kRed : kBlack;
+  const int toFile = fileOf(move.to);
+  const int toRank = rankOf(move.to);
+  if (!crossedRiver(side, toRank)) return false;
+  if (palaceContains(-side, toFile, toRank)) return true;
+  if (toFile != fileOf(enemyKing)) return false;
+
+  const int kingRank = rankOf(enemyKing);
+  const int rankDistance = side == kRed ? toRank - kingRank : kingRank - toRank;
+  return rankDistance >= 1 && rankDistance <= 4;
 }
 
 bool hasNullMoveMaterial(const Board& board, int side) {
@@ -4899,7 +4919,14 @@ int negamax(
     const bool singular = shouldTrySingularExtension(state, moves, move, hashCandidate, hashDepth, hashFlag, hashScore, depth, inCheck, extensionsRemaining)
         && isSingularMove(board, moves, move, hashScore, depth, ply, state, extensionsRemaining, enemyKing);
     if (state.stopped) break;
-    const int extension = (singular || givesCheck || recapture || checkEvasion) ? 1 : 0;
+    const bool pawnPressure = extensionsRemaining > 0
+        && !singular
+        && !givesCheck
+        && !recapture
+        && !checkEvasion
+        && depth > 1
+        && isPawnPressureExtensionMove(move, enemyKing, state.rootPieceCount);
+    const int extension = (singular || givesCheck || recapture || checkEvasion || pawnPressure) ? 1 : 0;
     const int childExtensions = extensionsRemaining - extension;
     if (!inCheck
         && depth <= 3
@@ -4941,6 +4968,7 @@ int negamax(
     if (extension > 0) {
       state.extensions += 1;
       if (recapture) state.recaptureExtensions += 1;
+      if (pawnPressure) state.pawnThreatExtensions += 1;
     }
 
     const int childOwnKing = (move.captured > 0 ? move.captured : -move.captured) == King ? -1 : enemyKing;
@@ -5560,12 +5588,19 @@ std::vector<RootLine> searchRootDepth(
 
   for (const RootMove& rootMove : rootMoves) {
     Move move = rootMove.move;
-    if (rootExtension > 0) state.extensions += 1;
     const KnownChildState child = rootMove.child;
+    const bool pawnPressure = rootExtension == 0
+        && depth > 1
+        && isPawnPressureExtensionMove(move, child.ownKing, state.rootPieceCount);
+    const int moveExtension = rootExtension + (pawnPressure ? 1 : 0);
+    if (moveExtension > 0) {
+      state.extensions += 1;
+      if (pawnPressure) state.pawnThreatExtensions += 1;
+    }
     state.rootChildStateReuses += 1;
     makeMove(board, move);
     childPv.clear();
-    const int childDepth = depth - 1 + rootExtension;
+    const int childDepth = depth - 1 + moveExtension;
     int score;
     const bool useRootPvs = useRootAlphaPruning && moveIndex > 0 && rootAlpha + 1 < beta;
     int multiPvReportCutoff = -kInf;
@@ -5594,7 +5629,7 @@ std::vector<RootLine> searchRootDepth(
           nullptr,
           true,
           move,
-          kMaxExtensions - rootExtension,
+          kMaxExtensions - moveExtension,
           child.ownKing,
           child.inCheck);
       if (reduction > 0 && !state.stopped && score > rootAlpha) {
@@ -5609,7 +5644,7 @@ std::vector<RootLine> searchRootDepth(
             nullptr,
             true,
             move,
-            kMaxExtensions - rootExtension,
+            kMaxExtensions - moveExtension,
             child.ownKing,
             child.inCheck);
       }
@@ -5626,7 +5661,7 @@ std::vector<RootLine> searchRootDepth(
             &childPv,
             true,
             move,
-            kMaxExtensions - rootExtension,
+            kMaxExtensions - moveExtension,
             child.ownKing,
             child.inCheck);
       }
@@ -5644,7 +5679,7 @@ std::vector<RootLine> searchRootDepth(
             nullptr,
             true,
             move,
-            kMaxExtensions - rootExtension,
+            kMaxExtensions - moveExtension,
             child.ownKing,
             child.inCheck);
         if (!state.stopped && reducedRootMoveNeedsFullSearch(score, multiPvReportCutoff)) {
@@ -5660,7 +5695,7 @@ std::vector<RootLine> searchRootDepth(
               &childPv,
               true,
               move,
-              kMaxExtensions - rootExtension,
+              kMaxExtensions - moveExtension,
               child.ownKing,
               child.inCheck);
         }
@@ -5675,7 +5710,7 @@ std::vector<RootLine> searchRootDepth(
             &childPv,
             true,
             move,
-            kMaxExtensions - rootExtension,
+            kMaxExtensions - moveExtension,
             child.ownKing,
             child.inCheck);
       }
@@ -6010,6 +6045,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " tguard " << state.rootTimeGuardStops
               << " opref " << state.openingPreferencePromotions
               << " ext " << state.extensions << " recext " << state.recaptureExtensions << " recorder " << state.recaptureOrderHits
+              << " pawnext " << state.pawnThreatExtensions
               << " singtry " << state.singularExtensionSearches << " singext " << state.singularExtensions
               << " singrej " << state.singularExtensionRejects
               << " qnodes " << state.qnodes
@@ -6085,6 +6121,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " tguard " << state.rootTimeGuardStops
               << " opref " << state.openingPreferencePromotions
               << " ext " << state.extensions << " recext " << state.recaptureExtensions << " recorder " << state.recaptureOrderHits
+              << " pawnext " << state.pawnThreatExtensions
               << " singtry " << state.singularExtensionSearches << " singext " << state.singularExtensions
               << " singrej " << state.singularExtensionRejects
               << " qnodes " << state.qnodes
