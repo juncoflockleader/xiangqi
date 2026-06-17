@@ -819,6 +819,7 @@ struct SearchState {
   int64_t ttProbes = 0;
   int64_t ttHits = 0;
   int64_t ttCutoffs = 0;
+  int64_t ttStores = 0;
   int64_t ttMoveHits = 0;
   int64_t ttPrefetches = 0;
   int64_t killerHits = 0;
@@ -976,6 +977,7 @@ struct SearchState {
     ttProbes = 0;
     ttHits = 0;
     ttCutoffs = 0;
+    ttStores = 0;
     ttMoveHits = 0;
     ttPrefetches = 0;
     killerHits = 0;
@@ -1201,8 +1203,8 @@ class TranspositionTable {
     return true;
   }
 
-  void store(uint64_t key, int depth, int score, int flag, const Move& bestMove) {
-    if (table_.empty()) return;
+  bool store(uint64_t key, int depth, int score, int flag, const Move& bestMove) {
+    if (table_.empty()) return false;
     TtEntry& entry = replacementEntry(key);
     Move storedBestMove = bestMove;
     if (entry.occupied && entry.key == key) {
@@ -1211,12 +1213,13 @@ class TranspositionTable {
       }
       const bool currentGeneration = entry.generation == generation_;
       const bool newExact = flag == kTtExact;
-      if (currentGeneration && entry.flag == kTtExact && entry.depth > depth) return;
-      if (currentGeneration && entry.flag == kTtExact && entry.depth == depth && !newExact) return;
-      if (currentGeneration && entry.depth > depth && !newExact) return;
+      if (currentGeneration && entry.flag == kTtExact && entry.depth > depth) return false;
+      if (currentGeneration && entry.flag == kTtExact && entry.depth == depth && !newExact) return false;
+      if (currentGeneration && entry.depth > depth && !newExact) return false;
     }
-    if (entry.occupied && entry.key != key && entry.depth > depth && entry.generation == generation_) return;
+    if (entry.occupied && entry.key != key && entry.depth > depth && entry.generation == generation_) return false;
     entry = {key, depth, score, flag, storedBestMove, generation_, true};
+    return true;
   }
 
   int hashfull() const {
@@ -4498,10 +4501,18 @@ class ScoredMovePicker {
   bool useQsearchCaptureHistory_ = false;
 };
 
+void storeTt(SearchState& state, const Board& board, int depth, int ply, int score, int flag, const Move& bestMove) {
+  if (!state.tt) return;
+  if (state.tt->store(board.key, depth, scoreToTt(score, ply), flag, bestMove)) {
+    state.ttStores += 1;
+  }
+}
+
 void storeQtt(SearchState& state, const Board& board, int depth, int ply, int score, int flag, const Move& bestMove) {
   if (!state.qtt || depth < 0) return;
-  state.qtt->store(board.key, depth, scoreToTt(score, ply), flag, bestMove);
-  state.qttStores += 1;
+  if (state.qtt->store(board.key, depth, scoreToTt(score, ply), flag, bestMove)) {
+    state.qttStores += 1;
+  }
 }
 
 void prefetchMainSearchCaches(SearchState& state, uint64_t key, int sideToMove) {
@@ -4840,7 +4851,7 @@ int verifyNullMoveCutoff(
   auto moves = generateLegalMoves(board, board.side, false, ownKing, false);
   if (moves.empty()) {
     const int mateScore = -kMate + ply;
-    if (state.tt) state.tt->store(board.key, verificationDepth, scoreToTt(mateScore, ply), kTtExact, {});
+    storeTt(state, board, verificationDepth, ply, mateScore, kTtExact, {});
     return mateScore;
   }
 
@@ -5065,7 +5076,7 @@ int negamax(
     if (hasMove) return kInf;
 
     const int mateScore = -kMate + ply;
-    if (state.tt) state.tt->store(board.key, depth, scoreToTt(mateScore, ply), kTtExact, {});
+    storeTt(state, board, depth, ply, mateScore, kTtExact, {});
     return mateScore;
   };
 
@@ -5116,12 +5127,12 @@ int negamax(
           state.nullMoveVerificationFailures += 1;
         } else {
           state.nullMovePrunes += 1;
-          if (state.tt) state.tt->store(board.key, depth, scoreToTt(beta, ply), kTtLower, {});
+          storeTt(state, board, depth, ply, beta, kTtLower, {});
           return beta;
         }
       } else {
         state.nullMovePrunes += 1;
-        if (state.tt) state.tt->store(board.key, depth, scoreToTt(nullScore, ply), kTtLower, {});
+        storeTt(state, board, depth, ply, nullScore, kTtLower, {});
         return nullScore;
       }
     }
@@ -5131,7 +5142,7 @@ int negamax(
     const int terminalScore = noLegalMoveScore();
     if (terminalScore != kInf) return terminalScore;
     state.reverseFutilityPrunes += 1;
-    if (state.tt) state.tt->store(board.key, depth, scoreToTt(beta, ply), kTtLower, {});
+    storeTt(state, board, depth, ply, beta, kTtLower, {});
     return beta;
   }
   if (shouldRazor(depth, inCheck, alpha, beta, staticScore)) {
@@ -5141,7 +5152,7 @@ int negamax(
     if (state.stopped) return razorScore;
     if (razorScore <= alpha) {
       state.razorPrunes += 1;
-      if (state.tt) state.tt->store(board.key, depth, scoreToTt(razorScore, ply), kTtUpper, {});
+      storeTt(state, board, depth, ply, razorScore, kTtUpper, {});
       return razorScore;
     }
     state.razorResearches += 1;
@@ -5149,7 +5160,7 @@ int negamax(
   auto moves = generateLegalMoves(board, board.side, false, ownKing, inCheck);
   if (moves.empty()) {
     const int mateScore = -kMate + ply;
-    if (state.tt) state.tt->store(board.key, depth, scoreToTt(mateScore, ply), kTtExact, {});
+    storeTt(state, board, depth, ply, mateScore, kTtExact, {});
     return mateScore;
   }
   enemyKing = resolveEnemyKing();
@@ -5162,7 +5173,7 @@ int negamax(
   if (shouldUseProbCut(depth, inCheck, alpha, beta)) {
     int probCutScore = 0;
     if (tryProbCut(board, moves, depth, beta, ply, state, extensionsRemaining, hashMove, counterMove, enemyKing, probCutScore)) {
-      if (state.tt) state.tt->store(board.key, depth, scoreToTt(probCutScore, ply), kTtLower, {});
+      storeTt(state, board, depth, ply, probCutScore, kTtLower, {});
       return probCutScore;
     }
     if (state.stopped) return staticScore;
@@ -5361,7 +5372,7 @@ int negamax(
 
   if (!state.stopped && state.tt && validMove(bestMove)) {
     const int flag = bestScore <= alphaOriginal ? kTtUpper : bestScore >= betaOriginal ? kTtLower : kTtExact;
-    state.tt->store(board.key, depth, scoreToTt(bestScore, ply), flag, bestMove);
+    storeTt(state, board, depth, ply, bestScore, flag, bestMove);
   }
 
   if (pv && pv->empty() && validMove(bestMove)) {
@@ -6265,8 +6276,9 @@ std::vector<RootLine> searchRoot(
     });
     applyTimedOpeningFinalPreference(depthLines, root, useTimedOpeningPriors, state);
     if (unrestrictedRootSearch && validMove(depthLines.front().move)) {
-      tt.store(root.key, depth, scoreToTt(depthLines.front().score, 0), kTtExact, depthLines.front().move);
-      state.rootTtStores += 1;
+      if (tt.store(root.key, depth, scoreToTt(depthLines.front().score, 0), kTtExact, depthLines.front().move)) {
+        state.rootTtStores += 1;
+      }
     }
     orderedRootMoves.clear();
     orderedRootMoves.reserve(depthLines.size());
@@ -6404,6 +6416,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
     std::cout << "info depth " << depth << " score mate -1 nodes " << state.nodes << " time " << time << " nps " << nps
               << " hashfull " << state.ttHashfull
               << " string tt " << state.ttHits << "/" << state.ttProbes << " cutoffs " << state.ttCutoffs
+              << " ttstores " << state.ttStores
               << " ttmove " << state.ttMoveHits << " ttpref " << state.ttPrefetches
               << " killers " << state.killerHits << " history " << state.historyUpdates
               << " caphist " << state.captureHistoryHits << " caphstores " << state.captureHistoryStores
@@ -6484,6 +6497,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " nps " << nps
               << " hashfull " << state.ttHashfull
               << " string tt " << state.ttHits << "/" << state.ttProbes << " cutoffs " << state.ttCutoffs
+              << " ttstores " << state.ttStores
               << " ttmove " << state.ttMoveHits << " ttpref " << state.ttPrefetches
               << " killers " << state.killerHits << " history " << state.historyUpdates
               << " caphist " << state.captureHistoryHits << " caphstores " << state.captureHistoryStores

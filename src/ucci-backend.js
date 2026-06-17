@@ -891,6 +891,7 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     checkedEvalSkips: maxInfoValue(infos, "checkedEvalSkips"),
     staticEvalTrendClears: maxInfoValue(infos, "staticEvalTrendClears"),
     ttHits: maxInfoValue(infos, "ttHits"),
+    ttStores: maxInfoValue(infos, "ttStores"),
     ttMoveHits: maxInfoValue(infos, "ttMoveHits"),
     ttPrefetches: maxInfoValue(infos, "ttPrefetches"),
     cutoffs: maxInfoValue(infos, "cutoffs"),
@@ -1192,6 +1193,9 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "cutoffs") {
       info.cutoffs = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "ttstores") {
+      info.ttStores = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "ttmove") {
       info.ttMoveHits = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -2413,6 +2417,7 @@ function createNativeStats(parsed) {
     checkedEvalSkips: parsed.checkedEvalSkips ?? 0,
     staticEvalTrendClears: parsed.staticEvalTrendClears ?? 0,
     ttHits: parsed.ttHits ?? 0,
+    ttStores: parsed.ttStores ?? 0,
     ttMoveHits: parsed.ttMoveHits ?? 0,
     ttPrefetches: parsed.ttPrefetches ?? 0,
     cutoffs: parsed.cutoffs ?? 0,
