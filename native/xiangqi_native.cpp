@@ -4238,6 +4238,29 @@ int pawnStructureBonus(const Board& board, int square, int side, int file, int r
   return bonus;
 }
 
+int pieceSafetyBonus(const Board& board, int square, int piece, int totalPieceCount) {
+  if (totalPieceCount > 16) return 0;
+  const int type = pieceCodeType(piece);
+  if (type == King || type == Advisor || type == Elephant || type == Pawn) return 0;
+
+  const int side = pieceCodeSide(piece);
+  const Move noMove{};
+  const int value = pieceCodeValue(piece);
+  const int enemyAttacker = leastAttackerValueAfterMove(board, noMove, -side, square);
+  const int ownDefender = leastAttackerValueAfterMove(board, noMove, side, square);
+
+  if (enemyAttacker < kInf) {
+    int penalty = ownDefender >= kInf
+        ? std::min(90, value / 12)
+        : std::min(35, value / 30);
+    if (enemyAttacker < value) penalty += 8;
+    return -penalty;
+  }
+
+  if (ownDefender < kInf) return std::min(18, value / 70) + 2;
+  return 0;
+}
+
 int evaluateRed(const Board& board) {
   const int redKing = trackedKingSquare(board, kRed);
   const int blackKing = trackedKingSquare(board, kBlack);
@@ -4286,6 +4309,7 @@ int evaluateRed(const Board& board) {
         value += elephantEyeCoordinationBonus(board, square, piece);
         value += elephantShapeBonus(square, piece, totalPieceCount);
       }
+      value += pieceSafetyBonus(board, square, piece, totalPieceCount);
 
       score += sign * value;
     }
