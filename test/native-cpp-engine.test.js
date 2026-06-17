@@ -617,6 +617,38 @@ test("local C++ engine keeps the Pikafish central-cannon double-horse timed choi
   }
 });
 
+test("local C++ engine keeps the Pikafish shifted-cannon elephant at depth seven", async (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const backend = createUcciEngineBackend({
+    command: build.output,
+    protocol: "uci",
+    depth: 7,
+    timeLimitMs: 1000,
+    startupTimeoutMs: 3000,
+    commandTimeoutMs: 5000
+  });
+
+  try {
+    const position = parseFen("rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/4C2C1/9/RHEAKAEHR b");
+    const result = await backend.chooseMove(position, {
+      useBook: false,
+      depth: 7,
+      timeLimitMs: 1000,
+      lines: 5
+    });
+
+    assert.equal(moveToNotation(result.bestMove), "c0-e2");
+    assert.ok(result.nodes > 0);
+  } finally {
+    await backend.close();
+  }
+});
+
 test("local C++ engine preserves mate-range TT scores across repeated searches", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {

@@ -5779,6 +5779,11 @@ int timedOpeningRootMaxLoss(const Board& root) {
   static const uint64_t centralCannonPawnChallenge = fenPositionKey(
       "rheakae1r/9/1c4hc1/p3p1p1p/2p6/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R r");
   if (root.key == centralCannonPawnChallenge) return 140;
+
+  static const uint64_t earlyPawnShiftedCannonBlack = fenPositionKey(
+      "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/4C2C1/9/RHEAKAEHR b");
+  if (root.key == earlyPawnShiftedCannonBlack) return 160;
+
   return kTimedOpeningPriorMaxLoss;
 }
 
