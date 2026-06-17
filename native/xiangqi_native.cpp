@@ -3037,9 +3037,9 @@ StaticEvalTrend staticEvalTrend(SearchState& state, int ply, int staticScore) {
 
 void clearStaticEvalTrendAtPly(SearchState& state, int ply) {
   if (ply < 0 || ply >= kMaxPly) return;
-  if (state.staticEvalKnown[ply]) state.staticEvalTrendClears += 1;
+  if (!state.staticEvalKnown[ply]) return;
+  state.staticEvalTrendClears += 1;
   state.staticEvalKnown[ply] = false;
-  state.staticEvalStack[ply] = 0;
 }
 
 int trendAdjustedMargin(int margin, StaticEvalTrend trend, int improvingSlack, int worseningTighten, int floor) {
