@@ -80,7 +80,7 @@ constexpr std::size_t kTtBucketSize = 4;
 constexpr std::size_t kEvalBucketSize = 4;
 constexpr std::size_t kCheckCacheBucketSize = 4;
 constexpr std::size_t kLeastAttackerCacheBucketSize = 4;
-constexpr std::size_t kCheckCacheSize = 65536;
+constexpr std::size_t kCheckCacheSize = 131072;
 constexpr std::size_t kLeastAttackerCacheSize = 65536;
 static_assert((kTtBucketSize & (kTtBucketSize - 1)) == 0, "TT bucket size must be a power of two");
 static_assert((kEvalBucketSize & (kEvalBucketSize - 1)) == 0, "eval bucket size must be a power of two");
@@ -831,7 +831,7 @@ struct SearchState {
   std::array<bool, kMaxPly> staticEvalKnown{};
   std::array<uint64_t, kMaxPly> pathKeys{};
   std::array<bool, kMaxPly> pathKeyKnown{};
-  std::array<CheckCacheEntry, kCheckCacheSize> checkCache{};
+  std::vector<CheckCacheEntry> checkCache = std::vector<CheckCacheEntry>(kCheckCacheSize);
   std::vector<LeastAttackerCacheEntry> leastAttackerCache = std::vector<LeastAttackerCacheEntry>(kLeastAttackerCacheSize);
 
   void resetForSearch() {
@@ -984,7 +984,10 @@ struct SearchState {
     rootHistoryHasPositions = false;
     rootHistoryHasRepeatedPositions = false;
     rootOrderMoves = {};
-    checkCache = {};
+    if (checkCache.size() != kCheckCacheSize) {
+      checkCache.resize(kCheckCacheSize);
+    }
+    std::fill(checkCache.begin(), checkCache.end(), CheckCacheEntry{});
     if (leastAttackerCache.size() != kLeastAttackerCacheSize) {
       leastAttackerCache.resize(kLeastAttackerCacheSize);
     }
