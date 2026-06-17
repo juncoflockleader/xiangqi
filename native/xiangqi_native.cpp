@@ -2009,6 +2009,12 @@ int findKing(const Board& board, int side) {
   return -1;
 }
 
+int trackedKingSquare(const Board& board, int side) {
+  const int square = side == kRed ? board.redKing : board.blackKing;
+  assert(square < 0 || (square < kSquares && board.cells[square] == side * King));
+  return square;
+}
+
 void setKingSquare(Board& board, int side, int square) {
   if (side == kRed) board.redKing = square;
   else if (side == kBlack) board.blackKing = square;
@@ -4152,8 +4158,8 @@ int pawnStructureBonus(const Board& board, int square, int side, int file, int r
 }
 
 int evaluateRed(const Board& board) {
-  const int redKing = findKing(board, kRed);
-  const int blackKing = findKing(board, kBlack);
+  const int redKing = trackedKingSquare(board, kRed);
+  const int blackKing = trackedKingSquare(board, kBlack);
   if (redKing < 0) return -kMate;
   if (blackKing < 0) return kMate;
 
