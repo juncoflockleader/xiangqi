@@ -227,6 +227,33 @@ test("local C++ engine scores projected repeated positions as draw-assumed", (t)
   assert.match(result.stdout, /\bbestmove b0c2\b/);
 });
 
+test("local C++ engine preserves repetition guards after long replayed histories", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const cycle = ["b0c2", "b9c7", "c2b0", "c7b9"];
+  const history = Array.from({ length: 12 }, () => cycle).flat().join(" ");
+  const input = [
+    "uci",
+    `position startpos moves ${history}`,
+    "go depth 3 searchmoves b0c2",
+    "quit"
+  ].join("\n");
+  const result = spawnSync(build.output, {
+    input,
+    encoding: "utf8",
+    timeout: 3000
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /\bscore cp 0\b/);
+  assert.match(result.stdout, /\brep [1-9]\d*\b/);
+  assert.match(result.stdout, /\bbestmove b0c2\b/);
+});
+
 test("local C++ engine lets movetime-only protocol searches iterate beyond the shallow default", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {

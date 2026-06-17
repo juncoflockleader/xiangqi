@@ -4299,7 +4299,7 @@ int countSearchPathOccurrences(const SearchState& state, int ply, uint64_t key) 
 bool recordSearchPathPosition(SearchState& state, int ply, uint64_t key) {
   if (ply < 0 || ply >= kMaxPly) return false;
   const auto pathIndex = static_cast<std::size_t>(ply);
-  const int previousOccurrences = countRootHistoryOccurrences(state, key)
+  const int previousOccurrences = lookupRootHistoryCount(state, key)
       + countSearchPathOccurrences(state, ply, key);
   if (previousOccurrences >= 2) {
     state.repetitions += 1;
