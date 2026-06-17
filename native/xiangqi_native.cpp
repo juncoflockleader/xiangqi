@@ -62,6 +62,8 @@ constexpr int kReverseFutilityMaxDepth = 5;
 constexpr int kImprovingEvalMargin = 12;
 constexpr int kTimedOpeningPriorMaxLoss = 100;
 constexpr int kTimedSearchDepthLimit = 64;
+constexpr int kKingLinePressureExtensionMaxPieces = 18;
+constexpr int kKingLinePressureOrderingBonus = 22000;
 constexpr int kRootReductionMinDepth = 6;
 constexpr int kRootReductionMoveIndex = 5;
 constexpr int kRootMultiPvReductionMoveIndex = 3;
@@ -925,6 +927,8 @@ struct SearchState {
   int64_t recaptureExtensions = 0;
   int64_t pawnThreatExtensions = 0;
   int64_t pawnThreatOrderHits = 0;
+  int64_t kingLinePressureExtensions = 0;
+  int64_t kingLinePressureOrderHits = 0;
   int64_t recaptureOrderHits = 0;
   int64_t singularExtensionSearches = 0;
   int64_t singularExtensions = 0;
@@ -1086,6 +1090,8 @@ struct SearchState {
     recaptureExtensions = 0;
     pawnThreatExtensions = 0;
     pawnThreatOrderHits = 0;
+    kingLinePressureExtensions = 0;
+    kingLinePressureOrderHits = 0;
     recaptureOrderHits = 0;
     singularExtensionSearches = 0;
     singularExtensions = 0;
@@ -3020,6 +3026,27 @@ bool isPawnPressureExtensionMove(const Move& move, int enemyKing, int rootPieceC
   return rankDistance >= 1 && rankDistance <= 4;
 }
 
+bool isKingLinePressureExtensionMove(const Board& board, const Move& move, int enemyKing, int rootPieceCount) {
+  if (rootPieceCount <= 0 || rootPieceCount > kKingLinePressureExtensionMaxPieces) return false;
+  if (enemyKing < 0 || move.captured != 0) return false;
+
+  const int movingPiece = move.piece != 0 ? move.piece : board.cells[move.from];
+  const int type = pieceCodeType(movingPiece);
+  if (type != Rook && type != Cannon) return false;
+  if (!kSameLineBySquare[static_cast<std::size_t>(move.to)][static_cast<std::size_t>(enemyKing)]) return false;
+
+  const int blockers = blockersBetweenAfterMove<true>(board, move, move.to, enemyKing, movingPiece);
+  const int side = pieceCodeSide(movingPiece);
+  const bool advancedAttacker = crossedRiver(side, rankOf(move.to));
+  const bool centralFilePressure = fileOf(move.to) == fileOf(enemyKing) && fileCentrality(fileOf(move.to)) >= 3;
+
+  if (type == Rook) {
+    return blockers == 1 && (advancedAttacker || centralFilePressure);
+  }
+
+  return blockers == 2 && (advancedAttacker || centralFilePressure || rootPieceCount <= 10);
+}
+
 bool hasNullMoveMaterial(const Board& board, int side) {
   return side == kRed ? board.redNullMoveMaterial > 0 : board.blackNullMoveMaterial > 0;
 }
@@ -4514,6 +4541,10 @@ int moveOrderingScore(
       score += kPawnPressureOrderingBonus;
       state.pawnThreatOrderHits += 1;
     }
+    if (board && isKingLinePressureExtensionMove(*board, move, enemyKing, state.rootPieceCount)) {
+      score += kKingLinePressureOrderingBonus;
+      state.kingLinePressureOrderHits += 1;
+    }
     score += state.quietHistory[move.from][move.to];
     score += continuationHistoryScore(state, previousMove, move, true);
     score += followupHistoryScore(state, previousOwnMove, move, true) / 2;
@@ -5541,7 +5572,15 @@ int negamax(
         && !checkEvasion
         && depth > 1
         && isPawnPressureExtensionMove(move, enemyKing, state.rootPieceCount);
-    const int extension = (singular || givesCheck || recapture || checkEvasion || pawnPressure) ? 1 : 0;
+    const bool kingLinePressure = extensionsRemaining > 0
+        && !singular
+        && !givesCheck
+        && !recapture
+        && !checkEvasion
+        && !pawnPressure
+        && depth > 1
+        && isKingLinePressureExtensionMove(board, move, enemyKing, state.rootPieceCount);
+    const int extension = (singular || givesCheck || recapture || checkEvasion || pawnPressure || kingLinePressure) ? 1 : 0;
     const int childExtensions = extensionsRemaining - extension;
     if (!inCheck
         && depth <= 3
@@ -5585,6 +5624,7 @@ int negamax(
       state.extensions += 1;
       if (recapture) state.recaptureExtensions += 1;
       if (pawnPressure) state.pawnThreatExtensions += 1;
+      if (kingLinePressure) state.kingLinePressureExtensions += 1;
     }
 
     const int childOwnKing = pieceCodeType(move.captured) == King ? -1 : enemyKing;
@@ -6349,10 +6389,15 @@ std::vector<RootLine> searchRootDepth(
     const bool pawnPressure = rootExtension == 0
         && depth > 1
         && isPawnPressureExtensionMove(move, child.ownKing, state.rootPieceCount);
-    const int moveExtension = rootExtension + (pawnPressure ? 1 : 0);
+    const bool kingLinePressure = rootExtension == 0
+        && !pawnPressure
+        && depth > 1
+        && isKingLinePressureExtensionMove(board, move, child.ownKing, state.rootPieceCount);
+    const int moveExtension = rootExtension + ((pawnPressure || kingLinePressure) ? 1 : 0);
     if (moveExtension > 0) {
       state.extensions += 1;
       if (pawnPressure) state.pawnThreatExtensions += 1;
+      if (kingLinePressure) state.kingLinePressureExtensions += 1;
     }
     state.rootChildStateReuses += 1;
     const uint64_t childKey = keyAfterMove(board, move);
@@ -6824,6 +6869,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " opref " << state.openingPreferencePromotions
               << " ext " << state.extensions << " recext " << state.recaptureExtensions << " recorder " << state.recaptureOrderHits
               << " pawnext " << state.pawnThreatExtensions << " pawnord " << state.pawnThreatOrderHits
+              << " klineext " << state.kingLinePressureExtensions << " klineord " << state.kingLinePressureOrderHits
               << " singtry " << state.singularExtensionSearches << " singext " << state.singularExtensions
               << " singrej " << state.singularExtensionRejects
               << " qnodes " << state.qnodes
@@ -6908,6 +6954,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " opref " << state.openingPreferencePromotions
               << " ext " << state.extensions << " recext " << state.recaptureExtensions << " recorder " << state.recaptureOrderHits
               << " pawnext " << state.pawnThreatExtensions << " pawnord " << state.pawnThreatOrderHits
+              << " klineext " << state.kingLinePressureExtensions << " klineord " << state.kingLinePressureOrderHits
               << " singtry " << state.singularExtensionSearches << " singext " << state.singularExtensions
               << " singrej " << state.singularExtensionRejects
               << " qnodes " << state.qnodes

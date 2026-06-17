@@ -1958,6 +1958,52 @@ test("local C++ engine orders late-game pawn pressure before ordinary quiets", (
   assert.match(result.stdout, /\bpawnord [1-9]\d*\b/);
 });
 
+test("local C++ engine extends quiet king-line pressure at the root", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const input = [
+    "uci",
+    "position fen 4k4/9/4a4/9/9/R8/9/9/9/4K4 r",
+    "go depth 2 searchmoves a4e4",
+    "quit"
+  ].join("\n");
+  const result = spawnSync(build.output, {
+    input,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /\bbestmove a4e4\b/);
+  assert.match(result.stdout, /\bklineext [1-9]\d*\b/);
+  assert.match(result.stdout, /\bext [1-9]\d*\b/);
+});
+
+test("local C++ engine orders quiet king-line pressure before ordinary quiets", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const input = [
+    "uci",
+    "position fen 4k4/9/4a4/9/9/R8/9/9/9/4K4 r",
+    "go depth 1",
+    "quit"
+  ].join("\n");
+  const result = spawnSync(build.output, {
+    input,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /\bklineord [1-9]\d*\b/);
+});
+
 test("local C++ engine rewards unclogging the palace center", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {
