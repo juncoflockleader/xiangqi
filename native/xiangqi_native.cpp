@@ -6101,7 +6101,7 @@ int main() {
   int hashMb = kDefaultHashMb;
   TranspositionTable tt(hashMb);
   TranspositionTable qtt(std::max(1, hashMb / 4));
-  EvalCache evalCache(std::max(1, hashMb / 8));
+  EvalCache evalCache(std::max(1, hashMb / 4));
   SearchState searchState;
   auto clearEngineMemory = [&]() {
     tt.clear();
@@ -6138,7 +6138,7 @@ int main() {
         hashMb = requestedHash;
         tt.resize(hashMb);
         qtt.resize(std::max(1, hashMb / 4));
-        evalCache.resize(std::max(1, hashMb / 8));
+        evalCache.resize(std::max(1, hashMb / 4));
       }
     } else if (command == "position") {
       handlePosition(position, line);
