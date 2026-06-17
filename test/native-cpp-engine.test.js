@@ -1111,6 +1111,32 @@ test("local C++ engine reduces late quiet root moves in MultiPV searches", (t) =
   assert.match(result.stdout, /\bbestmove [a-i][0-9][a-i][0-9]\b/);
 });
 
+test("local C++ engine reduces late bad root captures conservatively", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const input = [
+    "uci",
+    "setoption name MultiPV value 5",
+    "position fen 4k4/9/4r4/9/9/4p4/9/9/9/3KR4 r",
+    "go depth 6",
+    "quit"
+  ].join("\n");
+  const result = spawnSync(build.output, {
+    input,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /\binfo multipv 5\b/);
+  assert.match(result.stdout, /\brootsee [1-9]\d*\b/);
+  assert.match(result.stdout, /\brootred [1-9]\d*\/\d+\b/);
+  assert.match(result.stdout, /\bbestmove [a-i][0-9][a-i][0-9]\b/);
+});
+
 test("local C++ engine respects vertical horse-leg checks", async (t) => {
   const build = buildNativeEngine();
   if (build.skip) {

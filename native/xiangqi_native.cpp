@@ -73,6 +73,7 @@ constexpr int kRootHistoryReductionBoostMinDepth = 7;
 constexpr int kRootHistoryReductionBoostMoveIndex = 8;
 constexpr int kRootHistoryReductionBoostScale = 32;
 constexpr int kRootContinuationReductionBoostScale = 48;
+constexpr int kRootBadCaptureReductionLossMargin = 120;
 constexpr int kRootTrackedMultiPvLimit = 8;
 constexpr int kRootMultiPvReductionMargin = 5;
 constexpr int kQSeePruneMaxDepth = 4;
@@ -921,6 +922,7 @@ struct SearchState {
   int64_t rootReductionResearches = 0;
   int64_t rootHistoryReductionGuards = 0;
   int64_t rootHistoryReductionBoosts = 0;
+  int64_t rootBadCaptureReductions = 0;
   int64_t rootOrderHits = 0;
   int64_t rootOrderStores = 0;
   int64_t extensions = 0;
@@ -1084,6 +1086,7 @@ struct SearchState {
     rootReductionResearches = 0;
     rootHistoryReductionGuards = 0;
     rootHistoryReductionBoosts = 0;
+    rootBadCaptureReductions = 0;
     rootOrderHits = 0;
     rootOrderStores = 0;
     extensions = 0;
@@ -6392,6 +6395,16 @@ void storeRootOrderMemory(SearchState& state, uint64_t rootKey, const std::vecto
   state.rootOrderStores += state.rootOrderCount;
 }
 
+bool isRootReducibleBadCapture(const Board& root, const Move& move, SearchState& state) {
+  if (isQuiet(move) || pieceCodeType(move.captured) == King) return false;
+
+  const int movingValue = pieceCodeValue(move.piece);
+  const int capturedValue = pieceCodeValue(move.captured);
+  if (movingValue <= capturedValue + kRootBadCaptureReductionLossMargin) return false;
+
+  return badCaptureLossForCapture(root, move, state) > kRootBadCaptureReductionLossMargin;
+}
+
 int rootBaseMoveReduction(
     const Board& root,
     const Move& move,
@@ -6405,8 +6418,15 @@ int rootBaseMoveReduction(
   if (rootInCheck) return 0;
   const int reductionMoveIndex = trackedMultiPvReduction ? kRootMultiPvReductionMoveIndex : kRootReductionMoveIndex;
   if (depth < kRootReductionMinDepth || moveIndex < reductionMoveIndex) return 0;
-  if (!isQuiet(move) || child.inCheck) return 0;
+  if (child.inCheck) return 0;
   if (timedOpeningRootBonus(root, move) > 0) return 0;
+
+  const bool quietMove = isQuiet(move);
+  if (!quietMove) {
+    if (!isRootReducibleBadCapture(root, move, state)) return 0;
+    state.rootBadCaptureReductions += 1;
+    return 1;
+  }
 
   const int historyScale = depth * depth;
   const int historyScore = state.quietHistory[move.from][move.to];
@@ -7009,6 +7029,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " rootredply " << state.rootReductionPlies
               << " roothrguard " << state.rootHistoryReductionGuards
               << " roothrboost " << state.rootHistoryReductionBoosts
+              << " rootsee " << state.rootBadCaptureReductions
               << " roottt " << state.rootTtHits << " rootttstores " << state.rootTtStores
               << " rootord " << state.rootOrderHits << " rootordstores " << state.rootOrderStores
               << " pvs " << state.pvsResearches
@@ -7094,6 +7115,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " rootredply " << state.rootReductionPlies
               << " roothrguard " << state.rootHistoryReductionGuards
               << " roothrboost " << state.rootHistoryReductionBoosts
+              << " rootsee " << state.rootBadCaptureReductions
               << " roottt " << state.rootTtHits << " rootttstores " << state.rootTtStores
               << " rootord " << state.rootOrderHits << " rootordstores " << state.rootOrderStores
               << " pvs " << state.pvsResearches
