@@ -2636,11 +2636,14 @@ MoveList generateLegalQsearchMoves(
     int alpha,
     SearchState& state) {
   if (inCheck) return generateLegalMoves(board, side, false, ownKing, true);
+  if (ownKing < 0) return {};
 
   auto moves = generatePseudoMoves(board, side, GenerateCapturesOnly);
   std::size_t kept = 0;
   for (std::size_t index = 0; index < moves.size(); index += 1) {
     Move& move = moves[index];
+    if ((move.captured > 0 ? move.captured : -move.captured) == King) continue;
+
     const int capturedValue = pieceValue(move.captured);
     if (move.captured != 0
         && standPat + capturedValue + kQDeltaPruneMargin <= alpha
@@ -2652,10 +2655,15 @@ MoveList generateLegalQsearchMoves(
         continue;
       }
     }
+
+    if (!moveMayAffectOwnKingSafety(board, move, side, ownKing)) {
+      moves[kept++] = move;
+      continue;
+    }
+    if (isInCheckAfterGeneratedMoveKnownKing(board, move, side, ownKing)) continue;
     moves[kept++] = move;
   }
   moves.resize(kept);
-  filterLegalMovesInPlace(board, moves, side, ownKing, false);
   return moves;
 }
 
