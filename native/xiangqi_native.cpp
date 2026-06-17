@@ -5080,7 +5080,7 @@ int negamax(
   }
 
   if (depth <= 0) {
-    const int ownKing = knownOwnKing == kUnknownKingSquare ? findKing(board, board.side) : knownOwnKing;
+    const int ownKing = knownOwnKing == kUnknownKingSquare ? trackedKingSquare(board, board.side) : knownOwnKing;
     const bool inCheck = knownOwnKing == kUnknownKingSquare ? isInCheckKnownKing(board, board.side, ownKing) : knownInCheck;
     return quiescenceKnownCheck(board, alpha, beta, ply, inCheck ? 2 : 4, state, ownKing, inCheck);
   }
@@ -5141,7 +5141,7 @@ int negamax(
     }
   }
 
-  const int ownKing = knownOwnKing == kUnknownKingSquare ? findKing(board, board.side) : knownOwnKing;
+  const int ownKing = knownOwnKing == kUnknownKingSquare ? trackedKingSquare(board, board.side) : knownOwnKing;
   const bool inCheck = knownOwnKing == kUnknownKingSquare ? isInCheckKnownKing(board, board.side, ownKing) : knownInCheck;
   int staticScore = 0;
   StaticEvalTrend trend = TrendUnknown;
@@ -5155,7 +5155,7 @@ int negamax(
 
   int enemyKing = kUnknownKingSquare;
   auto resolveEnemyKing = [&]() -> int {
-    if (enemyKing == kUnknownKingSquare) enemyKing = findKing(board, -board.side);
+    if (enemyKing == kUnknownKingSquare) enemyKing = trackedKingSquare(board, -board.side);
     return enemyKing;
   };
   bool terminalKnown = false;
@@ -5553,7 +5553,7 @@ int quiescenceKnownCheck(
     return alpha;
   }
 
-  const int enemyKing = knownEnemyKing == kUnknownKingSquare ? findKing(board, -board.side) : knownEnemyKing;
+  const int enemyKing = knownEnemyKing == kUnknownKingSquare ? trackedKingSquare(board, -board.side) : knownEnemyKing;
   auto moves = generateLegalQsearchMoves(board, board.side, ownKing, inCheck, enemyKing, standPat, alpha, state);
   if (shouldSearchQuietChecksInQsearch(qDepth, inCheck, standPat, alpha)) {
     auto quietChecks = generateQuietChecks(board, board.side, enemyKing, quietCheckLimitForQDepth(qDepth), state, ownKing, inCheck);
@@ -6310,10 +6310,10 @@ std::vector<RootLine> searchRoot(
   evalCache.newSearch();
 
   const bool unrestrictedRootSearch = searchMoves.empty();
-  const int rootOwnKing = findKing(root, root.side);
+  const int rootOwnKing = trackedKingSquare(root, root.side);
   const bool rootInCheck = isInCheckKnownKing(root, root.side, rootOwnKing);
   auto rootMoves = filterRootMoves(generateLegalMoves(root, root.side, false, rootOwnKing, rootInCheck), searchMoves);
-  const int rootEnemyKing = findKing(root, -root.side);
+  const int rootEnemyKing = trackedKingSquare(root, -root.side);
   Move rootHashMove{};
   if (const TtEntry* entry = tt.probe(root.key)) {
     const bool rootHashMoveAllowed = validMove(entry->bestMove)
