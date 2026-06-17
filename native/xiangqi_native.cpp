@@ -1999,8 +1999,8 @@ template <bool hasKnownKey>
 void makeMoveImpl(Board& board, Move& move, uint64_t knownKey) {
   move.piece = board.cells[move.from];
   move.captured = board.cells[move.to];
-  const int movingSide = move.piece > 0 ? kRed : kBlack;
-  const int movingType = move.piece > 0 ? move.piece : -move.piece;
+  const int movingSide = pieceCodeSide(move.piece);
+  const int movingType = pieceCodeType(move.piece);
   const int captured = move.captured;
   if constexpr (hasKnownKey) {
     board.key = knownKey;
@@ -2013,8 +2013,8 @@ void makeMoveImpl(Board& board, Move& move, uint64_t knownKey) {
   board.positionalScore -= positionalScoreForPieceSquare(move.piece, move.from);
   board.positionalScore += positionalScoreForPieceSquare(move.piece, move.to);
   if (captured != 0) {
-    const int capturedSide = captured > 0 ? kRed : kBlack;
-    const int capturedType = captured > 0 ? captured : -captured;
+    const int capturedSide = pieceCodeSide(captured);
+    const int capturedType = pieceCodeType(captured);
     removePieceSquare(board, capturedSide, move.to);
     board.totalPieceCount -= 1;
     if (capturedType == King) setKingSquare(board, capturedSide, -1);
@@ -2040,8 +2040,8 @@ void makeMoveWithKnownKey(Board& board, Move& move, uint64_t knownKey) {
 }
 
 void undoMove(Board& board, const Move& move) {
-  const int movingSide = move.piece > 0 ? kRed : kBlack;
-  const int movingType = move.piece > 0 ? move.piece : -move.piece;
+  const int movingSide = pieceCodeSide(move.piece);
+  const int movingType = pieceCodeType(move.piece);
   const int captured = move.captured;
   board.side = -board.side;
   board.key ^= sideHash();
@@ -2052,8 +2052,8 @@ void undoMove(Board& board, const Move& move) {
   board.positionalScore += positionalScoreForPieceSquare(move.piece, move.from);
   movePieceSquare(board, movingSide, move.to, move.from);
   if (captured != 0) {
-    const int capturedSide = captured > 0 ? kRed : kBlack;
-    const int capturedType = captured > 0 ? captured : -captured;
+    const int capturedSide = pieceCodeSide(captured);
+    const int capturedType = pieceCodeType(captured);
     addPieceSquare(board, capturedSide, move.to);
     board.totalPieceCount += 1;
     if (capturedType == King) setKingSquare(board, capturedSide, move.to);
@@ -2329,7 +2329,7 @@ bool moveGivesCheck(const Board& board, const Move& move, int enemyKing, SearchS
 
 KnownChildState knownChildStateAfterMove(const Board& board, const Move& move, int enemyKing, SearchState& state) {
   KnownChildState child;
-  child.ownKing = (move.captured > 0 ? move.captured : -move.captured) == King ? -1 : enemyKing;
+  child.ownKing = pieceCodeType(move.captured) == King ? -1 : enemyKing;
   child.inCheck = child.ownKing < 0 || moveGivesCheck(board, move, enemyKing, state);
   return child;
 }
@@ -2444,7 +2444,7 @@ bool movingOntoLineMayCreateCannonCheck(const Board& board, const Move& move, in
 }
 
 bool moveMayAffectOwnKingSafety(const Board& board, const Move& move, int side, int kingSquare) {
-  if (kingSquare < 0 || (move.piece > 0 ? move.piece : -move.piece) == King) return true;
+  if (kingSquare < 0 || pieceCodeType(move.piece) == King) return true;
 
   // In quiet positions, only line/horse-leg effects can make a non-king move unsafe.
   return vacatingLineMayExposeKing(board, side, move.from, kingSquare)
@@ -2477,8 +2477,8 @@ bool pieceAttacksSquareAfterMove(
     int piece,
     int movingPiece) {
   if (from == target || piece == 0) return false;
-  const int side = piece > 0 ? kRed : kBlack;
-  const int type = piece > 0 ? piece : -piece;
+  const int side = pieceCodeSide(piece);
+  const int type = pieceCodeType(piece);
 
   if (type == Horse) {
     const int legSquare = kHorseLegSquareBySourceTarget[static_cast<std::size_t>(from)][static_cast<std::size_t>(target)];
@@ -2506,7 +2506,7 @@ bool pieceAttacksSquareAfterMove(
     if (std::abs(dx) + std::abs(dy) == 1 && palaceContains(side, targetFile, targetRank)) return true;
     const int targetPiece = pieceAfterMove<hasMove>(board, move, target, movingPiece);
     return dx == 0
-        && (targetPiece > 0 ? targetPiece : -targetPiece) == King
+        && pieceCodeType(targetPiece) == King
         && blockersBetweenAfterMove<hasMove>(board, move, from, target, movingPiece) == 0;
   }
   if (type == Advisor) {
@@ -2630,12 +2630,12 @@ int orthogonalLineAttackerValueAfterMove(
         continue;
       }
 
-      if (piece == cannonPiece) return pieceValue(Cannon);
+      if (piece == cannonPiece) return pieceTypeValue(Cannon);
       break;
     }
   }
 
-  return rookFound ? pieceValue(Rook) : kInf;
+  return rookFound ? pieceTypeValue(Rook) : kInf;
 }
 
 template <bool hasMove>
@@ -2659,7 +2659,7 @@ bool kingAttacksSquareAfterMove(
   }
 
   const int targetPiece = pieceAfterMove<hasMove>(board, move, target, movingPiece);
-  if ((targetPiece > 0 ? targetPiece : -targetPiece) != King) return false;
+  if (pieceCodeType(targetPiece) != King) return false;
   for (int direction : {0, 2}) {
     const auto& ray = rays[static_cast<std::size_t>(direction)];
     const int length = lengths[static_cast<std::size_t>(direction)];
@@ -2678,14 +2678,14 @@ bool kingAttacksSquareAfterMove(
 
 template <bool hasMove>
 int leastAttackerValueAfterMoveImpl(const Board& board, const Move& move, int side, int target, int movingPiece) {
-  if (pawnAttacksSquareAfterMove<hasMove>(board, move, side, target, movingPiece)) return pieceValue(Pawn);
+  if (pawnAttacksSquareAfterMove<hasMove>(board, move, side, target, movingPiece)) return pieceTypeValue(Pawn);
   if (advisorOrElephantAttacksSquareAfterMove<hasMove>(board, move, side, target, movingPiece)) {
-    return pieceValue(Advisor);
+    return pieceTypeValue(Advisor);
   }
-  if (horseAttacksSquareAfterMove<hasMove>(board, move, side, target, movingPiece)) return pieceValue(Horse);
+  if (horseAttacksSquareAfterMove<hasMove>(board, move, side, target, movingPiece)) return pieceTypeValue(Horse);
   const int lineAttackerValue = orthogonalLineAttackerValueAfterMove<hasMove>(board, move, side, target, movingPiece);
   if (lineAttackerValue < kInf) return lineAttackerValue;
-  if (kingAttacksSquareAfterMove<hasMove>(board, move, side, target, movingPiece)) return pieceValue(King);
+  if (kingAttacksSquareAfterMove<hasMove>(board, move, side, target, movingPiece)) return pieceTypeValue(King);
   return kInf;
 }
 
@@ -2803,7 +2803,7 @@ bool hasLegalMove(Board& board, int side, int ownKing, bool currentlyInCheck) {
 
   auto moves = generatePseudoMoves(board, side, GenerateAllMoves);
   for (Move& move : moves) {
-    if ((move.captured > 0 ? move.captured : -move.captured) == King) continue;
+    if (pieceCodeType(move.captured) == King) continue;
     if (!currentlyInCheck && !moveMayAffectOwnKingSafety(board, move, side, ownKing)) return true;
     if (!isInCheckAfterGeneratedMoveKnownKing(board, move, side, ownKing)) return true;
   }
@@ -2842,7 +2842,7 @@ MoveList generateLegalQsearchMoves(
   std::size_t kept = 0;
   for (std::size_t index = 0; index < moves.size(); index += 1) {
     Move& move = moves[index];
-    if ((move.captured > 0 ? move.captured : -move.captured) == King) continue;
+    if (pieceCodeType(move.captured) == King) continue;
 
     const int capturedValue = pieceCodeValue(move.captured);
     if (standPat + capturedValue + kQDeltaPruneMargin <= alpha
@@ -2959,9 +2959,9 @@ bool isRecapture(const Move& move, const Move& previousMove) {
 bool isPawnPressureExtensionMove(const Move& move, int enemyKing, int rootPieceCount) {
   if (rootPieceCount <= 0 || rootPieceCount > kPawnPressureExtensionMaxPieces) return false;
   if (enemyKing < 0 || move.captured != 0) return false;
-  if ((move.piece > 0 ? move.piece : -move.piece) != Pawn) return false;
+  if (pieceCodeType(move.piece) != Pawn) return false;
 
-  const int side = move.piece > 0 ? kRed : kBlack;
+  const int side = pieceCodeSide(move.piece);
   const int toFile = fileOf(move.to);
   const int toRank = rankOf(move.to);
   if (!crossedRiver(side, toRank)) return false;
@@ -5339,7 +5339,7 @@ int negamax(
       if (pawnPressure) state.pawnThreatExtensions += 1;
     }
 
-    const int childOwnKing = (move.captured > 0 ? move.captured : -move.captured) == King ? -1 : enemyKing;
+    const int childOwnKing = pieceCodeType(move.captured) == King ? -1 : enemyKing;
     const bool childInCheck = childOwnKing < 0 || givesCheck;
     std::vector<Move>* childPvSink = childPv ? &*childPv : nullptr;
     const uint64_t childKey = keyAfterMove(board, move);
@@ -5567,8 +5567,8 @@ int quiescenceKnownCheck(
         }
       }
     }
-    const int childOwnKing = (move.captured > 0 ? move.captured : -move.captured) == King ? -1 : enemyKing;
-    const int childEnemyKing = (move.piece > 0 ? move.piece : -move.piece) == King ? move.to : ownKing;
+    const int childOwnKing = pieceCodeType(move.captured) == King ? -1 : enemyKing;
+    const int childEnemyKing = pieceCodeType(move.piece) == King ? move.to : ownKing;
     const bool childInCheck = childOwnKing < 0 || givesCheck;
     const uint64_t childKey = keyAfterMove(board, move);
     prefetchQuiescenceCaches(state, childKey);
