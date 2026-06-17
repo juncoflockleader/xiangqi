@@ -165,9 +165,9 @@ optimization (`-flto`) by default for stronger local play. Use
 `node scripts/build-native.mjs --portable` when you need a binary intended for
 another machine, or `node scripts/build-native.mjs --no-lto` if your compiler
 has trouble with LTO.
-The native UCI engine defaults to a 64 MB hash table; pass
-`--engine-option Hash=128` or a UCI `setoption name Hash value N` command when
-you want to spend more memory on deeper analysis. It keeps search-ordering
+The native UCI engine defaults to a 128 MB hash table; pass
+`--engine-option Hash=N` or a UCI `setoption name Hash value N` command when
+you want to tune memory for deeper analysis. It keeps search-ordering
 memory warm across consecutive `go` commands for game play, and resets that
 memory with `ucinewgame` or `setoption name Clear Hash`.
 

@@ -129,7 +129,7 @@ test("local C++ engine advertises the stronger default hash size", (t) => {
   });
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /option name Hash type spin default 64 min 1 max 1024/);
+  assert.match(result.stdout, /option name Hash type spin default 128 min 1 max 1024/);
   assert.match(result.stdout, /option name Clear Hash type button/);
 });
 
