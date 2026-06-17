@@ -2072,7 +2072,6 @@ void recordSearchPathMove(SearchState& state, int ply, const Move& move) {
 void clearSearchPathMove(SearchState& state, int ply) {
   if (ply < 0 || ply >= kMaxPly) return;
   const auto pathIndex = static_cast<std::size_t>(ply);
-  state.pathMoves[pathIndex] = {};
   state.pathMoveKnown[pathIndex] = false;
 }
 
