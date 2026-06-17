@@ -5017,7 +5017,6 @@ int negamax(
   }
 
   if (depth <= 0) {
-    clearStaticEvalTrendAtPly(state, ply);
     const int ownKing = knownOwnKing == kUnknownKingSquare ? findKing(board, board.side) : knownOwnKing;
     const bool inCheck = knownOwnKing == kUnknownKingSquare ? isInCheckKnownKing(board, board.side, ownKing) : knownInCheck;
     return quiescenceKnownCheck(board, alpha, beta, ply, inCheck ? 2 : 4, state, ownKing, inCheck);
