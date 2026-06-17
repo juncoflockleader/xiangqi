@@ -119,8 +119,67 @@ test("opening book follows the generated central cannon pawn-push branch", () =>
   assert.equal(result.book.database.engineScore, -18);
   assert.deepEqual(
     result.bookAlternatives.slice(0, 3).map((entry) => entry.move.notation),
-    ["h2-i2", "i0-h0", "b2-e2"]
+    ["h2-i2", "i0-h0", "c3-c4"]
   );
+});
+
+test("opening book refreshes the central cannon screen-horse reply with Pikafish pawn push", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  let position = createInitialPosition();
+  for (const move of ["h7-e7", "h0-g2"]) {
+    position = engine.play(position, move);
+  }
+
+  const result = engine.chooseMove(position);
+
+  assert.equal(result.source, "opening-book");
+  assert.equal(result.bestMove.notation, "g6-g5");
+  assert.equal(result.book.name, "Pikafish best: g6-g5");
+  assert.equal(result.book.database.engineScore, 22);
+  assert.deepEqual(
+    result.bookAlternatives.slice(0, 3).map((entry) => entry.move.notation),
+    ["g6-g5", "h9-g7", "b7-d7"]
+  );
+});
+
+test("opening book extends the refreshed central cannon pawn-push continuation", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  let position = createInitialPosition();
+  for (const move of ["h7-e7", "h0-g2", "g6-g5", "h2-i2"]) {
+    position = engine.play(position, move);
+  }
+
+  const result = engine.chooseMove(position);
+
+  assert.equal(result.source, "opening-book");
+  assert.equal(result.bestMove.notation, "b9-c7");
+  assert.equal(result.book.name, "Pikafish best: b9-c7");
+  assert.equal(result.book.database.engineScore, 25);
+});
+
+test("opening book covers generated early-pawn side branches", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  let position = createInitialPosition();
+  for (const move of ["g6-g5", "h2-g2"]) {
+    position = engine.play(position, move);
+  }
+
+  const cannonSide = engine.chooseMove(position);
+  assert.equal(cannonSide.source, "opening-book");
+  assert.equal(cannonSide.bestMove.notation, "c9-e7");
+  assert.equal(cannonSide.book.name, "Pikafish best: c9-e7");
+  assert.equal(cannonSide.book.database.engineScore, 27);
+
+  position = createInitialPosition();
+  for (const move of ["g6-g5", "c3-c4"]) {
+    position = engine.play(position, move);
+  }
+
+  const pawnChallenge = engine.chooseMove(position);
+  assert.equal(pawnChallenge.source, "opening-book");
+  assert.equal(pawnChallenge.bestMove.notation, "b9-a7");
+  assert.equal(pawnChallenge.book.name, "Pikafish best: b9-a7");
+  assert.equal(pawnChallenge.book.database.engineScore, 34);
 });
 
 test("opening book covers the c3-c4 central cannon candidate branch", () => {

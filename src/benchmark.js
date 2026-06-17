@@ -37,6 +37,19 @@ export const ENGINE_BENCHMARKS = Object.freeze([
     lesson: "The opening layer should follow the Pikafish-generated central-cannon continuation instead of relying on the older hand-authored line."
   }),
   Object.freeze({
+    id: "book-central-cannon-screen-horse-refresh",
+    name: "Opening: Pikafish Screen-Horse Refresh",
+    fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR r",
+    expectedMoves: Object.freeze(["g6-g5"]),
+    expectedSource: "opening-book",
+    tags: Object.freeze(["opening", "book", "oracle", "learning"]),
+    options: Object.freeze({
+      depth: 2,
+      timeLimitMs: 500
+    }),
+    lesson: "The opening layer should use the refreshed Pikafish pawn push after the central cannon meets the screen-horse defense."
+  }),
+  Object.freeze({
     id: "rook-wins-central-rook",
     name: "Tactic: Win the Central Rook",
     fen: "4k4/9/4r4/9/9/9/9/9/9/3KR4 r",

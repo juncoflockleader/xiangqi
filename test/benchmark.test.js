@@ -71,11 +71,12 @@ test("benchmark report is readable", async () => {
   const report = await runBenchmarkSuite(null, { tag: "opening" });
   const text = formatBenchmarkReport(report);
 
-  assert.ok(text.includes("Benchmarks: 3/3 solved"));
+  assert.ok(text.includes("Benchmarks: 4/4 solved"));
   assert.ok(text.includes("nodes"));
   assert.ok(text.includes("depth"));
   assert.ok(text.includes("PASS book-central-cannon"));
   assert.ok(text.includes("PASS book-central-cannon-oracle-continuation"));
+  assert.ok(text.includes("PASS book-central-cannon-screen-horse-refresh"));
   assert.ok(text.includes("opening-book"));
 });
 
@@ -140,9 +141,9 @@ test("engine comparison reports multiple sync and async backends", async () => {
   const text = formatEngineComparisonReport(comparison);
 
   assert.equal(comparison.totalBackends, 2);
-  assert.equal(comparison.benchmarkTotal, 3);
-  assert.equal(comparison.backends[0].solved, 3);
-  assert.equal(comparison.backends[1].solved, 3);
+  assert.equal(comparison.benchmarkTotal, 4);
+  assert.equal(comparison.backends[0].solved, 4);
+  assert.equal(comparison.backends[1].solved, 4);
   assert.equal(comparison.backends[1].id, "async-reference");
   assert.equal(comparison.backends[0].status.state, "primary");
   assert.equal(comparison.backends[0].fallbackCount, 0);
@@ -150,7 +151,7 @@ test("engine comparison reports multiple sync and async backends", async () => {
   assert.ok(text.includes("JavaScript Reference Engine"));
   assert.ok(text.includes("Async Reference"));
   assert.ok(text.includes("status primary"));
-  assert.ok(text.includes("3/3 solved"));
+  assert.ok(text.includes("4/4 solved"));
 });
 
 test("engine comparison reports fallback backend usage", async () => {
@@ -195,9 +196,9 @@ test("oracle comparison grades candidate moves with oracle review", async () => 
   });
   const text = formatOracleComparisonReport(comparison);
 
-  assert.equal(comparison.total, 3);
-  assert.equal(comparison.exactMatches, 3);
-  assert.equal(comparison.acceptable, 3);
+  assert.equal(comparison.total, 4);
+  assert.equal(comparison.exactMatches, 4);
+  assert.equal(comparison.acceptable, 4);
   assert.equal(comparison.results[0].candidateMove, "h7-e7");
   assert.equal(comparison.results[0].oracleMove, "h7-e7");
   assert.equal(comparison.results[0].oracleReview.classification, "best");
