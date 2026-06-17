@@ -12,12 +12,12 @@ test("coach move gives progressive opening hints without needing search", () => 
   const hint = engine.coachMove(createInitialPosition());
 
   assert.equal(hint.source, "opening-book");
-  assert.equal(hint.bestMove.notation, "h7-e7");
+  assert.equal(hint.bestMove.notation, "b7-e7");
   assert.equal(hint.depth, 0);
   assert.equal(hint.levels.length, 4);
   assert.equal(hint.levels[0].kind, "concept");
   assert.equal(hint.levels.at(-1).kind, "reveal");
-  assert.ok(hint.levels.at(-1).text.includes("h7-e7"));
+  assert.ok(hint.levels.at(-1).text.includes("b7-e7"));
   assert.ok(hint.alternatives.length >= 3);
 });
 

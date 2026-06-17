@@ -45,7 +45,7 @@ test("benchmark suite can filter by id", async () => {
 
   assert.equal(report.total, 1);
   assert.equal(report.results[0].id, "book-central-cannon");
-  assert.equal(report.results[0].actualMove, "h7-e7");
+  assert.equal(report.results[0].actualMove, "b7-e7");
 });
 
 test("named opening oracle suite captures native regression positions", () => {
@@ -207,8 +207,8 @@ test("oracle comparison grades candidate moves with oracle review", async () => 
   assert.equal(comparison.total, 4);
   assert.equal(comparison.exactMatches, 4);
   assert.equal(comparison.acceptable, 4);
-  assert.equal(comparison.results[0].candidateMove, "h7-e7");
-  assert.equal(comparison.results[0].oracleMove, "h7-e7");
+  assert.equal(comparison.results[0].candidateMove, "b7-e7");
+  assert.equal(comparison.results[0].oracleMove, "b7-e7");
   assert.equal(comparison.results[0].oracleReview.classification, "best");
   assert.ok(comparison.aggregate.averageCentipawnLoss >= 0);
   assert.ok(text.includes("Oracle comparison:"));

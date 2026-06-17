@@ -23,7 +23,7 @@ test("UCCI backend uses the explainable opening book before native search", asyn
   const result = await backend.chooseMove(createInitialPosition());
 
   assert.equal(result.source, "opening-book");
-  assert.equal(result.bestMove.notation, "h7-e7");
+  assert.equal(result.bestMove.notation, "b7-e7");
   assert.equal(result.depth, 0);
   assert.equal(result.native.skipped, true);
   assert.ok(result.explanation.reasons.some((reason) => reason.includes("Opening book")));

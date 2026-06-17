@@ -5619,9 +5619,9 @@ uint64_t fenPositionKey(const std::string& fen) {
 int timedOpeningRootBonus(const Board& root, const Move& move) {
   const std::string uci = moveToUci(move);
   if (root.side == kRed && root.key == initialPositionKey()) {
-    if (uci == "h2e2") return 5000;  // h7-e7: central cannon.
+    if (uci == "b2e2") return 5000;  // b7-e7: refreshed 2026 Pikafish opposite central cannon.
+    if (uci == "h2e2") return 4900;  // h7-e7: classic central cannon remains a near-tie.
     if (uci == "g3g4") return 4700;  // g6-g5: common Pikafish near-tie from start.
-    if (uci == "b2e2") return 4500;  // b7-e7: opposite central cannon.
     if (uci == "b0c2" || uci == "h0g2") return 3200;  // Develop horses.
     return 0;
   }
@@ -5638,8 +5638,8 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t centralCannonHorseReply = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR r");
   if (root.key == centralCannonHorseReply) {
-    if (uci == "g3g4") return 5000;  // g6-g5: refreshed Pikafish near-tie pawn push.
-    if (uci == "h0g2") return 4900;  // h9-g7: close horse-development alternative.
+    if (uci == "h0g2") return 5000;  // h9-g7: refreshed 2026 Pikafish horse development.
+    if (uci == "g3g4") return 4900;  // g6-g5: close pawn-push alternative.
     if (uci == "b2d2") return 4600;  // b7-d7: flexible cannon shift.
     return 0;
   }
@@ -5665,8 +5665,8 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t earlyPawnRedElephantBlack = fenPositionKey(
       "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/1C2E2C1/9/RH1AKAEHR b");
   if (root.key == earlyPawnRedElephantBlack) {
-    if (uci == "b7e7") return 5000;  // b2-e2: centralize before chasing with cannons.
-    if (uci == "h9i7") return 4600;  // h0-i2: develop toward the flank.
+    if (uci == "h9i7") return 5000;  // h0-i2: refreshed 2026 Pikafish flank development.
+    if (uci == "b7e7") return 4900;  // b2-e2: close centralization alternative.
     if (uci == "b9c7") return 4400;  // b0-c2: compact horse development.
     return 0;
   }
@@ -5693,9 +5693,9 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t earlyPawnChallenge = fenPositionKey(
       "rheakaehr/9/1c5c1/p3p1p1p/2p6/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r");
   if (root.key == earlyPawnChallenge) {
-    if (uci == "b2c2") return 5000;  // b7-c7: refreshed depth-12 Pikafish top cannon regroup.
-    if (uci == "b0a2") return 4700;  // b9-a7: near-tie horse-shift alternative.
-    if (uci == "h0g2") return 4600;  // h9-g7: playable horse-development alternative.
+    if (uci == "b0a2") return 5000;  // b9-a7: refreshed 2026 Pikafish horse shift.
+    if (uci == "h0g2") return 4900;  // h9-g7: close horse-development alternative.
+    if (uci == "b2c2") return 4800;  // b7-c7: close cannon-regroup alternative.
     return 0;
   }
 
@@ -5749,10 +5749,10 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t centralCannonDoubleHorseBothRooks = fenPositionKey(
       "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 r");
   if (root.key == centralCannonDoubleHorseBothRooks) {
-    if (uci == "h0h6") return 5000;  // h9-h3: refreshed depth-12 Pikafish rook lift.
-    if (uci == "b0c2") return 4900;  // b9-c7: near-tie horse development.
-    if (uci == "c3c4") return 4600;  // c6-c5: tied pawn-challenge fallback.
-    if (uci == "h0h4") return 4400;  // h9-h5: older playable rook-pressure plan.
+    if (uci == "c3c4") return 5000;  // c6-c5: refreshed 2026 Pikafish pawn challenge.
+    if (uci == "h0h6") return 4900;  // h9-h3: close quiet rook-lift alternative.
+    if (uci == "h0h4") return 4700;  // h9-h5: playable rook-pressure plan.
+    if (uci == "b0c2") return 4600;  // b9-c7: near-tie horse development.
     return 0;
   }
 
@@ -5767,8 +5767,8 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t centralCannonPawnChallenge = fenPositionKey(
       "rheakae1r/9/1c4hc1/p3p1p1p/2p6/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R r");
   if (root.key == centralCannonPawnChallenge) {
-    if (uci == "b0a2") return 5000;  // b9-a7: Pikafish top cannon-side horse shift.
-    if (uci == "i0h0") return 4600;  // i9-h9: close quiet rook development.
+    if (uci == "i0h0") return 5000;  // i9-h9: refreshed 2026 Pikafish quiet rook development.
+    if (uci == "b0a2") return 4900;  // b9-a7: close cannon-side horse shift.
     if (uci == "g3g4") return 4550;  // g6-g5: close central pawn break.
     return 0;
   }
@@ -5785,8 +5785,8 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t shiftedCentralCannons = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b");
   if (root.key == shiftedCentralCannons) {
-    if (uci == "b9c7") return 5000;  // b0-c2: develop before chasing with the cannon.
-    if (uci == "b7d7") return 4600;  // b2-d2: close oracle alternative.
+    if (uci == "b9c7") return 5000;  // b0-c2: compact development remains the safest oracle tie.
+    if (uci == "b7d7") return 4900;  // b2-d2: close cannon-shift alternative.
     if (uci == "g6g5") return 4600;  // g3-g4: close oracle alternative.
     return 0;
   }
@@ -5819,6 +5819,14 @@ int timedOpeningRootMaxLoss(const Board& root) {
   static const uint64_t earlyPawnShiftedCannonBlack = fenPositionKey(
       "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/4C2C1/9/RHEAKAEHR b");
   if (root.key == earlyPawnShiftedCannonBlack) return 160;
+
+  static const uint64_t centralCannonDoubleHorseBothRooks = fenPositionKey(
+      "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 r");
+  if (root.key == centralCannonDoubleHorseBothRooks) return 180;
+
+  static const uint64_t huCentralCannonTrap = fenPositionKey(
+      "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r");
+  if (root.key == huCentralCannonTrap) return 180;
 
   return kTimedOpeningPriorMaxLoss;
 }

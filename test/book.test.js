@@ -19,8 +19,8 @@ test("opening book returns legal annotated entries from the initial position", (
   const book = lookupOpeningBook(position);
 
   assert.ok(book);
-  assert.equal(book.entry.name, "Central Cannon");
-  assert.equal(book.move.notation, "h7-e7");
+  assert.equal(book.entry.name, "Pikafish best: b7-e7");
+  assert.equal(book.move.notation, "b7-e7");
   assert.ok(book.entries.length >= 3);
 });
 
@@ -30,13 +30,13 @@ test("engine chooses and explains opening book moves by default", () => {
   const result = engine.chooseMove(position);
 
   assert.equal(result.source, "opening-book");
-  assert.equal(result.bestMove.notation, "h7-e7");
+  assert.equal(result.bestMove.notation, "b7-e7");
   assert.equal(result.depth, 0);
   assert.ok(result.explanation.summary.includes("book move"));
   assert.ok(result.explanation.reasons.some((reason) => reason.includes("Opening book")));
   assert.ok(result.explanation.confidence.score >= 45);
   assert.ok(result.explanation.confidence.factors.some((factor) => factor.kind === "book"));
-  assert.equal(result.explanation.linePlan.firstMove, "h7-e7");
+  assert.equal(result.explanation.linePlan.firstMove, "b7-e7");
   assert.equal(result.explanation.linePlan.moves[0].role, "opening-choice");
 });
 
@@ -98,8 +98,8 @@ test("opening book includes generated Pikafish early-pawn alternatives", () => {
   });
 
   assert.equal(result.source, "opening-book");
-  assert.equal(result.bestMove.notation, "g6-g5");
-  assert.equal(result.book.name, "Pikafish candidate 2: g6-g5");
+  assert.equal(result.bestMove.notation, "b7-e7");
+  assert.equal(result.book.name, "Pikafish best: b7-e7");
   assert.equal(result.book.database.source, "Pikafish");
   assert.equal(result.book.database.engineScore, 27);
 });
@@ -123,7 +123,7 @@ test("opening book follows the generated central cannon pawn-push branch", () =>
   );
 });
 
-test("opening book refreshes the central cannon screen-horse reply with Pikafish pawn push", () => {
+test("opening book refreshes the central cannon screen-horse reply with Pikafish horse development", () => {
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });
   let position = createInitialPosition();
   for (const move of ["h7-e7", "h0-g2"]) {
@@ -133,12 +133,12 @@ test("opening book refreshes the central cannon screen-horse reply with Pikafish
   const result = engine.chooseMove(position);
 
   assert.equal(result.source, "opening-book");
-  assert.equal(result.bestMove.notation, "g6-g5");
-  assert.equal(result.book.name, "Pikafish best: g6-g5");
-  assert.equal(result.book.database.engineScore, 22);
+  assert.equal(result.bestMove.notation, "h9-g7");
+  assert.equal(result.book.name, "Pikafish best: h9-g7");
+  assert.equal(result.book.database.engineScore, 33);
   assert.deepEqual(
     result.bookAlternatives.slice(0, 3).map((entry) => entry.move.notation),
-    ["g6-g5", "h9-g7", "b7-d7"]
+    ["h9-g7", "g6-g5", "b7-d7"]
   );
 });
 
@@ -177,9 +177,9 @@ test("opening book covers generated early-pawn side branches", () => {
 
   const pawnChallenge = engine.chooseMove(position);
   assert.equal(pawnChallenge.source, "opening-book");
-  assert.equal(pawnChallenge.bestMove.notation, "b7-c7");
-  assert.equal(pawnChallenge.book.name, "Pikafish best: b7-c7");
-  assert.equal(pawnChallenge.book.database.engineScore, 31);
+  assert.equal(pawnChallenge.bestMove.notation, "b9-a7");
+  assert.equal(pawnChallenge.book.name, "Pikafish best: b9-a7");
+  assert.equal(pawnChallenge.book.database.engineScore, 24);
 });
 
 test("opening book covers the c3-c4 central cannon candidate branch", () => {
@@ -192,9 +192,9 @@ test("opening book covers the c3-c4 central cannon candidate branch", () => {
   const result = engine.chooseMove(position);
 
   assert.equal(result.source, "opening-book");
-  assert.equal(result.bestMove.notation, "b9-a7");
-  assert.equal(result.book.name, "Pikafish best: b9-a7");
-  assert.equal(result.book.database.engineScore, 27);
+  assert.equal(result.bestMove.notation, "i9-h9");
+  assert.equal(result.book.name, "Pikafish best: i9-h9");
+  assert.equal(result.book.database.engineScore, 38);
 });
 
 test("opening book follows Pikafish principal-variation continuations past exact oracle nodes", () => {

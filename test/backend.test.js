@@ -27,7 +27,7 @@ test("javascript backend exposes the engine contract", () => {
   assert.equal(backend.kind, "javascript");
   assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.EXPLANATION), true);
   assert.equal(result.source, "opening-book");
-  assert.equal(result.bestMove.notation, "h7-e7");
+  assert.equal(result.bestMove.notation, "b7-e7");
   assert.equal(description.cacheCapacity, backend.cacheCapacity);
   assert.equal(description.status.state, "primary");
   assert.equal(description.status.native, false);
@@ -40,7 +40,7 @@ test("javascript backend exposes the engine contract", () => {
   assert.equal(typeof backend.lessonPlan, "function");
 
   const hint = backend.coachMove(position);
-  assert.equal(hint.bestMove.notation, "h7-e7");
+  assert.equal(hint.bestMove.notation, "b7-e7");
   assert.equal(hint.levels.at(-1).kind, "reveal");
 
   const lesson = backend.lessonPlan(["h7-e7"], {
@@ -112,7 +112,7 @@ test("learning backend factory falls back to the JavaScript engine", () => {
   assert.equal(backend.kind, "javascript");
   assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.LOCAL_SEARCH), true);
   assert.equal(isNativeEngineBackend(backend), false);
-  assert.equal(result.bestMove.notation, "h7-e7");
+  assert.equal(result.bestMove.notation, "b7-e7");
 });
 
 test("learning backend factory can prefer a native profile without requiring it", () => {

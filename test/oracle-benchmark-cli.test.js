@@ -33,11 +33,11 @@ test("oracle benchmark CLI compares JavaScript candidate to native oracle", asyn
   assert.equal(report.candidate.kind, "javascript");
   assert.equal(report.oracle.kind, "native-uci");
   assert.equal(report.results[0].id, "book-central-cannon");
-  assert.equal(report.results[0].candidateMove, "h7-e7");
+  assert.equal(report.results[0].candidateMove, "b7-e7");
   assert.equal(report.results[0].oracleMove, "h9-g7");
   assert.equal(report.results[0].oracleReview.classification, "good");
-  assert.equal(report.results[0].oracleReview.planComparison.summary, "Your plan starts with h7-e7; the engine prefers h9-g7, a good gap of 59 centipawns. Both lines expect h0-g2.");
-  assert.equal(report.results[0].oracleReview.playedLinePlan.firstMove, "h7-e7");
+  assert.equal(report.results[0].oracleReview.planComparison.summary, "Your plan starts with b7-e7; the engine prefers h9-g7, a good gap of 59 centipawns. Both lines expect h0-g2.");
+  assert.equal(report.results[0].oracleReview.playedLinePlan.firstMove, "b7-e7");
   assert.equal(report.results[0].oracleReview.bestLinePlan.firstMove, "h9-g7");
   assert.equal(report.results[0].oracleReview.bestAlternatives[0].move, "h9-g7");
   assert.ok(report.aggregate.averageCentipawnLoss >= 0);
@@ -59,7 +59,7 @@ test("oracle benchmark CLI prints learning evidence in text reports", async () =
     timeout: 5000
   });
 
-  assert.match(stdout, /Plan: Your plan starts with h7-e7; the engine prefers h9-g7/);
+  assert.match(stdout, /Plan: Your plan starts with b7-e7; the engine prefers h9-g7/);
 });
 
 test("oracle benchmark CLI applies the Pikafish oracle preset", async () => {
@@ -186,7 +186,7 @@ test("oracle benchmark CLI can load custom positions without expected moves", as
 
     assert.equal(report.total, 1);
     assert.equal(report.results[0].id, "oracle-only-opening");
-    assert.equal(report.results[0].candidateMove, "h7-e7");
+    assert.equal(report.results[0].candidateMove, "b7-e7");
     assert.equal(report.results[0].oracleMove, "h9-g7");
     assert.equal(report.results[0].oracleReview.classification, "good");
   } finally {

@@ -34,15 +34,15 @@ test("oracle-reviewed backend annotates a chosen move with stronger review", asy
     });
 
     assert.equal(backend.supports(ENGINE_BACKEND_FEATURES.ORACLE_REVIEW), true);
-    assert.equal(result.bestMove.notation, "h7-e7");
+    assert.equal(result.bestMove.notation, "b7-e7");
     assert.equal(result.oracleReview.status, "reviewed");
     assert.equal(result.oracleReview.backend.name, "Mock Oracle");
-    assert.equal(result.oracleReview.move, "h7-e7");
+    assert.equal(result.oracleReview.move, "b7-e7");
     assert.equal(result.oracleReview.bestMove, "h9-g7");
     assert.equal(result.oracleReview.classification, "good");
     assert.equal(result.oracleReview.centipawnLoss, 59);
     assert.equal(result.explanation.oracleReview.bestMove, "h9-g7");
-    assert.ok(result.explanation.reasons[0].includes("Mock Oracle grades h7-e7 as good"));
+    assert.ok(result.explanation.reasons[0].includes("Mock Oracle grades b7-e7 as good"));
 
     const game = await chooseAndPlayGameMoveAsync(createGame(position), backend, {
       searchOptions: { depth: 1, timeLimitMs: 100 },
@@ -72,7 +72,7 @@ test("oracle-reviewed backend can keep playing when oracle review is unavailable
     timeLimitMs: 100
   });
 
-  assert.equal(result.bestMove.notation, "h7-e7");
+  assert.equal(result.bestMove.notation, "b7-e7");
   assert.equal(result.oracleReview.status, "unavailable");
   assert.equal(result.oracleReview.classification, "unreviewed");
   assert.equal(result.oracleReview.error, "engine offline");
