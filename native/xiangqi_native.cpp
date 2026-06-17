@@ -5476,7 +5476,6 @@ int quiescenceKnownCheck(
     if (standPat > alpha) alpha = standPat;
   } else {
     state.checkedEvalSkips += 1;
-    clearStaticEvalTrendAtPly(state, ply);
   }
   if (!inCheck && qDepth <= 0) {
     const int flag = alpha <= alphaOriginal ? kTtUpper : kTtExact;
