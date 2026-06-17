@@ -670,22 +670,60 @@ class EvalCache;
 
 struct CheckCacheEntry {
   uint64_t key = 0;
-  int from = -1;
-  int to = -1;
-  int enemyKing = -1;
+  int8_t from = -1;
+  int8_t to = -1;
+  int8_t enemyKing = -1;
   bool givesCheck = false;
   bool occupied = false;
+
+  constexpr CheckCacheEntry() = default;
+
+  constexpr CheckCacheEntry(
+      uint64_t keyValue,
+      int fromSquare,
+      int toSquare,
+      int enemyKingSquare,
+      bool givesCheckValue,
+      bool occupiedValue)
+      : key(keyValue),
+        from(static_cast<int8_t>(fromSquare)),
+        to(static_cast<int8_t>(toSquare)),
+        enemyKing(static_cast<int8_t>(enemyKingSquare)),
+        givesCheck(givesCheckValue),
+        occupied(occupiedValue) {}
 };
 
 struct LeastAttackerCacheEntry {
   uint64_t key = 0;
-  int from = -1;
-  int to = -1;
-  int side = 0;
-  int target = -1;
   int value = kInf;
+  int8_t from = -1;
+  int8_t to = -1;
+  int8_t side = 0;
+  int8_t target = -1;
   bool occupied = false;
+
+  constexpr LeastAttackerCacheEntry() = default;
+
+  constexpr LeastAttackerCacheEntry(
+      uint64_t keyValue,
+      int fromSquare,
+      int toSquare,
+      int sideValue,
+      int targetSquare,
+      int attackerValue,
+      bool occupiedValue)
+      : key(keyValue),
+        value(attackerValue),
+        from(static_cast<int8_t>(fromSquare)),
+        to(static_cast<int8_t>(toSquare)),
+        side(static_cast<int8_t>(sideValue)),
+        target(static_cast<int8_t>(targetSquare)),
+        occupied(occupiedValue) {}
 };
+
+static_assert(kSquares - 1 <= std::numeric_limits<int8_t>::max(), "cache square fields must fit in int8_t");
+static_assert(sizeof(CheckCacheEntry) <= 16, "check cache entries should stay compact");
+static_assert(sizeof(LeastAttackerCacheEntry) <= 24, "least-attacker cache entries should stay compact");
 
 std::size_t floorPowerOfTwo(std::size_t value) {
   std::size_t power = 1;
