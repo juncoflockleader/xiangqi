@@ -52,8 +52,9 @@ constexpr int kSingularExtensionMargin = 90;
 constexpr int kHistoryPruningMaxDepth = 3;
 constexpr int kHistoryPruningBaseIndex = 7;
 constexpr int kHistoryPruningMarginScale = 32;
-constexpr int kLateMovePruningMaxDepth = 3;
+constexpr int kLateMovePruningMaxDepth = 4;
 constexpr int kLateMovePruningDepthThreeTighten = 20;
+constexpr int kLateMovePruningDepthFourTighten = 35;
 constexpr int kImprovingEvalMargin = 12;
 constexpr int kTimedOpeningPriorMaxLoss = 100;
 constexpr int kTimedSearchDepthLimit = 64;
@@ -780,6 +781,7 @@ struct SearchState {
   int64_t qSeePrunes = 0;
   int64_t lateMovePrunes = 0;
   int64_t depthThreeLateMovePrunes = 0;
+  int64_t depthFourLateMovePrunes = 0;
   int64_t lmrReductions = 0;
   int64_t reductionPlies = 0;
   int64_t deepReductions = 0;
@@ -927,6 +929,7 @@ struct SearchState {
     qSeePrunes = 0;
     lateMovePrunes = 0;
     depthThreeLateMovePrunes = 0;
+    depthFourLateMovePrunes = 0;
     lmrReductions = 0;
     reductionPlies = 0;
     deepReductions = 0;
@@ -2823,7 +2826,8 @@ enum StaticEvalTrend {
 enum LateMovePruneDecision {
   LateMoveKeep = 0,
   LateMovePruneShallow = 1,
-  LateMovePruneDepthThree = 2
+  LateMovePruneDepthThree = 2,
+  LateMovePruneDepthFour = 3
 };
 
 bool isImprovingTrend(StaticEvalTrend trend) {
@@ -2986,11 +2990,14 @@ LateMovePruneDecision shouldPruneLateMove(
     const Move& previousMove) {
   if (depth < 1 || depth > kLateMovePruningMaxDepth) return LateMoveKeep;
   const int baseThreshold = lateMovePruningBaseThreshold(depth);
-  const bool depthThreeCandidate = depth == kLateMovePruningMaxDepth;
+  const bool depthThreeCandidate = depth == 3;
+  const bool depthFourCandidate = depth == 4;
+  const int depthTighten = depthThreeCandidate
+      ? kLateMovePruningDepthThreeTighten
+      : depthFourCandidate ? kLateMovePruningDepthFourTighten : 0;
   const int threshold = std::max(
       1,
-      lateMovePruningThreshold(depth, trend)
-          - (depthThreeCandidate ? kLateMovePruningDepthThreeTighten : 0));
+      lateMovePruningThreshold(depth, trend) - depthTighten);
   if (orderedIndex < threshold) {
     if (isImprovingTrend(trend) && orderedIndex >= baseThreshold) {
       state.improvingLateMoveGuards += 1;
@@ -3011,6 +3018,15 @@ LateMovePruneDecision shouldPruneLateMove(
       return LateMoveKeep;
     }
     return historyScore < 0 || continuationScore < 0 ? LateMovePruneDepthThree : LateMoveKeep;
+  }
+  if (depthFourCandidate) {
+    if (isImprovingTrend(trend)) {
+      state.improvingLateMoveGuards += 1;
+      return LateMoveKeep;
+    }
+    const int combinedHistory = historyScore + continuationScore / 2;
+    const int negativeThreshold = -depth * depth * 24;
+    return combinedHistory <= negativeThreshold ? LateMovePruneDepthFour : LateMoveKeep;
   }
   if (isWorseningTrend(trend) && orderedIndex < baseThreshold) {
     state.nonImprovingLateMovePrunes += 1;
@@ -4979,6 +4995,7 @@ int negamax(
     if (lateMovePruneDecision != LateMoveKeep) {
       state.lateMovePrunes += 1;
       if (lateMovePruneDecision == LateMovePruneDepthThree) state.depthThreeLateMovePrunes += 1;
+      if (lateMovePruneDecision == LateMovePruneDepthFour) state.depthFourLateMovePrunes += 1;
       continue;
     }
     if (counterCandidate) state.countermoveHits += 1;
@@ -5134,6 +5151,7 @@ int quiescenceKnownCheck(
     if (standPat > alpha) alpha = standPat;
   } else {
     state.checkedEvalSkips += 1;
+    clearStaticEvalTrendAtPly(state, ply);
   }
   if (!inCheck && qDepth <= 0) {
     const int flag = alpha <= alphaOriginal ? kTtUpper : kTtExact;
@@ -6038,6 +6056,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " qdskip " << state.qDeltaPrefilterSkips
               << " qsee " << state.qSeePrunes
               << " lmp " << state.lateMovePrunes << " lmp3 " << state.depthThreeLateMovePrunes
+              << " lmp4 " << state.depthFourLateMovePrunes
               << " lmr " << state.lmrReductions << "/" << state.lmrResearches
               << " redply " << state.reductionPlies << " deepred " << state.deepReductions
               << " pvguard " << state.pvReductionGuards << " cutboost " << state.cutNodeReductionBoosts
@@ -6114,6 +6133,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " qdskip " << state.qDeltaPrefilterSkips
               << " qsee " << state.qSeePrunes
               << " lmp " << state.lateMovePrunes << " lmp3 " << state.depthThreeLateMovePrunes
+              << " lmp4 " << state.depthFourLateMovePrunes
               << " lmr " << state.lmrReductions << "/" << state.lmrResearches
               << " redply " << state.reductionPlies << " deepred " << state.deepReductions
               << " pvguard " << state.pvReductionGuards << " cutboost " << state.cutNodeReductionBoosts

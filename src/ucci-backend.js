@@ -907,6 +907,7 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     qSeePrunes: maxInfoValue(infos, "qSeePrunes"),
     lateMovePrunes: maxInfoValue(infos, "lateMovePrunes"),
     depthThreeLateMovePrunes: maxInfoValue(infos, "depthThreeLateMovePrunes"),
+    depthFourLateMovePrunes: maxInfoValue(infos, "depthFourLateMovePrunes"),
     reductions: maxInfoValue(infos, "reductions"),
     reductionPlies: maxInfoValue(infos, "reductionPlies"),
     deepReductions: maxInfoValue(infos, "deepReductions"),
@@ -1256,6 +1257,9 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "lmp3") {
       info.depthThreeLateMovePrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "lmp4") {
+      info.depthFourLateMovePrunes = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "lmr") {
       const [reductions, researches] = parseNativePair(tokens[index + 1]);
@@ -2100,6 +2104,7 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.qSeePrunes ?? 0) > 0) parts.push(nativeCount(stats.qSeePrunes, "quiescence SEE prune"));
   if ((stats.lateMovePrunes ?? 0) > 0) parts.push(nativeCount(stats.lateMovePrunes, "late-move prune"));
   if ((stats.depthThreeLateMovePrunes ?? 0) > 0) parts.push(nativeCount(stats.depthThreeLateMovePrunes, "depth-3 late-move prune"));
+  if ((stats.depthFourLateMovePrunes ?? 0) > 0) parts.push(nativeCount(stats.depthFourLateMovePrunes, "depth-4 late-move prune"));
   if ((stats.pvReductionGuards ?? 0) > 0) parts.push(nativeCount(stats.pvReductionGuards, "PV-node reduction guard"));
   if ((stats.cutNodeReductionBoosts ?? 0) > 0) parts.push(nativeCount(stats.cutNodeReductionBoosts, "cut-node reduction boost"));
   if ((stats.improvingReductionGuards ?? 0) > 0) parts.push(nativeCount(stats.improvingReductionGuards, "improving-position reduction guard"));
@@ -2382,6 +2387,7 @@ function createNativeStats(parsed) {
     qSeePrunes: parsed.qSeePrunes ?? 0,
     lateMovePrunes: parsed.lateMovePrunes ?? 0,
     depthThreeLateMovePrunes: parsed.depthThreeLateMovePrunes ?? 0,
+    depthFourLateMovePrunes: parsed.depthFourLateMovePrunes ?? 0,
     reductions: parsed.reductions ?? 0,
     reductionPlies: parsed.reductionPlies ?? 0,
     deepReductions: parsed.deepReductions ?? 0,
@@ -2501,6 +2507,7 @@ function createEmptyStats() {
     badHistoryPruneGuards: 0,
     lateMovePrunes: 0,
     depthThreeLateMovePrunes: 0,
+    depthFourLateMovePrunes: 0,
     deltaPrunes: 0,
     qDeltaPrefilterSkips: 0,
     qSeePrunes: 0,
