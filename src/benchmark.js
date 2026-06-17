@@ -111,7 +111,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     id: "oracle-opening-central-cannon-horse-reply",
     name: "Oracle Opening: Central Cannon Horse Reply",
     fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR r",
-    expectedMoves: Object.freeze(["h9-g7"]),
+    expectedMoves: Object.freeze(["g6-g5", "h9-g7"]),
     tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "central-cannon"]),
     options: Object.freeze({
       depth: 8,
@@ -119,7 +119,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
       useBook: false,
       lines: 5
     }),
-    lesson: "After black's screen-horse reply, Pikafish develops the red horse behind the central cannon."
+    lesson: "After Black's screen-horse reply, the refreshed Pikafish prior promotes the early g-pawn push while keeping horse development as a close accepted alternative."
   }),
   Object.freeze({
     id: "oracle-opening-central-cannon-double-horse",

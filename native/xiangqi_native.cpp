@@ -5532,9 +5532,9 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t centralCannonHorseReply = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR r");
   if (root.key == centralCannonHorseReply) {
-    if (uci == "h0g2") return 5000;  // h9-g7: develop behind the cannon.
+    if (uci == "g3g4") return 5000;  // g6-g5: refreshed Pikafish near-tie pawn push.
+    if (uci == "h0g2") return 4900;  // h9-g7: close horse-development alternative.
     if (uci == "b2d2") return 4600;  // b7-d7: flexible cannon shift.
-    if (uci == "g3g4") return 4200;  // g6-g5: viable pawn push.
     return 0;
   }
 

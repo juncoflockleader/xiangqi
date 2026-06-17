@@ -410,6 +410,7 @@ test("local C++ timed opening priors guide pure native central cannon branches",
 
   try {
     const huTrap = parseFen("rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r");
+    const centralHorseReply = parseFen("rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR r");
     const centralCannon = parseFen("rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R b");
     const pawnChallenge = parseFen("rheakae1r/9/1c4hc1/p3p1p1p/2p6/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R r");
     const pawnChallengeDoubleHorse = parseFen("r1eakae1r/9/1ch3hc1/p3p1p1p/2p6/9/P1P1P1P1P/HC2C1H2/9/R1EAKAE1R r");
@@ -424,6 +425,12 @@ test("local C++ timed opening priors guide pure native central cannon branches",
       useBook: false,
       depth: 4,
       timeLimitMs: 200
+    });
+    const centralHorseReplyResult = await backend.chooseMove(centralHorseReply, {
+      useBook: false,
+      depth: 4,
+      timeLimitMs: 200,
+      lines: 5
     });
     const centralResult = await backend.chooseMove(centralCannon, {
       useBook: false,
@@ -480,6 +487,7 @@ test("local C++ timed opening priors guide pure native central cannon branches",
     });
 
     assert.equal(moveToNotation(huResult.bestMove), "i9-h9");
+    assert.equal(moveToNotation(centralHorseReplyResult.bestMove), "g6-g5");
     assert.equal(moveToNotation(centralResult.bestMove), "g3-g4");
     assert.equal(moveToNotation(pawnChallengeResult.bestMove), "b9-a7");
     assert.equal(moveToNotation(pawnChallengeDoubleHorseResult.bestMove), "i9-h9");
@@ -490,6 +498,7 @@ test("local C++ timed opening priors guide pure native central cannon branches",
     assert.equal(moveToNotation(doubleHorseRookPressureResult.bestMove), "h2-i2");
     assert.equal(moveToNotation(leftScreenResult.bestMove), "h9-g7");
     assert.ok(huResult.nodes > 0);
+    assert.ok(centralHorseReplyResult.nodes > 0);
     assert.ok(centralResult.nodes > 0);
     assert.ok(pawnChallengeResult.nodes > 0);
     assert.ok(pawnChallengeDoubleHorseResult.nodes > 0);
