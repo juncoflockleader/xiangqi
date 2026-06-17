@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   resolveWebPlayerReviewOptions,
   resolveWebServerCommandTimeoutMs,
+  resolveWebServerRequestTimeoutMs,
   startWebServer
 } from "../examples/web-server.mjs";
 
@@ -11,6 +12,15 @@ test("web server scales native command timeout for deeper searches", () => {
   assert.equal(resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 8000 }), 315000);
   assert.equal(resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 25000 }), 500000);
   assert.equal(resolveWebServerCommandTimeoutMs({ commandTimeoutMs: 45000, depth: 7, timeLimitMs: 8000 }), 45000);
+});
+
+test("web server keeps HTTP requests open longer than deep native searches", () => {
+  const commandTimeoutMs = resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 8000 });
+
+  assert.equal(commandTimeoutMs, 315000);
+  assert.equal(resolveWebServerRequestTimeoutMs({ depth: 7, timeLimitMs: 8000 }, commandTimeoutMs), 345000);
+  assert.equal(resolveWebServerRequestTimeoutMs({ commandTimeoutMs: 45000 }), 75000);
+  assert.equal(resolveWebServerRequestTimeoutMs({ requestTimeoutMs: 90000, commandTimeoutMs: 45000 }), 90000);
 });
 
 test("web server caps live player review budget for deep play", () => {
@@ -55,6 +65,8 @@ test("web server serves the browser game and starts a session", async () => {
     const stylesheet = await fetchText(`${app.url}/app.css`);
     const created = await postJson(`${app.url}/api/new`, { side: "red" });
 
+    assert.equal(app.server.requestTimeout, 60000);
+    assert.equal(app.server.timeout, 60000);
     assert.match(page, /<main class="app-shell"/);
     assert.match(page, /楚河/);
     assert.match(page, /汉界/);

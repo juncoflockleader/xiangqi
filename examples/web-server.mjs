@@ -34,8 +34,10 @@ const DEFAULT_PORT = 5175;
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_STARTUP_TIMEOUT_MS = 5000;
 const DEFAULT_COMMAND_TIMEOUT_MS = 30000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
 const COMMAND_TIMEOUT_DEPTH_MS = 45000;
 const COMMAND_TIMEOUT_TIME_MULTIPLIER = 20;
+const REQUEST_TIMEOUT_BUFFER_MS = 30000;
 const PLAYER_REVIEW_DEPTH_CAP = 3;
 const PLAYER_REVIEW_TIME_CAP_MS = 1000;
 const JSON_LIMIT_BYTES = 64 * 1024;
@@ -102,6 +104,9 @@ export async function startWebServer(options = {}) {
     handleRequest({ request, response, config, engine, sessions })
       .catch((error) => sendError(response, error));
   });
+  server.requestTimeout = config.requestTimeoutMs;
+  server.headersTimeout = Math.min(config.requestTimeoutMs, DEFAULT_REQUEST_TIMEOUT_MS);
+  server.setTimeout(config.requestTimeoutMs);
 
   await new Promise((resolveListen, rejectListen) => {
     server.once("error", rejectListen);
@@ -138,6 +143,7 @@ function resolveServerOptions(options) {
   const nativePreset = options.nativePreset === false ? null : textOrNull(options.nativePreset) ?? "pikafish";
   const startupTimeoutMs = numberOrNull(options.startupTimeoutMs) ?? DEFAULT_STARTUP_TIMEOUT_MS;
   const commandTimeoutMs = resolveWebServerCommandTimeoutMs(options, depth, timeLimitMs);
+  const requestTimeoutMs = resolveWebServerRequestTimeoutMs(options, commandTimeoutMs);
 
   return {
     host: textOrNull(options.host) ?? DEFAULT_HOST,
@@ -149,6 +155,8 @@ function resolveServerOptions(options) {
     timeLimitMs,
     lines,
     playLevel,
+    commandTimeoutMs,
+    requestTimeoutMs,
     engineOptions: {
       native: options.native,
       preferNative: options.preferNative,
@@ -182,6 +190,12 @@ export function resolveWebServerCommandTimeoutMs(options = {}, depth = numberOrN
   const depthBudget = depth && depth > 1 ? depth * COMMAND_TIMEOUT_DEPTH_MS : 0;
   const timeBudget = timeLimitMs ? timeLimitMs * COMMAND_TIMEOUT_TIME_MULTIPLIER : 0;
   return Math.max(DEFAULT_COMMAND_TIMEOUT_MS, depthBudget, timeBudget);
+}
+
+export function resolveWebServerRequestTimeoutMs(options = {}, commandTimeoutMs = resolveWebServerCommandTimeoutMs(options)) {
+  const explicit = numberOrNull(options.requestTimeoutMs);
+  if (explicit) return explicit;
+  return Math.max(DEFAULT_REQUEST_TIMEOUT_MS, commandTimeoutMs + REQUEST_TIMEOUT_BUFFER_MS);
 }
 
 async function handleRequest(context) {
@@ -913,6 +927,7 @@ function parseArgs(args) {
     else if (arg === "--engine-eval-file") options.engineEvalFile = args[++index];
     else if (arg === "--startup-timeout") options.startupTimeoutMs = Number(args[++index]);
     else if (arg === "--command-timeout") options.commandTimeoutMs = Number(args[++index]);
+    else if (arg === "--request-timeout") options.requestTimeoutMs = Number(args[++index]);
     else if (arg === "--help" || arg === "-h") options.help = true;
     else throw new Error(`Unknown option: ${arg}`);
   }
@@ -939,6 +954,7 @@ Options:
   --no-book            Disable opening book moves.
   --no-native          Force the JavaScript engine.
   --engine-preset name Native engine preset. Default: pikafish.
+  --request-timeout ms HTTP wait budget. Default: engine command timeout + 30000ms.
 `.trim());
 }
 
