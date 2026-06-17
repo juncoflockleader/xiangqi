@@ -338,15 +338,17 @@ class UcciProcessClient {
 
     const timeBudget = resolveSearchBudget(protocolOptions, protocolOptions.side ?? position.turn, {}, { position });
     const timeoutMs = options.commandTimeoutMs ?? Math.max(DEFAULT_SEARCH_TIMEOUT_MS, timeBudget.timeLimitMs + 5000);
+    const stopSearch = () => {
+      try {
+        this.write("stop");
+      } catch {
+        // Process-end handlers reject waiters when the engine is already gone.
+      }
+    };
     return this.commandUntil(formatGoCommand(protocolOptions), (lines) => lines.some((line) => line.startsWith("bestmove ")), timeoutMs, {
       signal: options.signal,
-      onAbort: () => {
-        try {
-          this.write("stop");
-        } catch {
-          // Process-end handlers reject waiters when the engine is already gone.
-        }
-      }
+      onAbort: stopSearch,
+      onTimeout: stopSearch
     });
   }
 
@@ -365,6 +367,9 @@ class UcciProcessClient {
       ...options,
       onAbort: () => {
         if (commandStarted) options.onAbort?.();
+      },
+      onTimeout: () => {
+        if (commandStarted) options.onTimeout?.();
       }
     });
     this.write(command);
@@ -404,6 +409,7 @@ class UcciProcessClient {
         timer: setTimeout(() => {
           cleanup();
           this.waiters.delete(waiter);
+          options.onTimeout?.();
           reject(new Error(`Timed out waiting for UCCI response to ${label}.`));
         }, timeoutMs)
       };

@@ -45,6 +45,11 @@ rl.on("line", (line) => {
   } else if (command === "position") {
     currentPosition = trimmed;
   } else if (command === "go") {
+    if (pendingStopResponse) {
+      write("info string still waiting for stop");
+      return;
+    }
+
     const depth = hasOption("MockDepthFromGo") ? depthFromGo(trimmed) : 2;
     for (const option of appliedOptions) {
       write(`info string option ${option}`);

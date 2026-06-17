@@ -557,6 +557,33 @@ test("UCCI backend aborts an active native search and drains bestmove", async ()
   }
 });
 
+test("UCCI backend stops an active native search on command timeout", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 50,
+    engineOptions: {
+      MockWaitForStopOnce: true
+    }
+  });
+
+  try {
+    await assert.rejects(
+      backend.chooseMove(createInitialPosition(), { useBook: false }),
+      /Timed out waiting for UCCI response to go/
+    );
+
+    const next = await backend.chooseMove(createInitialPosition(), { useBook: false });
+    assert.equal(next.bestMove.notation, "h9-g7");
+    assert.equal(next.source, "native-ucci");
+  } finally {
+    await backend.close();
+  }
+});
+
 test("UCCI backend close terminates native process that ignores quit", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,
