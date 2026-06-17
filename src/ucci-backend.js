@@ -922,6 +922,7 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     deltaPrunes: maxInfoValue(infos, "deltaPrunes"),
     qDeltaPrefilterSkips: maxInfoValue(infos, "qDeltaPrefilterSkips"),
     qSeePrunes: maxInfoValue(infos, "qSeePrunes"),
+    qSeePrefilterPrunes: maxInfoValue(infos, "qSeePrefilterPrunes"),
     lateMovePrunes: maxInfoValue(infos, "lateMovePrunes"),
     depthThreeLateMovePrunes: maxInfoValue(infos, "depthThreeLateMovePrunes"),
     depthFourLateMovePrunes: maxInfoValue(infos, "depthFourLateMovePrunes"),
@@ -1112,6 +1113,7 @@ function parseInfoLine(line) {
     deltaPrunes: 0,
     qDeltaPrefilterSkips: 0,
     qSeePrunes: 0,
+    qSeePrefilterPrunes: 0,
     reductions: 0,
     reductionPlies: 0,
     deepReductions: 0,
@@ -1294,6 +1296,9 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "qsee") {
       info.qSeePrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "qseepf") {
+      info.qSeePrefilterPrunes = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "lmp") {
       info.lateMovePrunes = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -2179,6 +2184,7 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.deltaPrunes ?? 0) > 0) parts.push(nativeCount(stats.deltaPrunes, "delta prune"));
   if ((stats.qDeltaPrefilterSkips ?? 0) > 0) parts.push(nativeCount(stats.qDeltaPrefilterSkips, "qsearch delta prefilter"));
   if ((stats.qSeePrunes ?? 0) > 0) parts.push(nativeCount(stats.qSeePrunes, "quiescence SEE prune"));
+  if ((stats.qSeePrefilterPrunes ?? 0) > 0) parts.push(nativeCount(stats.qSeePrefilterPrunes, "qsearch SEE prefilter"));
   if ((stats.lateMovePrunes ?? 0) > 0) parts.push(nativeCount(stats.lateMovePrunes, "late-move prune"));
   if ((stats.depthThreeLateMovePrunes ?? 0) > 0) parts.push(nativeCount(stats.depthThreeLateMovePrunes, "depth-3 late-move prune"));
   if ((stats.depthFourLateMovePrunes ?? 0) > 0) parts.push(nativeCount(stats.depthFourLateMovePrunes, "depth-4 late-move prune"));
@@ -2474,6 +2480,7 @@ function createNativeStats(parsed) {
     deltaPrunes: parsed.deltaPrunes ?? 0,
     qDeltaPrefilterSkips: parsed.qDeltaPrefilterSkips ?? 0,
     qSeePrunes: parsed.qSeePrunes ?? 0,
+    qSeePrefilterPrunes: parsed.qSeePrefilterPrunes ?? 0,
     lateMovePrunes: parsed.lateMovePrunes ?? 0,
     depthThreeLateMovePrunes: parsed.depthThreeLateMovePrunes ?? 0,
     depthFourLateMovePrunes: parsed.depthFourLateMovePrunes ?? 0,
@@ -2612,6 +2619,7 @@ function createEmptyStats() {
     deltaPrunes: 0,
     qDeltaPrefilterSkips: 0,
     qSeePrunes: 0,
+    qSeePrefilterPrunes: 0,
     reductions: 0,
     reductionPlies: 0,
     deepReductions: 0,

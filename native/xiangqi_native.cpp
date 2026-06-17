@@ -873,6 +873,7 @@ struct SearchState {
   int64_t deltaPrunes = 0;
   int64_t qDeltaPrefilterSkips = 0;
   int64_t qSeePrunes = 0;
+  int64_t qSeePrefilterPrunes = 0;
   int64_t lateMovePrunes = 0;
   int64_t depthThreeLateMovePrunes = 0;
   int64_t depthFourLateMovePrunes = 0;
@@ -1038,6 +1039,7 @@ struct SearchState {
     deltaPrunes = 0;
     qDeltaPrefilterSkips = 0;
     qSeePrunes = 0;
+    qSeePrefilterPrunes = 0;
     lateMovePrunes = 0;
     depthThreeLateMovePrunes = 0;
     depthFourLateMovePrunes = 0;
@@ -2887,6 +2889,15 @@ MoveList generateLegalMoves(Board& board, int side, bool capturesOnly = false) {
 
 int qCaptureHistoryScore(SearchState& state, const Move& move);
 bool shouldGuardQDeltaCapture(SearchState& state, const Move& move, int standPat, int capturedValue, int alpha);
+bool shouldPruneQBadCapture(
+    const Board& board,
+    const Move& move,
+    SearchState& state,
+    int qDepth,
+    int standPat,
+    int alpha,
+    bool givesCheck,
+    bool prefilter);
 
 MoveList generateLegalQsearchMoves(
     Board& board,
@@ -2894,6 +2905,7 @@ MoveList generateLegalQsearchMoves(
     int ownKing,
     bool inCheck,
     int enemyKing,
+    int qDepth,
     int standPat,
     int alpha,
     SearchState& state) {
@@ -2907,21 +2919,38 @@ MoveList generateLegalQsearchMoves(
     if (pieceCodeType(move.captured) == King) continue;
 
     const int capturedValue = pieceCodeValue(move.captured);
+    const bool possibleCheck = maybeMoveCanGiveCheck(move, enemyKing);
+    bool givesCheck = false;
+    bool givesCheckKnown = false;
+    auto moveGivesCheck = [&]() {
+      if (!givesCheckKnown) {
+        givesCheck = possibleCheck && moveGivesCheckAssumingPossible(board, move, enemyKing, state);
+        givesCheckKnown = true;
+      }
+      return givesCheck;
+    };
+
     if (standPat + capturedValue + kQDeltaPruneMargin <= alpha
         && !shouldGuardQDeltaCapture(state, move, standPat, capturedValue, alpha)) {
-      const bool possibleCheck = maybeMoveCanGiveCheck(move, enemyKing);
-      if (!possibleCheck || !moveGivesCheckAssumingPossible(board, move, enemyKing, state)) {
+      if (!moveGivesCheck()) {
         state.deltaPrunes += 1;
         state.qDeltaPrefilterSkips += 1;
         continue;
       }
     }
+    const bool qSeeCandidate = qDepth <= kQSeePruneMaxDepth
+        && state.rootPieceCount > 0
+        && state.rootPieceCount <= kQSeePruneMaxRootPieces
+        && alpha > standPat + kQSeePruneAlphaMargin
+        && pieceCodeValue(move.piece) > capturedValue + kQSeePruneLossMargin;
 
     if (!moveMayAffectOwnKingSafety(board, move, side, ownKing)) {
+      if (qSeeCandidate && shouldPruneQBadCapture(board, move, state, qDepth, standPat, alpha, moveGivesCheck(), true)) continue;
       moves[kept++] = move;
       continue;
     }
     if (isInCheckAfterGeneratedMoveKnownKing(board, move, side, ownKing)) continue;
+    if (qSeeCandidate && shouldPruneQBadCapture(board, move, state, qDepth, standPat, alpha, moveGivesCheck(), true)) continue;
     moves[kept++] = move;
   }
   moves.resize(kept);
@@ -2944,6 +2973,40 @@ bool shouldGuardQDeltaCapture(SearchState& state, const Move& move, int standPat
   if (standPat + capturedValue + kQDeltaCaptureHistoryMargin <= alpha) return false;
   if (qCaptureHistoryScore(state, move) <= kQDeltaCaptureHistoryGuard) return false;
   state.qCaptureHistoryPruneGuards += 1;
+  return true;
+}
+
+bool shouldPruneQBadCapture(
+    const Board& board,
+    const Move& move,
+    SearchState& state,
+    int qDepth,
+    int standPat,
+    int alpha,
+    bool givesCheck,
+    bool prefilter) {
+  if (qDepth > kQSeePruneMaxDepth) return false;
+  if (state.rootPieceCount <= 0 || state.rootPieceCount > kQSeePruneMaxRootPieces) return false;
+  if (alpha <= standPat + kQSeePruneAlphaMargin) return false;
+  if (move.captured == 0 || givesCheck) return false;
+
+  const int capturedValue = pieceCodeValue(move.captured);
+  if (pieceCodeValue(move.piece) <= capturedValue + kQSeePruneLossMargin) return false;
+
+  const int badCaptureLoss = badCaptureLossForCapture(board, move, state);
+  if (badCaptureLoss <= kQSeePruneLossMargin) return false;
+  if (standPat + capturedValue - badCaptureLoss + kQSeePruneLossMargin > alpha) return false;
+
+  const int captureHistoryScore = state.captureHistory[move.from][move.to];
+  if (captureHistoryScore > kQSeeCaptureHistoryGuard
+      && badCaptureLoss <= kQSeePruneLossMargin * 2
+      && standPat + capturedValue - badCaptureLoss + kQSeePruneLossMargin * 2 > alpha) {
+    state.qCaptureHistoryPruneGuards += 1;
+    return false;
+  }
+
+  state.qSeePrunes += 1;
+  if (prefilter) state.qSeePrefilterPrunes += 1;
   return true;
 }
 
@@ -5975,7 +6038,7 @@ int quiescenceKnownCheck(
   }
 
   const int enemyKing = knownEnemyKing == kUnknownKingSquare ? trackedKingSquare(board, -board.side) : knownEnemyKing;
-  auto moves = generateLegalQsearchMoves(board, board.side, ownKing, inCheck, enemyKing, standPat, alpha, state);
+  auto moves = generateLegalQsearchMoves(board, board.side, ownKing, inCheck, enemyKing, qDepth, standPat, alpha, state);
   if (shouldSearchQuietChecksInQsearch(qDepth, inCheck, standPat, alpha)) {
     auto quietChecks = generateQuietChecks(board, board.side, enemyKing, quietCheckLimitForQDepth(qDepth), state, ownKing, inCheck);
     for (const Move& move : quietChecks) {
@@ -6014,27 +6077,8 @@ int quiescenceKnownCheck(
     }
     const bool quietCheckMove = !inCheck && !captureMove && givesCheck;
     const int alphaBeforeMove = alpha;
-    if (!inCheck
-        && qDepth <= kQSeePruneMaxDepth
-        && state.rootPieceCount > 0
-        && state.rootPieceCount <= kQSeePruneMaxRootPieces
-        && alpha > standPat + kQSeePruneAlphaMargin
-        && captureMove
-        && !givesCheck
-        && pieceCodeValue(move.piece) > capturedValue + kQSeePruneLossMargin) {
-      const int badCaptureLoss = badCaptureLossForCapture(board, move, state);
-      if (badCaptureLoss > kQSeePruneLossMargin
-          && standPat + capturedValue - badCaptureLoss + kQSeePruneLossMargin <= alpha) {
-        const int captureHistoryScore = state.captureHistory[move.from][move.to];
-        if (captureHistoryScore > kQSeeCaptureHistoryGuard
-            && badCaptureLoss <= kQSeePruneLossMargin * 2
-            && standPat + capturedValue - badCaptureLoss + kQSeePruneLossMargin * 2 > alpha) {
-          state.qCaptureHistoryPruneGuards += 1;
-        } else {
-          state.qSeePrunes += 1;
-          continue;
-        }
-      }
+    if (!inCheck && captureMove && shouldPruneQBadCapture(board, move, state, qDepth, standPat, alpha, givesCheck, false)) {
+      continue;
     }
     const int childOwnKing = pieceCodeType(move.captured) == King ? -1 : enemyKing;
     const int childEnemyKing = pieceCodeType(move.piece) == King ? move.to : ownKing;
@@ -7014,7 +7058,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " futil " << state.futilityPrunes << " hprune " << state.badHistoryPrunes
               << " hpguard " << state.badHistoryPruneGuards << " delta " << state.deltaPrunes
               << " qdskip " << state.qDeltaPrefilterSkips
-              << " qsee " << state.qSeePrunes
+              << " qsee " << state.qSeePrunes << " qseepf " << state.qSeePrefilterPrunes
               << " lmp " << state.lateMovePrunes << " lmp3 " << state.depthThreeLateMovePrunes
               << " lmp4 " << state.depthFourLateMovePrunes
               << " lmr " << state.lmrReductions << "/" << state.lmrResearches
@@ -7101,7 +7145,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " futil " << state.futilityPrunes << " hprune " << state.badHistoryPrunes
               << " hpguard " << state.badHistoryPruneGuards << " delta " << state.deltaPrunes
               << " qdskip " << state.qDeltaPrefilterSkips
-              << " qsee " << state.qSeePrunes
+              << " qsee " << state.qSeePrunes << " qseepf " << state.qSeePrefilterPrunes
               << " lmp " << state.lateMovePrunes << " lmp3 " << state.depthThreeLateMovePrunes
               << " lmp4 " << state.depthFourLateMovePrunes
               << " lmr " << state.lmrReductions << "/" << state.lmrResearches

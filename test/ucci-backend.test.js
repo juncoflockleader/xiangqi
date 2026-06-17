@@ -193,6 +193,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.deltaPrunes, 12);
     assert.equal(result.stats.qDeltaPrefilterSkips, 15);
     assert.equal(result.stats.qSeePrunes, 13);
+    assert.equal(result.stats.qSeePrefilterPrunes, 9);
     assert.equal(result.stats.lateMovePrunes, 4);
     assert.equal(result.stats.depthThreeLateMovePrunes, 2);
     assert.equal(result.stats.depthFourLateMovePrunes, 1);
@@ -302,6 +303,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.iterations[0].stats.deltaPrunes, 12);
     assert.equal(result.iterations[0].stats.qDeltaPrefilterSkips, 15);
     assert.equal(result.iterations[0].stats.qSeePrunes, 13);
+    assert.equal(result.iterations[0].stats.qSeePrefilterPrunes, 9);
     assert.equal(result.iterations[0].stats.lateMovePrunes, 4);
     assert.equal(result.iterations[0].stats.depthThreeLateMovePrunes, 2);
     assert.equal(result.iterations[0].stats.depthFourLateMovePrunes, 1);
@@ -402,6 +404,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("delta prune")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("qsearch delta prefilter")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("quiescence SEE prune")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("qsearch SEE prefilter")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("improving-position reduction guard")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("worsening-position reduction boost")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("root bad-capture reduction")));
