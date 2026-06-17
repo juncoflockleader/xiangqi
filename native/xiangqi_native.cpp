@@ -4612,7 +4612,10 @@ bool tryProbCut(
   };
 
   if (captures.size() > kProbCutCaptureLimit) {
-    ScoredMovePicker movePicker(captures, state, ply, hashMove, counterMove, &board, enemyKing);
+    ScoredMovePicker movePicker(captures);
+    if (!movePicker.tryHashMoveFirst(state, ply, hashMove, counterMove, &board, enemyKing)) {
+      movePicker.score(state, ply, hashMove, counterMove, &board, enemyKing);
+    }
     while (Move* pickedMove = movePicker.next()) {
       if (searchCapture(*pickedMove)) return true;
       if (state.stopped) return false;
