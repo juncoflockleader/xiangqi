@@ -5503,7 +5503,8 @@ int negamax(
   }
   const bool hashMoveValid = validMove(hashMove);
   const bool counterMoveValid = validMove(counterMove);
-  const bool useFullMoveOrder = !state.singularActive
+  const bool useFullMoveOrder = allowNullMove
+      && !state.singularActive
       && extensionsRemaining > 0
       && !inCheck
       && depth >= kSingularExtensionMinDepth
@@ -5563,7 +5564,8 @@ int negamax(
       givesCheck = moveGivesCheckAssumingPossible(board, move, enemyKing, state);
       givesCheckKnown = true;
     }
-    const bool singular = shouldTrySingularExtension(state, moves, move, hashCandidate, hashDepth, hashFlag, hashScore, depth, inCheck, extensionsRemaining)
+    const bool singular = allowNullMove
+        && shouldTrySingularExtension(state, moves, move, hashCandidate, hashDepth, hashFlag, hashScore, depth, inCheck, extensionsRemaining)
         && isSingularMove(board, moves, move, hashScore, depth, ply, state, extensionsRemaining, enemyKing);
     if (state.stopped) break;
     const bool pawnPressure = allowNullMove
