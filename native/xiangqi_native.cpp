@@ -3848,7 +3848,7 @@ bool isLineAttackerType(int type) {
 }
 
 int lineBatteryPieceBonus(int piece) {
-  return typeOf(piece) == Rook ? 9 : 7;
+  return pieceCodeType(piece) == Rook ? 9 : 7;
 }
 
 int lineBatteryPressureBonus(const Board& board, int side, int enemyKing, int totalPieceCount) {
@@ -3875,7 +3875,9 @@ int lineBatteryPressureBonus(const Board& board, int side, int enemyKing, int to
       const int piece = board.cells[square];
       if (piece == 0) continue;
 
-      if (sideOf(piece) == side && isLineAttackerType(typeOf(piece))) {
+      const int pieceSide = pieceCodeSide(piece);
+      const int type = pieceCodeType(piece);
+      if (pieceSide == side && isLineAttackerType(type)) {
         if (leadPiece == 0) {
           leadPiece = piece;
           leadSquare = square;
@@ -3885,8 +3887,7 @@ int lineBatteryPressureBonus(const Board& board, int side, int enemyKing, int to
           supportSquare = square;
           break;
         }
-      } else if (leadPiece == 0 && sideOf(piece) == -side) {
-        const int type = typeOf(piece);
+      } else if (leadPiece == 0 && pieceSide == -side) {
         if (type == Advisor || type == Elephant) pinnedGuards += 1;
       }
 
@@ -3959,8 +3960,8 @@ int palaceCenterBlockPenalty(int type) {
 int palaceShapePenalty(const Board& board, int side, int kingSquare) {
   const int center = indexOf(4, side == kRed ? 8 : 1);
   const int piece = board.cells[center];
-  if (piece == 0 || sideOf(piece) != side) return 0;
-  const int type = typeOf(piece);
+  if (piece == 0 || pieceCodeSide(piece) != side) return 0;
+  const int type = pieceCodeType(piece);
   if (type == King || type == Advisor) return 0;
 
   int penalty = palaceCenterBlockPenalty(type);
@@ -3985,9 +3986,9 @@ int palaceEscapeBlockPenalty(const Board& board, int side, int kingSquare, int t
 
     const int targetSquare = indexOf(targetFile, kingRank);
     const int piece = board.cells[targetSquare];
-    if (piece == 0 || sideOf(piece) != side) continue;
+    if (piece == 0 || pieceCodeSide(piece) != side) continue;
 
-    const int type = typeOf(piece);
+    const int type = pieceCodeType(piece);
     if (type == Advisor || type == King) continue;
 
     int targetPenalty = type == Pawn ? 18 : type == Elephant ? 16 : 28;
@@ -4000,7 +4001,7 @@ int palaceEscapeBlockPenalty(const Board& board, int side, int kingSquare, int t
 int advisorShapeBonus(const Board& board, int square, int piece, int ownKing, int totalPieceCount) {
   if (ownKing < 0) return 0;
   if (totalPieceCount > 20) return 0;
-  const int side = sideOf(piece);
+  const int side = pieceCodeSide(piece);
   const int center = indexOf(4, side == kRed ? 8 : 1);
   const int file = fileOf(square);
   const int rank = rankOf(square);
@@ -4019,34 +4020,35 @@ int advisorShapeBonus(const Board& board, int square, int piece, int ownKing, in
 }
 
 int kingLinePressureBonus(const Board& board, int square, int piece, int enemyKing) {
-  const int type = typeOf(piece);
+  const int type = pieceCodeType(piece);
   if ((type != Rook && type != Cannon) || enemyKing < 0) return 0;
   if (fileOf(square) != fileOf(enemyKing) && rankOf(square) != rankOf(enemyKing)) return 0;
 
   const LineBlockers blockers = lineBlockersBetween(board, square, enemyKing);
-  const bool advancedAttacker = crossedRiver(sideOf(piece), rankOf(square));
+  const int side = pieceCodeSide(piece);
+  const bool advancedAttacker = crossedRiver(side, rankOf(square));
   if (type == Rook) {
     if (blockers.count != 1 || !advancedAttacker) return 0;
     const int blocker = board.cells[blockers.first];
-    if (sideOf(blocker) == sideOf(piece)) return 6;
+    if (pieceCodeSide(blocker) == side) return 6;
     int bonus = 16;
-    if (palaceContains(-sideOf(piece), fileOf(blockers.first), rankOf(blockers.first))) bonus += 6;
-    if (typeOf(blocker) == Advisor || typeOf(blocker) == Elephant) bonus += 4;
+    if (palaceContains(-side, fileOf(blockers.first), rankOf(blockers.first))) bonus += 6;
+    if (pieceCodeType(blocker) == Advisor || pieceCodeType(blocker) == Elephant) bonus += 4;
     return bonus;
   }
   if (blockers.count == 0) return 4;
   if (blockers.count == 2 && blockers.second >= 0) {
     if (!advancedAttacker) return 2;
     const int pinned = board.cells[blockers.second];
-    if (sideOf(pinned) != -sideOf(piece)) return 2;
+    if (pieceCodeSide(pinned) != -side) return 2;
     int bonus = 10;
     const int screen = board.cells[blockers.first];
-    if (sideOf(screen) == sideOf(piece)) {
+    if (pieceCodeSide(screen) == side) {
       bonus += 6;
-      if (typeOf(screen) == Pawn) bonus += 4;
+      if (pieceCodeType(screen) == Pawn) bonus += 4;
       if (fileCentrality(fileOf(blockers.first)) >= 3) bonus += 2;
     }
-    if (palaceContains(-sideOf(piece), fileOf(blockers.second), rankOf(blockers.second))) bonus += 4;
+    if (palaceContains(-side, fileOf(blockers.second), rankOf(blockers.second))) bonus += 4;
     return bonus;
   }
   return 0;
@@ -4057,7 +4059,7 @@ bool friendlyPawnAt(const Board& board, int side, int file, int rank) {
 }
 
 int pawnThreatBonus(const Board& board, int square, int piece) {
-  const int side = sideOf(piece);
+  const int side = pieceCodeSide(piece);
   int bonus = 0;
   const auto& lookup = kPawnTargets[static_cast<std::size_t>(sideLookupIndex(side))];
   const int count = lookup.counts[static_cast<std::size_t>(square)];
@@ -4065,9 +4067,9 @@ int pawnThreatBonus(const Board& board, int square, int piece) {
 
   for (int index = 0; index < count; index += 1) {
     const int target = board.cells[targets[static_cast<std::size_t>(index)]];
-    if (target == 0 || sideOf(target) == side) continue;
-    const int targetType = typeOf(target);
-    bonus += targetType == King ? 120 : std::min(80, pieceValue(targetType) / 12);
+    if (target == 0 || pieceCodeSide(target) == side) continue;
+    const int targetType = pieceCodeType(target);
+    bonus += targetType == King ? 120 : std::min(80, pieceTypeValue(targetType) / 12);
   }
 
   return bonus;
@@ -4131,8 +4133,8 @@ int evaluateRed(const Board& board) {
       const int square = squares[listIndex];
       if (square < 0 || square >= kSquares) continue;
       const int piece = board.cells[square];
-      if (piece == 0 || sideOf(piece) != side) continue;
-      const int type = typeOf(piece);
+      if (piece == 0 || pieceCodeSide(piece) != side) continue;
+      const int type = pieceCodeType(piece);
       const int file = fileOf(square);
       const int rank = rankOf(square);
       int value = 0;
