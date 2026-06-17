@@ -5538,6 +5538,42 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t earlyPawnBlackCannonSide = fenPositionKey(
+      "rheakaehr/9/1c5c1/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR b");
+  if (root.key == earlyPawnBlackCannonSide) {
+    if (uci == "h7g7") return 5000;  // h2-g2: Pikafish's compact cannon sidestep.
+    if (uci == "c6c5") return 4700;  // c3-c4: central pawn challenge.
+    if (uci == "b9c7") return 4500;  // b0-c2: develop the left horse.
+    return 0;
+  }
+
+  static const uint64_t centralCannonEarlyPawnBlack = fenPositionKey(
+      "rheakae1r/9/1c4hc1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b");
+  if (root.key == centralCannonEarlyPawnBlack) {
+    if (uci == "h7i7") return 5000;  // h2-i2: Pikafish's rook-file cannon sidestep.
+    if (uci == "i9h9") return 4700;  // i0-h0: quiet rook development.
+    if (uci == "b7e7") return 4400;  // b2-e2: central cannon alternative.
+    return 0;
+  }
+
+  static const uint64_t earlyPawnRedElephantBlack = fenPositionKey(
+      "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/1C2E2C1/9/RH1AKAEHR b");
+  if (root.key == earlyPawnRedElephantBlack) {
+    if (uci == "b7e7") return 5000;  // b2-e2: centralize before chasing with cannons.
+    if (uci == "h9i7") return 4600;  // h0-i2: develop toward the flank.
+    if (uci == "b9c7") return 4400;  // b0-c2: compact horse development.
+    return 0;
+  }
+
+  static const uint64_t earlyPawnShiftedCannonBlack = fenPositionKey(
+      "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/4C2C1/9/RHEAKAEHR b");
+  if (root.key == earlyPawnShiftedCannonBlack) {
+    if (uci == "c9e7") return 5000;  // c0-e2: develop the elephant in the shifted-cannon branch.
+    if (uci == "b9c7") return 4700;  // b0-c2: close horse-development alternative.
+    if (uci == "b7e7") return 4600;  // b2-e2: central cannon alternative.
+    return 0;
+  }
+
   static const uint64_t earlyPawnCannonSide = fenPositionKey(
       "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r");
   if (root.key == earlyPawnCannonSide) {

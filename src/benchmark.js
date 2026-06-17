@@ -122,6 +122,62 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     lesson: "After Black's screen-horse reply, the refreshed Pikafish prior promotes the early g-pawn push while keeping horse development as a close accepted alternative."
   }),
   Object.freeze({
+    id: "oracle-opening-early-pawn-black-cannon-side",
+    name: "Oracle Opening: Early Pawn Black Cannon-Side Reply",
+    fen: "rheakaehr/9/1c5c1/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR b",
+    expectedMoves: Object.freeze(["h2-g2", "c3-c4", "b0-c2"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "After Red opens with the g-pawn, Black should keep compact cannon or development replies ahead of loose cannon lifts."
+  }),
+  Object.freeze({
+    id: "oracle-opening-central-cannon-early-pawn-black",
+    name: "Oracle Opening: Central Cannon Early Pawn Black Reply",
+    fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b",
+    expectedMoves: Object.freeze(["h2-i2", "i0-h0", "b2-e2"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn", "central-cannon"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "In the central-cannon early-pawn branch, Black should sidestep the cannon or develop the rook before launching flank cannon activity."
+  }),
+  Object.freeze({
+    id: "oracle-opening-early-pawn-red-elephant-black",
+    name: "Oracle Opening: Early Pawn Red Elephant Black Reply",
+    fen: "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/1C2E2C1/9/RH1AKAEHR b",
+    expectedMoves: Object.freeze(["b2-e2", "h0-i2", "b0-c2"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "When Red adds the elephant after an early pawn, Black should centralize or develop instead of overextending the b-cannon."
+  }),
+  Object.freeze({
+    id: "oracle-opening-early-pawn-shifted-cannon-black",
+    name: "Oracle Opening: Early Pawn Shifted-Cannon Black Reply",
+    fen: "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/4C2C1/9/RHEAKAEHR b",
+    expectedMoves: Object.freeze(["c0-e2", "b0-c2", "b2-e2"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "Against the shifted-cannon early-pawn setup, Black should develop the elephant or horse rather than chase with the g-cannon."
+  }),
+  Object.freeze({
     id: "oracle-opening-early-pawn-cannon-side",
     name: "Oracle Opening: Early Pawn Cannon-Side Development",
     fen: "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r",
