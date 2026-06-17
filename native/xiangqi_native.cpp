@@ -4576,9 +4576,8 @@ bool tryProbCut(
   }
   if (captures.empty()) return false;
 
-  orderMoves(captures, state, ply, hashMove, counterMove, &board, enemyKing);
   int searched = 0;
-  for (Move& move : captures) {
+  auto searchCapture = [&](Move& move) {
     if (timeExpired(state)) return false;
 
     state.probCutSearches += 1;
@@ -4609,7 +4608,23 @@ bool tryProbCut(
       scoreOut = threshold;
       return true;
     }
-    if (searched >= kProbCutCaptureLimit) break;
+    return false;
+  };
+
+  if (captures.size() > kProbCutCaptureLimit) {
+    ScoredMovePicker movePicker(captures, state, ply, hashMove, counterMove, &board, enemyKing);
+    while (Move* pickedMove = movePicker.next()) {
+      if (searchCapture(*pickedMove)) return true;
+      if (state.stopped) return false;
+      if (searched >= kProbCutCaptureLimit) break;
+    }
+  } else {
+    orderMoves(captures, state, ply, hashMove, counterMove, &board, enemyKing);
+    for (Move& move : captures) {
+      if (searchCapture(move)) return true;
+      if (state.stopped) return false;
+      if (searched >= kProbCutCaptureLimit) break;
+    }
   }
 
   return false;
@@ -4628,7 +4643,6 @@ Move internalIterativeDeepeningMoveHint(
     int enemyKing) {
   MoveList moves;
   for (const Move& move : legalMoves) moves.push_back(move);
-  orderMoves(moves, state, ply, {}, counterMoveFor(state, previousMove), &board, enemyKing, previousMove);
 
   const bool previousIidActive = state.iidActive;
   state.iidActive = true;
@@ -4640,8 +4654,8 @@ Move internalIterativeDeepeningMoveHint(
   const int reducedDepth = std::max(1, depth - kIidReduction);
   int searched = 0;
 
-  for (Move& move : moves) {
-    if (timeExpired(state)) break;
+  auto searchMove = [&](Move& move) {
+    if (timeExpired(state)) return true;
 
     const KnownChildState child = knownChildStateAfterMove(board, move, enemyKing, state);
     prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
@@ -4662,7 +4676,7 @@ Move internalIterativeDeepeningMoveHint(
         child.inCheck);
     undoMove(board, move);
     clearSearchPathMove(state, ply);
-    if (state.stopped) break;
+    if (state.stopped) return true;
 
     if (score > bestScore) {
       bestScore = score;
@@ -4670,11 +4684,23 @@ Move internalIterativeDeepeningMoveHint(
     }
     if (score > localAlpha) {
       localAlpha = score;
-      if (localAlpha >= beta) break;
+      if (localAlpha >= beta) return true;
     }
 
     searched += 1;
-    if (searched >= kIidMoveLimit) break;
+    return searched >= kIidMoveLimit;
+  };
+
+  if (moves.size() > kIidMoveLimit) {
+    ScoredMovePicker movePicker(moves, state, ply, {}, counterMoveFor(state, previousMove), &board, enemyKing, previousMove);
+    while (Move* pickedMove = movePicker.next()) {
+      if (searchMove(*pickedMove)) break;
+    }
+  } else {
+    orderMoves(moves, state, ply, {}, counterMoveFor(state, previousMove), &board, enemyKing, previousMove);
+    for (Move& move : moves) {
+      if (searchMove(move)) break;
+    }
   }
 
   state.iidActive = previousIidActive;
