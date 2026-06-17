@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  createEngine,
   createInitialPosition,
   createOpeningBookFromOracleArtifact,
   createOpeningBookFromRecords,
@@ -104,6 +105,30 @@ test("oracle opening artifacts round-trip into reusable books", async () => {
   } finally {
     await oracle.close();
   }
+});
+
+test("oracle opening records import principal-variation continuations", () => {
+  const book = createOpeningBookFromRecords([{
+    fen: "rheakaehr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RHEAKAEHR r",
+    move: "h9-g7",
+    weight: 100,
+    source: "Mock Oracle",
+    engineScore: 42,
+    name: "Oracle best: h9-g7",
+    tags: ["oracle", "generated"],
+    principalVariation: "h9-g7 h0-g2 h7-e7"
+  }]);
+  const engine = createEngine({ book, openingHeuristics: false, depth: 1, timeLimitMs: 500 });
+  const root = lookupOpeningBook(createInitialPosition(), { book, openingHeuristics: false });
+  const afterHorse = engine.play(createInitialPosition(), "h9-g7");
+  const reply = lookupOpeningBook(afterHorse, { book, openingHeuristics: false });
+
+  assert.equal(root.move.notation, "h9-g7");
+  assert.equal(reply.move.notation, "h0-g2");
+  assert.equal(reply.entry.name, "Mock Oracle PV continuation: h0-g2");
+  assert.ok(reply.entry.tags.includes("pv-continuation"));
+  assert.equal(reply.entry.database.sourceMove, "h9-g7");
+  assert.equal(reply.entry.database.principalVariation, "h9-g7 h0-g2 h7-e7");
 });
 
 test("oracle opening generator can explore bounded candidate branches", async () => {

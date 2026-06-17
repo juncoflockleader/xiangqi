@@ -454,48 +454,56 @@ function pikafishEntry(move, rank, weight, engineScore, pv) {
 function addPikafishPrincipalVariationContinuations(positions) {
   for (const position of PIKAFISH_OPENING_POSITIONS) {
     for (const entry of position.entries) {
-      const moves = extractMoveTokens(entry.principalVariation ?? "");
-      if (moves.length < 2) continue;
-      addLegalPikafishContinuationPrefix(positions, parseFen(position.fen), entry, moves);
+      addLegalPrincipalVariationPrefix(positions, parseFen(position.fen), entry, entry.principalVariation, {
+        includeFirst: false
+      });
     }
   }
 }
 
-function addLegalPikafishContinuationPrefix(positions, initialPosition, entry, moves) {
+function addLegalPrincipalVariationPrefix(positions, initialPosition, entry, principalVariation, options = {}) {
+  const moves = extractMoveTokens(principalVariation ?? "");
+  if (moves.length < 2) return;
+
   let position = initialPosition;
 
   for (let index = 0; index < moves.length; index += 1) {
-    const continuation = pikafishContinuationEntry(entry, moves[index], index);
+    const continuation = principalVariationContinuationEntry(entry, moves[index], index, moves.join(" "));
     let normalized;
     let nextPosition;
 
     try {
       normalized = freezeBookEntry(continuation, { position });
+      if (index === 0 && normalized.move !== entry.move) break;
       nextPosition = applyBookMove(position, normalized.move);
     } catch {
       break;
     }
 
-    addEntries(positions, positionKey(position), [normalized]);
+    if (index > 0 || options.includeFirst !== false) {
+      addEntries(positions, positionKey(position), [normalized], { aggregate: options.aggregate });
+    }
     position = nextPosition;
   }
 }
 
-function pikafishContinuationEntry(entry, move, index) {
+function principalVariationContinuationEntry(entry, move, index, principalVariation) {
   if (index === 0) return entry;
 
+  const source = entry.database?.source ?? entry.source ?? "Oracle";
   return {
     move,
-    name: `Pikafish PV continuation: ${move}`,
+    name: `${source} PV continuation: ${move}`,
     weight: Math.max(1, entry.weight - index * 8),
-    idea: `Continues the Pikafish principal variation after ${entry.move}. Source PV: ${entry.principalVariation}.`,
+    idea: `Continues the ${source} principal variation after ${entry.move}. Source PV: ${principalVariation}.`,
     tags: uniqueTags([...entry.tags, "pv-continuation"]),
     database: {
       ...entry.database,
+      principalVariation,
       sourceMove: entry.move,
       pvPly: index + 1
     },
-    principalVariation: entry.principalVariation
+    principalVariation
   };
 }
 
@@ -711,6 +719,10 @@ function addOpeningRecord(positions, record, options = {}) {
   const key = record.key ?? record.fen ?? positionKey(position);
   const entry = normalizeDatabaseMove(record, record.move, position.turn, 0, options.defaults, position);
   addEntries(positions, key, [entry], { aggregate: options.aggregate });
+  addLegalPrincipalVariationPrefix(positions, position, entry, record.principalVariation, {
+    includeFirst: false,
+    aggregate: options.aggregate
+  });
 }
 
 function addOpeningLineRecord(positions, record, options = {}) {
