@@ -1505,7 +1505,7 @@ test("local C++ engine avoids capture-risk probes for qsearch ordering", (t) => 
 
   const input = [
     "uci",
-    "position fen 4k4/9/9/9/4r4/9/4P4/9/9/3AK4 r",
+    "position fen 4k4/9/9/9/4r4/9/4P4/9/9/R3K4 r",
     "go depth 1",
     "quit"
   ].join("\n");
@@ -2146,6 +2146,21 @@ test("local C++ engine rewards pinning palace guards to the king line", (t) => {
 
   assert.ok(rookPin[0] - rookPin[1] >= 40, rookPin.join(", "));
   assert.ok(cannonPin[0] - cannonPin[1] >= 40, cannonPin.join(", "));
+});
+
+test("local C++ engine rewards pressure against palace guards", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const scores = staticEvalScores(build.output, [
+    "4k4/4a4/9/9/9/4R4/9/9/9/4K4 r",
+    "4k4/4a4/9/9/9/R8/9/9/9/4K4 r"
+  ]);
+
+  assert.ok(scores[0] >= scores[1] + 90, JSON.stringify(scores));
 });
 
 test("local C++ engine rewards rook-cannon batteries on the king line", (t) => {

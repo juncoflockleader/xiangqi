@@ -4153,6 +4153,48 @@ int kingLinePressureBonus(const Board& board, int square, int piece, int enemyKi
   return 0;
 }
 
+int palaceGuardPressureBonus(const Board& board, int side, int enemyKing, int totalPieceCount) {
+  if (enemyKing < 0) return 0;
+  if (totalPieceCount > 20) return 0;
+
+  const int enemy = -side;
+  const int enemyGuardCount = (enemy == kRed ? board.redAdvisorCount : board.blackAdvisorCount)
+      + (enemy == kRed ? board.redElephantCount : board.blackElephantCount);
+  const int weakenedFortress = std::max(0, 4 - enemyGuardCount);
+  const Move noMove{};
+  const auto& squares = pieceSquares(board, enemy);
+  const int count = pieceCount(board, enemy);
+  int bonus = 0;
+
+  for (int listIndex = 0; listIndex < count; listIndex += 1) {
+    const int square = squares[listIndex];
+    const int guard = trackedPieceAtSquare(board, enemy, square);
+    const int type = pieceCodeType(guard);
+    if (type != Advisor && type != Elephant) continue;
+
+    const int attacker = leastAttackerValueAfterMove(board, noMove, side, square);
+    if (attacker >= kInf) continue;
+
+    const int file = fileOf(square);
+    const int rank = rankOf(square);
+    const int kingDistance = std::abs(file - fileOf(enemyKing)) + std::abs(rank - rankOf(enemyKing));
+    int targetBonus = type == Advisor ? 28 : 22;
+    if (palaceContains(enemy, file, rank)) targetBonus += 18;
+    if (file == 4) targetBonus += 8;
+    if (kingDistance <= 1) targetBonus += 14;
+    else if (kingDistance <= 2) targetBonus += 8;
+    if ((file == fileOf(enemyKing) || rank == rankOf(enemyKing))
+        && blockersBetween(board, square, enemyKing) == 0) {
+      targetBonus += 8;
+    }
+    targetBonus += weakenedFortress * 4;
+    if (attacker <= pieceCodeValue(guard)) targetBonus += 8;
+    bonus += targetBonus;
+  }
+
+  return std::min(120, bonus);
+}
+
 bool friendlyPawnAt(const Board& board, int side, int file, int rank) {
   return inside(file, rank) && board.cells[indexOf(file, rank)] == side * Pawn;
 }
@@ -4319,6 +4361,8 @@ int evaluateRed(const Board& board) {
   scoreSide(kBlack);
   score += lineBatteryPressureBonus(board, kRed, blackKing, totalPieceCount);
   score -= lineBatteryPressureBonus(board, kBlack, redKing, totalPieceCount);
+  score += palaceGuardPressureBonus(board, kRed, blackKing, totalPieceCount);
+  score -= palaceGuardPressureBonus(board, kBlack, redKing, totalPieceCount);
 
   score -= palaceShapePenalty(board, kRed, redKing);
   score += palaceShapePenalty(board, kBlack, blackKing);
