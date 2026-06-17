@@ -89,10 +89,13 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(page, /role="tree"/);
     assert.match(script, /function renderBoard/);
     assert.match(script, /function buildMoveTree/);
-    assert.match(script, /function renderMainlineTreeNode/);
+    assert.match(script, /function renderTreeNode/);
+    assert.match(script, /function renderMiniBoard/);
+    assert.match(script, /function recomputeTreeNode/);
     assert.match(script, /function boardCellsForTreeSelection/);
     assert.match(script, /node\.alternative\.boardAfter/);
     assert.match(script, /t\("variationPreview"\)/);
+    assert.match(script, /"\/api\/analyze-node"/);
     assert.match(script, /function restoreTreeNode/);
     assert.match(script, /"\/api\/jump"/);
     assert.match(script, /button\.style\.setProperty\("--file", point\.file\)/);
@@ -126,6 +129,9 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(stylesheet, /\.selected-moves/);
     assert.match(stylesheet, /\.move-tree-list/);
     assert.match(stylesheet, /\.move-tree-branches/);
+    assert.match(stylesheet, /\.mini-board/);
+    assert.match(stylesheet, /\.move-tree-recompute/);
+    assert.match(stylesheet, /\.tree-panel/);
     assert.match(stylesheet, /\.tree-restore-button/);
     assert.match(stylesheet, /\.board-wrap\.tree-preview/);
     assert.match(stylesheet, /\.move-label/);
@@ -135,7 +141,7 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(stylesheet, /--grid-inset-x: calc\(100% \/ 18\)/);
     assert.match(stylesheet, /--grid-inset-y: calc\(100% \/ 20\)/);
     assert.match(stylesheet, /--edge-label-offset: clamp\(14px, 3\.6%, 20px\)/);
-    assert.match(stylesheet, /width: min\(100%, 700px, calc\(\(100vh - 112px\) \* 0\.9\)\)/);
+    assert.match(stylesheet, /width: min\(100%, 540px, calc\(\(100vh - 128px\) \* 0\.82\)\)/);
     assert.match(stylesheet, /--grid-files: 8/);
     assert.match(stylesheet, /--grid-ranks: 9/);
     assert.match(stylesheet, /--point-size: clamp\(31px, 8\.7%, 43px\)/);
@@ -198,6 +204,10 @@ test("web server plays a player move, engine reply, hints, best move, and undo",
     const best = await postJson(`${app.url}/api/best`, { sessionId });
     const hint = await postJson(`${app.url}/api/hint`, { sessionId });
     const moved = await postJson(`${app.url}/api/move`, { sessionId, move: "h7-e7" });
+    const analyzedNode = await postJson(`${app.url}/api/analyze-node`, {
+      sessionId,
+      node: { kind: "main", ply: 1 }
+    });
     const undone = await postJson(`${app.url}/api/undo`, { sessionId });
     const movedAgain = await postJson(`${app.url}/api/move`, { sessionId, move: "h7-e7" });
     const jumped = await postJson(`${app.url}/api/jump`, { sessionId, ply: 0 });
@@ -230,6 +240,12 @@ test("web server plays a player move, engine reply, hints, best move, and undo",
     if (moved.state.lastPlayerReview.planComparison) {
       assert.equal(typeof moved.state.lastPlayerReview.planComparison.zhSummary, "string");
     }
+    assert.equal(analyzedNode.ok, true);
+    assert.equal(analyzedNode.analysis.board.length, 90);
+    assert.equal(analyzedNode.analysis.branches.length, 2);
+    assert.equal(analyzedNode.analysis.branches[0].boardAfter.length, 90);
+    assert.equal(typeof analyzedNode.analysis.branches[0].zhMove, "string");
+    assert.equal(analyzedNode.state.history.length, 2);
     assert.equal(undone.ok, true);
     assert.equal(undone.state.history.length, 0);
     assert.equal(undone.state.playerTurn, true);

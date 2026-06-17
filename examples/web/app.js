@@ -283,6 +283,11 @@ const zhTwTranslations = {
   fold: "收合",
   selectedNode: "已選",
   restorePoint: "回到此處",
+  recomputeNode: "重新計算分支",
+  recomputingNode: "正在計算分支...",
+  generatedBranches: "新分支",
+  analysisBranch: "分析分支",
+  branchRank: "第 {rank} 選",
   variationPreview: "預覽局面",
   askPrompt: "可查看最佳、提示，或直接走棋。",
   redToMove: "紅方走棋",
@@ -349,6 +354,11 @@ const zhCnTranslations = {
   fold: "收起",
   selectedNode: "已选",
   restorePoint: "回到此处",
+  recomputeNode: "重新计算分支",
+  recomputingNode: "正在计算分支...",
+  generatedBranches: "新分支",
+  analysisBranch: "分析分支",
+  branchRank: "第 {rank} 选",
   variationPreview: "预览局面",
   askPrompt: "可查看最佳着法、提示，或直接走棋。",
   redToMove: "红方走棋",
@@ -424,6 +434,11 @@ const translations = {
     fold: "Collapse",
     selectedNode: "selected",
     restorePoint: "Restore here",
+    recomputeNode: "Recompute branches",
+    recomputingNode: "Computing branches...",
+    generatedBranches: "new branches",
+    analysisBranch: "analysis branch",
+    branchRank: "line {rank}",
     variationPreview: "preview position",
     askPrompt: "Ask for Best, Hint, or make a move.",
     redToMove: "Red to move",
@@ -494,6 +509,8 @@ const state = {
   panel: null,
   treeCollapsed: new Set(),
   treeSelectedId: null,
+  treeAnalysis: new Map(),
+  treeAnalysisPendingId: null,
   locale: loadLocale()
 };
 
@@ -519,6 +536,8 @@ async function newGame() {
   state.panel = null;
   state.treeCollapsed.clear();
   state.treeSelectedId = null;
+  state.treeAnalysis.clear();
+  state.treeAnalysisPendingId = null;
   await runRequest(async () => {
     const result = await api("/api/new", {
       side: elements.sideSelect.value
@@ -811,6 +830,14 @@ function renderEngineInfo() {
 
 function renderLastMove() {
   const treeNode = selectedTreeNode();
+  if (treeNode?.kind === "analysis") {
+    renderAnalysisBranchSummary(treeNode);
+    return;
+  }
+  if (treeNode && state.treeAnalysis.has(treeNode.id)) {
+    renderTreeAnalysisSummary(treeNode);
+    return;
+  }
   if (treeNode?.kind === "alternative") {
     renderAlternativeSummary(treeNode);
     return;
@@ -836,13 +863,32 @@ function renderLastMove() {
   if (review?.planComparison?.summary) {
     details.push(`<div class="line">${escapeHtml(localizedPlanComparisonSummary(review.planComparison))}</div>`);
   }
-  if (treeNode?.kind === "main" && treeNode.id !== latestMainlineNodeId()) {
-    details.push(`<div class="tree-action-row"><button class="tree-restore-button" type="button" data-tree-restore="${escapeHtml(treeNode.id)}">${escapeHtml(t("restorePoint"))}</button></div>`);
-  }
+  if (treeNode?.kind === "main") details.push(renderSelectedNodeActions(treeNode));
 
   elements.lastMovePanel.className = "stack";
   elements.lastMovePanel.innerHTML = details.join("");
   bindTreeRestoreAction();
+  bindTreeRecomputeActions(elements.lastMovePanel);
+}
+
+function renderTreeAnalysisSummary(node) {
+  const analysis = state.treeAnalysis.get(node.id);
+  const best = analysis?.best;
+  const details = [
+    `<div class="line"><strong>${escapeHtml(t("generatedBranches"))}</strong> <span class="score">${escapeHtml(treeNodePrefix(node))}</span></div>`
+  ];
+  if (best?.bestMove) {
+    details.push(`<div>${escapeHtml(localizedDecisionSummary(best))}</div>`);
+  }
+  if (analysis?.branches?.length) {
+    details.push(`<div class="score">${analysis.branches.length} ${escapeHtml(t("generatedBranches"))}</div>`);
+  }
+  details.push(renderSelectedNodeActions(node));
+
+  elements.lastMovePanel.className = "stack";
+  elements.lastMovePanel.innerHTML = details.join("");
+  bindTreeRestoreAction();
+  bindTreeRecomputeActions(elements.lastMovePanel);
 }
 
 function renderAlternativeSummary(node) {
@@ -863,9 +909,36 @@ function renderAlternativeSummary(node) {
   if (score) details.push(`<div class="score">${escapeHtml(t("scorePrefix"))}: ${escapeHtml(score)}</div>`);
   if (reply) details.push(reply);
   if (loss) details.push(loss);
+  details.push(renderSelectedNodeActions(node));
 
   elements.lastMovePanel.className = "stack";
   elements.lastMovePanel.innerHTML = details.join("");
+  bindTreeRecomputeActions(elements.lastMovePanel);
+}
+
+function renderAnalysisBranchSummary(node) {
+  const branch = node.branch;
+  const details = [
+    `<div class="line"><strong>${escapeHtml(t("analysisBranch"))}</strong> ${formatMoveHtml(branch.move, branch.zhMove)} <span class="score">${escapeHtml(treeNodePrefix(node))}</span></div>`
+  ];
+  const summary = analysisBranchSummaryText(branch);
+  if (summary) details.push(`<div class="score">${escapeHtml(summary)}</div>`);
+  if (branch.summary) details.push(`<div>${escapeHtml(localizedChineseText(branch.summary))}</div>`);
+  details.push(renderSelectedNodeActions(node));
+
+  elements.lastMovePanel.className = "stack";
+  elements.lastMovePanel.innerHTML = details.join("");
+  bindTreeRecomputeActions(elements.lastMovePanel);
+}
+
+function renderSelectedNodeActions(node) {
+  const actions = [
+    `<button class="tree-restore-button" type="button" data-tree-recompute="${escapeHtml(node.id)}">${escapeHtml(t("recomputeNode"))}</button>`
+  ];
+  if (node.kind === "main" && node.id !== latestMainlineNodeId()) {
+    actions.unshift(`<button class="tree-restore-button" type="button" data-tree-restore="${escapeHtml(node.id)}">${escapeHtml(t("restorePoint"))}</button>`);
+  }
+  return `<div class="tree-action-row">${actions.join("")}</div>`;
 }
 
 function renderReasoning() {
@@ -897,9 +970,53 @@ function renderReasoning() {
     renderAlternativeReasoning(panel.node);
     return;
   }
+  if (panel.kind === "treeAnalysis") {
+    renderTreeAnalysisReasoning(panel.nodeId);
+    return;
+  }
+  if (panel.kind === "treeBranch") {
+    renderAnalysisBranchReasoning(panel.nodeId);
+    return;
+  }
 
   elements.reasoningPanel.className = "stack muted";
   elements.reasoningPanel.textContent = t("askPrompt");
+}
+
+function renderTreeAnalysisReasoning(nodeId) {
+  const analysis = state.treeAnalysis.get(nodeId);
+  if (!analysis?.best) {
+    elements.reasoningPanel.className = "stack muted";
+    elements.reasoningPanel.textContent = t("noDecision");
+    return;
+  }
+  renderDecision(analysis.best);
+}
+
+function renderAnalysisBranchReasoning(nodeId) {
+  const node = findTreeNode(nodeId);
+  const branch = node?.branch;
+  if (!branch) {
+    elements.reasoningPanel.className = "stack muted";
+    elements.reasoningPanel.textContent = t("noDecision");
+    return;
+  }
+
+  const parts = [
+    `<div>${formatMoveHtml(branch.move, branch.zhMove)} <span class="score">${escapeHtml(analysisBranchSummaryText(branch))}</span></div>`
+  ];
+  if (branch.expectedReply) {
+    parts.push(`<div class="line"><strong>${escapeHtml(t("expectedReply"))}</strong> ${formatMoveHtml(branch.expectedReply, branch.zhExpectedReply)}</div>`);
+  }
+  if (branch.summary) {
+    parts.push(`<div class="line">${escapeHtml(localizedChineseText(branch.summary))}</div>`);
+  }
+  if (branch.reasons?.length) {
+    parts.push(`<ul class="reason-list">${branch.reasons.slice(0, 4).map((reason) => `<li>${escapeHtml(localizedChineseText(reason))}</li>`).join("")}</ul>`);
+  }
+
+  elements.reasoningPanel.className = "stack";
+  elements.reasoningPanel.innerHTML = parts.join("");
 }
 
 function renderAlternativeReasoning(node) {
@@ -1008,12 +1125,15 @@ function renderHistory() {
   }
 
   elements.historyList.className = "move-tree-list";
-  elements.historyList.innerHTML = tree.map(renderMainlineTreeNode).join("");
+  elements.historyList.innerHTML = tree.map(renderTreeNode).join("");
   elements.historyList.querySelectorAll("[data-tree-node]").forEach((button) => {
     button.addEventListener("click", () => selectTreeNode(button.dataset.treeNode));
   });
   elements.historyList.querySelectorAll("[data-tree-toggle]").forEach((button) => {
     button.addEventListener("click", () => toggleTreeNode(button.dataset.treeToggle));
+  });
+  elements.historyList.querySelectorAll("[data-tree-recompute]").forEach((button) => {
+    button.addEventListener("click", () => recomputeTreeNode(button.dataset.treeRecompute));
   });
 }
 
@@ -1023,10 +1143,10 @@ function buildMoveTree() {
       id: mainlineNodeId(move.ply),
       kind: "main",
       move,
-      alternatives: []
+      children: []
     };
-    node.alternatives = treeAlternativesForMove(move, node.id);
-    return node;
+    node.children = treeAlternativesForMove(move, node.id).map(attachAnalyzedChildren);
+    return attachAnalyzedChildren(node);
   });
 }
 
@@ -1051,7 +1171,8 @@ function treeAlternativesForMove(move, parentId) {
         parentId,
         parentMove: move,
         source: source.kind,
-        alternative
+        alternative,
+        children: []
       });
     });
   }
@@ -1059,56 +1180,127 @@ function treeAlternativesForMove(move, parentId) {
   return alternatives.slice(0, 4);
 }
 
-function renderMainlineTreeNode(node) {
+function attachAnalyzedChildren(node) {
+  const analysis = state.treeAnalysis.get(node.id) ?? null;
+  const generated = (analysis?.branches ?? []).map((branch, index) => attachAnalyzedChildren({
+    id: analysisNodeId(node.id, branch, index),
+    kind: "analysis",
+    parentId: node.id,
+    branch,
+    children: []
+  }));
+  return {
+    ...node,
+    analysis,
+    children: [
+      ...(node.children ?? []),
+      ...generated
+    ]
+  };
+}
+
+function analysisNodeId(parentId, branch, index) {
+  const rank = Number.isFinite(branch?.rank) ? branch.rank : index + 1;
+  return `${parentId}-line-${rank}-${sanitizeTreeId(branch?.move)}`;
+}
+
+function sanitizeTreeId(value) {
+  return String(value ?? "node").replace(/[^a-zA-Z0-9_-]+/g, "_");
+}
+
+function renderTreeNode(node) {
   const selected = state.treeSelectedId === node.id;
-  const current = node.id === latestMainlineNodeId();
-  const hasAlternatives = node.alternatives.length > 0;
+  const current = node.kind === "main" && node.id === latestMainlineNodeId();
+  const hasChildren = (node.children ?? []).length > 0;
   const expanded = !state.treeCollapsed.has(node.id);
   const rowClasses = [
-    "move-tree-item",
+    node.kind === "main" ? "move-tree-item" : "move-tree-branch",
+    `move-tree-${node.kind}`,
     selected ? "selected" : "",
     current ? "current" : ""
   ].filter(Boolean).join(" ");
-  const toggle = hasAlternatives
+  const toggle = hasChildren
     ? `<button class="move-tree-toggle" type="button" data-tree-toggle="${escapeHtml(node.id)}" aria-label="${escapeHtml(expanded ? t("fold") : t("expand"))}">${expanded ? "−" : "+"}</button>`
     : `<span class="move-tree-toggle-spacer" aria-hidden="true"></span>`;
-  const branches = hasAlternatives && expanded
-    ? `<ol class="move-tree-branches">${node.alternatives.map(renderAlternativeTreeNode).join("")}</ol>`
+  const branches = hasChildren && expanded
+    ? `<ol class="move-tree-branches">${node.children.map(renderTreeNode).join("")}</ol>`
     : "";
 
   return `<li class="${rowClasses}">${[
-    `<div class="move-tree-row">${toggle}${renderMainlineTreeButton(node, selected, current, hasAlternatives, expanded)}</div>`,
+    `<div class="move-tree-row">${toggle}${renderTreeNodeButton(node, selected, current, hasChildren, expanded)}${renderTreeRecomputeButton(node)}</div>`,
     branches
   ].join("")}</li>`;
 }
 
-function renderMainlineTreeButton(node, selected, current, hasAlternatives, expanded) {
-  const move = node.move;
-  const plyText = move.side === "black" ? `${move.moveNumber}...` : `${move.moveNumber}.`;
-  const ariaExpanded = hasAlternatives ? ` aria-expanded="${expanded ? "true" : "false"}"` : "";
+function renderTreeNodeButton(node, selected, current, hasChildren, expanded) {
+  const ariaExpanded = hasChildren ? ` aria-expanded="${expanded ? "true" : "false"}"` : "";
   const tags = [
-    `<span class="move-tree-tag">${escapeHtml(t("mainLine"))}</span>`,
+    `<span class="move-tree-tag">${escapeHtml(treeNodeKindLabel(node))}</span>`,
     current ? `<span class="move-tree-tag current">${escapeHtml(t("currentPosition"))}</span>` : "",
-    selected ? `<span class="move-tree-tag selected">${escapeHtml(t("selectedNode"))}</span>` : ""
+    selected ? `<span class="move-tree-tag selected">${escapeHtml(t("selectedNode"))}</span>` : "",
+    node.analysis?.branches?.length ? `<span class="move-tree-tag generated">${escapeHtml(`${node.analysis.branches.length} ${t("generatedBranches")}`)}</span>` : ""
   ].filter(Boolean).join("");
 
-  return `<button class="move-tree-node mainline" type="button" data-tree-node="${escapeHtml(node.id)}"${ariaExpanded}>${[
-    `<span class="move-tree-ply">${escapeHtml(plyText)}</span>`,
-    `<span class="move-tree-move">${formatMoveHtml(move.notation, move.zhNotation)}</span>`,
-    `<span class="move-tree-meta">${escapeHtml(actorName(move.actor))}${tags}</span>`
+  return `<button class="move-tree-node ${escapeHtml(node.kind)}" type="button" data-tree-node="${escapeHtml(node.id)}"${ariaExpanded}>${[
+    renderMiniBoard(treeNodeBoard(node)),
+    `<span class="move-tree-copy">` + [
+      `<span class="move-tree-ply">${escapeHtml(treeNodePrefix(node))}</span>`,
+      `<span class="move-tree-move">${treeNodeMoveHtml(node)}</span>`,
+      `<span class="move-tree-meta">${escapeHtml(treeNodeSummaryText(node))}${tags}</span>`
+    ].join("") + `</span>`
   ].join("")}</button>`;
 }
 
-function renderAlternativeTreeNode(node) {
-  const selected = state.treeSelectedId === node.id;
-  const alternative = node.alternative;
-  const classes = ["move-tree-branch", selected ? "selected" : ""].filter(Boolean).join(" ");
+function renderTreeRecomputeButton(node) {
+  const pending = state.pending && state.treeAnalysisPendingId === node.id;
+  return `<button class="move-tree-recompute" type="button" data-tree-recompute="${escapeHtml(node.id)}" title="${escapeHtml(t("recomputeNode"))}" aria-label="${escapeHtml(t("recomputeNode"))}"${state.pending ? " disabled" : ""}>${pending ? "…" : "↻"}</button>`;
+}
 
-  return `<li class="${classes}"><button class="move-tree-node alternative" type="button" data-tree-node="${escapeHtml(node.id)}">${[
-    `<span class="move-tree-ply">${escapeHtml(t("alternativeLine"))}</span>`,
-    `<span class="move-tree-move">${formatMoveHtml(alternative.move, alternative.zhMove)}</span>`,
-    `<span class="move-tree-meta">${escapeHtml(alternativeSummaryText(alternative))}</span>`
-  ].join("")}</button></li>`;
+function renderMiniBoard(board) {
+  const cells = Array.isArray(board) ? board : [];
+  const pieces = cells
+    .filter((cell) => cell?.piece)
+    .map((cell) => {
+      const point = visualPoint(cell.coord, state.game?.playerSide ?? "red");
+      return `<span class="mini-piece ${escapeHtml(cell.piece.side)}" style="--file:${point.file};--rank:${point.rank}">${escapeHtml(pieceSymbol(cell.piece))}</span>`;
+    });
+  return `<span class="mini-board" aria-hidden="true">${pieces.join("")}</span>`;
+}
+
+function treeNodeKindLabel(node) {
+  if (node.kind === "main") return t("mainLine");
+  if (node.kind === "alternative") return t("alternativeLine");
+  return t("analysisBranch");
+}
+
+function treeNodePrefix(node) {
+  if (node.kind === "main") {
+    const move = node.move;
+    return move.side === "black" ? `${move.moveNumber}...` : `${move.moveNumber}.`;
+  }
+  if (node.kind === "analysis") {
+    return t("branchRank").replace("{rank}", String(node.branch?.rank ?? ""));
+  }
+  return t("alternativeLine");
+}
+
+function treeNodeMoveHtml(node) {
+  if (node.kind === "main") return formatMoveHtml(node.move.notation, node.move.zhNotation);
+  if (node.kind === "analysis") return formatMoveHtml(node.branch.move, node.branch.zhMove);
+  return formatMoveHtml(node.alternative.move, node.alternative.zhMove);
+}
+
+function treeNodeSummaryText(node) {
+  if (node.kind === "main") return actorName(node.move.actor);
+  if (node.kind === "analysis") return analysisBranchSummaryText(node.branch);
+  return alternativeSummaryText(node.alternative);
+}
+
+function treeNodeBoard(node) {
+  if (node?.kind === "main") return node.move.boardAfter ?? state.game?.board ?? [];
+  if (node?.kind === "alternative") return node.alternative.boardAfter ?? node.parentMove.boardBefore ?? state.game?.board ?? [];
+  if (node?.kind === "analysis") return node.branch.boardAfter ?? state.game?.board ?? [];
+  return state.game?.board ?? [];
 }
 
 function alternativeSummaryText(alternative) {
@@ -1125,12 +1317,73 @@ function alternativeSummaryText(alternative) {
   return parts.join(" · ");
 }
 
+function analysisBranchSummaryText(branch) {
+  const parts = [];
+  if (branch.expectedReply) {
+    parts.push(`${t("expectedReply")} ${moveText(branch.expectedReply, branch.zhExpectedReply)}`);
+  }
+  if (Number.isFinite(branch.centipawnLoss)) {
+    parts.push(`${t("loss")} ${Math.round(branch.centipawnLoss)} cp`);
+  } else if (Number.isFinite(branch.score)) {
+    parts.push(`${t("scorePrefix")} ${formatCentipawns(branch.score)}`);
+  }
+  return parts.join(" · ");
+}
+
 function selectTreeNode(id) {
   if (!id) return;
   state.treeSelectedId = id;
   state.selected = null;
   state.panel = panelFromTreeSelection() ?? panelFromMove(state.game);
   render();
+}
+
+async function recomputeTreeNode(id) {
+  const node = findTreeNode(id);
+  const requestNode = analysisRequestForTreeNode(node);
+  if (!requestNode) return;
+
+  state.treeAnalysisPendingId = id;
+  await runRequest(async () => {
+    const result = await api("/api/analyze-node", {
+      sessionId: state.sessionId,
+      node: requestNode
+    });
+    state.treeAnalysis.set(id, result.analysis);
+    state.treeSelectedId = id;
+    state.panel = {
+      kind: "treeAnalysis",
+      nodeId: id
+    };
+    state.selected = null;
+    setGame(result.state);
+  });
+  state.treeAnalysisPendingId = null;
+  if (state.game) render();
+}
+
+function analysisRequestForTreeNode(node) {
+  if (!node) return null;
+  if (node.kind === "main") {
+    return {
+      kind: "main",
+      ply: node.move.ply
+    };
+  }
+  if (node.kind === "alternative") {
+    return {
+      kind: "alternative",
+      parentPly: node.parentMove.ply,
+      move: node.alternative.move
+    };
+  }
+  if (node.kind === "analysis" && node.branch.fenAfter) {
+    return {
+      kind: "fen",
+      fen: node.branch.fenAfter
+    };
+  }
+  return null;
 }
 
 async function restoreTreeNode(id) {
@@ -1154,6 +1407,12 @@ function bindTreeRestoreAction() {
   });
 }
 
+function bindTreeRecomputeActions(root) {
+  root.querySelectorAll("[data-tree-recompute]").forEach((button) => {
+    button.addEventListener("click", () => recomputeTreeNode(button.dataset.treeRecompute));
+  });
+}
+
 function toggleTreeNode(id) {
   if (!id) return;
   if (state.treeCollapsed.has(id)) state.treeCollapsed.delete(id);
@@ -1165,12 +1424,20 @@ function syncTreeSelection() {
   const tree = buildMoveTree();
   const ids = new Set();
   for (const node of tree) {
-    ids.add(node.id);
-    node.alternatives.forEach((alternative) => ids.add(alternative.id));
+    collectTreeNodeIds(node, ids);
+  }
+  for (const id of state.treeAnalysis.keys()) {
+    if (!ids.has(id)) state.treeAnalysis.delete(id);
   }
   if (!state.treeSelectedId || !ids.has(state.treeSelectedId)) {
     state.treeSelectedId = latestMainlineNodeId();
   }
+}
+
+function collectTreeNodeIds(node, ids) {
+  if (!node) return;
+  ids.add(node.id);
+  node.children?.forEach((child) => collectTreeNodeIds(child, ids));
 }
 
 function latestMainlineNodeId(game = state.game) {
@@ -1189,9 +1456,18 @@ function selectedTreeNode() {
 
 function findTreeNode(id) {
   for (const node of buildMoveTree()) {
-    if (node.id === id) return node;
-    const alternative = node.alternatives.find((candidate) => candidate.id === id);
-    if (alternative) return alternative;
+    const found = findTreeNodeInSubtree(node, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+function findTreeNodeInSubtree(node, id) {
+  if (!node) return null;
+  if (node.id === id) return node;
+  for (const child of node.children ?? []) {
+    const found = findTreeNodeInSubtree(child, id);
+    if (found) return found;
   }
   return null;
 }
@@ -1199,6 +1475,8 @@ function findTreeNode(id) {
 function panelFromTreeSelection() {
   const node = selectedTreeNode();
   if (!node) return null;
+  if (state.treeAnalysis.has(node.id)) return { kind: "treeAnalysis", nodeId: node.id };
+  if (node.kind === "analysis") return { kind: "treeBranch", nodeId: node.id };
   if (node.kind === "alternative") return { kind: "treeAlternative", node };
   if (node.move?.decision) return { kind: "move", decision: node.move.decision };
   if (node.move?.review) return { kind: "move", review: node.move.review };
@@ -1207,10 +1485,7 @@ function panelFromTreeSelection() {
 
 function boardCellsForTreeSelection() {
   const node = selectedTreeNode();
-  if (node?.kind === "alternative") {
-    return node.alternative.boardAfter ?? node.parentMove.boardBefore ?? state.game?.board ?? [];
-  }
-  if (node?.kind === "main" && node.id !== latestMainlineNodeId()) return node.move.boardAfter ?? state.game?.board ?? [];
+  if (node) return treeNodeBoard(node);
   return state.game?.board ?? [];
 }
 

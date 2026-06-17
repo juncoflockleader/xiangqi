@@ -279,6 +279,25 @@ async function handleApiPost(context, url) {
     });
   }
 
+  if (url.pathname === "/api/analyze-node") {
+    const session = requireSession(context.sessions, body.sessionId);
+    const analysis = await enqueueSession(session, async () => {
+      const target = resolveTreeAnalysisTarget(session.game, body.node ?? body);
+      const result = await context.engine.analyzePosition(target.position, {
+        ...searchOptions(session),
+        history: target.history,
+        initialPosition: session.game.initialPosition,
+        moveHistory: target.moveHistory
+      });
+      return summarizeTreeAnalysis(result, target.position);
+    });
+    return sendJson(context.response, 200, {
+      ok: true,
+      analysis,
+      state: serializeState(session, context.engine, context.config)
+    });
+  }
+
   if (url.pathname === "/api/undo") {
     const session = requireSession(context.sessions, body.sessionId);
     await enqueueSession(session, () => {
@@ -404,6 +423,43 @@ function truncateGameAtPly(game, ply) {
     moves,
     positions,
     positionCounts: countPositions(positions)
+  };
+}
+
+function resolveTreeAnalysisTarget(game, node = {}) {
+  if (node.fen) {
+    const position = parseFen(String(node.fen));
+    return {
+      position,
+      history: [positionKey(position)],
+      moveHistory: []
+    };
+  }
+
+  if (node.kind === "alternative") {
+    const parentPly = parsePly(node.parentPly, game.moves.length);
+    if (parentPly < 1) throw httpError(400, "Alternative nodes require a parent move.");
+    const before = game.positions[parentPly - 1];
+    if (!before) throw httpError(400, `No position before ply ${parentPly}.`);
+    const moveNotation = String(node.move ?? "");
+    const position = applyLegalMove(before, parseMoveNotation(moveNotation), before.turn);
+    return {
+      position,
+      history: [...game.positions.slice(0, parentPly), position].map(positionKey),
+      moveHistory: [
+        ...game.moves.slice(0, parentPly - 1).map((move) => move.notation),
+        moveNotation
+      ]
+    };
+  }
+
+  const ply = parsePly(node.ply, game.moves.length);
+  const position = game.positions[ply];
+  if (!position) throw httpError(400, `No position at ply ${ply}.`);
+  return {
+    position,
+    history: game.positions.slice(0, ply + 1).map(positionKey),
+    moveHistory: game.moves.slice(0, ply).map((move) => move.notation)
   };
 }
 
@@ -588,6 +644,47 @@ function summarizeCoach(coach, position = null) {
   return {
     ...summary,
     zhLevels: summarizeCoachLevelsZh(summary)
+  };
+}
+
+function summarizeTreeAnalysis(analysis, position) {
+  const lines = Array.isArray(analysis?.lines) ? analysis.lines : [];
+  return {
+    fen: toFen(position),
+    turn: position.turn,
+    board: serializeBoard(position),
+    best: summarizeDecision(analysis, position),
+    branches: lines.map((line, index) => summarizeAnalysisLine(line, position, index))
+  };
+}
+
+function summarizeAnalysisLine(line, position, index) {
+  const move = notationFor(line.move);
+  const rawPv = (line.principalVariation ?? []).map(notationFor).filter(Boolean);
+  const principalVariation = move && rawPv[0] !== move ? [move, ...rawPv] : rawPv;
+  const zhPrincipalVariation = chineseLineFor(position, principalVariation);
+  const expectedReply = principalVariation[1] ?? null;
+  const afterMove = positionAfterMove(position, move);
+  const afterReply = afterMove ? positionAfterMove(afterMove, expectedReply) : null;
+
+  return {
+    rank: line.rank ?? index + 1,
+    source: "analysis",
+    move,
+    zhMove: zhPrincipalVariation[0] ?? chineseNotationFor(position, line.move ?? move),
+    score: Number.isFinite(line.score) ? Math.round(line.score) : null,
+    scoreDetail: line.scoreDetail ?? null,
+    centipawnLoss: Number.isFinite(line.centipawnLoss) ? Math.round(line.centipawnLoss) : null,
+    expectedReply,
+    zhExpectedReply: zhPrincipalVariation[1] ?? null,
+    principalVariation,
+    zhPrincipalVariation,
+    boardAfter: afterMove ? serializeBoard(afterMove) : null,
+    replyBoardAfter: afterReply ? serializeBoard(afterReply) : null,
+    fenAfter: afterMove ? toFen(afterMove) : null,
+    fenReplyAfter: afterReply ? toFen(afterReply) : null,
+    summary: line.explanation?.summary ?? "",
+    reasons: [...(line.explanation?.reasons ?? [])]
   };
 }
 
