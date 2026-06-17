@@ -94,6 +94,7 @@ constexpr int kQDeltaCaptureHistoryGuard = 32768;
 constexpr int kQDeltaCaptureHistoryMargin = 120;
 constexpr int kQBadCaptureOrderingPenaltyScale = 8;
 constexpr int kQQuietCheckSecondLayerMargin = 190;
+constexpr int kQQuietCheckDeepReducedLimit = 4;
 constexpr int kAspirationInitialWindow = 80;
 constexpr int kAspirationRetryWindow = 320;
 constexpr int kRootTimeGuardMinMs = 8;
@@ -5173,8 +5174,12 @@ int negamax(
     int knownOwnKing = kUnknownKingSquare,
     bool knownInCheck = false);
 
-int quietCheckLimitForQDepth(int qDepth) {
-  if (qDepth >= 4) return kMaxQuietChecksPerQNode;
+int quietCheckLimitForQDepth(int qDepth, int standPat, int alpha) {
+  if (qDepth >= 4) {
+    return standPat + kQQuietCheckSecondLayerMargin >= alpha
+        ? kMaxQuietChecksPerQNode
+        : kQQuietCheckDeepReducedLimit;
+  }
   if (qDepth == 3) return 6;
   return 4;
 }
@@ -6052,7 +6057,7 @@ int quiescenceKnownCheck(
   const int enemyKing = knownEnemyKing == kUnknownKingSquare ? trackedKingSquare(board, -board.side) : knownEnemyKing;
   auto moves = generateLegalQsearchMoves(board, board.side, ownKing, inCheck, enemyKing, qDepth, standPat, alpha, state);
   if (shouldSearchQuietChecksInQsearch(qDepth, inCheck, standPat, alpha)) {
-    auto quietChecks = generateQuietChecks(board, board.side, enemyKing, quietCheckLimitForQDepth(qDepth), state, ownKing, inCheck);
+    auto quietChecks = generateQuietChecks(board, board.side, enemyKing, quietCheckLimitForQDepth(qDepth, standPat, alpha), state, ownKing, inCheck);
     for (const Move& move : quietChecks) {
       moves.push_back(move);
       state.qchecks += 1;
