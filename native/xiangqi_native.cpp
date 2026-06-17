@@ -3399,7 +3399,7 @@ int lateMoveReduction(
   if (beta - alpha > 1 && depth >= 8 && moveIndex >= 16 && reduction > 1) {
     reduction -= 1;
     state.pvReductionGuards += 1;
-  } else if (beta - alpha == 1 && state.completedDepth >= 7 && depth >= 6 && moveIndex >= 8) {
+  } else if (beta - alpha == 1 && state.completedDepth >= 6 && depth >= 6 && moveIndex >= 8) {
     reduction += 1;
     state.cutNodeReductionBoosts += 1;
   }
