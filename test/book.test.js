@@ -91,6 +91,38 @@ test("opening book follows oracle-generated deeper central cannon lines", () => 
   );
 });
 
+test("opening book includes generated Pikafish early-pawn alternatives", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  const result = engine.chooseMove(createInitialPosition(), {
+    bannedMoves: ["h7-e7"]
+  });
+
+  assert.equal(result.source, "opening-book");
+  assert.equal(result.bestMove.notation, "g6-g5");
+  assert.equal(result.book.name, "Pikafish candidate 2: g6-g5");
+  assert.equal(result.book.database.source, "Pikafish");
+  assert.equal(result.book.database.engineScore, 27);
+});
+
+test("opening book follows the generated central cannon pawn-push branch", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  let position = createInitialPosition();
+  for (const move of ["h7-e7", "h0-g2", "g6-g5"]) {
+    position = engine.play(position, move);
+  }
+
+  const result = engine.chooseMove(position);
+
+  assert.equal(result.source, "opening-book");
+  assert.equal(result.bestMove.notation, "h2-i2");
+  assert.equal(result.book.name, "Pikafish best: h2-i2");
+  assert.equal(result.book.database.engineScore, -18);
+  assert.deepEqual(
+    result.bookAlternatives.slice(0, 3).map((entry) => entry.move.notation),
+    ["h2-i2", "i0-h0", "b2-e2"]
+  );
+});
+
 test("opening book covers the c3-c4 central cannon candidate branch", () => {
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });
   let position = createInitialPosition();

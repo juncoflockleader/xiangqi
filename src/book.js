@@ -151,6 +151,14 @@ const OPENING_LINES = Object.freeze([
 
 const PIKAFISH_OPENING_POSITIONS = Object.freeze([
   Object.freeze({
+    fen: INITIAL_FEN,
+    entries: Object.freeze([
+      pikafishEntry("h7-e7", 1, 100, 29, "h7-e7 h0-g2 h9-g7 i0-h0 i9-h9 b0-c2 b9-c7"),
+      pikafishEntry("g6-g5", 2, 94, 27, "g6-g5 c3-c4 b7-e7 h0-g2 b9-c7"),
+      pikafishEntry("b7-e7", 3, 93, 27, "b7-e7 b0-c2 b9-c7 a0-b0 a9-b9 g3-g4")
+    ])
+  }),
+  Object.freeze({
     fen: AFTER_RED_CENTRAL_CANNON,
     entries: Object.freeze([
       pikafishEntry("h0-g2", 1, 100, -30, "h0-g2 h9-g7 i0-h0 i9-h9 c3-c4"),
@@ -192,6 +200,22 @@ const PIKAFISH_OPENING_POSITIONS = Object.freeze([
     ])
   }),
   Object.freeze({
+    fen: "rheakaehr/9/1c5c1/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR b",
+    entries: Object.freeze([
+      pikafishEntry("h2-g2", 1, 100, -25, "h2-g2 h9-g7 g3-g4 b7-e7 b0-c2"),
+      pikafishEntry("c3-c4", 2, 88, -32, "c3-c4 b7-e7 b0-c2 b9-c7 a0-b0"),
+      pikafishEntry("b0-c2", 3, 87, -33, "b0-c2 c6-c5 h0-i2 h9-g7 b2-a2")
+    ])
+  }),
+  Object.freeze({
+    fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b",
+    entries: Object.freeze([
+      pikafishEntry("h2-i2", 1, 100, -18, "h2-i2 h9-g7 i0-h0 c6-c5 c0-e2"),
+      pikafishEntry("i0-h0", 2, 93, -20, "i0-h0 h9-g7 h2-i2 c6-c5 c0-e2"),
+      pikafishEntry("b2-e2", 3, 76, -37, "b2-e2 h9-g7 b0-c2 b9-a7 i0-h0")
+    ])
+  }),
+  Object.freeze({
     fen: "rheakae1r/9/1c4hc1/p3p1p1p/2p6/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R r",
     entries: Object.freeze([
       pikafishEntry("b9-a7", 1, 100, 27, "b9-a7 b0-c2 i9-h9 i0-h0 g6-g5"),
@@ -206,6 +230,22 @@ const PIKAFISH_OPENING_POSITIONS = Object.freeze([
       pikafishEntry("b7-a7", 2, 92, 21, "b7-a7 b2-e2 h9-g7 g3-g4 i9-h9"),
       pikafishEntry("c6-c5", 3, 79, 8, "c6-c5 b0-c2 i9-h9 i0-h0 h9-h5"),
       pikafishEntry("b7-b8", 4, 62, -9, "b7-b8 b0-c2 h9-g7 i0-h0 i9-h9")
+    ])
+  }),
+  Object.freeze({
+    fen: "r1eakaehr/9/1ch4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R b",
+    entries: Object.freeze([
+      pikafishEntry("h0-g2", 1, 100, -38, "h0-g2 g6-g5"),
+      pikafishEntry("h2-e2", 2, 90, -43, "h2-e2 i9-h9 h0-g2 g6-g5 i0-i1"),
+      pikafishEntry("h2-f2", 3, 83, -50, "h2-f2 i9-h9 h0-g2 g6-g5 i0-i1")
+    ])
+  }),
+  Object.freeze({
+    fen: "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/1C2E2C1/9/RH1AKAEHR b",
+    entries: Object.freeze([
+      pikafishEntry("b2-e2", 1, 100, 5, "b2-e2 i6-i5 h0-i2 i9-i6 i0-h0"),
+      pikafishEntry("h0-i2", 2, 81, -9, "h0-i2 h9-g7 b2-e2 c6-c5 b0-c2"),
+      pikafishEntry("b0-c2", 3, 67, -23, "b0-c2 h9-g7 b2-a2 c6-c5 h0-i2")
     ])
   })
 ]);
