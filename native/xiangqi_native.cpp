@@ -5619,8 +5619,8 @@ uint64_t fenPositionKey(const std::string& fen) {
 int timedOpeningRootBonus(const Board& root, const Move& move) {
   const std::string uci = moveToUci(move);
   if (root.side == kRed && root.key == initialPositionKey()) {
-    if (uci == "b2e2") return 5000;  // b7-e7: refreshed 2026 Pikafish opposite central cannon.
-    if (uci == "h2e2") return 4900;  // h7-e7: classic central cannon remains a near-tie.
+    if (uci == "h2e2") return 5050;  // h7-e7: refreshed Pikafish top in current depth-7 oracle review.
+    if (uci == "b2e2") return 5000;  // b7-e7: opposite central cannon remains a near-tie.
     if (uci == "g3g4") return 4700;  // g6-g5: common Pikafish near-tie from start.
     if (uci == "b0c2" || uci == "h0g2") return 3200;  // Develop horses.
     return 0;
