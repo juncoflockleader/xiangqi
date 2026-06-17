@@ -4056,6 +4056,47 @@ int palaceEscapeBlockPenalty(const Board& board, int side, int kingSquare, int t
   return penalty;
 }
 
+int guardFortressShapeBonus(const Board& board, int side, int kingSquare) {
+  if (kingSquare < 0) return 0;
+  const int advisorCount = side == kRed ? board.redAdvisorCount : board.blackAdvisorCount;
+  const int elephantCount = side == kRed ? board.redElephantCount : board.blackElephantCount;
+  const int homeRank = side == kRed ? 9 : 0;
+  const int centerRank = side == kRed ? 8 : 1;
+  const int advancedRank = side == kRed ? 7 : 2;
+  int bonus = 0;
+
+  auto hasGuard = [&](int file, int rank, int type) {
+    return inside(file, rank) && board.cells[indexOf(file, rank)] == side * type;
+  };
+
+  int homeAdvisorCount = 0;
+  if (hasGuard(3, homeRank, Advisor)) homeAdvisorCount += 1;
+  if (hasGuard(5, homeRank, Advisor)) homeAdvisorCount += 1;
+  const int centerAdvisorCount = hasGuard(4, centerRank, Advisor) ? 1 : 0;
+
+  int homeElephantCount = 0;
+  if (hasGuard(2, homeRank, Elephant)) homeElephantCount += 1;
+  if (hasGuard(6, homeRank, Elephant)) homeElephantCount += 1;
+  const int centralElephantCount = hasGuard(4, advancedRank, Elephant) ? 1 : 0;
+
+  bonus += homeAdvisorCount * 6;
+  bonus += centerAdvisorCount * 8;
+  if (homeAdvisorCount >= 2) bonus += 10;
+  if (homeAdvisorCount >= 1 && centerAdvisorCount >= 1) bonus += 6;
+
+  bonus += homeElephantCount * 4;
+  bonus += centralElephantCount * 8;
+  if (homeElephantCount >= 2) bonus += 12;
+  if (homeAdvisorCount >= 2 && homeElephantCount >= 2) bonus += 16;
+
+  if (advisorCount >= 2 && elephantCount >= 2) {
+    bonus += 18;
+    if (fileOf(kingSquare) == 4 && rankOf(kingSquare) == homeRank) bonus += 8;
+  }
+
+  return bonus;
+}
+
 int advisorShapeBonus(const Board& board, int square, int piece, int ownKing, int totalPieceCount) {
   if (ownKing < 0) return 0;
   if (totalPieceCount > 20) return 0;
@@ -4259,6 +4300,8 @@ int evaluateRed(const Board& board) {
   score += palaceShapePenalty(board, kBlack, blackKing);
   score -= palaceEscapeBlockPenalty(board, kRed, redKing, totalPieceCount);
   score += palaceEscapeBlockPenalty(board, kBlack, blackKing, totalPieceCount);
+  score += guardFortressShapeBonus(board, kRed, redKing);
+  score -= guardFortressShapeBonus(board, kBlack, blackKing);
   return score;
 }
 

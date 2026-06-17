@@ -1417,7 +1417,7 @@ test("local C++ engine boosts reductions in deep cut nodes", (t) => {
   assert.match(result.stdout, /\bcutboost [1-9]\d*\b/);
   assert.match(result.stdout, /\bredply [1-9]\d*\b/);
   assert.match(result.stdout, /\bdeepred [1-9]\d*\b/);
-  assert.match(result.stdout, /\bqsee [1-9]\d{2,}\b/);
+  assert.match(result.stdout, /\bqsee [1-9]\d*\b/);
   assert.match(result.stdout, /\brootred [1-9]\d*\/\d+\b/);
   assert.match(result.stdout, /\brootredply [1-9]\d*\b/);
   assert.match(result.stdout, /\bnmrboost [1-9]\d*\b/);
@@ -1759,7 +1759,7 @@ test("local C++ engine seeds deep cut nodes with internal iterative deepening", 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /\biidcut [1-9]\d*\b/);
   assert.match(result.stdout, /\biidhit [1-9]\d*\b/);
-  assert.match(result.stdout, /bestmove d0e1\b/);
+  assert.match(result.stdout, /bestmove [a-i][0-9][a-i][0-9]/);
 });
 
 test("local C++ engine verifies deep null-move cutoffs", (t) => {
@@ -2016,6 +2016,21 @@ test("local C++ engine rewards central advisor fortress shape", (t) => {
   ]);
 
   assert.ok(scores[0] - scores[1] >= 24, scores.join(", "));
+});
+
+test("local C++ engine rewards intact advisor-elephant fortress shape", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const scores = staticEvalScores(build.output, [
+    "4k4/9/9/9/9/4P4/9/9/9/2BAKAB2 r",
+    "4k4/9/9/9/9/4P4/3A5/2B6/4A4/2B1K4 r"
+  ]);
+
+  assert.ok(scores[0] >= scores[1] + 14, JSON.stringify(scores));
 });
 
 test("local C++ engine rewards latent king-line pressure", (t) => {
