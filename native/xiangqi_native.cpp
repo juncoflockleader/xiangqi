@@ -451,9 +451,63 @@ constexpr std::array<std::array<bool, kSquares>, 2> makePalaceLookup() {
   return values;
 }
 
+using SquarePairLookup = std::array<std::array<uint8_t, kSquares>, kSquares>;
+
+constexpr SquarePairLookup makeSameLineLookup() {
+  SquarePairLookup values{};
+  for (int square = 0; square < kSquares; square += 1) {
+    const int file = square % kFiles;
+    const int rank = square / kFiles;
+    for (int target = 0; target < kSquares; target += 1) {
+      const int targetFile = target % kFiles;
+      const int targetRank = target / kFiles;
+      values[static_cast<std::size_t>(square)][static_cast<std::size_t>(target)] =
+          file == targetFile || rank == targetRank;
+    }
+  }
+  return values;
+}
+
+constexpr SquarePairLookup makeAdjacentLookup() {
+  SquarePairLookup values{};
+  for (int square = 0; square < kSquares; square += 1) {
+    const int file = square % kFiles;
+    const int rank = square / kFiles;
+    for (int target = 0; target < kSquares; target += 1) {
+      const int targetFile = target % kFiles;
+      const int targetRank = target / kFiles;
+      const int fileDelta = file > targetFile ? file - targetFile : targetFile - file;
+      const int rankDelta = rank > targetRank ? rank - targetRank : targetRank - rank;
+      values[static_cast<std::size_t>(square)][static_cast<std::size_t>(target)] =
+          fileDelta + rankDelta == 1;
+    }
+  }
+  return values;
+}
+
+constexpr SquarePairLookup makeHorseGeometryLookup() {
+  SquarePairLookup values{};
+  for (int square = 0; square < kSquares; square += 1) {
+    const int file = square % kFiles;
+    const int rank = square / kFiles;
+    for (int target = 0; target < kSquares; target += 1) {
+      const int targetFile = target % kFiles;
+      const int targetRank = target / kFiles;
+      const int fileDelta = file > targetFile ? file - targetFile : targetFile - file;
+      const int rankDelta = rank > targetRank ? rank - targetRank : targetRank - rank;
+      values[static_cast<std::size_t>(square)][static_cast<std::size_t>(target)] =
+          (fileDelta == 1 && rankDelta == 2) || (fileDelta == 2 && rankDelta == 1);
+    }
+  }
+  return values;
+}
+
 constexpr auto kFileBySquare = makeFileLookup();
 constexpr auto kRankBySquare = makeRankLookup();
 constexpr auto kFileCentrality = makeFileCentralityLookup();
+constexpr auto kSameLineBySquare = makeSameLineLookup();
+constexpr auto kAdjacentBySquare = makeAdjacentLookup();
+constexpr auto kHorseGeometryBySquare = makeHorseGeometryLookup();
 constexpr auto kRaySquares = makeRaySquareLookup();
 constexpr auto kRayLengths = makeRayLengthLookup();
 constexpr auto kOrthogonalDirectionBetween = makeOrthogonalDirectionLookup();
@@ -2088,22 +2142,14 @@ bool maybeMoveCanGiveCheck(const Move& move, int kingSquare) {
   if (kingSquare < 0) return false;
   if (move.to == kingSquare) return true;
 
-  const int fromFile = fileOf(move.from);
-  const int fromRank = rankOf(move.from);
-  const int toFile = fileOf(move.to);
-  const int toRank = rankOf(move.to);
-  const int kingFile = fileOf(kingSquare);
-  const int kingRank = rankOf(kingSquare);
-
-  if (fromFile == kingFile || fromRank == kingRank || toFile == kingFile || toRank == kingRank) return true;
-  if (std::abs(fromFile - kingFile) + std::abs(fromRank - kingRank) == 1) return true;
+  const auto from = static_cast<std::size_t>(move.from);
+  const auto to = static_cast<std::size_t>(move.to);
+  const auto king = static_cast<std::size_t>(kingSquare);
+  if (kSameLineBySquare[from][king] || kSameLineBySquare[to][king]) return true;
+  if (kAdjacentBySquare[from][king]) return true;
 
   const int type = typeOf(move.piece);
-  if (type == Horse) {
-    const int fileDelta = std::abs(toFile - kingFile);
-    const int rankDelta = std::abs(toRank - kingRank);
-    if ((fileDelta == 1 && rankDelta == 2) || (fileDelta == 2 && rankDelta == 1)) return true;
-  }
+  if (type == Horse && kHorseGeometryBySquare[to][king]) return true;
 
   return false;
 }
