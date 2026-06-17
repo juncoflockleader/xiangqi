@@ -568,6 +568,37 @@ test("local C++ engine reuses root TT best moves across repeated searches", (t) 
   assert.match(result.stdout, /\bbestmove b0c2\b/);
 });
 
+test("local C++ searchmoves probes do not seed root TT best moves", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const input = [
+    "uci",
+    "position startpos",
+    "go depth 2 searchmoves h2e2",
+    "position startpos",
+    "go depth 2",
+    "quit"
+  ].join("\n");
+  const result = spawnSync(build.output, {
+    input,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const rootTtHits = [...result.stdout.matchAll(/\broottt\s+(\d+)/g)].map((match) => Number(match[1]));
+  const rootTtStores = [...result.stdout.matchAll(/\brootttstores\s+(\d+)/g)].map((match) => Number(match[1]));
+
+  assert.deepEqual(rootTtHits, [0, 0], result.stdout);
+  assert.equal(rootTtStores[0], 0, result.stdout);
+  assert.ok(rootTtStores[1] >= 1, result.stdout);
+  assert.match(result.stdout, /\bbestmove h2e2\b/);
+  assert.match(result.stdout, /\bbestmove b0c2\b/);
+});
+
 test("local C++ engine reuses quiescence TT cutoffs across repeated searches", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {

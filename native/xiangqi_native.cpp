@@ -5776,6 +5776,7 @@ std::vector<RootLine> searchRoot(
   qtt.newSearch();
   evalCache.newSearch();
 
+  const bool unrestrictedRootSearch = searchMoves.empty();
   const int rootOwnKing = findKing(root, root.side);
   const bool rootInCheck = isInCheckKnownKing(root, root.side, rootOwnKing);
   auto rootMoves = filterRootMoves(generateLegalMoves(root, root.side, false, rootOwnKing, rootInCheck), searchMoves);
@@ -5791,9 +5792,9 @@ std::vector<RootLine> searchRoot(
       state.rootTtHits += 1;
     }
   }
-  const bool useTimedOpeningPriors = rootAlphaPruning && searchMoves.empty();
+  const bool useTimedOpeningPriors = rootAlphaPruning && unrestrictedRootSearch;
   orderMoves(rootMoves, state, 0, rootHashMove, {}, &root, rootEnemyKing, {}, rootInCheck);
-  applyRootOrderMemory(rootMoves, state, root.key, rootHashMove, searchMoves.empty());
+  applyRootOrderMemory(rootMoves, state, root.key, rootHashMove, unrestrictedRootSearch);
   applyTimedOpeningRootBias(rootMoves, root, useTimedOpeningPriors);
   std::vector<RootMove> orderedRootMoves;
   orderedRootMoves.reserve(rootMoves.size());
@@ -5867,7 +5868,7 @@ std::vector<RootLine> searchRoot(
       return left.score > right.score;
     });
     applyTimedOpeningFinalPreference(depthLines, root, useTimedOpeningPriors, state);
-    if (validMove(depthLines.front().move)) {
+    if (unrestrictedRootSearch && validMove(depthLines.front().move)) {
       tt.store(root.key, depth, scoreToTt(depthLines.front().score, 0), kTtExact, depthLines.front().move);
       state.rootTtStores += 1;
     }
@@ -5883,7 +5884,7 @@ std::vector<RootLine> searchRoot(
 
   const int limit = std::max(1, std::min<int>(multiPv, bestLines.size()));
   applyTimedOpeningFinalPreference(bestLines, root, useTimedOpeningPriors, state);
-  storeRootOrderMemory(state, root.key, bestLines, searchMoves.empty() && !state.stopped);
+  storeRootOrderMemory(state, root.key, bestLines, unrestrictedRootSearch && !state.stopped);
   bestLines.resize(limit);
   state.ttHashfull = tt.hashfull();
   return bestLines;
