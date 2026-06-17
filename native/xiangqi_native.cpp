@@ -68,6 +68,9 @@ constexpr int kQSeePruneMaxRootPieces = 32;
 constexpr int kQSeePruneAlphaMargin = 32;
 constexpr int kQSeePruneLossMargin = 120;
 constexpr int kQSeeCaptureHistoryGuard = 1024;
+constexpr int kQDeltaPruneMargin = 120;
+constexpr int kQDeltaCaptureHistoryGuard = 4096;
+constexpr int kQDeltaCaptureHistoryMargin = 160;
 constexpr int kAspirationInitialWindow = 80;
 constexpr int kAspirationRetryWindow = 320;
 constexpr int kRootTimeGuardMinMs = 8;
@@ -2582,6 +2585,9 @@ MoveList generateLegalMoves(Board& board, int side, bool capturesOnly = false) {
   return moves;
 }
 
+int qCaptureHistoryScore(SearchState& state, const Move& move);
+bool shouldGuardQDeltaCapture(SearchState& state, const Move& move, int standPat, int capturedValue, int alpha);
+
 MoveList generateLegalQsearchMoves(
     Board& board,
     int side,
@@ -2597,7 +2603,10 @@ MoveList generateLegalQsearchMoves(
   std::size_t kept = 0;
   for (std::size_t index = 0; index < moves.size(); index += 1) {
     Move& move = moves[index];
-    if (move.captured != 0 && standPat + pieceValue(move.captured) + 120 <= alpha) {
+    const int capturedValue = pieceValue(move.captured);
+    if (move.captured != 0
+        && standPat + capturedValue + kQDeltaPruneMargin <= alpha
+        && !shouldGuardQDeltaCapture(state, move, standPat, capturedValue, alpha)) {
       const bool possibleCheck = maybeMoveCanGiveCheck(move, enemyKing);
       if (!possibleCheck || !moveGivesCheckAssumingPossible(board, move, enemyKing, state)) {
         state.deltaPrunes += 1;
@@ -2612,10 +2621,23 @@ MoveList generateLegalQsearchMoves(
   return moves;
 }
 
+int qCaptureHistoryScore(SearchState& state, const Move& move) {
+  const int qHistory = state.qCaptureHistory[move.from][move.to];
+  if (qHistory != 0) state.qCaptureHistoryHits += 1;
+  return qHistory;
+}
+
 int qCheckHistoryScore(SearchState& state, const Move& move) {
   const int qHistory = state.qCheckHistory[move.from][move.to];
   if (qHistory != 0) state.qCheckHistoryHits += 1;
   return qHistory;
+}
+
+bool shouldGuardQDeltaCapture(SearchState& state, const Move& move, int standPat, int capturedValue, int alpha) {
+  if (standPat + capturedValue + kQDeltaCaptureHistoryMargin <= alpha) return false;
+  if (qCaptureHistoryScore(state, move) <= kQDeltaCaptureHistoryGuard) return false;
+  state.qCaptureHistoryPruneGuards += 1;
+  return true;
 }
 
 int quietCheckOrderingScore(const Board& board, const Move& move, SearchState& state, int enemyKing) {
@@ -3908,9 +3930,7 @@ int moveOrderingScore(
     if (captureHistoryScore != 0) state.captureHistoryHits += 1;
     score += captureHistoryScore;
     if (useQsearchCaptureHistory) {
-      const int qCaptureHistoryScore = state.qCaptureHistory[move.from][move.to];
-      if (qCaptureHistoryScore != 0) state.qCaptureHistoryHits += 1;
-      score += qCaptureHistoryScore;
+      score += qCaptureHistoryScore(state, move);
     }
     if (board) score -= captureRiskPenaltyForCapture(*board, move, state, movingValue, capturedValue, pieceSide);
   } else {
@@ -5061,12 +5081,15 @@ int quiescenceKnownCheck(
     bool givesCheck = !inCheck && move.captured == 0;
     const bool captureMove = move.captured != 0;
     const int capturedValue = pieceValue(move.captured);
-    if (!inCheck && move.captured != 0 && standPat + capturedValue + 120 <= alpha) {
-      if (!possibleCheck || !moveGivesCheckAssumingPossible(board, move, enemyKing, state)) {
+    if (!inCheck && move.captured != 0 && standPat + capturedValue + kQDeltaPruneMargin <= alpha) {
+      if (shouldGuardQDeltaCapture(state, move, standPat, capturedValue, alpha)) {
+        if (possibleCheck) givesCheck = moveGivesCheckAssumingPossible(board, move, enemyKing, state);
+      } else if (!possibleCheck || !moveGivesCheckAssumingPossible(board, move, enemyKing, state)) {
         state.deltaPrunes += 1;
         continue;
+      } else {
+        givesCheck = true;
       }
-      givesCheck = true;
     } else if (!givesCheck && possibleCheck) {
       givesCheck = moveGivesCheckAssumingPossible(board, move, enemyKing, state);
     }

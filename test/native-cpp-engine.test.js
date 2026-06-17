@@ -1278,6 +1278,7 @@ test("local C++ engine uses quiet-check history for checking move ordering", (t)
   assert.match(result.stdout, /\bqcheckhist [1-9]\d*\b/);
   assert.match(result.stdout, /\bqcheckhstores [1-9]\d*\b/);
   assert.match(result.stdout, /\bqcheckhm [1-9]\d*\b/);
+  assert.match(result.stdout, /\bqcapguard [1-9]\d*\b/);
   assert.match(result.stdout, /\bqnodes [1-9]\d*\b/);
   assert.match(result.stdout, /\bcheckhist [1-9]\d*\b/);
   assert.match(result.stdout, /\bcheckhstores [1-9]\d*\b/);
