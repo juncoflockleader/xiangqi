@@ -2015,6 +2015,13 @@ int trackedKingSquare(const Board& board, int side) {
   return square;
 }
 
+int trackedPieceAtSquare(const Board& board, int side, int square) {
+  assert(square >= 0 && square < kSquares);
+  const int piece = board.cells[square];
+  assert(piece != 0 && pieceCodeSide(piece) == side);
+  return piece;
+}
+
 void setKingSquare(Board& board, int side, int square) {
   if (side == kRed) board.redKing = square;
   else if (side == kBlack) board.blackKing = square;
@@ -4174,9 +4181,7 @@ int evaluateRed(const Board& board) {
     const int count = pieceCount(board, side);
     for (int listIndex = 0; listIndex < count; listIndex += 1) {
       const int square = squares[listIndex];
-      if (square < 0 || square >= kSquares) continue;
-      const int piece = board.cells[square];
-      if (piece == 0 || pieceCodeSide(piece) != side) continue;
+      const int piece = trackedPieceAtSquare(board, side, square);
       const int type = pieceCodeType(piece);
       const int file = fileOf(square);
       const int rank = rankOf(square);
