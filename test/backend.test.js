@@ -358,6 +358,53 @@ test("learning backend factory falls back when native search is unavailable", as
   }
 });
 
+test("learning backend retries native after a one-off fallback search failure", async () => {
+  const backend = createLearningEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    profile: "native-ucci",
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockIllegalFirstSearch: true
+    },
+    javascript: {
+      profile: "fast",
+      depth: 1,
+      timeLimitMs: 100
+    }
+  });
+  const position = createInitialPosition();
+
+  try {
+    const fallbackResult = await backend.chooseMove(position, {
+      useBook: false,
+      depth: 1,
+      timeLimitMs: 100
+    });
+
+    assert.equal(backend.fallbackActive, true);
+    assert.equal(fallbackResult.backendFallback.method, "chooseMove");
+    assert.equal(fallbackResult.backendFallback.fallbackBackend, "javascript-reference");
+    assert.ok(fallbackResult.backendFallback.message.includes("illegal move"));
+
+    const recovered = await backend.chooseMove(position, {
+      useBook: false,
+      depth: 2,
+      timeLimitMs: 500
+    });
+
+    assert.equal(backend.fallbackActive, false);
+    assert.equal(recovered.source, "native-ucci");
+    assert.equal(recovered.bestMove.notation, "h9-g7");
+    assert.equal(recovered.backendFallback, undefined);
+  } finally {
+    await backend.close();
+  }
+});
+
 test("learning backend factory can expose strict native behavior", async () => {
   const backend = createLearningEngineBackend({
     command: process.execPath,

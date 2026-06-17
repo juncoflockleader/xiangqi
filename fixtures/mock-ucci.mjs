@@ -115,6 +115,9 @@ rl.on("line", (line) => {
           write(`info depth ${depth} score cp 999 nodes 1 pv ${nativeMove("i0h0")}`);
           write(`bestmove ${nativeMove("i0h0")}`);
         }
+      } else if (hasOption("MockIllegalFirstSearch") && mockSearchCount === 1) {
+        write(`info depth ${depth} score cp 999 nodes 1 pv ${nativeMove("i0h0")}`);
+        write(`bestmove ${nativeMove("i0h0")}`);
       } else if (hasOption("MockTie")) {
         write(`info multipv 1 depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
         write(`info multipv 2 depth ${depth} score cp 38 nodes 123 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);

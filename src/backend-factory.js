@@ -195,6 +195,10 @@ export function createFallbackEngineBackend(primaryBackend, fallbackBackend, opt
   return backend;
 
   async function searchWithFallback(method, args) {
+    if (state.error) {
+      await tryRecoverPrimary();
+    }
+
     if (!state.error) {
       try {
         return await primaryBackend[method](...args);
@@ -205,6 +209,17 @@ export function createFallbackEngineBackend(primaryBackend, fallbackBackend, opt
 
     const result = await fallbackBackend[method](...args);
     return annotateFallbackResult(result, method, state.error, primaryBackend, fallbackBackend);
+  }
+
+  async function tryRecoverPrimary() {
+    state.error = null;
+    state.failedAt = null;
+
+    try {
+      await primaryBackend.ready?.();
+    } catch (error) {
+      rememberNativeFailure(error);
+    }
   }
 
   function auxiliaryWithFallback(method, args) {
