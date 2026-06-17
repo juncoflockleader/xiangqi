@@ -4056,6 +4056,55 @@ int palaceEscapeBlockPenalty(const Board& board, int side, int kingSquare, int t
   return penalty;
 }
 
+int palaceControlSafetyPenalty(const Board& board, int side, int kingSquare, int totalPieceCount) {
+  if (kingSquare < 0) return 0;
+  if (totalPieceCount > 16) return 0;
+
+  const int enemy = -side;
+  const Move noMove{};
+  const int kingFile = fileOf(kingSquare);
+  const int kingRank = rankOf(kingSquare);
+  const int palaceMinRank = side == kRed ? 7 : 0;
+  const int palaceMaxRank = side == kRed ? 9 : 2;
+  int penalty = 0;
+
+  for (int rank = palaceMinRank; rank <= palaceMaxRank; rank += 1) {
+    for (int file = 3; file <= 5; file += 1) {
+      const int square = indexOf(file, rank);
+      const int attacker = leastAttackerValueAfterMove(board, noMove, enemy, square);
+      if (attacker >= kInf) continue;
+
+      const int distance = std::abs(file - kingFile) + std::abs(rank - kingRank);
+      if (square == kingSquare) {
+        penalty += 80;
+      } else if (distance == 1) {
+        penalty += 22;
+      } else {
+        penalty += 8;
+      }
+    }
+  }
+
+  if (penalty == 0) return 0;
+
+  int safeEscapes = 0;
+  const auto& kingLookup = kKingTargets[static_cast<std::size_t>(sideLookupIndex(side))];
+  const auto& kingTargets = kingLookup.targets[static_cast<std::size_t>(kingSquare)];
+  const int kingTargetCount = kingLookup.counts[static_cast<std::size_t>(kingSquare)];
+  for (int index = 0; index < kingTargetCount; index += 1) {
+    const int target = kingTargets[static_cast<std::size_t>(index)];
+    if (!palaceContains(side, fileOf(target), rankOf(target))) continue;
+    const int occupant = board.cells[target];
+    if (occupant != 0 && pieceCodeSide(occupant) == side) continue;
+    if (leastAttackerValueAfterMove(board, noMove, enemy, target) >= kInf) safeEscapes += 1;
+  }
+
+  if (safeEscapes == 0) penalty += 30;
+  else if (safeEscapes == 1) penalty += 12;
+
+  return std::min(150, penalty);
+}
+
 int guardFortressShapeBonus(const Board& board, int side, int kingSquare) {
   if (kingSquare < 0) return 0;
   const int advisorCount = side == kRed ? board.redAdvisorCount : board.blackAdvisorCount;
@@ -4368,6 +4417,8 @@ int evaluateRed(const Board& board) {
   score += palaceShapePenalty(board, kBlack, blackKing);
   score -= palaceEscapeBlockPenalty(board, kRed, redKing, totalPieceCount);
   score += palaceEscapeBlockPenalty(board, kBlack, blackKing, totalPieceCount);
+  score -= palaceControlSafetyPenalty(board, kRed, redKing, totalPieceCount);
+  score += palaceControlSafetyPenalty(board, kBlack, blackKing, totalPieceCount);
   score += guardFortressShapeBonus(board, kRed, redKing);
   score -= guardFortressShapeBonus(board, kBlack, blackKing);
   return score;

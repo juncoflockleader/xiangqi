@@ -1786,7 +1786,7 @@ test("local C++ engine verifies deep null-move cutoffs", (t) => {
   assert.match(result.stdout, /\bnmvfail \d+\b/);
 });
 
-test("local C++ engine guards null-move pruning in defensive-only endgames", (t) => {
+test("local C++ engine guards null-move pruning in pawn-and-guard endgames", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {
     t.skip(build.skip);
@@ -1795,7 +1795,7 @@ test("local C++ engine guards null-move pruning in defensive-only endgames", (t)
 
   const input = [
     "uci",
-    "position fen 4k4/9/9/9/9/9/9/9/4A4/3AKAE2 r",
+    "position fen 4k4/9/9/9/4P4/9/9/9/4A4/3AKAE2 r",
     "go depth 5",
     "quit"
   ].join("\n");
@@ -2001,6 +2001,21 @@ test("local C++ engine rewards clearing blocked king escapes", (t) => {
   ]);
 
   assert.ok(scores[0] - scores[1] >= 8, scores.join(", "));
+});
+
+test("local C++ engine penalizes enemy control of palace escape squares", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const scores = staticEvalScores(build.output, [
+    "4k4/9/9/9/9/9/9/3r5/9/4K4 r",
+    "4k4/9/9/9/r8/9/9/9/9/4K4 r"
+  ]);
+
+  assert.ok(scores[1] >= scores[0] + 40, JSON.stringify(scores));
 });
 
 test("local C++ engine rewards central advisor fortress shape", (t) => {
