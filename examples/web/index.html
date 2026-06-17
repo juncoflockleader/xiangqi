@@ -8,116 +8,129 @@
   </head>
   <body>
     <main class="app-shell" id="app">
-      <section class="board-section" aria-label="象棋棋盘" data-i18n-aria-label="boardAria">
-        <div class="topbar">
-          <div>
-            <h1 data-i18n="appTitle">中国象棋</h1>
-            <p id="gameStatus">启动中...</p>
-          </div>
-          <div class="turn-pill" id="turnPill">红方</div>
-        </div>
-        <div class="board-wrap" id="boardWrap">
-          <div class="board-art">
-            <div class="board-lines" aria-hidden="true">
-              <svg class="board-grid" viewBox="0 0 8 9" preserveAspectRatio="none" focusable="false" aria-hidden="true">
-                <path class="board-grid-major" d="M0 0H8V9H0Z"></path>
-                <path class="board-grid-line" d="M0 1H8 M0 2H8 M0 3H8 M0 6H8 M0 7H8 M0 8H8"></path>
-                <path class="board-grid-major" d="M0 4H8 M0 5H8"></path>
-                <path class="board-grid-line" d="M1 0V4 M1 5V9 M2 0V4 M2 5V9 M3 0V4 M3 5V9 M4 0V4 M4 5V9 M5 0V4 M5 5V9 M6 0V4 M6 5V9 M7 0V4 M7 5V9"></path>
-                <path class="board-palace-line" d="M3 0L5 2 M5 0L3 2 M3 7L5 9 M5 7L3 9"></path>
-              </svg>
-              <div class="file-labels file-labels-north" aria-hidden="true">
-                <span class="file-label" style="--file: 0">1</span>
-                <span class="file-label" style="--file: 1">2</span>
-                <span class="file-label" style="--file: 2">3</span>
-                <span class="file-label" style="--file: 3">4</span>
-                <span class="file-label" style="--file: 4">5</span>
-                <span class="file-label" style="--file: 5">6</span>
-                <span class="file-label" style="--file: 6">7</span>
-                <span class="file-label" style="--file: 7">8</span>
-                <span class="file-label" style="--file: 8">9</span>
+      <section class="play-section" aria-label="象棋棋盘" data-i18n-aria-label="boardAria">
+        <div class="board-zone">
+          <div class="board-wrap" id="boardWrap">
+            <div class="board-art">
+              <div class="board-lines" aria-hidden="true">
+                <svg class="board-grid" viewBox="0 0 8 9" preserveAspectRatio="none" focusable="false" aria-hidden="true">
+                  <path class="board-grid-major" d="M0 0H8V9H0Z"></path>
+                  <path class="board-grid-line" d="M0 1H8 M0 2H8 M0 3H8 M0 6H8 M0 7H8 M0 8H8"></path>
+                  <path class="board-grid-major" d="M0 4H8 M0 5H8"></path>
+                  <path class="board-grid-line" d="M1 0V4 M1 5V9 M2 0V4 M2 5V9 M3 0V4 M3 5V9 M4 0V4 M4 5V9 M5 0V4 M5 5V9 M6 0V4 M6 5V9 M7 0V4 M7 5V9"></path>
+                  <path class="board-palace-line" d="M3 0L5 2 M5 0L3 2 M3 7L5 9 M5 7L3 9"></path>
+                </svg>
+                <div class="file-labels file-labels-north" aria-hidden="true">
+                  <span class="file-label" style="--file: 0">1</span>
+                  <span class="file-label" style="--file: 1">2</span>
+                  <span class="file-label" style="--file: 2">3</span>
+                  <span class="file-label" style="--file: 3">4</span>
+                  <span class="file-label" style="--file: 4">5</span>
+                  <span class="file-label" style="--file: 5">6</span>
+                  <span class="file-label" style="--file: 6">7</span>
+                  <span class="file-label" style="--file: 7">8</span>
+                  <span class="file-label" style="--file: 8">9</span>
+                </div>
+                <span class="river-label river-left">楚河</span>
+                <span class="river-label river-right">汉界</span>
+                <span class="point-mark" style="--file: 1; --rank: 2"></span>
+                <span class="point-mark" style="--file: 7; --rank: 2"></span>
+                <span class="point-mark point-edge-left" style="--file: 0; --rank: 3"></span>
+                <span class="point-mark" style="--file: 2; --rank: 3"></span>
+                <span class="point-mark" style="--file: 4; --rank: 3"></span>
+                <span class="point-mark" style="--file: 6; --rank: 3"></span>
+                <span class="point-mark point-edge-right" style="--file: 8; --rank: 3"></span>
+                <span class="point-mark point-edge-left" style="--file: 0; --rank: 6"></span>
+                <span class="point-mark" style="--file: 2; --rank: 6"></span>
+                <span class="point-mark" style="--file: 4; --rank: 6"></span>
+                <span class="point-mark" style="--file: 6; --rank: 6"></span>
+                <span class="point-mark point-edge-right" style="--file: 8; --rank: 6"></span>
+                <span class="point-mark" style="--file: 1; --rank: 7"></span>
+                <span class="point-mark" style="--file: 7; --rank: 7"></span>
+                <div class="file-labels file-labels-south" aria-hidden="true">
+                  <span class="file-label" style="--file: 0">九</span>
+                  <span class="file-label" style="--file: 1">八</span>
+                  <span class="file-label" style="--file: 2">七</span>
+                  <span class="file-label" style="--file: 3">六</span>
+                  <span class="file-label" style="--file: 4">五</span>
+                  <span class="file-label" style="--file: 5">四</span>
+                  <span class="file-label" style="--file: 6">三</span>
+                  <span class="file-label" style="--file: 7">二</span>
+                  <span class="file-label" style="--file: 8">一</span>
+                </div>
               </div>
-              <span class="river-label river-left">楚河</span>
-              <span class="river-label river-right">汉界</span>
-              <span class="point-mark" style="--file: 1; --rank: 2"></span>
-              <span class="point-mark" style="--file: 7; --rank: 2"></span>
-              <span class="point-mark point-edge-left" style="--file: 0; --rank: 3"></span>
-              <span class="point-mark" style="--file: 2; --rank: 3"></span>
-              <span class="point-mark" style="--file: 4; --rank: 3"></span>
-              <span class="point-mark" style="--file: 6; --rank: 3"></span>
-              <span class="point-mark point-edge-right" style="--file: 8; --rank: 3"></span>
-              <span class="point-mark point-edge-left" style="--file: 0; --rank: 6"></span>
-              <span class="point-mark" style="--file: 2; --rank: 6"></span>
-              <span class="point-mark" style="--file: 4; --rank: 6"></span>
-              <span class="point-mark" style="--file: 6; --rank: 6"></span>
-              <span class="point-mark point-edge-right" style="--file: 8; --rank: 6"></span>
-              <span class="point-mark" style="--file: 1; --rank: 7"></span>
-              <span class="point-mark" style="--file: 7; --rank: 7"></span>
-              <div class="file-labels file-labels-south" aria-hidden="true">
-                <span class="file-label" style="--file: 0">九</span>
-                <span class="file-label" style="--file: 1">八</span>
-                <span class="file-label" style="--file: 2">七</span>
-                <span class="file-label" style="--file: 3">六</span>
-                <span class="file-label" style="--file: 4">五</span>
-                <span class="file-label" style="--file: 5">四</span>
-                <span class="file-label" style="--file: 6">三</span>
-                <span class="file-label" style="--file: 7">二</span>
-                <span class="file-label" style="--file: 8">一</span>
-              </div>
+              <div class="board" id="board"></div>
             </div>
-            <div class="board" id="board"></div>
           </div>
+          <div class="selected-moves" id="selectedMoves" hidden></div>
         </div>
-        <div class="selected-moves" id="selectedMoves" hidden></div>
+
+        <div class="command-panel">
+          <div class="topbar">
+            <div>
+              <h1 data-i18n="appTitle">中国象棋</h1>
+              <p id="gameStatus">启动中...</p>
+            </div>
+            <div class="turn-pill" id="turnPill">红方</div>
+          </div>
+
+          <section class="controls" aria-label="对局控制" data-i18n-aria-label="controlsAria">
+            <div class="control-row">
+              <label for="localeSelect" data-i18n="language">语言</label>
+              <select id="localeSelect">
+                <option value="zh-CN">中文（简体）</option>
+                <option value="zh-TW">中文（繁體）</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+            <div class="control-row">
+              <label for="sideSelect" data-i18n="side">执方</label>
+              <select id="sideSelect">
+                <option value="red">红方</option>
+                <option value="black">黑方</option>
+              </select>
+            </div>
+            <div class="button-row">
+              <button id="newButton" type="button" data-i18n="newGame">新局</button>
+              <button id="undoButton" type="button" data-i18n="undo">悔棋</button>
+            </div>
+            <div class="button-row">
+              <button id="hintButton" type="button" data-i18n="hint">提示</button>
+              <button id="bestButton" type="button" data-i18n="best">最佳</button>
+            </div>
+          </section>
+
+          <section class="panel-block">
+            <h2 data-i18n="engine">引擎</h2>
+            <div id="engineInfo" class="meta-list"></div>
+          </section>
+
+          <section class="panel-block">
+            <h2 data-i18n="lastMove">上一手</h2>
+            <div id="lastMovePanel" class="stack muted">尚未走棋。</div>
+          </section>
+
+          <section class="panel-block">
+            <h2 data-i18n="reasoning">思路</h2>
+            <div id="reasoningPanel" class="stack muted">可查看最佳、提示，或直接走棋。</div>
+          </section>
+        </div>
       </section>
 
-      <aside class="side-panel">
-        <section class="controls" aria-label="对局控制" data-i18n-aria-label="controlsAria">
-          <div class="control-row">
-            <label for="localeSelect" data-i18n="language">语言</label>
-            <select id="localeSelect">
-              <option value="zh-CN">中文（简体）</option>
-              <option value="zh-TW">中文（繁體）</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-          <div class="control-row">
-            <label for="sideSelect" data-i18n="side">执方</label>
-            <select id="sideSelect">
-              <option value="red">红方</option>
-              <option value="black">黑方</option>
-            </select>
-          </div>
-          <div class="button-row">
-            <button id="newButton" type="button" data-i18n="newGame">新局</button>
-            <button id="undoButton" type="button" data-i18n="undo">悔棋</button>
-          </div>
-          <div class="button-row">
-            <button id="hintButton" type="button" data-i18n="hint">提示</button>
-            <button id="bestButton" type="button" data-i18n="best">最佳</button>
-          </div>
-        </section>
-
-        <section class="panel-block">
-          <h2 data-i18n="engine">引擎</h2>
-          <div id="engineInfo" class="meta-list"></div>
-        </section>
-
-        <section class="panel-block tree-panel">
+      <section class="panel-block tree-panel">
+        <div class="tree-panel-head">
           <h2 data-i18n="moveTree">变化树</h2>
-          <ol id="historyList" class="move-tree-list" role="tree"></ol>
-        </section>
-
-        <section class="panel-block">
-          <h2 data-i18n="lastMove">上一手</h2>
-          <div id="lastMovePanel" class="stack muted">尚未走棋。</div>
-        </section>
-
-        <section class="panel-block">
-          <h2 data-i18n="reasoning">思路</h2>
-          <div id="reasoningPanel" class="stack muted">可查看最佳、提示，或直接走棋。</div>
-        </section>
-      </aside>
+          <div class="tree-toolbar" aria-label="树视图控制">
+            <button id="treeFitButton" class="tree-tool-button" type="button" data-i18n="treeFit" data-i18n-title="treeFit" aria-label="适配">适配</button>
+            <button id="treeZoomOutButton" class="tree-tool-button" type="button" data-i18n-title="treeZoomOut" aria-label="缩小">−</button>
+            <button id="treeZoomInButton" class="tree-tool-button" type="button" data-i18n-title="treeZoomIn" aria-label="放大">+</button>
+            <button id="treeResetButton" class="tree-tool-button" type="button" data-i18n="treeReset" data-i18n-title="treeReset" aria-label="重置">重置</button>
+          </div>
+        </div>
+        <div id="treeViewport" class="tree-viewport">
+          <div id="historyList" class="move-tree-canvas" role="tree"></div>
+        </div>
+      </section>
     </main>
 
     <template id="pieceTemplate">

@@ -6,6 +6,13 @@ const DEFAULT_CLIENT_REQUEST_TIMEOUT_MS = 15 * 60 * 1000;
 const CLIENT_REQUEST_TIMEOUT_BUFFER_MS = 5000;
 const CLIENT_STATE_REFRESH_TIMEOUT_MS = 15000;
 const PENDING_STATUS_INTERVAL_MS = 1000;
+const TREE_NODE_WIDTH = 188;
+const TREE_NODE_HEIGHT = 96;
+const TREE_LEVEL_GAP = 96;
+const TREE_SIBLING_GAP = 34;
+const TREE_LAYOUT_PADDING = 44;
+const TREE_MIN_SCALE = 0.35;
+const TREE_MAX_SCALE = 1.8;
 
 const pieceNames = {
   "zh-CN": {
@@ -288,6 +295,10 @@ const zhTwTranslations = {
   generatedBranches: "新分支",
   analysisBranch: "分析分支",
   branchRank: "第 {rank} 選",
+  treeFit: "適配",
+  treeZoomIn: "放大",
+  treeZoomOut: "縮小",
+  treeReset: "重置",
   variationPreview: "預覽局面",
   askPrompt: "可查看最佳、提示，或直接走棋。",
   redToMove: "紅方走棋",
@@ -359,6 +370,10 @@ const zhCnTranslations = {
   generatedBranches: "新分支",
   analysisBranch: "分析分支",
   branchRank: "第 {rank} 选",
+  treeFit: "适配",
+  treeZoomIn: "放大",
+  treeZoomOut: "缩小",
+  treeReset: "重置",
   variationPreview: "预览局面",
   askPrompt: "可查看最佳着法、提示，或直接走棋。",
   redToMove: "红方走棋",
@@ -439,6 +454,10 @@ const translations = {
     generatedBranches: "new branches",
     analysisBranch: "analysis branch",
     branchRank: "line {rank}",
+    treeFit: "Fit",
+    treeZoomIn: "Zoom in",
+    treeZoomOut: "Zoom out",
+    treeReset: "Reset",
     variationPreview: "preview position",
     askPrompt: "Ask for Best, Hint, or make a move.",
     redToMove: "Red to move",
@@ -496,7 +515,12 @@ const elements = {
   engineInfo: document.querySelector("#engineInfo"),
   lastMovePanel: document.querySelector("#lastMovePanel"),
   reasoningPanel: document.querySelector("#reasoningPanel"),
-  historyList: document.querySelector("#historyList")
+  historyList: document.querySelector("#historyList"),
+  treeViewport: document.querySelector("#treeViewport"),
+  treeFitButton: document.querySelector("#treeFitButton"),
+  treeZoomInButton: document.querySelector("#treeZoomInButton"),
+  treeZoomOutButton: document.querySelector("#treeZoomOutButton"),
+  treeResetButton: document.querySelector("#treeResetButton")
 };
 
 const state = {
@@ -511,15 +535,33 @@ const state = {
   treeSelectedId: null,
   treeAnalysis: new Map(),
   treeAnalysisPendingId: null,
+  treeView: {
+    x: 24,
+    y: 24,
+    scale: 1,
+    layoutWidth: 0,
+    layoutHeight: 0,
+    userPositioned: false
+  },
   locale: loadLocale()
 };
 
 let pendingRenderTimer = null;
+let treeDrag = null;
 
 elements.newButton.addEventListener("click", () => newGame());
 elements.undoButton.addEventListener("click", () => undoMove());
 elements.hintButton.addEventListener("click", () => requestHint());
 elements.bestButton.addEventListener("click", () => requestBest());
+elements.treeFitButton.addEventListener("click", () => fitTreeView({ userInitiated: true }));
+elements.treeZoomInButton.addEventListener("click", () => zoomTreeView(1.16));
+elements.treeZoomOutButton.addEventListener("click", () => zoomTreeView(1 / 1.16));
+elements.treeResetButton.addEventListener("click", () => resetTreeView());
+elements.treeViewport.addEventListener("pointerdown", handleTreePointerDown);
+elements.treeViewport.addEventListener("pointermove", handleTreePointerMove);
+elements.treeViewport.addEventListener("pointerup", handleTreePointerUp);
+elements.treeViewport.addEventListener("pointercancel", handleTreePointerUp);
+elements.treeViewport.addEventListener("wheel", handleTreeWheel, { passive: false });
 elements.sideSelect.addEventListener("change", () => newGame());
 elements.localeSelect.addEventListener("change", () => {
   state.locale = normalizeLocale(elements.localeSelect.value);
@@ -538,6 +580,7 @@ async function newGame() {
   state.treeSelectedId = null;
   state.treeAnalysis.clear();
   state.treeAnalysisPendingId = null;
+  resetTreeView({ autoFit: true });
   await runRequest(async () => {
     const result = await api("/api/new", {
       side: elements.sideSelect.value
@@ -1119,13 +1162,29 @@ function renderAlternatives(alternatives) {
 function renderHistory() {
   const tree = buildMoveTree();
   if (!tree.length) {
-    elements.historyList.className = "move-tree-list muted";
-    elements.historyList.innerHTML = `<li class="move-tree-empty">${escapeHtml(t("treeEmpty"))}</li>`;
+    state.treeView.layoutWidth = 0;
+    state.treeView.layoutHeight = 0;
+    elements.historyList.className = "move-tree-canvas muted";
+    elements.historyList.style.width = "";
+    elements.historyList.style.height = "";
+    elements.historyList.innerHTML = `<div class="move-tree-empty">${escapeHtml(t("treeEmpty"))}</div>`;
+    applyTreeTransform();
     return;
   }
 
-  elements.historyList.className = "move-tree-list";
-  elements.historyList.innerHTML = tree.map(renderTreeNode).join("");
+  const layout = layoutMoveTree(tree);
+  state.treeView.layoutWidth = layout.width;
+  state.treeView.layoutHeight = layout.height;
+  elements.historyList.className = "move-tree-canvas";
+  elements.historyList.style.width = `${layout.width}px`;
+  elements.historyList.style.height = `${layout.height}px`;
+  elements.historyList.style.setProperty("--tree-node-width", `${TREE_NODE_WIDTH}px`);
+  elements.historyList.style.setProperty("--tree-node-height", `${TREE_NODE_HEIGHT}px`);
+  elements.historyList.innerHTML = [
+    renderTreeEdges(layout),
+    layout.edges.map(renderTreeEdgeLabel).join(""),
+    layout.nodes.map(renderTreeNode).join("")
+  ].join("");
   elements.historyList.querySelectorAll("[data-tree-node]").forEach((button) => {
     button.addEventListener("click", () => selectTreeNode(button.dataset.treeNode));
   });
@@ -1135,19 +1194,32 @@ function renderHistory() {
   elements.historyList.querySelectorAll("[data-tree-recompute]").forEach((button) => {
     button.addEventListener("click", () => recomputeTreeNode(button.dataset.treeRecompute));
   });
+  window.requestAnimationFrame(() => {
+    if (state.treeView.userPositioned) applyTreeTransform();
+    else fitTreeView();
+  });
 }
 
 function buildMoveTree() {
-  return (state.game?.history ?? []).map((move) => {
-    const node = {
+  const history = state.game?.history ?? [];
+  if (!history.length) return [];
+
+  const mainline = history.map((move) => ({
       id: mainlineNodeId(move.ply),
       kind: "main",
       move,
       children: []
-    };
-    node.children = treeAlternativesForMove(move, node.id).map(attachAnalyzedChildren);
-    return attachAnalyzedChildren(node);
+  }));
+
+  mainline.forEach((node, index) => {
+    const continuation = mainline[index + 1] ? [mainline[index + 1]] : [];
+    node.children = [
+      ...continuation,
+      ...treeAlternativesForMove(node.move, node.id)
+    ];
   });
+
+  return [attachAnalyzedChildren(mainline[0])];
 }
 
 function treeAlternativesForMove(move, parentId) {
@@ -1182,6 +1254,7 @@ function treeAlternativesForMove(move, parentId) {
 
 function attachAnalyzedChildren(node) {
   const analysis = state.treeAnalysis.get(node.id) ?? null;
+  const existingChildren = (node.children ?? []).map(attachAnalyzedChildren);
   const generated = (analysis?.branches ?? []).map((branch, index) => attachAnalyzedChildren({
     id: analysisNodeId(node.id, branch, index),
     kind: "analysis",
@@ -1193,7 +1266,7 @@ function attachAnalyzedChildren(node) {
     ...node,
     analysis,
     children: [
-      ...(node.children ?? []),
+      ...existingChildren,
       ...generated
     ]
   };
@@ -1208,28 +1281,96 @@ function sanitizeTreeId(value) {
   return String(value ?? "node").replace(/[^a-zA-Z0-9_-]+/g, "_");
 }
 
-function renderTreeNode(node) {
+function layoutMoveTree(roots) {
+  let leafCursor = 0;
+  const nodes = [];
+  const edges = [];
+
+  function place(node, depth) {
+    const hasChildren = (node.children ?? []).length > 0;
+    const expanded = !state.treeCollapsed.has(node.id);
+    const visibleChildren = hasChildren && expanded ? node.children : [];
+    const childItems = visibleChildren.map((child) => place(child, depth + 1));
+    const y = childItems.length
+      ? (childItems[0].y + childItems.at(-1).y) / 2
+      : TREE_LAYOUT_PADDING + allocateLeafY();
+    const item = {
+      node,
+      x: TREE_LAYOUT_PADDING + depth * (TREE_NODE_WIDTH + TREE_LEVEL_GAP),
+      y,
+      depth,
+      hasChildren,
+      expanded
+    };
+
+    nodes.push(item);
+    childItems.forEach((childItem) => {
+      edges.push({
+        from: item,
+        to: childItem,
+        child: childItem.node
+      });
+    });
+    return item;
+  }
+
+  function allocateLeafY() {
+    const y = leafCursor;
+    leafCursor += TREE_NODE_HEIGHT + TREE_SIBLING_GAP;
+    return y;
+  }
+
+  roots.forEach((root) => place(root, 0));
+  const width = Math.max(...nodes.map((item) => item.x + TREE_NODE_WIDTH), 0) + TREE_LAYOUT_PADDING;
+  const height = Math.max(...nodes.map((item) => item.y + TREE_NODE_HEIGHT), 0) + TREE_LAYOUT_PADDING;
+
+  return {
+    nodes,
+    edges,
+    width,
+    height
+  };
+}
+
+function renderTreeEdges(layout) {
+  const paths = layout.edges.map((edge) => {
+    const x1 = edge.from.x + TREE_NODE_WIDTH;
+    const y1 = edge.from.y + TREE_NODE_HEIGHT / 2;
+    const x2 = edge.to.x;
+    const y2 = edge.to.y + TREE_NODE_HEIGHT / 2;
+    const handle = Math.max(44, (x2 - x1) * 0.46);
+    const d = `M${x1} ${y1} C${x1 + handle} ${y1} ${x2 - handle} ${y2} ${x2} ${y2}`;
+    return `<path class="move-tree-edge ${escapeHtml(edge.child.kind)}" d="${d}"></path>`;
+  });
+  return `<svg class="move-tree-edges" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}" aria-hidden="true">${paths.join("")}</svg>`;
+}
+
+function renderTreeEdgeLabel(edge) {
+  const x1 = edge.from.x + TREE_NODE_WIDTH;
+  const y1 = edge.from.y + TREE_NODE_HEIGHT / 2;
+  const x2 = edge.to.x;
+  const y2 = edge.to.y + TREE_NODE_HEIGHT / 2;
+  const labelX = x1 + (x2 - x1) * 0.5;
+  const labelY = y1 + (y2 - y1) * 0.5 - 14;
+  return `<span class="move-tree-edge-label ${escapeHtml(edge.child.kind)}" style="left:${labelX}px;top:${labelY}px">${escapeHtml(treeNodeMoveText(edge.child))}</span>`;
+}
+
+function renderTreeNode(item) {
+  const node = item.node;
   const selected = state.treeSelectedId === node.id;
   const current = node.kind === "main" && node.id === latestMainlineNodeId();
-  const hasChildren = (node.children ?? []).length > 0;
-  const expanded = !state.treeCollapsed.has(node.id);
-  const rowClasses = [
-    node.kind === "main" ? "move-tree-item" : "move-tree-branch",
+  const cardClasses = [
+    "move-tree-node-card",
     `move-tree-${node.kind}`,
     selected ? "selected" : "",
     current ? "current" : ""
   ].filter(Boolean).join(" ");
-  const toggle = hasChildren
-    ? `<button class="move-tree-toggle" type="button" data-tree-toggle="${escapeHtml(node.id)}" aria-label="${escapeHtml(expanded ? t("fold") : t("expand"))}">${expanded ? "−" : "+"}</button>`
-    : `<span class="move-tree-toggle-spacer" aria-hidden="true"></span>`;
-  const branches = hasChildren && expanded
-    ? `<ol class="move-tree-branches">${node.children.map(renderTreeNode).join("")}</ol>`
-    : "";
+  const ariaExpanded = item.hasChildren ? ` aria-expanded="${item.expanded ? "true" : "false"}"` : "";
 
-  return `<li class="${rowClasses}">${[
-    `<div class="move-tree-row">${toggle}${renderTreeNodeButton(node, selected, current, hasChildren, expanded)}${renderTreeRecomputeButton(node)}</div>`,
-    branches
-  ].join("")}</li>`;
+  return `<div class="${cardClasses}" style="--tree-x:${item.x}px;--tree-y:${item.y}px" role="treeitem" aria-selected="${selected ? "true" : "false"}"${ariaExpanded}>${[
+    renderTreeNodeButton(node, selected, current, item.hasChildren, item.expanded),
+    renderTreeNodeActions(node, item)
+  ].join("")}</div>`;
 }
 
 function renderTreeNodeButton(node, selected, current, hasChildren, expanded) {
@@ -1249,6 +1390,14 @@ function renderTreeNodeButton(node, selected, current, hasChildren, expanded) {
       `<span class="move-tree-meta">${escapeHtml(treeNodeSummaryText(node))}${tags}</span>`
     ].join("") + `</span>`
   ].join("")}</button>`;
+}
+
+function renderTreeNodeActions(node, item) {
+  const toggle = item.hasChildren
+    ? `<button class="move-tree-toggle" type="button" data-tree-toggle="${escapeHtml(node.id)}" title="${escapeHtml(item.expanded ? t("fold") : t("expand"))}" aria-label="${escapeHtml(item.expanded ? t("fold") : t("expand"))}">${item.expanded ? "−" : "+"}</button>`
+    : "";
+  const className = item.hasChildren ? "move-tree-node-actions" : "move-tree-node-actions single";
+  return `<span class="${className}">${toggle}${renderTreeRecomputeButton(node)}</span>`;
 }
 
 function renderTreeRecomputeButton(node) {
@@ -1288,6 +1437,12 @@ function treeNodeMoveHtml(node) {
   if (node.kind === "main") return formatMoveHtml(node.move.notation, node.move.zhNotation);
   if (node.kind === "analysis") return formatMoveHtml(node.branch.move, node.branch.zhMove);
   return formatMoveHtml(node.alternative.move, node.alternative.zhMove);
+}
+
+function treeNodeMoveText(node) {
+  if (node.kind === "main") return moveText(node.move.notation, node.move.zhNotation);
+  if (node.kind === "analysis") return moveText(node.branch.move, node.branch.zhMove);
+  return moveText(node.alternative.move, node.alternative.zhMove);
 }
 
 function treeNodeSummaryText(node) {
@@ -1418,6 +1573,104 @@ function toggleTreeNode(id) {
   if (state.treeCollapsed.has(id)) state.treeCollapsed.delete(id);
   else state.treeCollapsed.add(id);
   renderHistory();
+}
+
+function applyTreeTransform() {
+  elements.historyList.style.transform = `translate(${state.treeView.x}px, ${state.treeView.y}px) scale(${state.treeView.scale})`;
+}
+
+function fitTreeView(options = {}) {
+  const viewport = elements.treeViewport;
+  const width = state.treeView.layoutWidth;
+  const height = state.treeView.layoutHeight;
+  if (!viewport || !width || !height) {
+    applyTreeTransform();
+    return;
+  }
+
+  const rect = viewport.getBoundingClientRect();
+  if (!rect.width || !rect.height) {
+    applyTreeTransform();
+    return;
+  }
+
+  const padding = 34;
+  const fittedScale = Math.min(
+    (rect.width - padding * 2) / width,
+    (rect.height - padding * 2) / height
+  );
+  const scale = clamp(fittedScale, TREE_MIN_SCALE, Math.min(1.08, TREE_MAX_SCALE));
+  state.treeView.scale = scale;
+  state.treeView.x = Math.round((rect.width - width * scale) / 2);
+  state.treeView.y = Math.round((rect.height - height * scale) / 2);
+  if (options.userInitiated) state.treeView.userPositioned = true;
+  applyTreeTransform();
+}
+
+function zoomTreeView(factor, origin = null) {
+  const viewport = elements.treeViewport;
+  if (!viewport) return;
+
+  const rect = viewport.getBoundingClientRect();
+  const originX = origin?.x ?? rect.width / 2;
+  const originY = origin?.y ?? rect.height / 2;
+  const beforeX = (originX - state.treeView.x) / state.treeView.scale;
+  const beforeY = (originY - state.treeView.y) / state.treeView.scale;
+  const nextScale = clamp(state.treeView.scale * factor, TREE_MIN_SCALE, TREE_MAX_SCALE);
+
+  state.treeView.scale = nextScale;
+  state.treeView.x = originX - beforeX * nextScale;
+  state.treeView.y = originY - beforeY * nextScale;
+  state.treeView.userPositioned = true;
+  applyTreeTransform();
+}
+
+function resetTreeView(options = {}) {
+  state.treeView.x = 24;
+  state.treeView.y = 24;
+  state.treeView.scale = 1;
+  state.treeView.userPositioned = Boolean(options.autoFit) ? false : true;
+  applyTreeTransform();
+}
+
+function handleTreePointerDown(event) {
+  if (event.button !== 0 || event.target.closest("button")) return;
+  treeDrag = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    viewX: state.treeView.x,
+    viewY: state.treeView.y
+  };
+  state.treeView.userPositioned = true;
+  elements.treeViewport.classList.add("dragging");
+  elements.treeViewport.setPointerCapture(event.pointerId);
+}
+
+function handleTreePointerMove(event) {
+  if (!treeDrag || treeDrag.pointerId !== event.pointerId) return;
+  state.treeView.x = treeDrag.viewX + event.clientX - treeDrag.startX;
+  state.treeView.y = treeDrag.viewY + event.clientY - treeDrag.startY;
+  applyTreeTransform();
+}
+
+function handleTreePointerUp(event) {
+  if (!treeDrag || treeDrag.pointerId !== event.pointerId) return;
+  treeDrag = null;
+  elements.treeViewport.classList.remove("dragging");
+  if (elements.treeViewport.hasPointerCapture(event.pointerId)) {
+    elements.treeViewport.releasePointerCapture(event.pointerId);
+  }
+}
+
+function handleTreeWheel(event) {
+  event.preventDefault();
+  const rect = elements.treeViewport.getBoundingClientRect();
+  const factor = event.deltaY > 0 ? 0.9 : 1.1;
+  zoomTreeView(factor, {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  });
 }
 
 function syncTreeSelection() {
@@ -1611,6 +1864,11 @@ function applyLocale() {
     const key = element.dataset.i18nAriaLabel;
     element.setAttribute("aria-label", t(key));
   });
+  document.querySelectorAll("[data-i18n-title]").forEach((element) => {
+    const key = element.dataset.i18nTitle;
+    element.setAttribute("title", t(key));
+    element.setAttribute("aria-label", t(key));
+  });
   setOptionText(elements.localeSelect, "zh-CN", t("localeSimplified"));
   setOptionText(elements.localeSelect, "zh-TW", t("localeTraditional"));
   setOptionText(elements.localeSelect, "en", t("localeEnglish"));
@@ -1654,6 +1912,10 @@ function formatDuration(ms) {
     return minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`;
   }
   return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function t(key) {
