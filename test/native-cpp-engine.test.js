@@ -2378,6 +2378,21 @@ test("local C++ engine rewards crossed pawn attacks on valuable pieces", (t) => 
   assert.ok(scores[0] - scores[1] >= 30, scores.join(", "));
 });
 
+test("local C++ engine rewards pressure on loose valuable pieces", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const scores = staticEvalScores(build.output, [
+    "4k4/9/9/9/4P4/5c3/3N5/9/9/4K4 r",
+    "4k4/9/9/9/4P4/7c1/3N5/9/9/4K4 r"
+  ]);
+
+  assert.ok(scores[0] - scores[1] >= 60, JSON.stringify(scores));
+});
+
 test("local C++ hybrid backend solves the starter benchmark suite", async (t) => {
   const build = buildNativeEngine();
   if (build.skip) {

@@ -4315,6 +4315,47 @@ int palaceGuardPressureBonus(const Board& board, int side, int enemyKing, int to
   return std::min(120, bonus);
 }
 
+int loosePiecePressureBonus(const Board& board, int side, int totalPieceCount) {
+  if (totalPieceCount > 20) return 0;
+
+  const int enemy = -side;
+  const Move noMove{};
+  const auto& squares = pieceSquares(board, enemy);
+  const int count = pieceCount(board, enemy);
+  int bonus = 0;
+
+  for (int listIndex = 0; listIndex < count; listIndex += 1) {
+    const int square = squares[listIndex];
+    const int target = trackedPieceAtSquare(board, enemy, square);
+    const int type = pieceCodeType(target);
+    if (type != Rook && type != Horse && type != Cannon) continue;
+
+    const int attacker = leastAttackerValueAfterMove(board, noMove, side, square);
+    if (attacker >= kInf) continue;
+
+    const int defender = leastAttackerValueAfterMove(board, noMove, enemy, square);
+    const int targetValue = pieceCodeValue(target);
+    int targetBonus = 0;
+    if (defender >= kInf) {
+      targetBonus += 18 + std::min(34, targetValue / 18);
+    } else if (attacker + 80 < targetValue && defender > attacker) {
+      targetBonus += 10 + std::min(24, targetValue / 30);
+    } else if (attacker <= pieceTypeValue(Pawn) && targetValue >= pieceTypeValue(Horse)) {
+      targetBonus += 12;
+    }
+
+    if (targetBonus == 0) continue;
+    if (type == Rook) targetBonus += 8;
+    else if (type == Cannon) targetBonus += 5;
+    else targetBonus += 3;
+    targetBonus += fileCentrality(fileOf(square));
+    if (crossedRiver(side, rankOf(square))) targetBonus += 4;
+    bonus += targetBonus;
+  }
+
+  return std::min(120, bonus);
+}
+
 bool friendlyPawnAt(const Board& board, int side, int file, int rank) {
   return inside(file, rank) && board.cells[indexOf(file, rank)] == side * Pawn;
 }
@@ -4484,6 +4525,8 @@ int evaluateRed(const Board& board) {
   score -= lineBatteryPressureBonus(board, kBlack, redKing, totalPieceCount);
   score += palaceGuardPressureBonus(board, kRed, blackKing, totalPieceCount);
   score -= palaceGuardPressureBonus(board, kBlack, redKing, totalPieceCount);
+  score += loosePiecePressureBonus(board, kRed, totalPieceCount);
+  score -= loosePiecePressureBonus(board, kBlack, totalPieceCount);
 
   score -= palaceShapePenalty(board, kRed, redKing);
   score += palaceShapePenalty(board, kBlack, blackKing);
