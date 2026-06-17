@@ -12,6 +12,7 @@ let currentProtocol = "ucci";
 let pendingStopResponse = null;
 let mockWaitForStopOnceUsed = false;
 let mockMemoryAge = 0;
+let mockSearchCount = 0;
 const appliedOptions = [];
 
 function write(line) {
@@ -38,6 +39,7 @@ rl.on("line", (line) => {
     currentPosition = "";
     pendingStopResponse = null;
     mockMemoryAge = 0;
+    mockSearchCount = 0;
   } else if (command === "setoption") {
     appliedOptions.push(trimmed);
     const match = trimmed.match(/\bname\s+MultiPV\s+value\s+(\d+)/i);
@@ -45,6 +47,7 @@ rl.on("line", (line) => {
   } else if (command === "position") {
     currentPosition = trimmed;
   } else if (command === "go") {
+    mockSearchCount += 1;
     if (pendingStopResponse) {
       write("info string still waiting for stop");
       return;
@@ -60,11 +63,11 @@ rl.on("line", (line) => {
 
     const respond = () => {
       if (hasOption("MockMateWdl")) {
-        const move = /\sb(?:\s|$)/.test(currentPosition) ? "h0g2" : "h9g7";
-        const reply = /\sb(?:\s|$)/.test(currentPosition) ? "h9g7" : "h0g2";
+        const move = currentPositionSideIsBlack() ? "h0g2" : "h9g7";
+        const reply = currentPositionSideIsBlack() ? "h9g7" : "h0g2";
         write(`info depth ${depth} score mate 2 wdl 980 20 0 nodes 456 pv ${nativeMove(move)} ${nativeMove(reply)}`);
         write(`bestmove ${nativeMove(move)}`);
-      } else if (hasOption("MockRejectHeuristic") && /\sb(?:\s|$)/.test(currentPosition)) {
+      } else if (hasOption("MockRejectHeuristic") && currentPositionSideIsBlack()) {
         write(`info depth ${depth} score cp 240 nodes 88 pv ${nativeMove("g2e3")}`);
         write(`bestmove ${nativeMove("g2e3")}`);
       } else if (hasOption("MockRejectHeuristic")) {
@@ -76,7 +79,7 @@ rl.on("line", (line) => {
       } else if (isRookTacticAfterQuietMove()) {
         write(`info depth ${depth} score cp 0 nodes 99 pv ${nativeMove("e2d2")}`);
         write(`bestmove ${nativeMove("e2d2")}`);
-      } else if (/\sb(?:\s|$)/.test(currentPosition)) {
+      } else if (currentPositionSideIsBlack()) {
         write(`info depth ${depth} score cp 17 nodes 77 pv ${nativeMove("h0g2")}`);
         write(`bestmove ${nativeMove("h0g2")}`);
       } else if (/\bwtime\s+\d+/i.test(trimmed)) {
@@ -101,6 +104,17 @@ rl.on("line", (line) => {
         write(`info multipv 1 depth ${depth} score cp -2 nodes 123 opref 1 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);
         write(`info multipv 2 depth ${depth} score cp 38 nodes 123 opref 1 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
         write(`bestmove ${nativeMove("h7e7")}`);
+      } else if (hasOption("MockRequirePlayedMoveReplay")) {
+        if (mockSearchCount === 1) {
+          write(`info depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h0g2")}`);
+          write(`bestmove ${nativeMove("h0g2")}`);
+        } else if (hasReplayedMoves(["h7e7", "b0c2"])) {
+          write(`info depth ${depth} score cp 17 nodes 77 pv ${nativeMove("h9g7")}`);
+          write(`bestmove ${nativeMove("h9g7")}`);
+        } else {
+          write(`info depth ${depth} score cp 999 nodes 1 pv ${nativeMove("i0h0")}`);
+          write(`bestmove ${nativeMove("i0h0")}`);
+        }
       } else if (hasOption("MockTie")) {
         write(`info multipv 1 depth ${depth} score cp 42 nodes 123 pv ${nativeMove("h9g7")} ${nativeMove("h0g2")}`);
         write(`info multipv 2 depth ${depth} score cp 38 nodes 123 pv ${nativeMove("h7e7")} ${nativeMove("h0g2")}`);
@@ -141,6 +155,20 @@ rl.on("line", (line) => {
 
 function hasOption(name) {
   return appliedOptions.some((option) => option.includes(`name ${name}`));
+}
+
+function hasReplayedMoves(moves) {
+  return currentPosition.includes(`moves ${moves.map(nativeMove).join(" ")}`);
+}
+
+function currentPositionSideIsBlack() {
+  const [positionText, movesText = ""] = currentPosition.split(/\s+moves\s+/i);
+  const tokens = positionText.split(/\s+/);
+  const fenIndex = tokens.findIndex((token) => token.toLowerCase() === "fen");
+  const sideToken = tokens[fenIndex + 2]?.toLowerCase();
+  const startsBlack = sideToken === "b" || sideToken === "black";
+  const moveCount = movesText.trim() ? movesText.trim().split(/\s+/).length : 0;
+  return moveCount % 2 === 0 ? startsBlack : !startsBlack;
 }
 
 function isRookTacticPosition() {

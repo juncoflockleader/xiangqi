@@ -1194,6 +1194,42 @@ test("UCCI backend reviews moves with native search scores", async () => {
   }
 });
 
+test("UCCI backend replays the reviewed move when scoring the played continuation", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockRequirePlayedMoveReplay: true
+    }
+  });
+
+  try {
+    const initial = createInitialPosition();
+    const openingMove = generateLegalMoves(initial, initial.turn)
+      .find((move) => move.notation === "h7-e7");
+    const position = makeMove(initial, openingMove);
+
+    const review = await backend.reviewMove(position, "b0-c2", {
+      depth: 2,
+      timeLimitMs: 500,
+      lines: 2,
+      initialPosition: initial,
+      moveHistory: ["h7-e7"]
+    });
+
+    assert.equal(review.source, "native-ucci");
+    assert.equal(review.move.notation, "b0-c2");
+    assert.equal(review.bestMove.notation, "h0-g2");
+    assert.deepEqual(review.principalVariation, ["b0-c2", "h9-g7"]);
+    assert.equal(review.playedScore, -17);
+  } finally {
+    await backend.close();
+  }
+});
+
 test("UCCI backend reviews games with native move reviews", async () => {
   const backend = createUcciEngineBackend({
     command: process.execPath,

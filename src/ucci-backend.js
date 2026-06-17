@@ -645,7 +645,7 @@ async function nativeReviewMove(client, position, moveOrNotation, options) {
 
 async function analyzePlayedNativeMove(client, position, move, options) {
   const after = makeMove(position, move);
-  const reply = await nativeSearch(client, after, options);
+  const reply = await nativeSearch(client, after, optionsWithPlayedMoveReplay(options, move));
   const annotated = annotateMove(position, move);
 
   return {
@@ -656,6 +656,18 @@ async function analyzePlayedNativeMove(client, position, move, options) {
     principalVariation: [
       annotated,
       ...reply.principalVariation
+    ]
+  };
+}
+
+function optionsWithPlayedMoveReplay(options, move) {
+  if (!options.initialPosition) return options;
+
+  return {
+    ...options,
+    moveHistory: [
+      ...normalizeMoveHistory(options.moveHistory ?? options.historyMoves),
+      move.notation ?? moveToNotation(move)
     ]
   };
 }
