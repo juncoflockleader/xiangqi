@@ -1867,6 +1867,21 @@ test("local C++ engine values clear central passed pawns", async (t) => {
   }
 });
 
+test("local C++ engine clears own blockers from passed pawn lanes", async (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const scores = forcedSearchScores(build.output, "4k4/9/2R6/9/2P6/9/9/9/9/3K5 r", [
+    "c7d7",
+    "c7c6"
+  ]);
+
+  assert.ok(scores[0] >= scores[1] + 45, JSON.stringify(scores));
+});
+
 test("local C++ engine extends late-game pawn pressure at the root", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {

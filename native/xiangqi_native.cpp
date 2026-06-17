@@ -4156,8 +4156,14 @@ int pawnStructureBonus(const Board& board, int square, int side, int file, int r
   bonus += std::max(0, progress - 4) * 9;
   if (file >= 3 && file <= 5) bonus += 10;
 
-  const bool laneBlocked = rayBlocker(board, square, side == kRed ? 0 : 2) != 0;
-  if (!laneBlocked) bonus += 16;
+  const int forwardBlocker = rayBlocker(board, square, side == kRed ? 0 : 2);
+  if (forwardBlocker == 0) {
+    bonus += 16;
+  } else if (pieceCodeSide(forwardBlocker) == side) {
+    bonus -= 12;
+  } else {
+    bonus += std::min(18, pieceCodeValue(forwardBlocker) / 40);
+  }
 
   if (palaceContains(enemy, file, rank)) {
     bonus += 36;
