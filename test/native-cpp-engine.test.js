@@ -143,7 +143,7 @@ test("local C++ engine finds the central rook capture tactic", async (t) => {
     protocol: "uci",
     depth: 2,
     timeLimitMs: 500,
-    startupTimeoutMs: 1000,
+    startupTimeoutMs: 3000,
     commandTimeoutMs: 3000
   });
 

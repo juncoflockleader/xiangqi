@@ -452,6 +452,7 @@ constexpr std::array<std::array<bool, kSquares>, 2> makePalaceLookup() {
 }
 
 using SquarePairLookup = std::array<std::array<uint8_t, kSquares>, kSquares>;
+using SquarePairIndexLookup = std::array<std::array<int8_t, kSquares>, kSquares>;
 
 constexpr SquarePairLookup makeSameLineLookup() {
   SquarePairLookup values{};
@@ -488,18 +489,22 @@ constexpr SquarePairLookup makeHorseLegBlockerLookup() {
   return values;
 }
 
-constexpr SquarePairLookup makeHorseGeometryLookup() {
-  SquarePairLookup values{};
+constexpr SquarePairIndexLookup makeHorseLegSquareLookup() {
+  SquarePairIndexLookup values{};
+  for (auto& row : values) row.fill(-1);
+  constexpr int deltas[kMaxHorseTargets][2] = {{1, 2}, {2, 1}, {2, -1}, {1, -2}, {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2}};
   for (int square = 0; square < kSquares; square += 1) {
     const int file = square % kFiles;
     const int rank = square / kFiles;
-    for (int target = 0; target < kSquares; target += 1) {
-      const int targetFile = target % kFiles;
-      const int targetRank = target / kFiles;
-      const int fileDelta = file > targetFile ? file - targetFile : targetFile - file;
-      const int rankDelta = rank > targetRank ? rank - targetRank : targetRank - rank;
+    for (const auto& delta : deltas) {
+      const int targetFile = file + delta[0];
+      const int targetRank = rank + delta[1];
+      if (targetFile < 0 || targetFile >= kFiles || targetRank < 0 || targetRank >= kRanks) continue;
+      const int legFile = (delta[0] == 2 || delta[0] == -2) ? file + (delta[0] > 0 ? 1 : -1) : file;
+      const int legRank = (delta[1] == 2 || delta[1] == -2) ? rank + (delta[1] > 0 ? 1 : -1) : rank;
+      const int target = targetRank * kFiles + targetFile;
       values[static_cast<std::size_t>(square)][static_cast<std::size_t>(target)] =
-          (fileDelta == 1 && rankDelta == 2) || (fileDelta == 2 && rankDelta == 1);
+          static_cast<int8_t>(legRank * kFiles + legFile);
     }
   }
   return values;
@@ -510,7 +515,7 @@ constexpr auto kRankBySquare = makeRankLookup();
 constexpr auto kFileCentrality = makeFileCentralityLookup();
 constexpr auto kSameLineBySquare = makeSameLineLookup();
 constexpr auto kHorseLegBlockerByTarget = makeHorseLegBlockerLookup();
-constexpr auto kHorseGeometryBySquare = makeHorseGeometryLookup();
+constexpr auto kHorseLegSquareBySourceTarget = makeHorseLegSquareLookup();
 constexpr auto kRaySquares = makeRaySquareLookup();
 constexpr auto kRayLengths = makeRayLengthLookup();
 constexpr auto kOrthogonalDirectionBetween = makeOrthogonalDirectionLookup();
@@ -2152,7 +2157,7 @@ bool maybeMoveCanGiveCheck(const Move& move, int kingSquare) {
   if (kHorseLegBlockerByTarget[from][king]) return true;
 
   const int type = typeOf(move.piece);
-  if (type == Horse && kHorseGeometryBySquare[to][king]) return true;
+  if (type == Horse && kHorseLegSquareBySourceTarget[to][king] >= 0) return true;
 
   return false;
 }
@@ -2163,19 +2168,18 @@ int blockersBetweenAfterMove(const Board& board, const Move& move, int from, int
 bool movedPieceDirectlyChecksAfterMove(const Board& board, const Move& move, int enemyKing, int movingPiece) {
   const int type = movingPiece > 0 ? movingPiece : -movingPiece;
   const int side = movingPiece > 0 ? kRed : kBlack;
+
+  if (type == Horse) {
+    const int legSquare = kHorseLegSquareBySourceTarget[static_cast<std::size_t>(move.to)][static_cast<std::size_t>(enemyKing)];
+    return legSquare >= 0 && pieceAfterMove<true>(board, move, legSquare, movingPiece) == 0;
+  }
+
   const int toFile = fileOf(move.to);
   const int toRank = rankOf(move.to);
   const int kingFile = fileOf(enemyKing);
   const int kingRank = rankOf(enemyKing);
   const int dx = kingFile - toFile;
   const int dy = kingRank - toRank;
-
-  if (type == Horse) {
-    if (!((std::abs(dx) == 1 && std::abs(dy) == 2) || (std::abs(dx) == 2 && std::abs(dy) == 1))) return false;
-    const int legFile = std::abs(dx) == 2 ? toFile + (dx > 0 ? 1 : -1) : toFile;
-    const int legRank = std::abs(dy) == 2 ? toRank + (dy > 0 ? 1 : -1) : toRank;
-    return pieceAfterMove<true>(board, move, indexOf(legFile, legRank), movingPiece) == 0;
-  }
 
   if (type == Pawn) {
     if (dx == 0 && dy == forwardDelta(side)) return true;
@@ -2419,6 +2423,22 @@ bool pieceAttacksSquareAfterMove(
   if (from == target || piece == 0) return false;
   const int side = piece > 0 ? kRed : kBlack;
   const int type = piece > 0 ? piece : -piece;
+
+  if (type == Horse) {
+    const int legSquare = kHorseLegSquareBySourceTarget[static_cast<std::size_t>(from)][static_cast<std::size_t>(target)];
+    return legSquare >= 0 && pieceAfterMove<hasMove>(board, move, legSquare, movingPiece) == 0;
+  }
+
+  if (type == Rook) {
+    return kSameLineBySquare[static_cast<std::size_t>(from)][static_cast<std::size_t>(target)]
+        && blockersBetweenAfterMove<hasMove>(board, move, from, target, movingPiece) == 0;
+  }
+
+  if (type == Cannon) {
+    return kSameLineBySquare[static_cast<std::size_t>(from)][static_cast<std::size_t>(target)]
+        && blockersBetweenAfterMove<hasMove>(board, move, from, target, movingPiece) == 1;
+  }
+
   const int fromFile = fileOf(from);
   const int fromRank = rankOf(from);
   const int targetFile = fileOf(target);
@@ -2439,18 +2459,6 @@ bool pieceAttacksSquareAfterMove(
   if (type == Elephant) {
     if (std::abs(dx) != 2 || std::abs(dy) != 2 || !ownRiverSide(side, targetRank)) return false;
     return pieceAfterMove<hasMove>(board, move, indexOf(fromFile + dx / 2, fromRank + dy / 2), movingPiece) == 0;
-  }
-  if (type == Horse) {
-    if (!((std::abs(dx) == 1 && std::abs(dy) == 2) || (std::abs(dx) == 2 && std::abs(dy) == 1))) return false;
-    const int legFile = std::abs(dx) == 2 ? fromFile + (dx > 0 ? 1 : -1) : fromFile;
-    const int legRank = std::abs(dy) == 2 ? fromRank + (dy > 0 ? 1 : -1) : fromRank;
-    return pieceAfterMove<hasMove>(board, move, indexOf(legFile, legRank), movingPiece) == 0;
-  }
-  if (type == Rook) {
-    return (dx == 0 || dy == 0) && blockersBetweenAfterMove<hasMove>(board, move, from, target, movingPiece) == 0;
-  }
-  if (type == Cannon) {
-    return (dx == 0 || dy == 0) && blockersBetweenAfterMove<hasMove>(board, move, from, target, movingPiece) == 1;
   }
   if (type == Pawn) {
     if (dx == 0 && dy == forwardDelta(side)) return true;
