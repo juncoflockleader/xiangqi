@@ -559,7 +559,7 @@ test("local C++ timed opening priors guide pure native central cannon branches",
     assert.equal(moveToNotation(earlyPawnChallengeResult.bestMove), "b9-a7");
     assert.equal(moveToNotation(refreshedPawnPushContinuationResult.bestMove), "h9-g7");
     assert.equal(moveToNotation(shiftedLeftPawnResult.bestMove), "g0-e2");
-    assert.equal(moveToNotation(earlyPawnBlackCannonSideResult.bestMove), "h2-g2");
+    assert.equal(moveToNotation(earlyPawnBlackCannonSideResult.bestMove), "c3-c4");
     assert.equal(moveToNotation(centralCannonEarlyPawnBlackResult.bestMove), "i0-h0");
     assert.equal(moveToNotation(earlyPawnRedElephantBlackResult.bestMove), "h0-i2");
     assert.equal(moveToNotation(earlyPawnShiftedCannonBlackResult.bestMove), "c0-e2");

@@ -5647,8 +5647,8 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t earlyPawnBlackCannonSide = fenPositionKey(
       "rheakaehr/9/1c5c1/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR b");
   if (root.key == earlyPawnBlackCannonSide) {
-    if (uci == "h7g7") return 5000;  // h2-g2: Pikafish's compact cannon sidestep.
-    if (uci == "c6c5") return 4700;  // c3-c4: central pawn challenge.
+    if (uci == "c6c5") return 5000;  // c3-c4: refreshed Pikafish central pawn challenge.
+    if (uci == "h7g7") return 4700;  // h2-g2: compact cannon sidestep remains playable.
     if (uci == "b9c7") return 4500;  // b0-c2: develop the left horse.
     return 0;
   }
