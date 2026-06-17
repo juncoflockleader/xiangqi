@@ -34,8 +34,8 @@ const DEFAULT_PORT = 5175;
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_STARTUP_TIMEOUT_MS = 5000;
 const DEFAULT_COMMAND_TIMEOUT_MS = 30000;
-const COMMAND_TIMEOUT_DEPTH_MS = 30000;
-const COMMAND_TIMEOUT_TIME_MULTIPLIER = 12;
+const COMMAND_TIMEOUT_DEPTH_MS = 45000;
+const COMMAND_TIMEOUT_TIME_MULTIPLIER = 20;
 const PLAYER_REVIEW_DEPTH_CAP = 3;
 const PLAYER_REVIEW_TIME_CAP_MS = 1000;
 const JSON_LIMIT_BYTES = 64 * 1024;
@@ -179,7 +179,7 @@ export function resolveWebServerCommandTimeoutMs(options = {}, depth = numberOrN
   const explicit = numberOrNull(options.commandTimeoutMs);
   if (explicit) return explicit;
 
-  const depthBudget = depth ? depth * COMMAND_TIMEOUT_DEPTH_MS : 0;
+  const depthBudget = depth && depth > 1 ? depth * COMMAND_TIMEOUT_DEPTH_MS : 0;
   const timeBudget = timeLimitMs ? timeLimitMs * COMMAND_TIMEOUT_TIME_MULTIPLIER : 0;
   return Math.max(DEFAULT_COMMAND_TIMEOUT_MS, depthBudget, timeBudget);
 }

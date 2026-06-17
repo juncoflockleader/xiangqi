@@ -299,6 +299,8 @@ const zhTwTranslations = {
   noDecision: "尚無決策。",
   engineSelected: "引擎已選擇一手。",
   moveReviewed: "已覆盤此手。",
+  thinking: "引擎思考中...",
+  thinkingShort: "思考中",
   legalMoves: "合法著法",
   legalMovesSuffix: "的合法著法",
   candidate: "候選",
@@ -360,6 +362,8 @@ const zhCnTranslations = {
   noDecision: "尚无决策。",
   engineSelected: "引擎已选择一手。",
   moveReviewed: "已复盘此手。",
+  thinking: "引擎思考中...",
+  thinkingShort: "思考中",
   legalMoves: "合法着法",
   legalMovesSuffix: "的合法着法",
   candidate: "候选",
@@ -430,6 +434,8 @@ const translations = {
     noDecision: "No decision yet.",
     engineSelected: "Engine selected a move.",
     moveReviewed: "Move reviewed.",
+    thinking: "Engine thinking...",
+    thinkingShort: "Thinking",
     legalMoves: "Legal moves",
     legalMovesSuffix: " legal moves",
     candidate: "candidate",
@@ -556,6 +562,7 @@ async function requestBest() {
 async function runRequest(task) {
   if (state.pending) return;
   state.pending = true;
+  renderStatus();
   updateDisabled();
   try {
     await task();
@@ -563,8 +570,8 @@ async function runRequest(task) {
     renderError(error.message);
   } finally {
     state.pending = false;
-    if (state.game) renderBoard();
-    updateDisabled();
+    if (state.game) render();
+    else updateDisabled();
   }
 }
 
@@ -607,6 +614,13 @@ function render() {
 function renderStatus() {
   const game = state.game;
   if (!game) return;
+
+  if (state.pending) {
+    elements.gameStatus.textContent = t("thinking");
+    elements.turnPill.textContent = t("thinkingShort");
+    elements.turnPill.className = "turn-pill thinking";
+    return;
+  }
 
   const status = game.status;
   const check = status.inCheck ? t("inCheck") : "";

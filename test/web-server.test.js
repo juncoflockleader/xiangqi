@@ -8,8 +8,8 @@ import {
 
 test("web server scales native command timeout for deeper searches", () => {
   assert.equal(resolveWebServerCommandTimeoutMs({ depth: 1, timeLimitMs: 50 }), 30000);
-  assert.equal(resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 8000 }), 210000);
-  assert.equal(resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 25000 }), 300000);
+  assert.equal(resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 8000 }), 315000);
+  assert.equal(resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 25000 }), 500000);
   assert.equal(resolveWebServerCommandTimeoutMs({ commandTimeoutMs: 45000, depth: 7, timeLimitMs: 8000 }), 45000);
 });
 
@@ -87,6 +87,9 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /glyph\.className = "piece-glyph"/);
     assert.match(script, /function renderSelectedMoves/);
     assert.match(script, /function localizedChineseText/);
+    assert.match(script, /thinking: "引擎思考中\.\.\."/);
+    assert.match(script, /thinkingShort: "思考中"/);
+    assert.match(script, /className = "turn-pill thinking"/);
     assert.match(script, /traditionalChineseMap/);
     assert.match(script, /function moveLabelText/);
     assert.match(script, /function moveTitleText/);
@@ -117,6 +120,7 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(stylesheet, /--piece-size: clamp\(30px, 88%, 38px\)/);
     assert.match(stylesheet, /--piece-font-size: 12\.5px/);
     assert.match(stylesheet, /--piece-inner-inset: clamp\(5px, 15%, 7px\)/);
+    assert.match(stylesheet, /\.turn-pill\.thinking/);
     assert.match(stylesheet, /\.piece-glyph/);
     assert.match(stylesheet, /width: 62%/);
     assert.match(stylesheet, /\.board-lines::before/);
