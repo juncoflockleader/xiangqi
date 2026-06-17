@@ -95,6 +95,7 @@ constexpr int kQDeltaCaptureHistoryMargin = 120;
 constexpr int kQBadCaptureOrderingPenaltyScale = 8;
 constexpr int kQQuietCheckSecondLayerMargin = 190;
 constexpr int kQQuietCheckDeepReducedLimit = 4;
+constexpr int kQHashFirstMinRootPieces = 6;
 constexpr int kAspirationInitialWindow = 80;
 constexpr int kAspirationRetryWindow = 320;
 constexpr int kRootTimeGuardMinMs = 8;
@@ -5190,6 +5191,89 @@ bool shouldSearchQuietChecksInQsearch(int qDepth, bool inCheck, int standPat, in
   return standPat + kQQuietCheckSecondLayerMargin >= alpha;
 }
 
+bool isPseudoLegalMoveFromBoard(const Board& board, const Move& move, int side) {
+  if (!validMove(move)) return false;
+  const int piece = board.cells[move.from];
+  if (piece == 0 || pieceCodeSide(piece) != side) return false;
+  const int captured = board.cells[move.to];
+  if (captured != 0 && pieceCodeSide(captured) == side) return false;
+  if (pieceCodeType(captured) == King) return false;
+
+  const int fromFile = fileOf(move.from);
+  const int fromRank = rankOf(move.from);
+  const int toFile = fileOf(move.to);
+  const int toRank = rankOf(move.to);
+  const int dx = toFile - fromFile;
+  const int dy = toRank - fromRank;
+  const int type = pieceCodeType(piece);
+
+  if (type == King) {
+    return std::abs(dx) + std::abs(dy) == 1 && palaceContains(side, toFile, toRank);
+  }
+  if (type == Advisor) {
+    return std::abs(dx) == 1 && std::abs(dy) == 1 && palaceContains(side, toFile, toRank);
+  }
+  if (type == Elephant) {
+    if (std::abs(dx) != 2 || std::abs(dy) != 2 || !ownRiverSide(side, toRank)) return false;
+    return board.cells[indexOf(fromFile + dx / 2, fromRank + dy / 2)] == 0;
+  }
+  if (type == Horse) {
+    const int legSquare = kHorseLegSquareBySourceTarget[static_cast<std::size_t>(move.from)][static_cast<std::size_t>(move.to)];
+    return legSquare >= 0 && board.cells[legSquare] == 0;
+  }
+  if (type == Rook) {
+    return kSameLineBySquare[static_cast<std::size_t>(move.from)][static_cast<std::size_t>(move.to)]
+        && blockersBetweenAfterMove<false>(board, move, move.from, move.to, 0) == 0;
+  }
+  if (type == Cannon) {
+    if (!kSameLineBySquare[static_cast<std::size_t>(move.from)][static_cast<std::size_t>(move.to)]) return false;
+    const int blockers = blockersBetweenAfterMove<false>(board, move, move.from, move.to, 0);
+    return captured == 0 ? blockers == 0 : blockers == 1;
+  }
+  if (type == Pawn) {
+    if (dx == 0 && dy == forwardDelta(side)) return true;
+    return crossedRiver(side, fromRank) && std::abs(dx) == 1 && dy == 0;
+  }
+  return false;
+}
+
+bool hydrateQsearchHashMove(
+    const Board& board,
+    Move& move,
+    int side,
+    int ownKing,
+    bool inCheck,
+    int enemyKing,
+    int qDepth,
+    int standPat,
+    int alpha,
+    SearchState& state,
+    bool& givesCheck) {
+  givesCheck = false;
+  if (!isPseudoLegalMoveFromBoard(board, move, side)) return false;
+  move.piece = static_cast<int16_t>(board.cells[move.from]);
+  move.captured = static_cast<int16_t>(board.cells[move.to]);
+
+  if (ownKing < 0) return false;
+  if (inCheck || moveMayAffectOwnKingSafety(board, move, side, ownKing)) {
+    if (isInCheckAfterGeneratedMoveKnownKing(board, move, side, ownKing)) return false;
+  }
+
+  if (inCheck) return true;
+
+  const bool captureMove = move.captured != 0;
+  const bool possibleCheck = maybeMoveCanGiveCheck(move, enemyKing);
+  if (!captureMove) {
+    if (!shouldSearchQuietChecksInQsearch(qDepth, false, standPat, alpha)) return false;
+    if (!possibleCheck || !moveGivesCheckAssumingPossible(board, move, enemyKing, state)) return false;
+    givesCheck = true;
+    return true;
+  }
+
+  if (possibleCheck) givesCheck = moveGivesCheckAssumingPossible(board, move, enemyKing, state);
+  return true;
+}
+
 bool tryProbCut(
     Board& board,
     const MoveList& legalMoves,
@@ -6055,6 +6139,81 @@ int quiescenceKnownCheck(
   }
 
   const int enemyKing = knownEnemyKing == kUnknownKingSquare ? trackedKingSquare(board, -board.side) : knownEnemyKing;
+  Move bestMove{};
+  bool hashMoveHandled = false;
+  Move handledHashMove{};
+  const bool canTryHashMoveFirst = state.rootPieceCount >= kQHashFirstMinRootPieces
+      && !isMateScore(alpha)
+      && !isMateScore(beta);
+  if (canTryHashMoveFirst && validMove(hashMove)) {
+    Move qHashMove = hashMove;
+    bool hashGivesCheck = false;
+    if (hydrateQsearchHashMove(board, qHashMove, board.side, ownKing, inCheck, enemyKing, qDepth, standPat, alpha, state, hashGivesCheck)) {
+      const bool captureMove = qHashMove.captured != 0;
+      const bool quietCheckMove = !inCheck && !captureMove && hashGivesCheck;
+      const int capturedValue = captureMove ? pieceCodeValue(qHashMove.captured) : 0;
+      bool hashPruned = false;
+      if (!inCheck && captureMove && standPat + capturedValue + kQDeltaPruneMargin <= alpha) {
+        if (!shouldGuardQDeltaCapture(state, qHashMove, standPat, capturedValue, alpha)) {
+          if (!hashGivesCheck) {
+            state.deltaPrunes += 1;
+            state.qDeltaPrefilterSkips += 1;
+            hashPruned = true;
+          }
+        }
+      }
+      if (!hashPruned && !inCheck && captureMove
+          && shouldPruneQBadCapture(board, qHashMove, state, qDepth, standPat, alpha, hashGivesCheck, true)) {
+        hashPruned = true;
+      }
+
+      hashMoveHandled = true;
+      handledHashMove = qHashMove;
+      if (!hashPruned) {
+        if (quietCheckMove) state.qchecks += 1;
+        const int alphaBeforeMove = alpha;
+        const int childOwnKing = pieceCodeType(qHashMove.captured) == King ? -1 : enemyKing;
+        const int childEnemyKing = pieceCodeType(qHashMove.piece) == King ? qHashMove.to : ownKing;
+        const bool childInCheck = childOwnKing < 0 || hashGivesCheck;
+        const uint64_t childKey = keyAfterMove(board, qHashMove);
+        prefetchQuiescenceCaches(state, childKey);
+        makeMoveWithKnownKey(board, qHashMove, childKey);
+        const int score = -quiescenceKnownCheck(board, -beta, -alpha, ply + 1, qDepth - 1, state, childOwnKing, childInCheck, childEnemyKing);
+        undoMove(board, qHashMove);
+        if (state.stopped) return alpha;
+        if (score >= beta) {
+          if (captureMove) {
+            const int bonus = std::clamp((qDepth + 1) * (qDepth + 1) * 8, 8, 512);
+            addHistoryScore(state.qCaptureHistory, qHashMove, bonus);
+            state.qCaptureHistoryStores += 1;
+          }
+          if (quietCheckMove) {
+            const int bonus = std::clamp((qDepth + 1) * (qDepth + 1) * 16, 16, 1024);
+            addHistoryScore(state.qCheckHistory, qHashMove, bonus);
+            state.qCheckHistoryStores += 1;
+          }
+          storeQtt(state, board, qDepth, ply, score, kTtLower, qHashMove);
+          return beta;
+        }
+        if (captureMove && score <= alphaBeforeMove) {
+          const int penalty = std::clamp((qDepth + 1) * (qDepth + 1) * 4, 4, 256);
+          addHistoryScore(state.qCaptureHistory, qHashMove, -penalty);
+          state.qCaptureHistoryMaluses += 1;
+        }
+        if (quietCheckMove && score <= alphaBeforeMove) {
+          const int penalty = std::clamp((qDepth + 1) * (qDepth + 1) * 8, 8, 512);
+          addHistoryScore(state.qCheckHistory, qHashMove, -penalty);
+          state.qCheckHistoryMaluses += 1;
+        }
+        if (score > alpha) {
+          alpha = score;
+          alphaFromTtLower = false;
+          bestMove = qHashMove;
+        }
+      }
+    }
+  }
+
   auto moves = generateLegalQsearchMoves(board, board.side, ownKing, inCheck, enemyKing, qDepth, standPat, alpha, state);
   if (shouldSearchQuietChecksInQsearch(qDepth, inCheck, standPat, alpha)) {
     auto quietChecks = generateQuietChecks(board, board.side, enemyKing, quietCheckLimitForQDepth(qDepth, standPat, alpha), state, ownKing, inCheck);
@@ -6062,6 +6221,17 @@ int quiescenceKnownCheck(
       moves.push_back(move);
       state.qchecks += 1;
     }
+  }
+  if (hashMoveHandled) {
+    std::size_t kept = 0;
+    for (std::size_t index = 0; index < moves.size(); index += 1) {
+      if (sameMove(moves[index], handledHashMove)) {
+        if (!inCheck && handledHashMove.captured == 0 && state.qchecks > 0) state.qchecks -= 1;
+        continue;
+      }
+      moves[kept++] = moves[index];
+    }
+    moves.resize(kept);
   }
   if (moves.empty()) {
     const int score = inCheck ? -kMate + ply : alpha;
@@ -6073,7 +6243,6 @@ int quiescenceKnownCheck(
     movePicker.score(state, ply, hashMove, {}, &board, enemyKing, {}, inCheck, false, false, true);
   }
 
-  Move bestMove{};
   while (Move* pickedMove = movePicker.next()) {
     Move& move = *pickedMove;
     const bool possibleCheck = maybeMoveCanGiveCheck(move, enemyKing);
