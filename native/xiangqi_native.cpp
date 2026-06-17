@@ -4509,9 +4509,8 @@ void prefetchMainSearchCaches(SearchState& state, uint64_t key, int sideToMove) 
   if (state.evalCache && state.evalCache->prefetch(evalCacheKeyFor(key, sideToMove))) state.evalCachePrefetches += 1;
 }
 
-void prefetchQuiescenceCaches(SearchState& state, uint64_t key, int sideToMove) {
+void prefetchQuiescenceCaches(SearchState& state, uint64_t key) {
   if (state.qtt && state.qtt->prefetch(key)) state.qttPrefetches += 1;
-  if (state.evalCache && state.evalCache->prefetch(evalCacheKeyFor(key, sideToMove))) state.evalCachePrefetches += 1;
 }
 
 bool timeExpired(SearchState& state) {
@@ -5516,7 +5515,7 @@ int quiescenceKnownCheck(
     const int childEnemyKing = (move.piece > 0 ? move.piece : -move.piece) == King ? move.to : ownKing;
     const bool childInCheck = childOwnKing < 0 || givesCheck;
     const uint64_t childKey = keyAfterMove(board, move);
-    prefetchQuiescenceCaches(state, childKey, -board.side);
+    prefetchQuiescenceCaches(state, childKey);
     makeMoveWithKnownKey(board, move, childKey);
     const int score = -quiescenceKnownCheck(board, -beta, -alpha, ply + 1, qDepth - 1, state, childOwnKing, childInCheck, childEnemyKing);
     undoMove(board, move);
