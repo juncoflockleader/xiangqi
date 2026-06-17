@@ -259,9 +259,9 @@ const PIKAFISH_OPENING_POSITIONS = Object.freeze([
   Object.freeze({
     fen: "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r",
     entries: Object.freeze([
-      pikafishEntry("c9-e7", 1, 100, 27, "c9-e7 h0-i2 h9-g7 i0-h0 g7-f5"),
-      pikafishEntry("b7-e7", 2, 87, 19, "b7-e7 b0-c2 b9-c7 g3-g4 h9-i7"),
-      pikafishEntry("b9-c7", 3, 84, 16, "b9-c7 g3-g4 g9-e7 g4-g5 h9-f8")
+      pikafishEntry("b7-e7", 1, 100, 21, "b7-e7 c0-e2 h9-i7 h0-i2 i9-h9 i0-h0 h7-h3 d0-e1 c6-c5 b0-d1 b9-c7"),
+      pikafishEntry("b9-c7", 2, 96, 20, "b9-c7 g3-g4 c6-c5 g4-g5 g9-e7 h0-i2 c7-d5 i0-h0 a9-a8 d0-e1 h9-i7"),
+      pikafishEntry("c9-e7", 3, 84, 15, "c9-e7 h0-i2 h9-g7 i0-h0 g7-f5")
     ])
   }),
   Object.freeze({

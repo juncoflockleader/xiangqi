@@ -181,7 +181,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     id: "oracle-opening-early-pawn-cannon-side",
     name: "Oracle Opening: Early Pawn Cannon-Side Development",
     fen: "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r",
-    expectedMoves: Object.freeze(["c9-e7", "b7-e7", "b9-c7"]),
+    expectedMoves: Object.freeze(["b7-e7", "b9-c7", "c9-e7"]),
     tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn"]),
     options: Object.freeze({
       depth: 8,
@@ -189,7 +189,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
       useBook: false,
       lines: 5
     }),
-    lesson: "After Red starts with the g-pawn and Black develops both cannons, the native engine should prefer Pikafish's c-file elephant development or close central alternatives."
+    lesson: "After Red starts with the g-pawn and Black develops both cannons, the native engine should prefer Pikafish's central cannon or near-tie horse-development alternatives."
   }),
   Object.freeze({
     id: "oracle-opening-early-pawn-challenge",

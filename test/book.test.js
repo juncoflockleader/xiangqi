@@ -166,9 +166,9 @@ test("opening book covers generated early-pawn side branches", () => {
 
   const cannonSide = engine.chooseMove(position);
   assert.equal(cannonSide.source, "opening-book");
-  assert.equal(cannonSide.bestMove.notation, "c9-e7");
-  assert.equal(cannonSide.book.name, "Pikafish best: c9-e7");
-  assert.equal(cannonSide.book.database.engineScore, 27);
+  assert.equal(cannonSide.bestMove.notation, "b7-e7");
+  assert.equal(cannonSide.book.name, "Pikafish best: b7-e7");
+  assert.equal(cannonSide.book.database.engineScore, 21);
 
   position = createInitialPosition();
   for (const move of ["g6-g5", "c3-c4"]) {
