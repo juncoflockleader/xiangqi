@@ -1037,6 +1037,29 @@ test("local C++ engine preserves stable ordering for tied small move lists", (t)
   assert.match(result.stdout, /\bbestmove b0c2\b/);
 });
 
+test("local C++ engine uses the last protocol move for root recapture ordering", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const input = [
+    "uci",
+    "position fen r2k5/9/9/9/9/9/9/9/PR7/4K4 b moves a9a1",
+    "go depth 1",
+    "quit"
+  ].join("\n");
+  const result = spawnSync(build.output, {
+    input,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /\brecorder [1-9]\d*\b/);
+  assert.match(result.stdout, /\bbestmove b1a1\b/);
+});
+
 test("local C++ engine preserves root PVs across MultiPV root moves", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {

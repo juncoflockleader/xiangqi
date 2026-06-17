@@ -6158,6 +6158,7 @@ std::vector<RootLine> searchRoot(
     int moveTimeMs,
     int multiPv,
     const std::vector<Move>& searchMoves,
+    const Move& rootPreviousMove,
     const std::vector<uint64_t>& historyKeys,
     const std::unordered_map<uint64_t, int>& historyCounts,
     TranspositionTable& tt,
@@ -6202,7 +6203,8 @@ std::vector<RootLine> searchRoot(
     }
   }
   const bool useTimedOpeningPriors = rootAlphaPruning && unrestrictedRootSearch;
-  orderMoves(rootMoves, state, 0, rootHashMove, {}, &root, rootEnemyKing, {}, rootInCheck);
+  const Move rootCounterMove = counterMoveFor(state, rootPreviousMove);
+  orderMoves(rootMoves, state, 0, rootHashMove, rootCounterMove, &root, rootEnemyKing, rootPreviousMove, rootInCheck);
   applyRootOrderMemory(rootMoves, state, root.key, rootHashMove, unrestrictedRootSearch);
   applyTimedOpeningRootBias(rootMoves, root, useTimedOpeningPriors);
   std::vector<RootMove> orderedRootMoves;
@@ -6316,14 +6318,16 @@ int elapsedMs(const SearchState& state) {
 
 struct PositionState {
   Board board;
+  Move lastMove;
   std::vector<uint64_t> historyKeys;
   std::unordered_map<uint64_t, int> historyCounts;
 };
 
-bool applyMoveIfLegal(Board& board, const Move& requested) {
+bool applyMoveIfLegal(Board& board, const Move& requested, Move* appliedMove = nullptr) {
   auto legal = generateLegalMoves(board, board.side);
   for (Move move : legal) {
     if (!sameMove(move, requested)) continue;
+    if (appliedMove) *appliedMove = move;
     makeMove(board, move);
     return true;
   }
@@ -6332,7 +6336,9 @@ bool applyMoveIfLegal(Board& board, const Move& requested) {
 
 void applyMoveWithHistory(PositionState& position, const Move& requested) {
   const uint64_t beforeMoveKey = position.board.key;
-  if (applyMoveIfLegal(position.board, requested)) {
+  Move appliedMove;
+  if (applyMoveIfLegal(position.board, requested, &appliedMove)) {
+    position.lastMove = appliedMove;
     position.historyKeys.push_back(beforeMoveKey);
     position.historyCounts[beforeMoveKey] += 1;
   }
@@ -6342,6 +6348,7 @@ void handlePosition(PositionState& position, const std::string& line) {
   const auto tokens = split(line);
   if (tokens.size() >= 2 && tokens[1] == "startpos") {
     parseFen(position.board, initialFen());
+    position.lastMove = {};
     position.historyKeys.clear();
     position.historyCounts.clear();
     auto movesIt = std::find(tokens.begin(), tokens.end(), "moves");
@@ -6360,6 +6367,7 @@ void handlePosition(PositionState& position, const std::string& line) {
     fen += *it;
   }
   parseFen(position.board, fen);
+  position.lastMove = {};
   position.historyKeys.clear();
   position.historyCounts.clear();
   if (movesIt != tokens.end()) {
@@ -6665,6 +6673,7 @@ int main() {
       std::cout << "readyok" << std::endl;
     } else if (command == "ucinewgame") {
       parseFen(position.board, initialFen());
+      position.lastMove = {};
       position.historyKeys.clear();
       position.historyCounts.clear();
       clearEngineMemory();
@@ -6693,6 +6702,7 @@ int main() {
             options.moveTimeMs,
             multiPv,
             options.searchMoves,
+            position.lastMove,
             position.historyKeys,
             position.historyCounts,
             tt,
@@ -6710,6 +6720,7 @@ int main() {
             options.moveTimeMs,
             multiPv,
             options.searchMoves,
+            position.lastMove,
             position.historyKeys,
             position.historyCounts,
             isolatedTt,
