@@ -73,6 +73,8 @@ constexpr int kRootHistoryReductionBoostMinDepth = 7;
 constexpr int kRootHistoryReductionBoostMoveIndex = 8;
 constexpr int kRootHistoryReductionBoostScale = 32;
 constexpr int kRootContinuationReductionBoostScale = 48;
+constexpr int kRootMultiPvQuietBoostMinDepth = 7;
+constexpr int kRootMultiPvQuietBoostMoveIndex = 6;
 constexpr int kRootBadCaptureReductionLossMargin = 120;
 constexpr int kRootTrackedMultiPvLimit = 8;
 constexpr int kRootMultiPvReductionMargin = 5;
@@ -6501,6 +6503,14 @@ int rootBaseMoveReduction(
       state.rootHistoryReductionBoosts += 1;
     }
   }
+  if (trackedMultiPvReduction
+      && depth >= kRootMultiPvQuietBoostMinDepth
+      && moveIndex >= kRootMultiPvQuietBoostMoveIndex
+      && historyScore <= 0
+      && continuationScore <= 0) {
+    reduction += 1;
+    state.rootHistoryReductionBoosts += 1;
+  }
   return std::clamp(reduction, 0, depth - 2);
 }
 
@@ -7067,7 +7077,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " imp " << state.improvingNodes << " nimp " << state.nonImprovingNodes
               << " imprd " << state.improvingReductionGuards << " nimprd " << state.nonImprovingReductionBoosts
               << " implmp " << state.improvingLateMoveGuards << " nimlmp " << state.nonImprovingLateMovePrunes
-              << " cm " << state.countermoveHits << " ch " << state.continuationHistoryHits
+              << " cm " << state.countermoveHits << " cmstores " << state.countermoveStores
+              << " ch " << state.continuationHistoryHits << " chstores " << state.continuationHistoryStores
               << " chred " << state.continuationReductionBoosts << " chredm " << state.continuationReductionMaluses
               << " fch " << state.followupHistoryHits << " fchstores " << state.followupHistoryStores
               << " fchred " << state.followupReductionBoosts << " fchredm " << state.followupReductionMaluses
@@ -7154,7 +7165,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " imp " << state.improvingNodes << " nimp " << state.nonImprovingNodes
               << " imprd " << state.improvingReductionGuards << " nimprd " << state.nonImprovingReductionBoosts
               << " implmp " << state.improvingLateMoveGuards << " nimlmp " << state.nonImprovingLateMovePrunes
-              << " cm " << state.countermoveHits << " ch " << state.continuationHistoryHits
+              << " cm " << state.countermoveHits << " cmstores " << state.countermoveStores
+              << " ch " << state.continuationHistoryHits << " chstores " << state.continuationHistoryStores
               << " chred " << state.continuationReductionBoosts << " chredm " << state.continuationReductionMaluses
               << " fch " << state.followupHistoryHits << " fchstores " << state.followupHistoryStores
               << " fchred " << state.followupReductionBoosts << " fchredm " << state.followupReductionMaluses

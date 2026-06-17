@@ -938,7 +938,9 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     nonImprovingReductionBoosts: maxInfoValue(infos, "nonImprovingReductionBoosts"),
     improvingLateMoveGuards: maxInfoValue(infos, "improvingLateMoveGuards"),
     nonImprovingLateMovePrunes: maxInfoValue(infos, "nonImprovingLateMovePrunes"),
+    countermoveStores: maxInfoValue(infos, "countermoveStores"),
     countermoveHits: maxInfoValue(infos, "countermoveHits"),
+    continuationHistoryStores: maxInfoValue(infos, "continuationHistoryStores"),
     continuationHistoryHits: maxInfoValue(infos, "continuationHistoryHits"),
     continuationReductionBoosts: maxInfoValue(infos, "continuationReductionBoosts"),
     continuationReductionMaluses: maxInfoValue(infos, "continuationReductionMaluses"),
@@ -1347,8 +1349,14 @@ function parseInfoLine(line) {
     } else if (token === "cm") {
       info.countermoveHits = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
+    } else if (token === "cmstores") {
+      info.countermoveStores = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
     } else if (token === "ch") {
       info.continuationHistoryHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "chstores") {
+      info.continuationHistoryStores = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "chred") {
       info.continuationReductionBoosts = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -2208,7 +2216,9 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.captureHistoryStores ?? 0) > 0) parts.push(nativeCount(stats.captureHistoryStores, "capture-history update"));
   if ((stats.captureHistoryMaluses ?? 0) > 0) parts.push(nativeCount(stats.captureHistoryMaluses, "capture-history malus"));
   if ((stats.captureHistoryPruneGuards ?? 0) > 0) parts.push(nativeCount(stats.captureHistoryPruneGuards, "capture-history prune guard"));
+  if ((stats.countermoveStores ?? 0) > 0) parts.push(nativeCount(stats.countermoveStores, "countermove update"));
   if ((stats.countermoveHits ?? 0) > 0) parts.push(nativeCount(stats.countermoveHits, "countermove-order hit"));
+  if ((stats.continuationHistoryStores ?? 0) > 0) parts.push(nativeCount(stats.continuationHistoryStores, "continuation-history update"));
   if ((stats.continuationHistoryHits ?? 0) > 0) parts.push(nativeCount(stats.continuationHistoryHits, "continuation-history hit"));
   if ((stats.followupHistoryHits ?? 0) > 0) parts.push(nativeCount(stats.followupHistoryHits, "same-side follow-up history hit"));
   if ((stats.followupHistoryStores ?? 0) > 0) parts.push(nativeCount(stats.followupHistoryStores, "same-side follow-up history update"));
@@ -2496,7 +2506,9 @@ function createNativeStats(parsed) {
     nonImprovingReductionBoosts: parsed.nonImprovingReductionBoosts ?? 0,
     improvingLateMoveGuards: parsed.improvingLateMoveGuards ?? 0,
     nonImprovingLateMovePrunes: parsed.nonImprovingLateMovePrunes ?? 0,
+    countermoveStores: parsed.countermoveStores ?? 0,
     countermoveHits: parsed.countermoveHits ?? 0,
+    continuationHistoryStores: parsed.continuationHistoryStores ?? 0,
     continuationHistoryHits: parsed.continuationHistoryHits ?? 0,
     continuationReductionBoosts: parsed.continuationReductionBoosts ?? 0,
     continuationReductionMaluses: parsed.continuationReductionMaluses ?? 0,

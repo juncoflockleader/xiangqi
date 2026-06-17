@@ -210,7 +210,9 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.improvingLateMoveGuards, 1);
     assert.equal(result.stats.nonImprovingLateMovePrunes, 2);
     assert.equal(result.stats.countermoveHits, 6);
+    assert.equal(result.stats.countermoveStores, 7);
     assert.equal(result.stats.continuationHistoryHits, 8);
+    assert.equal(result.stats.continuationHistoryStores, 11);
     assert.equal(result.stats.continuationReductionBoosts, 3);
     assert.equal(result.stats.continuationReductionMaluses, 1);
     assert.equal(result.stats.followupHistoryHits, 9);
@@ -318,7 +320,9 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.iterations[0].stats.improvingLateMoveGuards, 1);
     assert.equal(result.iterations[0].stats.nonImprovingLateMovePrunes, 2);
     assert.equal(result.iterations[0].stats.countermoveHits, 6);
+    assert.equal(result.iterations[0].stats.countermoveStores, 7);
     assert.equal(result.iterations[0].stats.continuationHistoryHits, 8);
+    assert.equal(result.iterations[0].stats.continuationHistoryStores, 11);
     assert.equal(result.iterations[0].stats.continuationReductionBoosts, 3);
     assert.equal(result.iterations[0].stats.continuationReductionMaluses, 1);
     assert.equal(result.iterations[0].stats.followupHistoryHits, 9);
@@ -415,7 +419,9 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("capture-history prune guard")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("check-cache hit")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("countermove-order hit")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("countermove update")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("continuation-history hit")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("continuation-history update")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("same-side follow-up history hit")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("same-side follow-up history update")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("follow-up reduction guard")));
