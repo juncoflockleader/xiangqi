@@ -5565,7 +5565,8 @@ int negamax(
     const bool singular = shouldTrySingularExtension(state, moves, move, hashCandidate, hashDepth, hashFlag, hashScore, depth, inCheck, extensionsRemaining)
         && isSingularMove(board, moves, move, hashScore, depth, ply, state, extensionsRemaining, enemyKing);
     if (state.stopped) break;
-    const bool pawnPressure = extensionsRemaining > 0
+    const bool pawnPressure = allowNullMove
+        && extensionsRemaining > 0
         && !singular
         && !givesCheck
         && !recapture
