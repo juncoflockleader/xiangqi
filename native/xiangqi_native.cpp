@@ -2612,11 +2612,15 @@ MoveList generateLegalQsearchMoves(
   return moves;
 }
 
-int quietCheckOrderingScore(const Board& board, const Move& move, SearchState& state, int enemyKing) {
-  int score = state.quietHistory[move.from][move.to];
+int qCheckHistoryScore(SearchState& state, const Move& move) {
   const int qHistory = state.qCheckHistory[move.from][move.to];
   if (qHistory != 0) state.qCheckHistoryHits += 1;
-  score += qHistory * 2;
+  return qHistory;
+}
+
+int quietCheckOrderingScore(const Board& board, const Move& move, SearchState& state, int enemyKing) {
+  int score = state.quietHistory[move.from][move.to];
+  score += qCheckHistoryScore(state, move) * 2;
   score += state.checkHistory[move.from][move.to] / 4;
   if (movedPieceDirectlyChecksAfterMove(board, move, enemyKing, move.piece)) score += 200000;
   score += pieceValue(move.piece) / 2;
@@ -3914,6 +3918,10 @@ int moveOrderingScore(
     if (counterMoveValid && sameMove(move, counterMove)) score += 35000;
     score += state.quietHistory[move.from][move.to];
     score += continuationHistoryScore(state, previousMove, move, true);
+    if (useQsearchCaptureHistory && !inCheck) {
+      score += qCheckHistoryScore(state, move) * 2;
+      score += state.checkHistory[move.from][move.to] / 4;
+    }
   }
   const int toFile = fileOf(move.to);
   score += fileCentrality(toFile) * 4;
