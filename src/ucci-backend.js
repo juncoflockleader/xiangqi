@@ -952,6 +952,7 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     extensions: maxInfoValue(infos, "extensions"),
     recaptureExtensions: maxInfoValue(infos, "recaptureExtensions"),
     pawnThreatExtensions: maxInfoValue(infos, "pawnThreatExtensions"),
+    pawnThreatOrderHits: maxInfoValue(infos, "pawnThreatOrderHits"),
     singularExtensionSearches: maxInfoValue(infos, "singularExtensionSearches"),
     singularExtensions: maxInfoValue(infos, "singularExtensions"),
     singularExtensionRejects: maxInfoValue(infos, "singularExtensionRejects"),
@@ -1389,6 +1390,9 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "pawnext") {
       info.pawnThreatExtensions = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "pawnord") {
+      info.pawnThreatOrderHits = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "singtry") {
       info.singularExtensionSearches = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -2071,6 +2075,7 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.extensions ?? 0) > 0) parts.push(nativeCount(stats.extensions, "tactical extension"));
   if ((stats.recaptureExtensions ?? 0) > 0) parts.push(nativeCount(stats.recaptureExtensions, "recapture extension"));
   if ((stats.pawnThreatExtensions ?? 0) > 0) parts.push(nativeCount(stats.pawnThreatExtensions, "late pawn-pressure extension"));
+  if ((stats.pawnThreatOrderHits ?? 0) > 0) parts.push(nativeCount(stats.pawnThreatOrderHits, "late pawn-pressure ordering boost"));
   if ((stats.singularExtensions ?? 0) > 0) parts.push(nativeCount(stats.singularExtensions, "singular extension"));
   if ((stats.repetitions ?? 0) > 0) parts.push(nativeCount(stats.repetitions, "draw-assumed repetition guard"));
   if ((stats.nullMovePrunes ?? 0) > 0) parts.push(nativeCount(stats.nullMovePrunes, "null-move cutoff"));
@@ -2410,6 +2415,7 @@ function createNativeStats(parsed) {
     rootTimeGuardStops: parsed.rootTimeGuardStops ?? 0,
     openingPreferencePromotions: parsed.openingPreferencePromotions ?? 0,
     pawnThreatExtensions: parsed.pawnThreatExtensions ?? 0,
+    pawnThreatOrderHits: parsed.pawnThreatOrderHits ?? 0,
     pvsResearches: parsed.pvsResearches ?? 0,
     aspirationSearches: parsed.aspirationSearches ?? 0,
     aspirationWidenedSearches: parsed.aspirationWidenedSearches ?? 0,
@@ -2466,6 +2472,7 @@ function createEmptyStats() {
     extensions: 0,
     recaptureExtensions: 0,
     pawnThreatExtensions: 0,
+    pawnThreatOrderHits: 0,
     singularExtensionSearches: 0,
     singularExtensions: 0,
     singularExtensionRejects: 0,

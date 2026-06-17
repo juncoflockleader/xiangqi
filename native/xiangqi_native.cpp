@@ -79,6 +79,7 @@ constexpr int kRootTimeGuardDivisor = 3;
 constexpr int kDefaultHashMb = 64;
 constexpr int kHistoryCountLookupThreshold = 64;
 constexpr int kPawnPressureExtensionMaxPieces = 10;
+constexpr int kPawnPressureOrderingBonus = 28000;
 constexpr int64_t kTimeCheckNodeMask = 16383;
 constexpr std::size_t kTtBucketSize = 4;
 constexpr std::size_t kEvalBucketSize = 4;
@@ -827,6 +828,7 @@ struct SearchState {
   int64_t extensions = 0;
   int64_t recaptureExtensions = 0;
   int64_t pawnThreatExtensions = 0;
+  int64_t pawnThreatOrderHits = 0;
   int64_t recaptureOrderHits = 0;
   int64_t singularExtensionSearches = 0;
   int64_t singularExtensions = 0;
@@ -972,6 +974,7 @@ struct SearchState {
     extensions = 0;
     recaptureExtensions = 0;
     pawnThreatExtensions = 0;
+    pawnThreatOrderHits = 0;
     recaptureOrderHits = 0;
     singularExtensionSearches = 0;
     singularExtensions = 0;
@@ -2761,7 +2764,7 @@ bool isRecapture(const Move& move, const Move& previousMove) {
 }
 
 bool isPawnPressureExtensionMove(const Move& move, int enemyKing, int rootPieceCount) {
-  if (rootPieceCount > kPawnPressureExtensionMaxPieces) return false;
+  if (rootPieceCount <= 0 || rootPieceCount > kPawnPressureExtensionMaxPieces) return false;
   if (enemyKing < 0 || move.captured != 0) return false;
   if ((move.piece > 0 ? move.piece : -move.piece) != Pawn) return false;
 
@@ -4003,6 +4006,10 @@ int moveOrderingScore(
   } else {
     if (isKillerMove(state, ply, move, true)) score += 90000;
     if (counterMoveValid && sameMove(move, counterMove)) score += 35000;
+    if (isPawnPressureExtensionMove(move, enemyKing, state.rootPieceCount)) {
+      score += kPawnPressureOrderingBonus;
+      state.pawnThreatOrderHits += 1;
+    }
     score += state.quietHistory[move.from][move.to];
     score += continuationHistoryScore(state, previousMove, move, true);
     if (useQsearchCaptureHistory && !inCheck) {
@@ -6045,7 +6052,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " tguard " << state.rootTimeGuardStops
               << " opref " << state.openingPreferencePromotions
               << " ext " << state.extensions << " recext " << state.recaptureExtensions << " recorder " << state.recaptureOrderHits
-              << " pawnext " << state.pawnThreatExtensions
+              << " pawnext " << state.pawnThreatExtensions << " pawnord " << state.pawnThreatOrderHits
               << " singtry " << state.singularExtensionSearches << " singext " << state.singularExtensions
               << " singrej " << state.singularExtensionRejects
               << " qnodes " << state.qnodes
@@ -6121,7 +6128,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " tguard " << state.rootTimeGuardStops
               << " opref " << state.openingPreferencePromotions
               << " ext " << state.extensions << " recext " << state.recaptureExtensions << " recorder " << state.recaptureOrderHits
-              << " pawnext " << state.pawnThreatExtensions
+              << " pawnext " << state.pawnThreatExtensions << " pawnord " << state.pawnThreatOrderHits
               << " singtry " << state.singularExtensionSearches << " singext " << state.singularExtensions
               << " singrej " << state.singularExtensionRejects
               << " qnodes " << state.qnodes
