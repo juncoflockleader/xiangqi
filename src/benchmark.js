@@ -77,9 +77,9 @@ export const ENGINE_BENCHMARKS = Object.freeze([
   }),
   Object.freeze({
     id: "hu-central-cannon-trap",
-    name: "Opening Trap: Pikafish Cannon Sidestep Prior",
+    name: "Opening Trap: Pikafish Quiet-Rook Prior",
     fen: "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r",
-    expectedMoves: Object.freeze(["b7-a7"]),
+    expectedMoves: Object.freeze(["i9-h9", "b7-a7"]),
     expectedSource: "opening-book",
     tags: Object.freeze(["trap", "learning", "search", "opening", "book", "oracle"]),
     options: Object.freeze({
@@ -175,7 +175,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
       useBook: false,
       lines: 5
     }),
-    lesson: "Against the shifted-cannon early-pawn setup, Black should develop the elephant or horse rather than chase with the g-cannon."
+    lesson: "Against the shifted-cannon early-pawn setup, Black should centralize or develop rather than chase with the g-cannon."
   }),
   Object.freeze({
     id: "oracle-opening-early-pawn-cannon-side",
@@ -315,7 +315,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
       useBook: false,
       lines: 5
     }),
-    lesson: "The shifted-cannon structure should prefer compact development or close cannon-shift alternatives over shallow chasing."
+    lesson: "The shifted-cannon structure should prefer a compact pawn push, development, or close cannon-shift alternatives over shallow chasing."
   }),
   Object.freeze({
     id: "oracle-opening-shifted-central-cannons-double-horse",

@@ -10,6 +10,7 @@ import {
   DEFAULT_OPENING_BOOK,
   lookupOpeningBook,
   mergeOpeningBooks,
+  parseFen,
   parseOpeningBookCsv,
   positionKey
 } from "../src/index.js";
@@ -195,6 +196,36 @@ test("opening book covers the c3-c4 central cannon candidate branch", () => {
   assert.equal(result.bestMove.notation, "i9-h9");
   assert.equal(result.book.name, "Pikafish best: i9-h9");
   assert.equal(result.book.database.engineScore, 38);
+});
+
+test("opening book follows refreshed Pikafish priors in shifted branches", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  const cases = [
+    {
+      fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b",
+      move: "g3-g4"
+    },
+    {
+      fen: "r1eakaehr/9/1ch4c1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b",
+      move: "g3-g4"
+    },
+    {
+      fen: "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/4C2C1/9/RHEAKAEHR b",
+      move: "b2-e2"
+    },
+    {
+      fen: "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r",
+      move: "i9-h9"
+    }
+  ];
+
+  for (const { fen, move } of cases) {
+    const result = engine.chooseMove(parseFen(fen), { openingHeuristics: false });
+
+    assert.equal(result.source, "opening-book");
+    assert.equal(result.bestMove.notation, move);
+    assert.equal(result.book.name, `Pikafish best: ${move}`);
+  }
 });
 
 test("opening book follows Pikafish principal-variation continuations past exact oracle nodes", () => {

@@ -5745,8 +5745,8 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t earlyPawnBlackCannonSide = fenPositionKey(
       "rheakaehr/9/1c5c1/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR b");
   if (root.key == earlyPawnBlackCannonSide) {
-    if (sameUciMove(move, "c6c5")) return 5000;  // c3-c4: refreshed Pikafish central pawn challenge.
-    if (sameUciMove(move, "h7g7")) return 4700;  // h2-g2: compact cannon sidestep remains playable.
+    if (sameUciMove(move, "h7g7")) return 5050;  // h2-g2: refreshed Pikafish compact cannon sidestep.
+    if (sameUciMove(move, "c6c5")) return 5000;  // c3-c4: central pawn challenge remains a near-tie.
     if (sameUciMove(move, "b9c7")) return 4500;  // b0-c2: develop the left horse.
     return 0;
   }
@@ -5772,9 +5772,9 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t earlyPawnShiftedCannonBlack = fenPositionKey(
       "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/4C2C1/9/RHEAKAEHR b");
   if (root.key == earlyPawnShiftedCannonBlack) {
-    if (sameUciMove(move, "c9e7")) return 5000;  // c0-e2: develop the elephant in the shifted-cannon branch.
+    if (sameUciMove(move, "b7e7")) return 5050;  // b2-e2: refreshed Pikafish central cannon response.
+    if (sameUciMove(move, "c9e7")) return 5000;  // c0-e2: elephant development remains playable.
     if (sameUciMove(move, "b9c7")) return 4700;  // b0-c2: close horse-development alternative.
-    if (sameUciMove(move, "b7e7")) return 4600;  // b2-e2: central cannon alternative.
     return 0;
   }
 
@@ -5809,9 +5809,9 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t shiftedLeftPawn = fenPositionKey(
       "r1eakaehr/9/1ch4c1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b");
   if (root.key == shiftedLeftPawn) {
-    if (sameUciMove(move, "g9e7")) return 5000;  // g0-e2: refreshed 2026 Pikafish top elephant development.
+    if (sameUciMove(move, "g6g5")) return 5050;  // g3-g4: refreshed Pikafish pawn-push alternative.
+    if (sameUciMove(move, "g9e7")) return 5000;  // g0-e2: elephant development remains a near-tie.
     if (sameUciMove(move, "c6c5")) return 4900;  // c3-c4: near-tie central pawn challenge.
-    if (sameUciMove(move, "g6g5")) return 4500;  // g3-g4: close pawn-push alternative.
     return 0;
   }
 
@@ -5883,9 +5883,9 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t shiftedCentralCannons = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b");
   if (root.key == shiftedCentralCannons) {
-    if (sameUciMove(move, "b9c7")) return 5000;  // b0-c2: compact development remains the safest oracle tie.
+    if (sameUciMove(move, "g6g5")) return 5050;  // g3-g4: refreshed Pikafish pawn-push preference.
+    if (sameUciMove(move, "b9c7")) return 5000;  // b0-c2: compact development remains a near-tie.
     if (sameUciMove(move, "b7d7")) return 4900;  // b2-d2: close cannon-shift alternative.
-    if (sameUciMove(move, "g6g5")) return 4600;  // g3-g4: close oracle alternative.
     return 0;
   }
 
@@ -5901,8 +5901,8 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t huCentralCannonTrap = fenPositionKey(
       "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r");
   if (root.key == huCentralCannonTrap) {
-    if (sameUciMove(move, "b2a2")) return 5000;  // b7-a7: refreshed 2026 Pikafish top cannon sidestep.
-    if (sameUciMove(move, "i0h0")) return 4900;  // i9-h9: close quiet rook improvement before tactics.
+    if (sameUciMove(move, "i0h0")) return 5050;  // i9-h9: refreshed Pikafish quiet rook improvement before tactics.
+    if (sameUciMove(move, "b2a2")) return 5000;  // b7-a7: cannon sidestep remains a near-tie.
     if (sameUciMove(move, "c3c4")) return 4300;  // c6-c5: useful central pawn break.
     if (sameUciMove(move, "b2b1")) return 4000;  // b7-b8: playable cannon retreat.
   }

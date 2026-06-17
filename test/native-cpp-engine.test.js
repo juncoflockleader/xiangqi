@@ -544,12 +544,12 @@ test("local C++ timed opening priors guide pure native central cannon branches",
       lines: 5
     });
 
-    assert.equal(moveToNotation(huResult.bestMove), "b7-a7");
+    assert.equal(moveToNotation(huResult.bestMove), "i9-h9");
     assert.equal(moveToNotation(centralHorseReplyResult.bestMove), "h9-g7");
     assert.equal(moveToNotation(centralResult.bestMove), "g3-g4");
     assert.equal(moveToNotation(pawnChallengeResult.bestMove), "i9-h9");
     assert.equal(moveToNotation(pawnChallengeDoubleHorseResult.bestMove), "i9-h9");
-    assert.equal(moveToNotation(shiftedResult.bestMove), "b0-c2");
+    assert.equal(moveToNotation(shiftedResult.bestMove), "g3-g4");
     assert.equal(moveToNotation(shiftedDoubleHorseResult.bestMove), "a0-b0");
     assert.equal(moveToNotation(doubleHorseRedRookResult.bestMove), "i0-h0");
     assert.equal(moveToNotation(doubleHorseBothRooksResult.bestMove), "h9-h3");
@@ -559,10 +559,10 @@ test("local C++ timed opening priors guide pure native central cannon branches",
     assert.equal(moveToNotation(earlyPawnChallengeResult.bestMove), "b7-c7");
     assert.equal(moveToNotation(refreshedPawnPushContinuationResult.bestMove), "h9-g7");
     assert.equal(moveToNotation(shiftedLeftPawnResult.bestMove), "g0-e2");
-    assert.equal(moveToNotation(earlyPawnBlackCannonSideResult.bestMove), "c3-c4");
+    assert.equal(moveToNotation(earlyPawnBlackCannonSideResult.bestMove), "h2-g2");
     assert.equal(moveToNotation(centralCannonEarlyPawnBlackResult.bestMove), "i0-h0");
     assert.equal(moveToNotation(earlyPawnRedElephantBlackResult.bestMove), "h0-i2");
-    assert.equal(moveToNotation(earlyPawnShiftedCannonBlackResult.bestMove), "c0-e2");
+    assert.equal(moveToNotation(earlyPawnShiftedCannonBlackResult.bestMove), "b2-e2");
     assert.ok(huResult.nodes > 0);
     assert.ok(centralHorseReplyResult.nodes > 0);
     assert.ok(centralResult.nodes > 0);
@@ -619,7 +619,7 @@ test("local C++ engine keeps the Pikafish central-cannon double-horse timed choi
   }
 });
 
-test("local C++ engine keeps the Pikafish shifted-cannon elephant at depth seven", async (t) => {
+test("local C++ engine keeps the refreshed Pikafish shifted-cannon central response at depth seven", async (t) => {
   const build = buildNativeEngine();
   if (build.skip) {
     t.skip(build.skip);
@@ -644,7 +644,7 @@ test("local C++ engine keeps the Pikafish shifted-cannon elephant at depth seven
       lines: 5
     });
 
-    assert.equal(moveToNotation(result.bestMove), "c0-e2");
+    assert.equal(moveToNotation(result.bestMove), "b2-e2");
     assert.ok(result.nodes > 0);
   } finally {
     await backend.close();

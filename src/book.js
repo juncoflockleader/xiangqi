@@ -194,9 +194,9 @@ const PIKAFISH_OPENING_POSITIONS = Object.freeze([
   Object.freeze({
     fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b",
     entries: Object.freeze([
-      pikafishEntry("b0-c2", 1, 100, -19, "b0-c2 h9-g7 c3-c4 b9-a7 h2-h4"),
-      pikafishEntry("b2-d2", 2, 92, -23, "b2-d2 b9-c7 b0-c2 a9-b9 g3-g4"),
-      pikafishEntry("g3-g4", 3, 92, -18, "g3-g4 b9-c7 b2-d2 a9-b9 b0-c2")
+      pikafishEntry("g3-g4", 1, 100, -18, "g3-g4 b9-c7 b2-d2 a9-b9 b0-c2"),
+      pikafishEntry("b0-c2", 2, 96, -19, "b0-c2 h9-g7 c3-c4 b9-a7 h2-h4"),
+      pikafishEntry("b2-d2", 3, 92, -23, "b2-d2 b9-c7 b0-c2 a9-b9 g3-g4")
     ])
   }),
   Object.freeze({
@@ -226,8 +226,8 @@ const PIKAFISH_OPENING_POSITIONS = Object.freeze([
   Object.freeze({
     fen: "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r",
     entries: Object.freeze([
-      pikafishEntry("b7-a7", 1, 100, 10, "b7-a7 b0-c2 a9-b9 a0-b0 b9-b5"),
-      pikafishEntry("i9-h9", 2, 92, 8, "i9-h9 b0-c2 g6-g5 c3-c4 b9-a7"),
+      pikafishEntry("i9-h9", 1, 100, 12, "i9-h9 b0-c2 g6-g5 c3-c4 b9-a7"),
+      pikafishEntry("b7-a7", 2, 96, 10, "b7-a7 b0-c2 a9-b9 a0-b0 b9-b5"),
       pikafishEntry("c6-c5", 3, 79, 8, "c6-c5 b0-c2 i9-h9 i0-h0 h9-h5"),
       pikafishEntry("b7-b8", 4, 62, -9, "b7-b8 b0-c2 h9-g7 i0-h0 i9-h9")
     ])
@@ -276,17 +276,17 @@ const PIKAFISH_OPENING_POSITIONS = Object.freeze([
   Object.freeze({
     fen: "r1eakaehr/9/1ch4c1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b",
     entries: Object.freeze([
-      pikafishEntry("g0-e2", 1, 100, -16, "g0-e2 b9-c7 c3-c4 a9-a8 a0-a1"),
-      pikafishEntry("c3-c4", 2, 94, -17, "c3-c4 h9-g7 g0-e2 i9-h9 h0-f1"),
-      pikafishEntry("g3-g4", 3, 91, -21, "g3-g4 g5-g4 a0-a1 h9-g7 a1-g1")
+      pikafishEntry("g3-g4", 1, 100, -15, "g3-g4 g5-g4 a0-a1 h9-g7 a1-g1"),
+      pikafishEntry("g0-e2", 2, 96, -16, "g0-e2 b9-c7 c3-c4 a9-a8 a0-a1"),
+      pikafishEntry("c3-c4", 3, 94, -17, "c3-c4 h9-g7 g0-e2 i9-h9 h0-f1")
     ])
   }),
   Object.freeze({
     fen: "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/4C2C1/9/RHEAKAEHR b",
     entries: Object.freeze([
-      pikafishEntry("c0-e2", 1, 100, -17, "c0-e2 h9-i7 h0-i2 i9-h9 i0-h0"),
-      pikafishEntry("b0-c2", 2, 93, -19, "b0-c2 b9-c7 h0-i2 h9-g7 i0-h0"),
-      pikafishEntry("b2-e2", 3, 93, -19, "b2-e2 b9-c7 h0-i2 h9-g7 i0-h0")
+      pikafishEntry("b2-e2", 1, 100, -16, "b2-e2 b9-c7 h0-i2 h9-g7 i0-h0"),
+      pikafishEntry("c0-e2", 2, 96, -17, "c0-e2 h9-i7 h0-i2 i9-h9 i0-h0"),
+      pikafishEntry("b0-c2", 3, 93, -19, "b0-c2 b9-c7 h0-i2 h9-g7 i0-h0")
     ])
   }),
   Object.freeze({
