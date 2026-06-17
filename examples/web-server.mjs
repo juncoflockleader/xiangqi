@@ -36,6 +36,8 @@ const DEFAULT_STARTUP_TIMEOUT_MS = 5000;
 const DEFAULT_COMMAND_TIMEOUT_MS = 30000;
 const COMMAND_TIMEOUT_DEPTH_MS = 30000;
 const COMMAND_TIMEOUT_TIME_MULTIPLIER = 12;
+const PLAYER_REVIEW_DEPTH_CAP = 3;
+const PLAYER_REVIEW_TIME_CAP_MS = 1000;
 const JSON_LIMIT_BYTES = 64 * 1024;
 
 const PIECE_SYMBOLS = Object.freeze({
@@ -225,7 +227,7 @@ async function handleApiPost(context, url) {
       const before = session.game;
       session.game = await playGameMoveAsync(session.game, context.engine, String(body.move ?? ""), {
         actor: "player",
-        reviewOptions: searchOptions(session)
+        reviewOptions: resolveWebPlayerReviewOptions(session)
       });
       session.undoStack.push(before);
       await maybePlayEngineTurn(session, context.engine);
@@ -341,6 +343,20 @@ function searchOptions(session) {
     ...(session.timeLimitMs ? { timeLimitMs: session.timeLimitMs } : {}),
     lines: session.lines,
     useBook: session.useBook
+  };
+}
+
+export function resolveWebPlayerReviewOptions(session) {
+  const reviewDepth = session.depth
+    ? Math.min(session.depth, PLAYER_REVIEW_DEPTH_CAP)
+    : PLAYER_REVIEW_DEPTH_CAP;
+  const reviewTimeLimitMs = session.timeLimitMs
+    ? Math.min(session.timeLimitMs, PLAYER_REVIEW_TIME_CAP_MS)
+    : PLAYER_REVIEW_TIME_CAP_MS;
+  return {
+    ...searchOptions(session),
+    depth: reviewDepth,
+    timeLimitMs: reviewTimeLimitMs
   };
 }
 

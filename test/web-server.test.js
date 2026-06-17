@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  resolveWebPlayerReviewOptions,
   resolveWebServerCommandTimeoutMs,
   startWebServer
 } from "../examples/web-server.mjs";
@@ -10,6 +11,32 @@ test("web server scales native command timeout for deeper searches", () => {
   assert.equal(resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 8000 }), 210000);
   assert.equal(resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 25000 }), 300000);
   assert.equal(resolveWebServerCommandTimeoutMs({ commandTimeoutMs: 45000, depth: 7, timeLimitMs: 8000 }), 45000);
+});
+
+test("web server caps live player review budget for deep play", () => {
+  assert.deepEqual(resolveWebPlayerReviewOptions({
+    depth: 7,
+    timeLimitMs: 8000,
+    lines: 2,
+    useBook: true
+  }), {
+    depth: 3,
+    timeLimitMs: 1000,
+    lines: 2,
+    useBook: true
+  });
+
+  assert.deepEqual(resolveWebPlayerReviewOptions({
+    depth: 1,
+    timeLimitMs: 50,
+    lines: 2,
+    useBook: false
+  }), {
+    depth: 1,
+    timeLimitMs: 50,
+    lines: 2,
+    useBook: false
+  });
 });
 
 test("web server serves the browser game and starts a session", async () => {
