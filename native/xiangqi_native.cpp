@@ -61,6 +61,7 @@ constexpr int kTimedOpeningPriorMaxLoss = 100;
 constexpr int kTimedSearchDepthLimit = 64;
 constexpr int kRootReductionMinDepth = 6;
 constexpr int kRootReductionMoveIndex = 5;
+constexpr int kRootMultiPvReductionMoveIndex = 3;
 constexpr int kRootDeepReductionMinDepth = 8;
 constexpr int kRootDeepReductionMoveIndex = 12;
 constexpr int kRootHistoryReductionBoostMinDepth = 7;
@@ -5913,9 +5914,11 @@ int rootBaseMoveReduction(
     int moveIndex,
     bool rootInCheck,
     SearchState& state,
-    const Move& rootPreviousMove) {
+    const Move& rootPreviousMove,
+    bool trackedMultiPvReduction = false) {
   if (rootInCheck) return 0;
-  if (depth < kRootReductionMinDepth || moveIndex < kRootReductionMoveIndex) return 0;
+  const int reductionMoveIndex = trackedMultiPvReduction ? kRootMultiPvReductionMoveIndex : kRootReductionMoveIndex;
+  if (depth < kRootReductionMinDepth || moveIndex < reductionMoveIndex) return 0;
   if (!isQuiet(move) || child.inCheck) return 0;
   if (timedOpeningRootBonus(root, move) > 0) return 0;
 
@@ -6071,7 +6074,7 @@ std::vector<RootLine> searchRootDepth(
     if (useMultiPvReduction) {
       multiPvReportCutoff = reportCutoff.cutoff();
       if (!isMateScore(multiPvReportCutoff)) {
-        reduction = rootBaseMoveReduction(root, move, child, depth, moveIndex, rootInCheck, state, rootPreviousMove);
+        reduction = rootBaseMoveReduction(root, move, child, depth, moveIndex, rootInCheck, state, rootPreviousMove, true);
       }
     }
     if (useRootPvs) {
