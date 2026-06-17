@@ -77,9 +77,9 @@ export const ENGINE_BENCHMARKS = Object.freeze([
   }),
   Object.freeze({
     id: "hu-central-cannon-trap",
-    name: "Opening Trap: Pikafish Quiet Rook Prior",
+    name: "Opening Trap: Pikafish Cannon Sidestep Prior",
     fen: "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r",
-    expectedMoves: Object.freeze(["i9-h9"]),
+    expectedMoves: Object.freeze(["b7-a7"]),
     expectedSource: "opening-book",
     tags: Object.freeze(["trap", "learning", "search", "opening", "book", "oracle"]),
     options: Object.freeze({
@@ -88,7 +88,7 @@ export const ENGINE_BENCHMARKS = Object.freeze([
       openingHeuristicValidationDepth: 2,
       openingHeuristicValidationTimeMs: 4000
     }),
-    lesson: "In this central-cannon trap structure, the oracle prefers improving the rook before forcing immediate cannon tactics."
+    lesson: "In this central-cannon trap structure, the oracle prefers a compact cannon sidestep before forcing immediate tactics."
   })
 ]);
 
@@ -139,7 +139,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     id: "oracle-opening-central-cannon-early-pawn-black",
     name: "Oracle Opening: Central Cannon Early Pawn Black Reply",
     fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b",
-    expectedMoves: Object.freeze(["h2-i2", "i0-h0", "b2-e2"]),
+    expectedMoves: Object.freeze(["i0-h0", "h2-i2", "b2-e2"]),
     tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn", "central-cannon"]),
     options: Object.freeze({
       depth: 8,
@@ -147,7 +147,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
       useBook: false,
       lines: 5
     }),
-    lesson: "In the central-cannon early-pawn branch, Black should sidestep the cannon or develop the rook before launching flank cannon activity."
+    lesson: "In the central-cannon early-pawn branch, Black should develop the rook or sidestep the cannon before launching flank cannon activity."
   }),
   Object.freeze({
     id: "oracle-opening-early-pawn-red-elephant-black",
@@ -181,7 +181,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     id: "oracle-opening-early-pawn-cannon-side",
     name: "Oracle Opening: Early Pawn Cannon-Side Development",
     fen: "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r",
-    expectedMoves: Object.freeze(["b7-e7", "b9-c7", "c9-e7"]),
+    expectedMoves: Object.freeze(["h7-e7", "b7-e7", "b9-c7", "c9-e7"]),
     tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn"]),
     options: Object.freeze({
       depth: 8,
@@ -189,7 +189,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
       useBook: false,
       lines: 5
     }),
-    lesson: "After Red starts with the g-pawn and Black develops both cannons, the native engine should prefer Pikafish's central cannon or near-tie horse-development alternatives."
+    lesson: "After Red starts with the g-pawn and Black develops both cannons, the native engine should prefer the refreshed central cannon or near-tie development alternatives."
   }),
   Object.freeze({
     id: "oracle-opening-early-pawn-challenge",
@@ -209,7 +209,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     id: "oracle-opening-refreshed-pawn-continuation",
     name: "Oracle Opening: Refreshed Pawn Continuation",
     fen: "rheakae1r/9/1c4h1c/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR r",
-    expectedMoves: Object.freeze(["b9-c7", "h9-g7", "b9-a7"]),
+    expectedMoves: Object.freeze(["h9-g7", "b9-c7", "b9-a7"]),
     tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn", "central-cannon"]),
     options: Object.freeze({
       depth: 8,
@@ -217,13 +217,13 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
       useBook: false,
       lines: 5
     }),
-    lesson: "In the refreshed pawn-push continuation, the native engine should develop the b-horse before chasing activity with cannons."
+    lesson: "In the refreshed pawn-push continuation, the native engine should develop a horse before chasing activity with cannons."
   }),
   Object.freeze({
     id: "oracle-opening-shifted-left-pawn",
     name: "Oracle Opening: Shifted Left-Screen Pawn",
     fen: "r1eakaehr/9/1ch4c1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b",
-    expectedMoves: Object.freeze(["c3-c4", "g0-e2", "g3-g4"]),
+    expectedMoves: Object.freeze(["g0-e2", "c3-c4", "g3-g4"]),
     tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn", "central-cannon"]),
     options: Object.freeze({
       depth: 8,
@@ -231,7 +231,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
       useBook: false,
       lines: 5
     }),
-    lesson: "After the left-screen structure meets Red's early pawn, the native engine should challenge the center before drifting into cannon lifts."
+    lesson: "After the left-screen structure meets Red's early pawn, the native engine should prefer elephant development or a central pawn challenge before drifting into cannon lifts."
   }),
   Object.freeze({
     id: "oracle-opening-central-cannon-double-horse",
@@ -349,7 +349,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     id: "oracle-opening-hu-central-cannon-trap",
     name: "Oracle Opening: Hu Central Cannon Trap",
     fen: "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r",
-    expectedMoves: Object.freeze(["i9-h9", "b7-a7"]),
+    expectedMoves: Object.freeze(["b7-a7", "i9-h9"]),
     tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "central-cannon", "trap"]),
     options: Object.freeze({
       depth: 8,
@@ -357,7 +357,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
       useBook: false,
       lines: 5
     }),
-    lesson: "The Hu trap structure should keep the quiet rook improvement and close oracle cannon alternative both recognized."
+    lesson: "The Hu trap structure should keep the refreshed cannon sidestep and close quiet-rook alternative both recognized."
   })
 ]);
 
