@@ -2,6 +2,10 @@ const files = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
 const ranks = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 const chineseNumerals = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
 const blackFileLabels = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+const DEFAULT_CLIENT_REQUEST_TIMEOUT_MS = 15 * 60 * 1000;
+const CLIENT_REQUEST_TIMEOUT_BUFFER_MS = 5000;
+const CLIENT_STATE_REFRESH_TIMEOUT_MS = 15000;
+const PENDING_STATUS_INTERVAL_MS = 1000;
 
 const pieceNames = {
   "zh-CN": {
@@ -301,6 +305,9 @@ const zhTwTranslations = {
   moveReviewed: "已覆盤此手。",
   thinking: "引擎思考中...",
   thinkingShort: "思考中",
+  requestTimedOut: "請求等待時間過長，請重試。",
+  requestFailed: "連線中斷，請重試。",
+  stateRefreshed: "已重新同步當前局面。",
   legalMoves: "合法著法",
   legalMovesSuffix: "的合法著法",
   candidate: "候選",
@@ -364,6 +371,9 @@ const zhCnTranslations = {
   moveReviewed: "已复盘此手。",
   thinking: "引擎思考中...",
   thinkingShort: "思考中",
+  requestTimedOut: "请求等待时间过长，请重试。",
+  requestFailed: "连接中断，请重试。",
+  stateRefreshed: "已重新同步当前局面。",
   legalMoves: "合法着法",
   legalMovesSuffix: "的合法着法",
   candidate: "候选",
@@ -436,6 +446,9 @@ const translations = {
     moveReviewed: "Move reviewed.",
     thinking: "Engine thinking...",
     thinkingShort: "Thinking",
+    requestTimedOut: "The request waited too long. Please try again.",
+    requestFailed: "The connection was interrupted. Please try again.",
+    stateRefreshed: "Current position resynced.",
     legalMoves: "Legal moves",
     legalMovesSuffix: " legal moves",
     candidate: "candidate",
@@ -476,11 +489,15 @@ const state = {
   game: null,
   selected: null,
   pending: false,
+  pendingSince: null,
+  errorMessage: null,
   panel: null,
   treeCollapsed: new Set(),
   treeSelectedId: null,
   locale: loadLocale()
 };
+
+let pendingRenderTimer = null;
 
 elements.newButton.addEventListener("click", () => newGame());
 elements.undoButton.addEventListener("click", () => undoMove());
@@ -562,32 +579,117 @@ async function requestBest() {
 async function runRequest(task) {
   if (state.pending) return;
   state.pending = true;
+  state.pendingSince = Date.now();
+  state.errorMessage = null;
+  startPendingTicker();
   renderStatus();
   updateDisabled();
   try {
     await task();
   } catch (error) {
-    renderError(error.message);
+    const refreshed = await refreshStateAfterFailure();
+    state.errorMessage = refreshed
+      ? `${error.message} ${t("stateRefreshed")}`
+      : error.message;
   } finally {
     state.pending = false;
+    state.pendingSince = null;
+    stopPendingTicker();
     if (state.game) render();
-    else updateDisabled();
+    else {
+      updateDisabled();
+      if (state.errorMessage) renderError(state.errorMessage);
+    }
   }
 }
 
 async function api(path, payload) {
-  const response = await fetch(path, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload ?? {})
-  });
-  const result = await response.json();
+  const timeoutMs = currentRequestTimeoutMs();
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+
+  try {
+    response = await fetch(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload ?? {}),
+      signal: controller.signal
+    });
+  } catch (error) {
+    throw normalizeRequestError(error, timeoutMs);
+  } finally {
+    window.clearTimeout(timeout);
+  }
+
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+
   if (!response.ok || result.ok === false) {
     throw new Error(result.error ?? `Request failed: ${response.status}`);
   }
   return result;
+}
+
+async function fetchState() {
+  if (!state.sessionId) return null;
+
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), CLIENT_STATE_REFRESH_TIMEOUT_MS);
+  try {
+    const response = await fetch(`/api/state?session=${encodeURIComponent(state.sessionId)}`, {
+      cache: "no-store",
+      signal: controller.signal
+    });
+    const result = await response.json();
+    if (!response.ok || result.ok === false) return null;
+    return result.state ?? null;
+  } catch {
+    return null;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+async function refreshStateAfterFailure() {
+  const latest = await fetchState();
+  if (!latest) return false;
+  setGame(latest);
+  return true;
+}
+
+function currentRequestTimeoutMs() {
+  const serverBudget = Number(state.game?.web?.requestTimeoutMs);
+  if (Number.isFinite(serverBudget) && serverBudget > 0) {
+    return serverBudget + CLIENT_REQUEST_TIMEOUT_BUFFER_MS;
+  }
+  return DEFAULT_CLIENT_REQUEST_TIMEOUT_MS;
+}
+
+function normalizeRequestError(error, timeoutMs) {
+  if (error?.name === "AbortError") {
+    return new Error(`${t("requestTimedOut")} (${formatDuration(timeoutMs)})`);
+  }
+  return new Error(t("requestFailed"));
+}
+
+function startPendingTicker() {
+  stopPendingTicker();
+  pendingRenderTimer = window.setInterval(() => {
+    if (state.pending) renderStatus();
+  }, PENDING_STATUS_INTERVAL_MS);
+}
+
+function stopPendingTicker() {
+  if (!pendingRenderTimer) return;
+  window.clearInterval(pendingRenderTimer);
+  pendingRenderTimer = null;
 }
 
 function setGame(game) {
@@ -616,7 +718,7 @@ function renderStatus() {
   if (!game) return;
 
   if (state.pending) {
-    elements.gameStatus.textContent = t("thinking");
+    elements.gameStatus.textContent = pendingStatusText();
     elements.turnPill.textContent = t("thinkingShort");
     elements.turnPill.className = "turn-pill thinking";
     return;
@@ -767,6 +869,11 @@ function renderAlternativeSummary(node) {
 }
 
 function renderReasoning() {
+  if (state.errorMessage) {
+    renderError(state.errorMessage);
+    return;
+  }
+
   const panel = state.panel;
   if (!panel) return;
 
@@ -1255,6 +1362,23 @@ function gameOverText(status) {
       : `${capitalize(status.state)}. ${capitalize(status.winner)} ${t("wins")}`;
   }
   return capitalize(status.state);
+}
+
+function pendingStatusText() {
+  const elapsedMs = state.pendingSince ? Date.now() - state.pendingSince : 0;
+  if (elapsedMs < PENDING_STATUS_INTERVAL_MS) return t("thinking");
+  return `${t("thinking")} ${formatDuration(elapsedMs)}`;
+}
+
+function formatDuration(ms) {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (isChineseLocale()) {
+    return minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`;
+  }
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 }
 
 function t(key) {

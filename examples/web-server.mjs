@@ -223,7 +223,7 @@ async function handleRequest(context) {
 async function handleApiGet(context, url) {
   if (url.pathname === "/api/state") {
     const session = requireSession(context.sessions, url.searchParams.get("session"));
-    return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine) });
+    return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine, context.config) });
   }
 
   sendJson(context.response, 404, { ok: false, error: "Unknown API route." });
@@ -236,7 +236,7 @@ async function handleApiPost(context, url) {
     const session = createSession(context.config, body);
     context.sessions.set(session.id, session);
     await enqueueSession(session, () => maybePlayEngineTurn(session, context.engine));
-    return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine) });
+    return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine, context.config) });
   }
 
   if (url.pathname === "/api/move") {
@@ -251,7 +251,7 @@ async function handleApiPost(context, url) {
       session.undoStack.push(before);
       await maybePlayEngineTurn(session, context.engine);
     });
-    return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine) });
+    return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine, context.config) });
   }
 
   if (url.pathname === "/api/hint") {
@@ -265,7 +265,7 @@ async function handleApiPost(context, url) {
     return sendJson(context.response, 200, {
       ok: true,
       hint: summarizeCoach(hint, session.game.position),
-      state: serializeState(session, context.engine)
+      state: serializeState(session, context.engine, context.config)
     });
   }
 
@@ -275,7 +275,7 @@ async function handleApiPost(context, url) {
     return sendJson(context.response, 200, {
       ok: true,
       best: summarizeDecision(decision, session.game.position),
-      state: serializeState(session, context.engine)
+      state: serializeState(session, context.engine, context.config)
     });
   }
 
@@ -286,7 +286,7 @@ async function handleApiPost(context, url) {
       if (!previous) throw httpError(400, "Nothing to undo.");
       session.game = previous;
     });
-    return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine) });
+    return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine, context.config) });
   }
 
   if (url.pathname === "/api/jump") {
@@ -298,7 +298,7 @@ async function handleApiPost(context, url) {
       session.undoStack.push(before);
       await maybePlayEngineTurn(session, context.engine);
     });
-    return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine) });
+    return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine, context.config) });
   }
 
   sendJson(context.response, 404, { ok: false, error: "Unknown API route." });
@@ -416,7 +416,7 @@ function countPositions(positions) {
   return counts;
 }
 
-function serializeState(session, engine) {
+function serializeState(session, engine, config = {}) {
   const status = gameStatus(session.game);
   const legalMoves = engine.legalMoves(session.game.position)
     .map((move) => summarizeMove(move, session.game.position));
@@ -442,7 +442,11 @@ function serializeState(session, engine) {
     lastMove: lastMove ? summarizeHistoryMove(lastMove) : null,
     lastPlayerReview: lastPlayerMove?.review ? summarizeReview(lastPlayerMove.review, lastPlayerPosition) : null,
     lastEngineDecision: lastEngineMove?.decision ? summarizeDecision(lastEngineMove.decision, lastEnginePosition) : null,
-    backend: describeEngineBackend(engine)
+    backend: describeEngineBackend(engine),
+    web: {
+      commandTimeoutMs: config.commandTimeoutMs ?? null,
+      requestTimeoutMs: config.requestTimeoutMs ?? null
+    }
   };
 }
 

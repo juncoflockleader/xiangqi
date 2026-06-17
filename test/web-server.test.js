@@ -103,6 +103,14 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function localizedChineseText/);
     assert.match(script, /thinking: "引擎思考中\.\.\."/);
     assert.match(script, /thinkingShort: "思考中"/);
+    assert.match(script, /DEFAULT_CLIENT_REQUEST_TIMEOUT_MS = 15 \* 60 \* 1000/);
+    assert.match(script, /function currentRequestTimeoutMs/);
+    assert.match(script, /function fetchState/);
+    assert.match(script, /function refreshStateAfterFailure/);
+    assert.match(script, /state\.errorMessage = refreshed/);
+    assert.match(script, /function pendingStatusText/);
+    assert.match(script, /requestTimedOut: "请求等待时间过长，请重试。"/);
+    assert.match(script, /stateRefreshed: "已重新同步当前局面。"/);
     assert.match(script, /className = "turn-pill thinking"/);
     assert.match(script, /traditionalChineseMap/);
     assert.match(script, /function moveLabelText/);
@@ -160,6 +168,8 @@ test("web server serves the browser game and starts a session", async () => {
     assert.equal(created.ok, true);
     assert.equal(created.state.playerSide, "red");
     assert.equal(created.state.engineSide, "black");
+    assert.equal(created.state.web.commandTimeoutMs, 30000);
+    assert.equal(created.state.web.requestTimeoutMs, 90000);
     assert.equal(created.state.board.length, 90);
     assert.equal(created.state.board.find((cell) => cell.coord === "a0").piece.zhLabel, "黑方車");
     assert.equal(created.state.board.find((cell) => cell.coord === "e9").piece.zhLabel, "紅方帥");
