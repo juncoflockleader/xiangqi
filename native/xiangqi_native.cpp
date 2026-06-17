@@ -1503,6 +1503,8 @@ int trackedPieceSquareSlot(const Board& board, int side, int square) {
   const auto& squares = pieceSquares(board, side);
   const auto& slots = pieceSlots(board, side);
   const int count = pieceCount(board, side);
+  (void)squares;
+  (void)count;
   const int index = slots[square];
   assert(index >= 0 && index < count);
   assert(squares[index] == square);
@@ -1707,15 +1709,6 @@ int pieceCodeValue(int piece) {
 }
 
 int pieceTypeValue(int type) {
-  return kPieceValues[static_cast<std::size_t>(type)];
-}
-
-int pieceValue(int pieceOrType) {
-  if (pieceOrType >= -7 && pieceOrType <= 7) {
-    return kValueByPieceCode[static_cast<std::size_t>(pieceOrType + kPieceCodeOffset)];
-  }
-  const int type = pieceOrType < 0 ? -pieceOrType : pieceOrType;
-  if (type < 0 || type >= static_cast<int>(kPieceValues.size())) return 0;
   return kPieceValues[static_cast<std::size_t>(type)];
 }
 
@@ -2021,6 +2014,7 @@ int trackedKingSquare(const Board& board, int side) {
 int trackedPieceAtSquare(const Board& board, int side, int square) {
   assert(square >= 0 && square < kSquares);
   const int piece = board.cells[square];
+  (void)side;
   assert(piece != 0 && pieceCodeSide(piece) == side);
   return piece;
 }
