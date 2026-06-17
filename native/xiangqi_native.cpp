@@ -5683,8 +5683,8 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t earlyPawnCannonSide = fenPositionKey(
       "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r");
   if (root.key == earlyPawnCannonSide) {
-    if (uci == "h2e2") return 5000;  // h7-e7: refreshed 2026 Pikafish top central cannon.
-    if (uci == "b2e2") return 4900;  // b7-e7: near-tie opposite central cannon.
+    if (uci == "b2e2") return 5000;  // b7-e7: refreshed 2026 Pikafish top central cannon.
+    if (uci == "h2e2") return 4900;  // h7-e7: near-tie opposite central cannon.
     if (uci == "b0c2") return 4700;  // b9-c7: horse-development alternative.
     if (uci == "c0e2") return 4400;  // c9-e7: older playable elephant-development fallback.
     return 0;
