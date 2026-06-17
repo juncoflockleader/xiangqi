@@ -875,6 +875,7 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     evalCacheProbes: maxInfoValue(infos, "evalCacheProbes"),
     evalCacheStores: maxInfoValue(infos, "evalCacheStores"),
     checkedEvalSkips: maxInfoValue(infos, "checkedEvalSkips"),
+    checkedEvalTrendResets: maxInfoValue(infos, "checkedEvalTrendResets"),
     ttHits: maxInfoValue(infos, "ttHits"),
     ttMoveHits: maxInfoValue(infos, "ttMoveHits"),
     cutoffs: maxInfoValue(infos, "cutoffs"),
@@ -1454,6 +1455,9 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "evalskip") {
       info.checkedEvalSkips = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "evalguard") {
+      info.checkedEvalTrendResets = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "rep") {
       info.repetitions = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -2072,6 +2076,7 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.checkCacheHits ?? 0) > 0) parts.push(nativeCount(stats.checkCacheHits, "check-cache hit"));
   if ((stats.leastAttackerCacheHits ?? 0) > 0) parts.push(nativeCount(stats.leastAttackerCacheHits, "least-attacker cache hit"));
   if ((stats.checkedEvalSkips ?? 0) > 0) parts.push(nativeCount(stats.checkedEvalSkips, "checked-node eval skip"));
+  if ((stats.checkedEvalTrendResets ?? 0) > 0) parts.push(nativeCount(stats.checkedEvalTrendResets, "checked-node eval-trend reset"));
   if ((stats.extensions ?? 0) > 0) parts.push(nativeCount(stats.extensions, "tactical extension"));
   if ((stats.recaptureExtensions ?? 0) > 0) parts.push(nativeCount(stats.recaptureExtensions, "recapture extension"));
   if ((stats.pawnThreatExtensions ?? 0) > 0) parts.push(nativeCount(stats.pawnThreatExtensions, "late pawn-pressure extension"));
@@ -2348,6 +2353,7 @@ function createNativeStats(parsed) {
     evalCacheHits: parsed.evalCacheHits ?? 0,
     evalCacheStores: parsed.evalCacheStores ?? 0,
     checkedEvalSkips: parsed.checkedEvalSkips ?? 0,
+    checkedEvalTrendResets: parsed.checkedEvalTrendResets ?? 0,
     ttHits: parsed.ttHits ?? 0,
     ttMoveHits: parsed.ttMoveHits ?? 0,
     cutoffs: parsed.cutoffs ?? 0,
@@ -2456,6 +2462,7 @@ function createEmptyStats() {
     evalCacheHits: 0,
     evalCacheStores: 0,
     checkedEvalSkips: 0,
+    checkedEvalTrendResets: 0,
     tacticalCacheHits: 0,
     tacticalCacheStores: 0,
     ttHits: 0,

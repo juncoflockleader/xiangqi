@@ -853,6 +853,7 @@ struct SearchState {
   int64_t evalCacheHits = 0;
   int64_t evalCacheStores = 0;
   int64_t checkedEvalSkips = 0;
+  int64_t checkedEvalTrendResets = 0;
   int memoryAge = 0;
   uint64_t rootOrderKey = 0;
   int rootOrderCount = 0;
@@ -999,6 +1000,7 @@ struct SearchState {
     evalCacheHits = 0;
     evalCacheStores = 0;
     checkedEvalSkips = 0;
+    checkedEvalTrendResets = 0;
     memoryAge += 1;
     ttHashfull = 0;
     tt = nullptr;
@@ -2854,6 +2856,13 @@ StaticEvalTrend staticEvalTrend(SearchState& state, int ply, int staticScore) {
 
   state.stableEvalTrendNodes += 1;
   return TrendStable;
+}
+
+void clearStaticEvalTrendAtPly(SearchState& state, int ply) {
+  if (ply < 0 || ply >= kMaxPly) return;
+  if (state.staticEvalKnown[ply]) state.checkedEvalTrendResets += 1;
+  state.staticEvalKnown[ply] = false;
+  state.staticEvalStack[ply] = 0;
 }
 
 int trendAdjustedMargin(int margin, StaticEvalTrend trend, int improvingSlack, int worseningTighten, int floor) {
@@ -4745,6 +4754,7 @@ int negamax(
   StaticEvalTrend trend = TrendUnknown;
   if (inCheck) {
     state.checkedEvalSkips += 1;
+    clearStaticEvalTrendAtPly(state, ply);
   } else {
     staticScore = evaluateSideToMove(board, state);
     trend = staticEvalTrend(state, ply, staticScore);
@@ -6067,7 +6077,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " qtt " << state.qttHits << "/" << state.qttProbes << " qttstores " << state.qttStores
               << " qttcut " << state.qttCutoffs << " qttmove " << state.qttMoveHits
               << " eval " << state.evalCacheHits << "/" << state.evalCacheProbes << " evalstores " << state.evalCacheStores
-              << " evalskip " << state.checkedEvalSkips
+              << " evalskip " << state.checkedEvalSkips << " evalguard " << state.checkedEvalTrendResets
               << " rep " << state.repetitions
               << " memage " << state.memoryAge
               << " pv\n";
@@ -6143,7 +6153,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " qtt " << state.qttHits << "/" << state.qttProbes << " qttstores " << state.qttStores
               << " qttcut " << state.qttCutoffs << " qttmove " << state.qttMoveHits
               << " eval " << state.evalCacheHits << "/" << state.evalCacheProbes << " evalstores " << state.evalCacheStores
-              << " evalskip " << state.checkedEvalSkips
+              << " evalskip " << state.checkedEvalSkips << " evalguard " << state.checkedEvalTrendResets
               << " rep " << state.repetitions
               << " memage " << state.memoryAge
               << " pv " << formatPv(line.pv)
