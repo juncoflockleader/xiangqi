@@ -5521,7 +5521,7 @@ int quiescenceKnownCheck(
   if (!inCheck) {
     standPat = evaluateSideToMove(board, state);
     if (standPat >= beta) {
-      storeQtt(state, board, qDepth, ply, beta, kTtLower, {});
+      storeQtt(state, board, qDepth, ply, standPat, kTtLower, {});
       return beta;
     }
     if (standPat > alpha) alpha = standPat;
@@ -5624,7 +5624,7 @@ int quiescenceKnownCheck(
         addHistoryScore(state.qCheckHistory, move, bonus);
         state.qCheckHistoryStores += 1;
       }
-      storeQtt(state, board, qDepth, ply, beta, kTtLower, move);
+      storeQtt(state, board, qDepth, ply, score, kTtLower, move);
       return beta;
     }
     if (captureMove && score <= alphaBeforeMove) {
