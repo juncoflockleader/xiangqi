@@ -77,6 +77,7 @@ constexpr int kRootTimeGuardMinMs = 8;
 constexpr int kRootTimeGuardMaxMs = 250;
 constexpr int kRootTimeGuardDivisor = 3;
 constexpr int kDefaultHashMb = 64;
+constexpr int kIsolatedSearchHashMb = 16;
 constexpr int kHistoryCountLookupThreshold = 64;
 constexpr int kPawnPressureExtensionMaxPieces = 10;
 constexpr int kPawnPressureOrderingBonus = 28000;
@@ -6244,20 +6245,42 @@ int main() {
       handlePosition(position, line);
     } else if (command == "go") {
       const GoOptions options = parseGo(line);
-      auto lines = searchRoot(
-          position.board,
-          options.depth,
-          options.moveTimeMs,
-          multiPv,
-          options.searchMoves,
-          position.historyKeys,
-          position.historyCounts,
-          tt,
-          qtt,
-          evalCache,
-          searchState,
-          options.rootAlphaPruning);
-      writeSearchResult(lines, searchState);
+      if (options.searchMoves.empty()) {
+        auto lines = searchRoot(
+            position.board,
+            options.depth,
+            options.moveTimeMs,
+            multiPv,
+            options.searchMoves,
+            position.historyKeys,
+            position.historyCounts,
+            tt,
+            qtt,
+            evalCache,
+            searchState,
+            options.rootAlphaPruning);
+        writeSearchResult(lines, searchState);
+      } else {
+        const int scratchHashMb = std::max(1, std::min(hashMb, kIsolatedSearchHashMb));
+        TranspositionTable scratchTt(scratchHashMb);
+        TranspositionTable scratchQtt(std::max(1, scratchHashMb / 4));
+        EvalCache scratchEvalCache(std::max(1, scratchHashMb / 4));
+        SearchState scratchState;
+        auto lines = searchRoot(
+            position.board,
+            options.depth,
+            options.moveTimeMs,
+            multiPv,
+            options.searchMoves,
+            position.historyKeys,
+            position.historyCounts,
+            scratchTt,
+            scratchQtt,
+            scratchEvalCache,
+            scratchState,
+            options.rootAlphaPruning);
+        writeSearchResult(lines, scratchState);
+      }
     } else if (command == "quit") {
       break;
     } else if (command == "stop") {
