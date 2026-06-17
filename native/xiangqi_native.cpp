@@ -468,18 +468,21 @@ constexpr SquarePairLookup makeSameLineLookup() {
   return values;
 }
 
-constexpr SquarePairLookup makeAdjacentLookup() {
+constexpr SquarePairLookup makeHorseLegBlockerLookup() {
   SquarePairLookup values{};
-  for (int square = 0; square < kSquares; square += 1) {
-    const int file = square % kFiles;
-    const int rank = square / kFiles;
-    for (int target = 0; target < kSquares; target += 1) {
-      const int targetFile = target % kFiles;
-      const int targetRank = target / kFiles;
-      const int fileDelta = file > targetFile ? file - targetFile : targetFile - file;
-      const int rankDelta = rank > targetRank ? rank - targetRank : targetRank - rank;
-      values[static_cast<std::size_t>(square)][static_cast<std::size_t>(target)] =
-          fileDelta + rankDelta == 1;
+  constexpr int deltas[kMaxHorseTargets][2] = {{1, 2}, {2, 1}, {2, -1}, {1, -2}, {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2}};
+  for (int source = 0; source < kSquares; source += 1) {
+    const int file = source % kFiles;
+    const int rank = source / kFiles;
+    for (const auto& delta : deltas) {
+      const int targetFile = file + delta[0];
+      const int targetRank = rank + delta[1];
+      if (targetFile < 0 || targetFile >= kFiles || targetRank < 0 || targetRank >= kRanks) continue;
+      const int legFile = (delta[0] == 2 || delta[0] == -2) ? file + (delta[0] > 0 ? 1 : -1) : file;
+      const int legRank = (delta[1] == 2 || delta[1] == -2) ? rank + (delta[1] > 0 ? 1 : -1) : rank;
+      const int blocker = legRank * kFiles + legFile;
+      const int target = targetRank * kFiles + targetFile;
+      values[static_cast<std::size_t>(blocker)][static_cast<std::size_t>(target)] = true;
     }
   }
   return values;
@@ -506,7 +509,7 @@ constexpr auto kFileBySquare = makeFileLookup();
 constexpr auto kRankBySquare = makeRankLookup();
 constexpr auto kFileCentrality = makeFileCentralityLookup();
 constexpr auto kSameLineBySquare = makeSameLineLookup();
-constexpr auto kAdjacentBySquare = makeAdjacentLookup();
+constexpr auto kHorseLegBlockerByTarget = makeHorseLegBlockerLookup();
 constexpr auto kHorseGeometryBySquare = makeHorseGeometryLookup();
 constexpr auto kRaySquares = makeRaySquareLookup();
 constexpr auto kRayLengths = makeRayLengthLookup();
@@ -2146,7 +2149,7 @@ bool maybeMoveCanGiveCheck(const Move& move, int kingSquare) {
   const auto to = static_cast<std::size_t>(move.to);
   const auto king = static_cast<std::size_t>(kingSquare);
   if (kSameLineBySquare[from][king] || kSameLineBySquare[to][king]) return true;
-  if (kAdjacentBySquare[from][king]) return true;
+  if (kHorseLegBlockerByTarget[from][king]) return true;
 
   const int type = typeOf(move.piece);
   if (type == Horse && kHorseGeometryBySquare[to][king]) return true;
@@ -2201,17 +2204,14 @@ bool discoveredMoveGivesCheck(const Board& board, const Move& move, int enemyKin
   const int side = (movingPiece > 0) - (movingPiece < 0);
   if (side == 0 || enemyKing < 0) return true;
 
-  const int fromFile = fileOf(move.from);
-  const int fromRank = rankOf(move.from);
-  const int toFile = fileOf(move.to);
-  const int toRank = rankOf(move.to);
-  const int kingFile = fileOf(enemyKing);
-  const int kingRank = rankOf(enemyKing);
+  const auto from = static_cast<std::size_t>(move.from);
+  const auto to = static_cast<std::size_t>(move.to);
+  const auto king = static_cast<std::size_t>(enemyKing);
 
-  const bool lineMayChange = fromFile == kingFile || fromRank == kingRank || toFile == kingFile || toRank == kingRank;
+  const bool lineMayChange = kSameLineBySquare[from][king] || kSameLineBySquare[to][king];
   if (lineMayChange && lineCheckAfterMove<true>(board, move, side, enemyKing, movingPiece)) return true;
 
-  const bool horseLegMayOpen = std::abs(fromFile - kingFile) + std::abs(fromRank - kingRank) == 1;
+  const bool horseLegMayOpen = kHorseLegBlockerByTarget[from][king];
   if (horseLegMayOpen && horseCheckAfterMove<true>(board, move, side, enemyKing, movingPiece)) return true;
 
   return pawnCheckAfterMove<true>(board, move, side, enemyKing, movingPiece);

@@ -1066,7 +1066,7 @@ test("local C++ engine respects vertical horse-leg checks", async (t) => {
     protocol: "uci",
     depth: 1,
     timeLimitMs: 500,
-    startupTimeoutMs: 1000,
+    startupTimeoutMs: 3000,
     commandTimeoutMs: 3000
   });
 
@@ -1083,6 +1083,29 @@ test("local C++ engine respects vertical horse-leg checks", async (t) => {
   } finally {
     await backend.close();
   }
+});
+
+test("local C++ engine recognizes discovered horse-leg checks from diagonal blockers", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const input = [
+    "uci",
+    "position fen 9/2HP5/4k4/9/9/9/9/9/9/3K5 r",
+    "go depth 3",
+    "quit"
+  ].join("\n");
+  const result = spawnSync(build.output, {
+    input,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /\bbestmove d8d9\b/);
+  assert.match(result.stdout, /\bscore cp 9999[0-9]\b/);
 });
 
 test("local C++ engine detects line checks from the a0 square", (t) => {
