@@ -5512,13 +5512,14 @@ int negamax(
       && hashFlag != kTtUpper
       && hashDepth >= depth - 2
       && !isMateScore(hashScore);
+  const bool scoreTacticalChecks = allowNullMove;
   if (useFullMoveOrder) {
-    orderMoves(moves, state, ply, hashMove, counterMove, &board, enemyKing, previousMove, inCheck);
+    orderMoves(moves, state, ply, hashMove, counterMove, &board, enemyKing, previousMove, inCheck, scoreTacticalChecks);
   }
   ScoredMovePicker movePicker(moves);
   if (!useFullMoveOrder) {
-    if (!movePicker.tryHashMoveFirst(state, ply, hashMove, counterMove, &board, enemyKing, previousMove, inCheck)) {
-      movePicker.score(state, ply, hashMove, counterMove, &board, enemyKing, previousMove, inCheck);
+    if (!movePicker.tryHashMoveFirst(state, ply, hashMove, counterMove, &board, enemyKing, previousMove, inCheck, scoreTacticalChecks)) {
+      movePicker.score(state, ply, hashMove, counterMove, &board, enemyKing, previousMove, inCheck, scoreTacticalChecks);
     }
   }
 
