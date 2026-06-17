@@ -954,6 +954,7 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     checkCacheHits: maxInfoValue(infos, "checkCacheHits"),
     checkCacheStores: maxInfoValue(infos, "checkCacheStores"),
     iidSearches: maxInfoValue(infos, "iidSearches"),
+    iidCutNodeSearches: maxInfoValue(infos, "iidCutNodeSearches"),
     iidMoveHits: maxInfoValue(infos, "iidMoveHits"),
     rootMovesSearched: maxInfoValue(infos, "rootMovesSearched"),
     rootChildStateReuses: maxInfoValue(infos, "rootChildStateReuses"),
@@ -1121,6 +1122,7 @@ function parseInfoLine(line) {
     improvingLateMoveGuards: 0,
     nonImprovingLateMovePrunes: 0,
     iidSearches: 0,
+    iidCutNodeSearches: 0,
     iidMoveHits: 0,
     rootMovesSearched: 0,
     rootChildStateReuses: 0,
@@ -1382,6 +1384,9 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "iid") {
       info.iidSearches = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "iidcut") {
+      info.iidCutNodeSearches = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "iidhit") {
       info.iidMoveHits = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -2489,6 +2494,7 @@ function createNativeStats(parsed) {
     checkCacheHits: parsed.checkCacheHits ?? 0,
     checkCacheStores: parsed.checkCacheStores ?? 0,
     iidSearches: parsed.iidSearches ?? 0,
+    iidCutNodeSearches: parsed.iidCutNodeSearches ?? 0,
     iidMoveHits: parsed.iidMoveHits ?? 0,
     rootMovesSearched: parsed.rootMovesSearched ?? 0,
     rootChildStateReuses: parsed.rootChildStateReuses ?? 0,
@@ -2643,6 +2649,7 @@ function createEmptyStats() {
     rootTimeGuardStops: 0,
     openingPreferencePromotions: 0,
     iidSearches: 0,
+    iidCutNodeSearches: 0,
     iidMoveHits: 0,
     rootMovesSearched: 0,
     rootChildStateReuses: 0,

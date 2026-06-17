@@ -45,6 +45,7 @@ constexpr int kProbCutReduction = 2;
 constexpr int kProbCutMargin = 190;
 constexpr int kProbCutCaptureLimit = 6;
 constexpr int kIidMinDepth = 5;
+constexpr int kIidCutNodeMinDepth = 7;
 constexpr int kIidReduction = 2;
 constexpr int kIidMoveLimit = 8;
 constexpr int kNullMoveVerificationMinDepth = 5;
@@ -901,6 +902,7 @@ struct SearchState {
   int64_t checkCacheHits = 0;
   int64_t checkCacheStores = 0;
   int64_t iidSearches = 0;
+  int64_t iidCutNodeSearches = 0;
   int64_t iidMoveHits = 0;
   int64_t rootTtHits = 0;
   int64_t rootTtStores = 0;
@@ -1061,6 +1063,7 @@ struct SearchState {
     checkCacheHits = 0;
     checkCacheStores = 0;
     iidSearches = 0;
+    iidCutNodeSearches = 0;
     iidMoveHits = 0;
     rootTtHits = 0;
     rootTtStores = 0;
@@ -3339,7 +3342,12 @@ bool shouldUseInternalIterativeDeepening(
   if (validMove(hashMove) && hashDepth >= depth) return false;
   if (inCheck || depth < kIidMinDepth) return false;
   if (legalMoves.size() < 2) return false;
-  if (beta - alpha <= 1) return false;
+  const int window = beta - alpha;
+  const bool pvNode = window > 1;
+  const bool deepCutNode = window == 1
+      && depth >= kIidCutNodeMinDepth
+      && legalMoves.size() > kIidMoveLimit;
+  if (!pvNode && !deepCutNode) return false;
   if (isMateScore(alpha) || isMateScore(beta)) return false;
   return true;
 }
@@ -4843,6 +4851,7 @@ Move internalIterativeDeepeningMoveHint(
   const bool previousIidActive = state.iidActive;
   state.iidActive = true;
   state.iidSearches += 1;
+  if (beta - alpha == 1) state.iidCutNodeSearches += 1;
 
   Move bestMove{};
   int bestScore = -kInf;
@@ -6607,7 +6616,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " checkhist " << state.checkHistoryHits << " checkhstores " << state.checkHistoryStores
               << " checkhm " << state.checkHistoryMaluses
               << " checkcache " << state.checkCacheHits << "/" << state.checkCacheStores
-              << " iid " << state.iidSearches << " iidhit " << state.iidMoveHits
+              << " iid " << state.iidSearches << " iidcut " << state.iidCutNodeSearches
+              << " iidhit " << state.iidMoveHits
               << " rootmoves " << state.rootMovesSearched
               << " rootstate " << state.rootChildStateReuses
               << " rootred " << state.rootReductions << "/" << state.rootReductionResearches
@@ -6690,7 +6700,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " checkhist " << state.checkHistoryHits << " checkhstores " << state.checkHistoryStores
               << " checkhm " << state.checkHistoryMaluses
               << " checkcache " << state.checkCacheHits << "/" << state.checkCacheStores
-              << " iid " << state.iidSearches << " iidhit " << state.iidMoveHits
+              << " iid " << state.iidSearches << " iidcut " << state.iidCutNodeSearches
+              << " iidhit " << state.iidMoveHits
               << " rootmoves " << state.rootMovesSearched
               << " rootstate " << state.rootChildStateReuses
               << " rootred " << state.rootReductions << "/" << state.rootReductionResearches

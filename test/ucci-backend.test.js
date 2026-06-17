@@ -225,6 +225,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.checkCacheHits, 21);
     assert.equal(result.stats.checkCacheStores, 34);
     assert.equal(result.stats.iidSearches, 4);
+    assert.equal(result.stats.iidCutNodeSearches, 2);
     assert.equal(result.stats.iidMoveHits, 3);
     assert.equal(result.stats.rootMovesSearched, 12);
     assert.equal(result.stats.rootChildStateReuses, 24);
@@ -326,6 +327,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.iterations[0].stats.checkHistoryHits, 14);
     assert.equal(result.iterations[0].stats.checkHistoryStores, 9);
     assert.equal(result.iterations[0].stats.checkHistoryMaluses, 2);
+    assert.equal(result.iterations[0].stats.iidCutNodeSearches, 2);
     assert.equal(result.iterations[0].stats.iidMoveHits, 3);
     assert.equal(result.iterations[0].stats.rootMovesSearched, 12);
     assert.equal(result.iterations[0].stats.rootChildStateReuses, 24);
