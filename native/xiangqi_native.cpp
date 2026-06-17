@@ -6204,11 +6204,32 @@ int main() {
   TranspositionTable qtt(std::max(1, hashMb / 4));
   EvalCache evalCache(std::max(1, hashMb / 4));
   SearchState searchState;
+  int isolatedHashMb = std::max(1, std::min(hashMb, kIsolatedSearchHashMb));
+  TranspositionTable isolatedTt(isolatedHashMb);
+  TranspositionTable isolatedQtt(std::max(1, isolatedHashMb / 4));
+  EvalCache isolatedEvalCache(std::max(1, isolatedHashMb / 4));
+  SearchState isolatedSearchState;
+  auto resizeIsolatedMemory = [&]() {
+    const int nextIsolatedHashMb = std::max(1, std::min(hashMb, kIsolatedSearchHashMb));
+    if (nextIsolatedHashMb == isolatedHashMb) return;
+    isolatedHashMb = nextIsolatedHashMb;
+    isolatedTt.resize(isolatedHashMb);
+    isolatedQtt.resize(std::max(1, isolatedHashMb / 4));
+    isolatedEvalCache.resize(std::max(1, isolatedHashMb / 4));
+    isolatedSearchState.clearSearchMemory();
+  };
+  auto clearIsolatedMemory = [&]() {
+    isolatedTt.clear();
+    isolatedQtt.clear();
+    isolatedEvalCache.clear();
+    isolatedSearchState.clearSearchMemory();
+  };
   auto clearEngineMemory = [&]() {
     tt.clear();
     qtt.clear();
     evalCache.clear();
     searchState.clearSearchMemory();
+    clearIsolatedMemory();
   };
 
   std::string line;
@@ -6240,6 +6261,7 @@ int main() {
         tt.resize(hashMb);
         qtt.resize(std::max(1, hashMb / 4));
         evalCache.resize(std::max(1, hashMb / 4));
+        resizeIsolatedMemory();
       }
     } else if (command == "position") {
       handlePosition(position, line);
@@ -6261,11 +6283,8 @@ int main() {
             options.rootAlphaPruning);
         writeSearchResult(lines, searchState);
       } else {
-        const int scratchHashMb = std::max(1, std::min(hashMb, kIsolatedSearchHashMb));
-        TranspositionTable scratchTt(scratchHashMb);
-        TranspositionTable scratchQtt(std::max(1, scratchHashMb / 4));
-        EvalCache scratchEvalCache(std::max(1, scratchHashMb / 4));
-        SearchState scratchState;
+        resizeIsolatedMemory();
+        clearIsolatedMemory();
         auto lines = searchRoot(
             position.board,
             options.depth,
@@ -6274,12 +6293,12 @@ int main() {
             options.searchMoves,
             position.historyKeys,
             position.historyCounts,
-            scratchTt,
-            scratchQtt,
-            scratchEvalCache,
-            scratchState,
+            isolatedTt,
+            isolatedQtt,
+            isolatedEvalCache,
+            isolatedSearchState,
             options.rootAlphaPruning);
-        writeSearchResult(lines, scratchState);
+        writeSearchResult(lines, isolatedSearchState);
       }
     } else if (command == "quit") {
       break;
