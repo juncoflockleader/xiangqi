@@ -35,7 +35,7 @@ const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_STARTUP_TIMEOUT_MS = 5000;
 const DEFAULT_COMMAND_TIMEOUT_MS = 30000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
-const COMMAND_TIMEOUT_DEPTH_MS = 45000;
+const COMMAND_TIMEOUT_DEPTH_MS = 90000;
 const COMMAND_TIMEOUT_TIME_MULTIPLIER = 20;
 const REQUEST_TIMEOUT_BUFFER_MS = 30000;
 const PLAYER_REVIEW_DEPTH_CAP = 3;
@@ -965,7 +965,7 @@ Options:
   --no-book            Disable opening book moves.
   --no-native          Force the JavaScript engine.
   --engine-preset name Native engine preset. Default: pikafish.
-  --request-timeout ms HTTP wait budget. Default: engine command timeout + 30000ms.
+  --request-timeout ms HTTP wait budget. Default: engine command timeout + capped review timeout + 30000ms.
 `.trim());
 }
 

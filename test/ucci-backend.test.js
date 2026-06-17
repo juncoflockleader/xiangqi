@@ -180,6 +180,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.razorPrunes, 4);
     assert.equal(result.stats.razorResearches, 1);
     assert.equal(result.stats.seePrunes, 3);
+    assert.equal(result.stats.depthThreeSeePrunes, 2);
     assert.equal(result.stats.leastAttackerCacheHits, 13);
     assert.equal(result.stats.leastAttackerCacheProbes, 21);
     assert.equal(result.stats.leastAttackerCacheStores, 8);
@@ -231,6 +232,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.rootChildStateReuses, 24);
     assert.equal(result.stats.rootReductions, 5);
     assert.equal(result.stats.rootReductionResearches, 2);
+    assert.equal(result.stats.rootBadCaptureReductions, 3);
     assert.equal(result.stats.rootReductionPlies, 7);
     assert.equal(result.stats.rootHistoryReductionGuards, 4);
     assert.equal(result.stats.rootHistoryReductionBoosts, 5);
@@ -289,6 +291,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.iterations[0].stats.mateDistancePrunes, 2);
     assert.equal(result.iterations[0].stats.razorPrunes, 4);
     assert.equal(result.iterations[0].stats.seePrunes, 3);
+    assert.equal(result.iterations[0].stats.depthThreeSeePrunes, 2);
     assert.equal(result.iterations[0].stats.leastAttackerCacheHits, 13);
     assert.equal(result.iterations[0].stats.leastAttackerCacheProbes, 21);
     assert.equal(result.iterations[0].stats.leastAttackerCacheStores, 8);
@@ -333,6 +336,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.iterations[0].stats.rootChildStateReuses, 24);
     assert.equal(result.iterations[0].stats.rootReductions, 5);
     assert.equal(result.iterations[0].stats.rootReductionResearches, 2);
+    assert.equal(result.iterations[0].stats.rootBadCaptureReductions, 3);
     assert.equal(result.iterations[0].stats.rootReductionPlies, 7);
     assert.equal(result.iterations[0].stats.rootHistoryReductionGuards, 4);
     assert.equal(result.iterations[0].stats.rootHistoryReductionBoosts, 5);
@@ -382,6 +386,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("reverse-futility prune")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("razoring cutoff")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("static-exchange prune")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("depth-3 static-exchange prune")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("ProbCut capture prune")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("ProbCut capture prefilter")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("bad-history prune")));
@@ -399,6 +404,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("quiescence SEE prune")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("improving-position reduction guard")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("worsening-position reduction boost")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("root bad-capture reduction")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("transposition hash-move ordering hint")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("capture-history hit")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("capture-history update")));

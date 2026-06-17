@@ -9,16 +9,16 @@ import {
 
 test("web server scales native command timeout for deeper searches", () => {
   assert.equal(resolveWebServerCommandTimeoutMs({ depth: 1, timeLimitMs: 50 }), 30000);
-  assert.equal(resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 8000 }), 315000);
-  assert.equal(resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 25000 }), 500000);
+  assert.equal(resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 8000 }), 630000);
+  assert.equal(resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 25000 }), 630000);
   assert.equal(resolveWebServerCommandTimeoutMs({ commandTimeoutMs: 45000, depth: 7, timeLimitMs: 8000 }), 45000);
 });
 
 test("web server keeps HTTP requests open longer than deep native searches", () => {
   const commandTimeoutMs = resolveWebServerCommandTimeoutMs({ depth: 7, timeLimitMs: 8000 });
 
-  assert.equal(commandTimeoutMs, 315000);
-  assert.equal(resolveWebServerRequestTimeoutMs({ depth: 7, timeLimitMs: 8000 }, commandTimeoutMs), 375000);
+  assert.equal(commandTimeoutMs, 630000);
+  assert.equal(resolveWebServerRequestTimeoutMs({ depth: 7, timeLimitMs: 8000 }, commandTimeoutMs), 690000);
   assert.equal(resolveWebServerRequestTimeoutMs({ commandTimeoutMs: 45000 }), 105000);
   assert.equal(resolveWebServerRequestTimeoutMs({ requestTimeoutMs: 90000, commandTimeoutMs: 45000 }), 90000);
 });

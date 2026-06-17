@@ -909,6 +909,7 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     razorPrunes: maxInfoValue(infos, "razorPrunes"),
     razorResearches: maxInfoValue(infos, "razorResearches"),
     seePrunes: maxInfoValue(infos, "seePrunes"),
+    depthThreeSeePrunes: maxInfoValue(infos, "depthThreeSeePrunes"),
     leastAttackerCacheHits: maxInfoValue(infos, "leastAttackerCacheHits"),
     leastAttackerCacheProbes: maxInfoValue(infos, "leastAttackerCacheProbes"),
     leastAttackerCacheStores: maxInfoValue(infos, "leastAttackerCacheStores"),
@@ -959,6 +960,7 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     rootMovesSearched: maxInfoValue(infos, "rootMovesSearched"),
     rootChildStateReuses: maxInfoValue(infos, "rootChildStateReuses"),
     rootReductions: maxInfoValue(infos, "rootReductions"),
+    rootBadCaptureReductions: maxInfoValue(infos, "rootBadCaptureReductions"),
     rootReductionPlies: maxInfoValue(infos, "rootReductionPlies"),
     rootReductionResearches: maxInfoValue(infos, "rootReductionResearches"),
     rootHistoryReductionGuards: maxInfoValue(infos, "rootHistoryReductionGuards"),
@@ -1095,6 +1097,7 @@ function parseInfoLine(line) {
     razorPrunes: 0,
     razorResearches: 0,
     seePrunes: 0,
+    depthThreeSeePrunes: 0,
     leastAttackerCacheHits: 0,
     leastAttackerCacheProbes: 0,
     leastAttackerCacheStores: 0,
@@ -1127,6 +1130,7 @@ function parseInfoLine(line) {
     rootMovesSearched: 0,
     rootChildStateReuses: 0,
     rootReductions: 0,
+    rootBadCaptureReductions: 0,
     rootReductionPlies: 0,
     rootReductionResearches: 0,
     rootHistoryReductionGuards: 0,
@@ -1252,6 +1256,9 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "see") {
       info.seePrunes = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "see3") {
+      info.depthThreeSeePrunes = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "lacache") {
       const [hits, probes] = parseNativePair(tokens[index + 1]);
@@ -1401,6 +1408,9 @@ function parseInfoLine(line) {
       const [reductions, researches] = parseNativePair(tokens[index + 1]);
       info.rootReductions = reductions;
       info.rootReductionResearches = researches;
+      index += 1;
+    } else if (token === "rootsee") {
+      info.rootBadCaptureReductions = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "rootredply") {
       info.rootReductionPlies = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -2161,6 +2171,7 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.mateDistancePrunes ?? 0) > 0) parts.push(nativeCount(stats.mateDistancePrunes, "mate-distance prune"));
   if ((stats.razorPrunes ?? 0) > 0) parts.push(nativeCount(stats.razorPrunes, "razoring cutoff"));
   if ((stats.seePrunes ?? 0) > 0) parts.push(nativeCount(stats.seePrunes, "static-exchange prune"));
+  if ((stats.depthThreeSeePrunes ?? 0) > 0) parts.push(nativeCount(stats.depthThreeSeePrunes, "depth-3 static-exchange prune"));
   if ((stats.probCutPrunes ?? 0) > 0) parts.push(nativeCount(stats.probCutPrunes, "ProbCut capture prune"));
   if ((stats.probCutCaptureSkips ?? 0) > 0) parts.push(nativeCount(stats.probCutCaptureSkips, "ProbCut capture prefilter"));
   if ((stats.futilityPrunes ?? 0) > 0) parts.push(nativeCount(stats.futilityPrunes, "futility prune"));
@@ -2177,6 +2188,7 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.nonImprovingReductionBoosts ?? 0) > 0) parts.push(nativeCount(stats.nonImprovingReductionBoosts, "worsening-position reduction boost"));
   if ((stats.rootChildStateReuses ?? 0) > 0) parts.push(nativeCount(stats.rootChildStateReuses, "root child-state reuse"));
   if ((stats.rootReductions ?? 0) > 0) parts.push(nativeCount(stats.rootReductions, "root late-move reduction"));
+  if ((stats.rootBadCaptureReductions ?? 0) > 0) parts.push(nativeCount(stats.rootBadCaptureReductions, "root bad-capture reduction"));
   if ((stats.rootReductionResearches ?? 0) > 0) parts.push(nativeCount(stats.rootReductionResearches, "root reduction re-search"));
   if ((stats.rootHistoryReductionGuards ?? 0) > 0) parts.push(nativeCount(stats.rootHistoryReductionGuards, "root history reduction guard"));
   if ((stats.rootHistoryReductionBoosts ?? 0) > 0) parts.push(nativeCount(stats.rootHistoryReductionBoosts, "root history reduction boost"));
@@ -2449,6 +2461,7 @@ function createNativeStats(parsed) {
     razorPrunes: parsed.razorPrunes ?? 0,
     razorResearches: parsed.razorResearches ?? 0,
     seePrunes: parsed.seePrunes ?? 0,
+    depthThreeSeePrunes: parsed.depthThreeSeePrunes ?? 0,
     leastAttackerCacheHits: parsed.leastAttackerCacheHits ?? 0,
     leastAttackerCacheProbes: parsed.leastAttackerCacheProbes ?? 0,
     leastAttackerCacheStores: parsed.leastAttackerCacheStores ?? 0,
@@ -2499,6 +2512,7 @@ function createNativeStats(parsed) {
     rootMovesSearched: parsed.rootMovesSearched ?? 0,
     rootChildStateReuses: parsed.rootChildStateReuses ?? 0,
     rootReductions: parsed.rootReductions ?? 0,
+    rootBadCaptureReductions: parsed.rootBadCaptureReductions ?? 0,
     rootReductionPlies: parsed.rootReductionPlies ?? 0,
     rootReductionResearches: parsed.rootReductionResearches ?? 0,
     rootHistoryReductionGuards: parsed.rootHistoryReductionGuards ?? 0,
@@ -2577,6 +2591,7 @@ function createEmptyStats() {
     singularExtensionRejects: 0,
     softStops: 0,
     seePrunes: 0,
+    depthThreeSeePrunes: 0,
     leastAttackerCacheHits: 0,
     leastAttackerCacheProbes: 0,
     leastAttackerCacheStores: 0,
@@ -2654,6 +2669,7 @@ function createEmptyStats() {
     rootMovesSearched: 0,
     rootChildStateReuses: 0,
     rootReductions: 0,
+    rootBadCaptureReductions: 0,
     rootReductionPlies: 0,
     rootReductionResearches: 0,
     rootHistoryReductionGuards: 0,
