@@ -800,7 +800,7 @@ std::size_t floorPowerOfTwo(std::size_t value) {
 
 void prefetchForRead(const void* address) {
 #if defined(__GNUC__) || defined(__clang__)
-  __builtin_prefetch(address, 0, 1);
+  __builtin_prefetch(address, 0, 0);
 #else
   (void)address;
 #endif
