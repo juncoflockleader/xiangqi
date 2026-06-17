@@ -4492,7 +4492,8 @@ int moveOrderingScore(
     bool inCheck = false,
     bool scoreChecks = true,
     bool countHashMoveHit = true,
-    bool useQsearchCaptureHistory = false) {
+    bool useQsearchCaptureHistory = false,
+    int knownGivesCheck = -1) {
   if (hashMoveValid && sameMove(move, hashMove)) {
     if (countHashMoveHit) state.ttMoveHits += 1;
     return 10000000;
@@ -4556,11 +4557,70 @@ int moveOrderingScore(
   const int toFile = fileOf(move.to);
   score += fileCentrality(toFile) * 4;
   if (pieceType == Pawn && crossedRiver(pieceSide, rankOf(move.to))) score += 50;
-  if (scoreChecks && board && enemyKing >= 0 && moveGivesCheck(*board, move, enemyKing, state)) {
-    score += quietMove ? 85000 : 25000;
-    if (quietMove) score += checkHistoryScore(state, move, quietMove);
+  if (scoreChecks && board && enemyKing >= 0) {
+    const bool givesCheck = knownGivesCheck >= 0
+        ? knownGivesCheck > 0
+        : moveGivesCheck(*board, move, enemyKing, state);
+    if (givesCheck) {
+      score += quietMove ? 85000 : 25000;
+      if (quietMove) score += checkHistoryScore(state, move, quietMove);
+    }
   }
   return score;
+}
+
+void orderRootMoves(
+    std::vector<RootMove>& rootMoves,
+    SearchState& state,
+    const Move& rootHashMove,
+    const Move& rootCounterMove,
+    const Board& root,
+    int rootEnemyKing,
+    const Move& rootPreviousMove,
+    bool rootInCheck) {
+  if (rootMoves.size() <= 1) return;
+
+  struct ScoredRootMove {
+    RootMove rootMove;
+    int score = 0;
+    int ordinal = 0;
+  };
+  const bool hashMoveValid = validMove(rootHashMove);
+  const bool counterMoveValid = validMove(rootCounterMove);
+  const Move previousOwnMove = previousOwnMoveFor(state, 0);
+  std::vector<ScoredRootMove> scored;
+  scored.reserve(rootMoves.size());
+
+  for (int index = 0; index < static_cast<int>(rootMoves.size()); index += 1) {
+    const RootMove& rootMove = rootMoves[static_cast<std::size_t>(index)];
+    const int score = moveOrderingScore(
+        rootMove.move,
+        state,
+        0,
+        rootHashMove,
+        hashMoveValid,
+        rootCounterMove,
+        counterMoveValid,
+        &root,
+        rootEnemyKing,
+        rootPreviousMove,
+        previousOwnMove,
+        rootInCheck,
+        true,
+        true,
+        false,
+        rootMove.child.inCheck ? 1 : 0);
+    scored.push_back({rootMove, score, index});
+  }
+
+  std::stable_sort(scored.begin(), scored.end(), [](const ScoredRootMove& left, const ScoredRootMove& right) {
+    if (left.score != right.score) return left.score > right.score;
+    return left.ordinal < right.ordinal;
+  });
+
+  for (std::size_t index = 0; index < scored.size(); index += 1) {
+    rootMoves[index] = scored[index].rootMove;
+  }
 }
 
 template <typename MoveContainer>
@@ -6174,10 +6234,10 @@ int timedOpeningRootMaxLoss(const Board& root) {
   return kTimedOpeningPriorMaxLoss;
 }
 
-void applyTimedOpeningRootBias(std::vector<Move>& rootMoves, const Board& root, bool enabled) {
+void applyTimedOpeningRootBias(std::vector<RootMove>& rootMoves, const Board& root, bool enabled) {
   if (!enabled || rootMoves.size() <= 1) return;
-  std::stable_sort(rootMoves.begin(), rootMoves.end(), [&root](const Move& left, const Move& right) {
-    return timedOpeningRootBonus(root, left) > timedOpeningRootBonus(root, right);
+  std::stable_sort(rootMoves.begin(), rootMoves.end(), [&root](const RootMove& left, const RootMove& right) {
+    return timedOpeningRootBonus(root, left.move) > timedOpeningRootBonus(root, right.move);
   });
 }
 
@@ -6211,7 +6271,7 @@ int cachedRootOrderRank(const SearchState& state, const Move& move) {
 }
 
 void applyRootOrderMemory(
-    std::vector<Move>& rootMoves,
+    std::vector<RootMove>& rootMoves,
     SearchState& state,
     uint64_t rootKey,
     const Move& rootHashMove,
@@ -6220,20 +6280,20 @@ void applyRootOrderMemory(
   if (state.rootOrderKey != rootKey || state.rootOrderCount <= 0) return;
 
   int matched = 0;
-  for (const Move& move : rootMoves) {
-    if (cachedRootOrderRank(state, move) < kInf) matched += 1;
+  for (const RootMove& rootMove : rootMoves) {
+    if (cachedRootOrderRank(state, rootMove.move) < kInf) matched += 1;
   }
   if (matched <= 1) return;
 
   state.rootOrderHits += matched;
   const bool hasRootHashMove = validMove(rootHashMove);
-  std::stable_sort(rootMoves.begin(), rootMoves.end(), [&state, &rootHashMove, hasRootHashMove](const Move& left, const Move& right) {
+  std::stable_sort(rootMoves.begin(), rootMoves.end(), [&state, &rootHashMove, hasRootHashMove](const RootMove& left, const RootMove& right) {
     if (hasRootHashMove) {
-      const bool leftHash = sameMove(left, rootHashMove);
-      const bool rightHash = sameMove(right, rootHashMove);
+      const bool leftHash = sameMove(left.move, rootHashMove);
+      const bool rightHash = sameMove(right.move, rootHashMove);
       if (leftHash != rightHash) return leftHash;
     }
-    return cachedRootOrderRank(state, left) < cachedRootOrderRank(state, right);
+    return cachedRootOrderRank(state, left.move) < cachedRootOrderRank(state, right.move);
   });
 }
 
@@ -6599,14 +6659,14 @@ std::vector<RootLine> searchRoot(
   }
   const bool useTimedOpeningPriors = rootAlphaPruning && unrestrictedRootSearch;
   const Move rootCounterMove = counterMoveFor(state, rootPreviousMove);
-  orderMoves(rootMoves, state, 0, rootHashMove, rootCounterMove, &root, rootEnemyKing, rootPreviousMove, rootInCheck);
-  applyRootOrderMemory(rootMoves, state, root.key, rootHashMove, unrestrictedRootSearch);
-  applyTimedOpeningRootBias(rootMoves, root, useTimedOpeningPriors);
   std::vector<RootMove> orderedRootMoves;
   orderedRootMoves.reserve(rootMoves.size());
   for (Move& move : rootMoves) {
     orderedRootMoves.push_back({move, knownChildStateAfterMove(root, move, rootEnemyKing, state)});
   }
+  orderRootMoves(orderedRootMoves, state, rootHashMove, rootCounterMove, root, rootEnemyKing, rootPreviousMove, rootInCheck);
+  applyRootOrderMemory(orderedRootMoves, state, root.key, rootHashMove, unrestrictedRootSearch);
+  applyTimedOpeningRootBias(orderedRootMoves, root, useTimedOpeningPriors);
   std::vector<RootLine> bestLines;
   bestLines.reserve(orderedRootMoves.size());
   const int rootStaticScore = evaluateRed(root) * root.side;
