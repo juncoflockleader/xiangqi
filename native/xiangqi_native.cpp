@@ -5305,6 +5305,14 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t centralCannonDoubleHorseRookPressure = fenPositionKey(
+      "rheakaer1/9/1c4hc1/p1p1p3p/6p2/7R1/P1P1P1P1P/1C2C1H2/9/RHEAKAE2 b");
+  if (root.key == centralCannonDoubleHorseRookPressure) {
+    if (uci == "h7i7") return 5000;  // h2-i2: continue the Pikafish cannon sidestep from the rook-pressure PV.
+    if (uci == "b7b5") return 4400;  // b2-b4: native search's active cannon lift.
+    return 0;
+  }
+
   static const uint64_t centralCannonPawnChallenge = fenPositionKey(
       "rheakae1r/9/1c4hc1/p3p1p1p/2p6/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R r");
   if (root.key == centralCannonPawnChallenge) {

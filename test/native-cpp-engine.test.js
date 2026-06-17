@@ -366,6 +366,7 @@ test("local C++ timed opening priors guide pure native central cannon branches",
     const shiftedCannonsDoubleHorse = parseFen("r1eakae1r/9/1ch3hc1/p1p1p1p1p/9/9/P1P1P1P1P/2HCC4/9/R1EAKAEHR b");
     const doubleHorseRedRook = parseFen("rheakae1r/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 b");
     const doubleHorseBothRooks = parseFen("rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 r");
+    const doubleHorseRookPressure = parseFen("rheakaer1/9/1c4hc1/p1p1p3p/6p2/7R1/P1P1P1P1P/1C2C1H2/9/RHEAKAE2 b");
     const leftScreen = parseFen("r1eakaehr/9/1ch4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR r");
 
     const huResult = await backend.chooseMove(huTrap, {
@@ -414,6 +415,12 @@ test("local C++ timed opening priors guide pure native central cannon branches",
       timeLimitMs: 200,
       lines: 5
     });
+    const doubleHorseRookPressureResult = await backend.chooseMove(doubleHorseRookPressure, {
+      useBook: false,
+      depth: 4,
+      timeLimitMs: 200,
+      lines: 5
+    });
     const leftScreenResult = await backend.chooseMove(leftScreen, {
       useBook: false,
       depth: 4,
@@ -429,6 +436,7 @@ test("local C++ timed opening priors guide pure native central cannon branches",
     assert.equal(moveToNotation(shiftedDoubleHorseResult.bestMove), "a0-b0");
     assert.equal(moveToNotation(doubleHorseRedRookResult.bestMove), "i0-h0");
     assert.equal(moveToNotation(doubleHorseBothRooksResult.bestMove), "h9-h5");
+    assert.equal(moveToNotation(doubleHorseRookPressureResult.bestMove), "h2-i2");
     assert.equal(moveToNotation(leftScreenResult.bestMove), "h9-g7");
     assert.ok(huResult.nodes > 0);
     assert.ok(centralResult.nodes > 0);
@@ -438,6 +446,7 @@ test("local C++ timed opening priors guide pure native central cannon branches",
     assert.ok(shiftedDoubleHorseResult.nodes > 0);
     assert.ok(doubleHorseRedRookResult.nodes > 0);
     assert.ok(doubleHorseBothRooksResult.nodes > 0);
+    assert.ok(doubleHorseRookPressureResult.nodes > 0);
     assert.ok(leftScreenResult.nodes > 0);
   } finally {
     await backend.close();
