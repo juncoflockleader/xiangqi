@@ -960,6 +960,8 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     rootReductions: maxInfoValue(infos, "rootReductions"),
     rootReductionPlies: maxInfoValue(infos, "rootReductionPlies"),
     rootReductionResearches: maxInfoValue(infos, "rootReductionResearches"),
+    rootHistoryReductionGuards: maxInfoValue(infos, "rootHistoryReductionGuards"),
+    rootHistoryReductionBoosts: maxInfoValue(infos, "rootHistoryReductionBoosts"),
     rootTtHits: maxInfoValue(infos, "rootTtHits"),
     rootTtStores: maxInfoValue(infos, "rootTtStores"),
     rootOrderHits: maxInfoValue(infos, "rootOrderHits"),
@@ -1125,6 +1127,8 @@ function parseInfoLine(line) {
     rootReductions: 0,
     rootReductionPlies: 0,
     rootReductionResearches: 0,
+    rootHistoryReductionGuards: 0,
+    rootHistoryReductionBoosts: 0,
     rootTtHits: 0,
     rootTtStores: 0,
     rootOrderHits: 0,
@@ -1395,6 +1399,12 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "rootredply") {
       info.rootReductionPlies = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "roothrguard") {
+      info.rootHistoryReductionGuards = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "roothrboost") {
+      info.rootHistoryReductionBoosts = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "roottt") {
       info.rootTtHits = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -2163,6 +2173,8 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.rootChildStateReuses ?? 0) > 0) parts.push(nativeCount(stats.rootChildStateReuses, "root child-state reuse"));
   if ((stats.rootReductions ?? 0) > 0) parts.push(nativeCount(stats.rootReductions, "root late-move reduction"));
   if ((stats.rootReductionResearches ?? 0) > 0) parts.push(nativeCount(stats.rootReductionResearches, "root reduction re-search"));
+  if ((stats.rootHistoryReductionGuards ?? 0) > 0) parts.push(nativeCount(stats.rootHistoryReductionGuards, "root history reduction guard"));
+  if ((stats.rootHistoryReductionBoosts ?? 0) > 0) parts.push(nativeCount(stats.rootHistoryReductionBoosts, "root history reduction boost"));
   if ((stats.rootTtHits ?? 0) > 0) parts.push(nativeCount(stats.rootTtHits, "root transposition-table ordering hint"));
   if ((stats.rootOrderHits ?? 0) > 0) parts.push(nativeCount(stats.rootOrderHits, "persisted root-order hint"));
   if ((stats.rootTimeGuardStops ?? 0) > 0) parts.push(nativeCount(stats.rootTimeGuardStops, "root time-guard stop"));
@@ -2483,6 +2495,8 @@ function createNativeStats(parsed) {
     rootReductions: parsed.rootReductions ?? 0,
     rootReductionPlies: parsed.rootReductionPlies ?? 0,
     rootReductionResearches: parsed.rootReductionResearches ?? 0,
+    rootHistoryReductionGuards: parsed.rootHistoryReductionGuards ?? 0,
+    rootHistoryReductionBoosts: parsed.rootHistoryReductionBoosts ?? 0,
     rootTtHits: parsed.rootTtHits ?? 0,
     rootTtStores: parsed.rootTtStores ?? 0,
     rootOrderHits: parsed.rootOrderHits ?? 0,
@@ -2635,6 +2649,8 @@ function createEmptyStats() {
     rootReductions: 0,
     rootReductionPlies: 0,
     rootReductionResearches: 0,
+    rootHistoryReductionGuards: 0,
+    rootHistoryReductionBoosts: 0,
     rootTtHits: 0,
     rootTtStores: 0,
     repetitions: 0

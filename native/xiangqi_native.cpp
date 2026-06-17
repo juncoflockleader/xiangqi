@@ -63,6 +63,10 @@ constexpr int kRootReductionMinDepth = 6;
 constexpr int kRootReductionMoveIndex = 5;
 constexpr int kRootDeepReductionMinDepth = 8;
 constexpr int kRootDeepReductionMoveIndex = 12;
+constexpr int kRootHistoryReductionBoostMinDepth = 7;
+constexpr int kRootHistoryReductionBoostMoveIndex = 8;
+constexpr int kRootHistoryReductionBoostScale = 32;
+constexpr int kRootContinuationReductionBoostScale = 48;
 constexpr int kRootTrackedMultiPvLimit = 8;
 constexpr int kRootMultiPvReductionMargin = 5;
 constexpr int kQSeePruneMaxDepth = 3;
@@ -904,6 +908,8 @@ struct SearchState {
   int64_t rootReductions = 0;
   int64_t rootReductionPlies = 0;
   int64_t rootReductionResearches = 0;
+  int64_t rootHistoryReductionGuards = 0;
+  int64_t rootHistoryReductionBoosts = 0;
   int64_t rootOrderHits = 0;
   int64_t rootOrderStores = 0;
   int64_t extensions = 0;
@@ -1062,6 +1068,8 @@ struct SearchState {
     rootReductions = 0;
     rootReductionPlies = 0;
     rootReductionResearches = 0;
+    rootHistoryReductionGuards = 0;
+    rootHistoryReductionBoosts = 0;
     rootOrderHits = 0;
     rootOrderStores = 0;
     extensions = 0;
@@ -5888,14 +5896,33 @@ int rootBaseMoveReduction(
     const KnownChildState& child,
     int depth,
     int moveIndex,
-    bool rootInCheck) {
+    bool rootInCheck,
+    SearchState& state,
+    const Move& rootPreviousMove) {
   if (rootInCheck) return 0;
   if (depth < kRootReductionMinDepth || moveIndex < kRootReductionMoveIndex) return 0;
   if (!isQuiet(move) || child.inCheck) return 0;
   if (timedOpeningRootBonus(root, move) > 0) return 0;
 
+  const int historyScale = depth * depth;
+  const int historyScore = state.quietHistory[move.from][move.to];
+  const int continuationScore = continuationHistoryValue(state, rootPreviousMove, move, true);
+  const Move rootCounterMove = counterMoveFor(state, rootPreviousMove);
+  if (validMove(rootCounterMove) && sameMove(move, rootCounterMove)) {
+    state.rootHistoryReductionGuards += 1;
+    return 0;
+  }
+
   int reduction = 1;
   if (depth >= kRootDeepReductionMinDepth && moveIndex >= kRootDeepReductionMoveIndex) reduction += 1;
+  if (depth >= kRootHistoryReductionBoostMinDepth && moveIndex >= kRootHistoryReductionBoostMoveIndex) {
+    const bool badHistory = historyScore < -historyScale * kRootHistoryReductionBoostScale && continuationScore <= 0;
+    const bool badContinuation = continuationScore < -historyScale * kRootContinuationReductionBoostScale && historyScore <= 0;
+    if (badHistory || badContinuation) {
+      reduction += 1;
+      state.rootHistoryReductionBoosts += 1;
+    }
+  }
   return std::clamp(reduction, 0, depth - 2);
 }
 
@@ -5908,10 +5935,12 @@ int rootMoveReduction(
     bool rootInCheck,
     bool useRootPvs,
     int rootAlpha,
-    int beta) {
+    int beta,
+    SearchState& state,
+    const Move& rootPreviousMove) {
   if (!useRootPvs) return 0;
   if (isMateScore(rootAlpha) || isMateScore(beta)) return 0;
-  return rootBaseMoveReduction(root, move, child, depth, moveIndex, rootInCheck);
+  return rootBaseMoveReduction(root, move, child, depth, moveIndex, rootInCheck, state, rootPreviousMove);
 }
 
 bool reducedRootMoveNeedsFullSearch(int reducedScore, int currentReportCutoff) {
@@ -5986,7 +6015,8 @@ std::vector<RootLine> searchRootDepth(
     SearchState& state,
     bool rootInCheck,
     bool useRootAlphaPruning,
-    int multiPv) {
+    int multiPv,
+    const Move& rootPreviousMove) {
   std::vector<RootLine> depthLines;
   depthLines.reserve(rootMoves.size());
   const int rootExtension = rootInCheck && depth > 1 ? 1 : 0;
@@ -6022,11 +6052,11 @@ std::vector<RootLine> searchRootDepth(
     const bool useMultiPvReduction = !useRootPvs
         && useTrackedMultiPvCutoff
         && reportCutoff.full();
-    int reduction = rootMoveReduction(root, move, child, depth, moveIndex, rootInCheck, useRootPvs, rootAlpha, beta);
+    int reduction = rootMoveReduction(root, move, child, depth, moveIndex, rootInCheck, useRootPvs, rootAlpha, beta, state, rootPreviousMove);
     if (useMultiPvReduction) {
       multiPvReportCutoff = reportCutoff.cutoff();
       if (!isMateScore(multiPvReportCutoff)) {
-        reduction = rootBaseMoveReduction(root, move, child, depth, moveIndex, rootInCheck);
+        reduction = rootBaseMoveReduction(root, move, child, depth, moveIndex, rootInCheck, state, rootPreviousMove);
       }
     }
     if (useRootPvs) {
@@ -6245,7 +6275,7 @@ std::vector<RootLine> searchRoot(
     }
 
     const bool useRootAlphaPruning = rootAlphaPruning && multiPv <= 1;
-    std::vector<RootLine> depthLines = searchRootDepth(root, orderedRootMoves, depth, alpha, beta, state, rootInCheck, useRootAlphaPruning, multiPv);
+    std::vector<RootLine> depthLines = searchRootDepth(root, orderedRootMoves, depth, alpha, beta, state, rootInCheck, useRootAlphaPruning, multiPv, rootPreviousMove);
     if (!state.stopped && useAspiration && !depthLines.empty()) {
       std::stable_sort(depthLines.begin(), depthLines.end(), [](const RootLine& left, const RootLine& right) {
         return left.score > right.score;
@@ -6262,13 +6292,13 @@ std::vector<RootLine> searchRoot(
             ? std::min(kInf, previousScore + kAspirationInitialWindow)
             : std::min(kInf, previousScore + kAspirationRetryWindow);
         state.aspirationWidenedSearches += 1;
-        depthLines = searchRootDepth(root, orderedRootMoves, depth, retryAlpha, retryBeta, state, rootInCheck, useRootAlphaPruning, multiPv);
+        depthLines = searchRootDepth(root, orderedRootMoves, depth, retryAlpha, retryBeta, state, rootInCheck, useRootAlphaPruning, multiPv, rootPreviousMove);
         if (!state.stopped && !depthLines.empty()) {
           std::stable_sort(depthLines.begin(), depthLines.end(), [](const RootLine& left, const RootLine& right) {
             return left.score > right.score;
           });
           if (depthLines.front().score <= retryAlpha || depthLines.front().score >= retryBeta) {
-            depthLines = searchRootDepth(root, orderedRootMoves, depth, -kInf, kInf, state, rootInCheck, useRootAlphaPruning, multiPv);
+            depthLines = searchRootDepth(root, orderedRootMoves, depth, -kInf, kInf, state, rootInCheck, useRootAlphaPruning, multiPv, rootPreviousMove);
           }
         }
       }
@@ -6467,6 +6497,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " rootstate " << state.rootChildStateReuses
               << " rootred " << state.rootReductions << "/" << state.rootReductionResearches
               << " rootredply " << state.rootReductionPlies
+              << " roothrguard " << state.rootHistoryReductionGuards
+              << " roothrboost " << state.rootHistoryReductionBoosts
               << " roottt " << state.rootTtHits << " rootttstores " << state.rootTtStores
               << " rootord " << state.rootOrderHits << " rootordstores " << state.rootOrderStores
               << " pvs " << state.pvsResearches
@@ -6548,6 +6580,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " rootstate " << state.rootChildStateReuses
               << " rootred " << state.rootReductions << "/" << state.rootReductionResearches
               << " rootredply " << state.rootReductionPlies
+              << " roothrguard " << state.rootHistoryReductionGuards
+              << " roothrboost " << state.rootHistoryReductionBoosts
               << " roottt " << state.rootTtHits << " rootttstores " << state.rootTtStores
               << " rootord " << state.rootOrderHits << " rootordstores " << state.rootOrderStores
               << " pvs " << state.pvsResearches
