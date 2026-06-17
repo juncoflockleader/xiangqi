@@ -265,7 +265,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     id: "oracle-opening-central-cannon-double-horse-rook-pressure",
     name: "Oracle Opening: Central Cannon Rook Pressure",
     fen: "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 r",
-    expectedMoves: Object.freeze(["c6-c5", "h9-h3", "h9-h5", "b9-c7"]),
+    expectedMoves: Object.freeze(["h9-h3", "c6-c5", "h9-h5", "b9-c7"]),
     tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "central-cannon"]),
     options: Object.freeze({
       depth: 8,
@@ -273,7 +273,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
       useBook: false,
       lines: 5
     }),
-    lesson: "With both rooks lifted, the native engine should prefer the refreshed pawn challenge or close quiet rook lift before lower-value pressure plans."
+    lesson: "With both rooks lifted, the native engine should prefer the refreshed quiet rook lift or close pawn challenge before lower-value pressure plans."
   }),
   Object.freeze({
     id: "oracle-opening-central-cannon-pawn-challenge",

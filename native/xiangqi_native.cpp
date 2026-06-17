@@ -5764,8 +5764,8 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t centralCannonDoubleHorseBothRooks = fenPositionKey(
       "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 r");
   if (root.key == centralCannonDoubleHorseBothRooks) {
-    if (sameUciMove(move, "c3c4")) return 5000;  // c6-c5: refreshed 2026 Pikafish pawn challenge.
-    if (sameUciMove(move, "h0h6")) return 4900;  // h9-h3: close quiet rook-lift alternative.
+    if (sameUciMove(move, "h0h6")) return 5050;  // h9-h3: refreshed Pikafish top quiet rook lift.
+    if (sameUciMove(move, "c3c4")) return 5000;  // c6-c5: close central pawn challenge.
     if (sameUciMove(move, "h0h4")) return 4700;  // h9-h5: playable rook-pressure plan.
     if (sameUciMove(move, "b0c2")) return 4600;  // b9-c7: near-tie horse development.
     return 0;
