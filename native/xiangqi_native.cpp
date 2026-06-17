@@ -3829,19 +3829,29 @@ int cannonActivityBonus(const Board& board, int square, int piece) {
   const auto& lengths = kRayLengths[static_cast<std::size_t>(square)];
   for (int direction = 0; direction < kOrthogonalDirections; direction += 1) {
     bool screen = false;
+    int screenPiece = 0;
     const auto& ray = rays[static_cast<std::size_t>(direction)];
     const int length = lengths[static_cast<std::size_t>(direction)];
     for (int step = 0; step < length; step += 1) {
-      const int target = board.cells[ray[static_cast<std::size_t>(step)]];
+      const int targetSquare = ray[static_cast<std::size_t>(step)];
+      const int target = board.cells[targetSquare];
       if (!screen) {
         if (target == 0) {
           bonus += 2;
         } else {
           screen = true;
+          screenPiece = target;
         }
       } else if (target != 0) {
         if (pieceCodeSide(target) != side) {
-          bonus += pieceCodeType(target) == King ? 160 : std::min(100, pieceCodeValue(target) / 10);
+          const int targetType = pieceCodeType(target);
+          int targetBonus = targetType == King ? 160 : std::min(100, pieceCodeValue(target) / 10);
+          if (board.totalPieceCount <= 24
+              && (targetType == Advisor || targetType == Elephant)
+              && palaceContains(pieceCodeSide(target), fileOf(targetSquare), rankOf(targetSquare))) {
+            targetBonus += pieceCodeSide(screenPiece) == side ? 18 : 12;
+          }
+          bonus += targetBonus;
         }
         break;
       }

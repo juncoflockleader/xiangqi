@@ -2143,6 +2143,24 @@ test("local C++ engine rewards coordinated cannon batteries", (t) => {
   assert.ok(scores[0] - scores[1] >= 8, scores.join(", "));
 });
 
+test("local C++ engine rewards cannon platforms against palace guards", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const scores = staticEvalScores(build.output, [
+    "4k4/9/5a3/9/9/5P3/9/9/5C3/4K4 r",
+    "4k4/9/3a5/9/9/5P3/9/9/5C3/4K4 r",
+    "4k4/9/5b3/9/9/5P3/9/9/5C3/4K4 r",
+    "4k4/9/3b5/9/9/5P3/9/9/5C3/4K4 r"
+  ]);
+
+  assert.ok(scores[0] >= scores[1] + 50, JSON.stringify(scores));
+  assert.ok(scores[2] >= scores[3] + 45, JSON.stringify(scores));
+});
+
 test("local C++ engine rewards pinning palace guards to the king line", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {
