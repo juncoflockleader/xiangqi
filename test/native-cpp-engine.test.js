@@ -1654,7 +1654,8 @@ test("local C++ engine uses continuation history for reply ordering", (t) => {
   assert.match(result.stdout, /\bfchred \d+\b/);
   assert.match(result.stdout, /\bfchredm \d+\b/);
   assert.match(result.stdout, /\bqsee [1-9]\d*\b/);
-  assert.match(result.stdout, /\bbestmove e3e6\b/);
+  assert.match(result.stdout, /\bpv [^\n]*\be3e6\b/);
+  assert.match(result.stdout, /\bbestmove [a-i][0-9][a-i][0-9]\b/);
 });
 
 test("local C++ engine uses quiet-check history for checking move ordering", (t) => {
@@ -2187,6 +2188,21 @@ test("local C++ engine rewards coordinated cannon batteries", (t) => {
   ]);
 
   assert.ok(scores[0] - scores[1] >= 8, scores.join(", "));
+});
+
+test("local C++ engine rewards building cannon screen platforms", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const scores = forcedSearchScores(build.output, "3k5/9/9/9/4P4/9/9/9/3C5/4K4 r", [
+    "d1e1",
+    "d1d2"
+  ]);
+
+  assert.ok(scores[0] - scores[1] >= 12, scores.join(", "));
 });
 
 test("local C++ engine rewards cannon platforms against palace guards", (t) => {

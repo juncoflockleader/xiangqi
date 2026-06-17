@@ -3887,6 +3887,46 @@ int cannonActivityBonus(const Board& board, int square, int piece) {
   return bonus;
 }
 
+int cannonScreenPlatformBonus(const Board& board, int square, int piece) {
+  if (board.totalPieceCount > 24) return 0;
+  const int side = pieceCodeSide(piece);
+  int bonus = 0;
+  const auto& rays = kRaySquares[static_cast<std::size_t>(square)];
+  const auto& lengths = kRayLengths[static_cast<std::size_t>(square)];
+
+  for (int direction = 0; direction < kOrthogonalDirections; direction += 1) {
+    const auto& ray = rays[static_cast<std::size_t>(direction)];
+    const int length = lengths[static_cast<std::size_t>(direction)];
+    int quietBeforeScreen = 0;
+    for (int step = 0; step < length; step += 1) {
+      const int screenSquare = ray[static_cast<std::size_t>(step)];
+      const int screen = board.cells[screenSquare];
+      if (screen == 0) {
+        quietBeforeScreen += 1;
+        continue;
+      }
+      if (pieceCodeSide(screen) != side || pieceCodeType(screen) == King) break;
+      if (quietBeforeScreen == 0) break;
+
+      const int screenType = pieceCodeType(screen);
+      const int screenFile = fileOf(screenSquare);
+      const int screenRank = rankOf(screenSquare);
+      int platform = 3 + std::min(8, quietBeforeScreen * 2) + fileCentrality(screenFile);
+      if (screenType == Pawn) {
+        platform += 5;
+        if (crossedRiver(side, screenRank)) platform += 6;
+      }
+      if (fileCentrality(screenFile) >= 3) platform += 5;
+      if (direction == (side == kRed ? 0 : 2)) platform += 4;
+      if (palaceContains(-side, screenFile, screenRank)) platform += 6;
+      bonus += std::max(0, platform);
+      break;
+    }
+  }
+
+  return std::min(36, bonus);
+}
+
 int cannonBatteryBonus(const Board& board, int square, int piece) {
   const int side = pieceCodeSide(piece);
   int bonus = 0;
@@ -4422,6 +4462,7 @@ int evaluateRed(const Board& board) {
         value += kingLinePressureBonus(board, square, piece, enemyKing);
       } else if (type == Cannon) {
         value += cannonActivityBonus(board, square, piece);
+        value += cannonScreenPlatformBonus(board, square, piece);
         value += cannonBatteryBonus(board, square, piece);
         value += riverControlBonus(board, square, piece, totalPieceCount);
         value += kingLinePressureBonus(board, square, piece, enemyKing);
