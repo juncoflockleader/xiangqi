@@ -55,6 +55,7 @@ constexpr int kSingularExtensionMargin = 90;
 constexpr int kHistoryPruningMaxDepth = 4;
 constexpr int kHistoryPruningBaseIndex = 6;
 constexpr int kHistoryPruningMarginScale = 32;
+constexpr int kHistoryPruningFollowupScale = 8;
 constexpr int kLateMovePruningMaxDepth = 4;
 constexpr int kLateMovePruningDepthThreeTighten = 20;
 constexpr int kLateMovePruningDepthFourTighten = 35;
@@ -74,7 +75,8 @@ constexpr int kRootHistoryReductionBoostMoveIndex = 8;
 constexpr int kRootHistoryReductionBoostScale = 32;
 constexpr int kRootContinuationReductionBoostScale = 48;
 constexpr int kRootMultiPvQuietBoostMinDepth = 7;
-constexpr int kRootMultiPvQuietBoostMoveIndex = 6;
+constexpr int kRootMultiPvQuietBoostMoveIndex = 5;
+constexpr int kFollowupReductionMalusScale = 48;
 constexpr int kRootBadCaptureReductionLossMargin = 120;
 constexpr int kRootTrackedMultiPvLimit = 8;
 constexpr int kRootMultiPvReductionMargin = 5;
@@ -3309,7 +3311,11 @@ bool shouldPruneBadHistory(
     return false;
   }
 
-  return historyScore <= threshold || continuationScore <= threshold / 2;
+  const bool badFollowup = depth >= 2
+      && followupScore <= threshold * kHistoryPruningFollowupScale
+      && historyScore <= 0
+      && continuationScore <= 0;
+  return historyScore <= threshold || continuationScore <= threshold / 2 || badFollowup;
 }
 
 LateMovePruneDecision shouldPruneLateMove(
@@ -3590,7 +3596,11 @@ int lateMoveReduction(
     reduction -= 1;
     state.followupReductionBoosts += 1;
   }
-  if (followupScore < -historyScale * 96 && depth >= 5 && moveIndex >= 8) {
+  if (followupScore < -historyScale * kFollowupReductionMalusScale
+      && historyScore <= 0
+      && continuationScore <= 0
+      && depth >= 5
+      && moveIndex >= 8) {
     reduction += 1;
     state.followupReductionMaluses += 1;
   }
@@ -6505,9 +6515,7 @@ int rootBaseMoveReduction(
   }
   if (trackedMultiPvReduction
       && depth >= kRootMultiPvQuietBoostMinDepth
-      && moveIndex >= kRootMultiPvQuietBoostMoveIndex
-      && historyScore <= 0
-      && continuationScore <= 0) {
+      && moveIndex >= kRootMultiPvQuietBoostMoveIndex) {
     reduction += 1;
     state.rootHistoryReductionBoosts += 1;
   }

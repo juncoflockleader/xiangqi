@@ -1096,7 +1096,7 @@ test("local C++ engine reduces late quiet root moves in MultiPV searches", (t) =
     "uci",
     "setoption name MultiPV value 5",
     "position fen rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R b",
-    "go depth 6",
+    "go depth 7",
     "quit"
   ].join("\n");
   const result = spawnSync(build.output, {
@@ -1108,6 +1108,10 @@ test("local C++ engine reduces late quiet root moves in MultiPV searches", (t) =
   assert.match(result.stdout, /\binfo multipv 5\b/);
   assert.match(result.stdout, /\brootred [1-9]\d*\/[1-9]\d*\b/);
   assert.match(result.stdout, /\brootredply [1-9]\d*\b/);
+  assert.match(result.stdout, /\broothrboost [1-9]\d*\b/);
+  const rootReductions = [...result.stdout.matchAll(/\brootred (\d+)\//g)].map((match) => Number(match[1]));
+  const rootReductionPlies = [...result.stdout.matchAll(/\brootredply (\d+)/g)].map((match) => Number(match[1]));
+  assert.ok(rootReductionPlies.at(-1) > rootReductions.at(-1), result.stdout);
   assert.match(result.stdout, /\bbestmove [a-i][0-9][a-i][0-9]\b/);
 });
 
