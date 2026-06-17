@@ -159,7 +159,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.evalCacheHits, 19);
     assert.equal(result.stats.evalCacheStores, 29);
     assert.equal(result.stats.checkedEvalSkips, 31);
-    assert.equal(result.stats.checkedEvalTrendResets, 4);
+    assert.equal(result.stats.staticEvalTrendClears, 4);
     assert.equal(result.stats.ttHits, 5);
     assert.equal(result.stats.ttMoveHits, 6);
     assert.equal(result.stats.cutoffs, 2);
@@ -260,7 +260,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.iterations[0].stats.qttHits, 11);
     assert.equal(result.iterations[0].stats.evalCacheHits, 19);
     assert.equal(result.iterations[0].stats.checkedEvalSkips, 31);
-    assert.equal(result.iterations[0].stats.checkedEvalTrendResets, 4);
+    assert.equal(result.iterations[0].stats.staticEvalTrendClears, 4);
     assert.equal(result.iterations[0].stats.ttMoveHits, 6);
     assert.equal(result.iterations[0].stats.captureHistoryHits, 12);
     assert.equal(result.iterations[0].stats.captureHistoryStores, 5);
@@ -347,7 +347,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("root time-guard stop")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("opening/root preference promotion")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("checked-node eval skip")));
-    assert.ok(result.explanation.reasons.some((reason) => reason.includes("checked-node eval-trend reset")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("static eval-trend reset")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("tactical extension")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("late pawn-pressure extension")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("late pawn-pressure ordering boost")));

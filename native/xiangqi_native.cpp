@@ -855,7 +855,7 @@ struct SearchState {
   int64_t evalCacheHits = 0;
   int64_t evalCacheStores = 0;
   int64_t checkedEvalSkips = 0;
-  int64_t checkedEvalTrendResets = 0;
+  int64_t staticEvalTrendClears = 0;
   int memoryAge = 0;
   uint64_t rootOrderKey = 0;
   int rootOrderCount = 0;
@@ -1003,7 +1003,7 @@ struct SearchState {
     evalCacheHits = 0;
     evalCacheStores = 0;
     checkedEvalSkips = 0;
-    checkedEvalTrendResets = 0;
+    staticEvalTrendClears = 0;
     memoryAge += 1;
     ttHashfull = 0;
     tt = nullptr;
@@ -2864,7 +2864,7 @@ StaticEvalTrend staticEvalTrend(SearchState& state, int ply, int staticScore) {
 
 void clearStaticEvalTrendAtPly(SearchState& state, int ply) {
   if (ply < 0 || ply >= kMaxPly) return;
-  if (state.staticEvalKnown[ply]) state.checkedEvalTrendResets += 1;
+  if (state.staticEvalKnown[ply]) state.staticEvalTrendClears += 1;
   state.staticEvalKnown[ply] = false;
   state.staticEvalStack[ply] = 0;
 }
@@ -4705,9 +4705,13 @@ int negamax(
   state.nodes += 1;
 
   const bool syntheticNullNode = !allowNullMove && !validMove(previousMove);
-  if (!syntheticNullNode && recordSearchPathPosition(state, ply, board.key)) return 0;
+  if (!syntheticNullNode && recordSearchPathPosition(state, ply, board.key)) {
+    clearStaticEvalTrendAtPly(state, ply);
+    return 0;
+  }
 
   if (depth <= 0) {
+    clearStaticEvalTrendAtPly(state, ply);
     const int ownKing = knownOwnKing == kUnknownKingSquare ? findKing(board, board.side) : knownOwnKing;
     const bool inCheck = knownOwnKing == kUnknownKingSquare ? isInCheckKnownKing(board, board.side, ownKing) : knownInCheck;
     return quiescenceKnownCheck(board, alpha, beta, ply, inCheck ? 2 : 4, state, ownKing, inCheck);
@@ -4717,6 +4721,7 @@ int negamax(
   beta = std::min(beta, kMate - ply - 1);
   if (alpha >= beta) {
     state.mateDistancePrunes += 1;
+    clearStaticEvalTrendAtPly(state, ply);
     return alpha;
   }
 
@@ -4737,12 +4742,14 @@ int negamax(
       if (entry->depth >= depth) {
         const int ttScore = hashScore;
         if (entry->flag == kTtExact) {
+          clearStaticEvalTrendAtPly(state, ply);
           setPvToMove(pv, entry->bestMove);
           return ttScore;
         }
         if (entry->flag == kTtLower) {
           if (ttScore >= beta) {
             state.ttCutoffs += 1;
+            clearStaticEvalTrendAtPly(state, ply);
             setPvToMove(pv, entry->bestMove);
             return ttScore;
           }
@@ -4750,6 +4757,7 @@ int negamax(
         } else if (entry->flag == kTtUpper) {
           if (ttScore <= alpha) {
             state.ttCutoffs += 1;
+            clearStaticEvalTrendAtPly(state, ply);
             setPvToMove(pv, entry->bestMove);
             return ttScore;
           }
@@ -4757,6 +4765,7 @@ int negamax(
         }
         if (alpha >= beta) {
           state.ttCutoffs += 1;
+          clearStaticEvalTrendAtPly(state, ply);
           setPvToMove(pv, entry->bestMove);
           return ttScore;
         }
@@ -5103,6 +5112,7 @@ int quiescenceKnownCheck(
   if (state.stopped || timeExpired(state)) return evaluateSideToMove(board, state);
   state.nodes += 1;
   state.qnodes += 1;
+  clearStaticEvalTrendAtPly(state, ply);
 
   if (state.rootHistoryHasRepeatedPositions && recordQuiescencePathPosition(state, ply, board.key)) return 0;
 
@@ -6096,7 +6106,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " qtt " << state.qttHits << "/" << state.qttProbes << " qttstores " << state.qttStores
               << " qttcut " << state.qttCutoffs << " qttmove " << state.qttMoveHits
               << " eval " << state.evalCacheHits << "/" << state.evalCacheProbes << " evalstores " << state.evalCacheStores
-              << " evalskip " << state.checkedEvalSkips << " evalguard " << state.checkedEvalTrendResets
+              << " evalskip " << state.checkedEvalSkips << " evalguard " << state.staticEvalTrendClears
               << " rep " << state.repetitions
               << " memage " << state.memoryAge
               << " pv\n";
@@ -6173,7 +6183,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " qtt " << state.qttHits << "/" << state.qttProbes << " qttstores " << state.qttStores
               << " qttcut " << state.qttCutoffs << " qttmove " << state.qttMoveHits
               << " eval " << state.evalCacheHits << "/" << state.evalCacheProbes << " evalstores " << state.evalCacheStores
-              << " evalskip " << state.checkedEvalSkips << " evalguard " << state.checkedEvalTrendResets
+              << " evalskip " << state.checkedEvalSkips << " evalguard " << state.staticEvalTrendClears
               << " rep " << state.repetitions
               << " memage " << state.memoryAge
               << " pv " << formatPv(line.pv)

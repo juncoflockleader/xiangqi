@@ -302,7 +302,7 @@ test("local C++ depth-only protocol searches reach the requested depth", (t) => 
   assert.match(result.stdout, /\bbestmove\b/);
 });
 
-test("local C++ engine clears stale eval trends at checked nodes", (t) => {
+test("local C++ engine clears stale eval trends on static-eval skips", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {
     t.skip(build.skip);
