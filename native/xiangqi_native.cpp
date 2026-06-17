@@ -3256,8 +3256,7 @@ bool isProbCutCaptureCandidate(const Move& move) {
   return capturedValue >= pieceValue(Horse) || capturedValue >= movingValue;
 }
 
-bool shouldVerifyProbCutCapture(const Board& board, const Move& move, SearchState& state) {
-  if (!isProbCutCaptureCandidate(move)) return false;
+bool shouldVerifyProbCutCaptureCandidate(const Board& board, const Move& move, SearchState& state) {
   return badCaptureLossForCapture(board, move, state) <= 0;
 }
 
@@ -4714,7 +4713,7 @@ bool tryProbCut(
     for (const Move& legalMove : legalMoves) {
       if (!sameMove(legalMove, hashMove)) continue;
       Move hashCapture = legalMove;
-      if (shouldVerifyProbCutCapture(board, hashCapture, state)) {
+      if (shouldVerifyProbCutCaptureCandidate(board, hashCapture, state)) {
         searchedHashCapture = true;
         if (searchCapture(hashCapture)) return true;
         if (state.stopped) return false;
@@ -4731,7 +4730,7 @@ bool tryProbCut(
       state.probCutCaptureSkips += 1;
       continue;
     }
-    if (!shouldVerifyProbCutCapture(board, move, state)) {
+    if (!shouldVerifyProbCutCaptureCandidate(board, move, state)) {
       state.probCutCaptureSkips += 1;
       continue;
     }
