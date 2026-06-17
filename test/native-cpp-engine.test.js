@@ -1496,6 +1496,31 @@ test("local C++ engine skips capture-risk probes for favorable captures", (t) =>
   assert.match(result.stdout, /bestmove [a-i][0-9][a-i][0-9]/);
 });
 
+test("local C++ engine avoids capture-risk probes for qsearch ordering", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const input = [
+    "uci",
+    "position fen 4k4/9/9/9/4r4/9/4P4/9/9/3AK4 r",
+    "go depth 1",
+    "quit"
+  ].join("\n");
+  const result = spawnSync(build.output, {
+    input,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /\bqnodes [1-9]\d*\b/);
+  assert.match(result.stdout, /\bqcapstores [1-9]\d*\b/);
+  assert.match(result.stdout, /\bcrisk 0\/0\b/);
+  assert.match(result.stdout, /bestmove [a-i][0-9][a-i][0-9]/);
+});
+
 test("local C++ engine prunes bad-history quiet moves conservatively", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {

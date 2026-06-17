@@ -4224,7 +4224,9 @@ int moveOrderingScore(
     if (useQsearchCaptureHistory) {
       score += qCaptureHistoryScore(state, move);
     }
-    if (board) score -= captureRiskPenaltyForCapture(*board, move, state, movingValue, capturedValue, pieceSide);
+    if (board && !useQsearchCaptureHistory) {
+      score -= captureRiskPenaltyForCapture(*board, move, state, movingValue, capturedValue, pieceSide);
+    }
   } else {
     if (isKillerMove(state, ply, move, true)) score += 90000;
     if (counterMoveValid && sameMove(move, counterMove)) score += 35000;
