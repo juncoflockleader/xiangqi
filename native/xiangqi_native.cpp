@@ -3510,7 +3510,7 @@ void rememberBetaCutoff(
 }
 
 int horseMobilityBonus(const Board& board, int square, int piece) {
-  const int side = sideOf(piece);
+  const int side = pieceCodeSide(piece);
   int bonus = 0;
   const int count = kHorseTargets.counts[static_cast<std::size_t>(square)];
   const auto& targets = kHorseTargets.targets[static_cast<std::size_t>(square)];
@@ -3518,11 +3518,11 @@ int horseMobilityBonus(const Board& board, int square, int piece) {
   for (int index = 0; index < count; index += 1) {
     if (board.cells[blockers[static_cast<std::size_t>(index)]] != 0) continue;
     const int target = board.cells[targets[static_cast<std::size_t>(index)]];
-    if (target != 0 && sideOf(target) == side) continue;
+    if (target != 0 && pieceCodeSide(target) == side) continue;
     bonus += 9;
     const int targetSquare = targets[static_cast<std::size_t>(index)];
     if (palaceContains(-side, fileOf(targetSquare), rankOf(targetSquare))) bonus += 16;
-    if (target != 0) bonus += std::min(60, pieceValue(target) / 16);
+    if (target != 0) bonus += std::min(60, pieceCodeValue(target) / 16);
   }
   return bonus;
 }
@@ -3531,7 +3531,7 @@ int horseLegCoordinationBonus(const Board& board, int square, int piece) {
   static constexpr int legs[4][2] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
   const int file = fileOf(square);
   const int rank = rankOf(square);
-  const int side = sideOf(piece);
+  const int side = pieceCodeSide(piece);
   int blockedLegs = 0;
   int bonus = 0;
 
@@ -3542,7 +3542,7 @@ int horseLegCoordinationBonus(const Board& board, int square, int piece) {
     const int blocker = board.cells[indexOf(legFile, legRank)];
     if (blocker == 0) continue;
     blockedLegs += 1;
-    bonus -= sideOf(blocker) == side ? 5 : 3;
+    bonus -= pieceCodeSide(blocker) == side ? 5 : 3;
   }
 
   return blockedLegs == 0 ? bonus + 4 : bonus;
@@ -3569,7 +3569,7 @@ int linkedHorseBonus(const Board& board, int square, int piece) {
     const int targetRank = rankOf(target);
     const int centrality = fileCentrality(file) + fileCentrality(partnerFile);
     bonus += 8 + centrality;
-    if (crossedRiver(sideOf(piece), rank) || crossedRiver(sideOf(partner), targetRank)) bonus += 3;
+    if (crossedRiver(pieceCodeSide(piece), rank) || crossedRiver(pieceCodeSide(partner), targetRank)) bonus += 3;
   }
 
   return bonus;
@@ -3584,7 +3584,7 @@ bool isHorsePalaceOutpost(int defendingSide, int file, int rank) {
 
 int horsePressureBonus(const Board& board, int square, int piece, int enemyKing) {
   if (enemyKing < 0) return 0;
-  const int side = sideOf(piece);
+  const int side = pieceCodeSide(piece);
   const int enemy = -side;
   const int file = fileOf(square);
   const int rank = rankOf(square);
@@ -3608,7 +3608,7 @@ int horsePressureBonus(const Board& board, int square, int piece, int enemyKing)
     for (int kingIndex = 0; kingIndex < kingTargetCount; kingIndex += 1) {
       const int escapeSquare = kingTargets[static_cast<std::size_t>(kingIndex)];
       const int occupant = board.cells[escapeSquare];
-      if (occupant != 0 && sideOf(occupant) == enemy) continue;
+      if (occupant != 0 && pieceCodeSide(occupant) == enemy) continue;
       if (targetSquare == escapeSquare) {
         bonus += 10;
         break;
@@ -3624,7 +3624,7 @@ int horsePressureBonus(const Board& board, int square, int piece, int enemyKing)
 }
 
 int elephantEyeCoordinationBonus(const Board& board, int square, int piece) {
-  const int side = sideOf(piece);
+  const int side = pieceCodeSide(piece);
   int openEyes = 0;
   int bonus = 0;
   const auto& lookup = kElephantTargets[static_cast<std::size_t>(sideLookupIndex(side))];
@@ -3637,7 +3637,7 @@ int elephantEyeCoordinationBonus(const Board& board, int square, int piece) {
       openEyes += 1;
       bonus += 2;
     } else {
-      bonus -= sideOf(blocker) == side ? 4 : 5;
+      bonus -= pieceCodeSide(blocker) == side ? 4 : 5;
     }
   }
 
@@ -3646,7 +3646,7 @@ int elephantEyeCoordinationBonus(const Board& board, int square, int piece) {
 
 int elephantShapeBonus(int square, int piece, int totalPieceCount) {
   if (totalPieceCount > 6) return 0;
-  const int side = sideOf(piece);
+  const int side = pieceCodeSide(piece);
   const int file = fileOf(square);
   const int rank = rankOf(square);
   int bonus = fileCentrality(file) * 2;
@@ -3657,7 +3657,7 @@ int elephantShapeBonus(int square, int piece, int totalPieceCount) {
 }
 
 int rookActivityBonus(const Board& board, int square, int piece) {
-  const int side = sideOf(piece);
+  const int side = pieceCodeSide(piece);
   int bonus = 0;
   const auto& rays = kRaySquares[static_cast<std::size_t>(square)];
   const auto& lengths = kRayLengths[static_cast<std::size_t>(square)];
@@ -3669,7 +3669,7 @@ int rookActivityBonus(const Board& board, int square, int piece) {
       if (target == 0) {
         bonus += 4;
       } else {
-        if (sideOf(target) != side) bonus += std::min(90, pieceValue(target) / 14);
+        if (pieceCodeSide(target) != side) bonus += std::min(90, pieceCodeValue(target) / 14);
         break;
       }
     }
@@ -3678,7 +3678,7 @@ int rookActivityBonus(const Board& board, int square, int piece) {
 }
 
 int connectedRookBonus(const Board& board, int square, int piece) {
-  const int side = sideOf(piece);
+  const int side = pieceCodeSide(piece);
   int bonus = 0;
   const auto& rays = kRaySquares[static_cast<std::size_t>(square)];
   const auto& lengths = kRayLengths[static_cast<std::size_t>(square)];
@@ -3722,10 +3722,10 @@ int rayBlocker(const Board& board, int square, int direction) {
 }
 
 int riverControlBonus(const Board& board, int square, int piece, int totalPieceCount) {
-  const int type = typeOf(piece);
+  const int type = pieceCodeType(piece);
   if (type != Rook && type != Cannon) return 0;
 
-  const int side = sideOf(piece);
+  const int side = pieceCodeSide(piece);
   const int file = fileOf(square);
   const int rank = rankOf(square);
   if (rank != 4 && rank != 5) return 0;
@@ -3741,8 +3741,8 @@ int riverControlBonus(const Board& board, int square, int piece, int totalPieceC
     const int forwardBlocker = rayBlocker(board, square, side == kRed ? 0 : 2);
     if (forwardBlocker == 0) {
       bonus += 4;
-    } else if (sideOf(forwardBlocker) != side) {
-      bonus += std::min(6, pieceValue(forwardBlocker) / 110);
+    } else if (pieceCodeSide(forwardBlocker) != side) {
+      bonus += std::min(6, pieceCodeValue(forwardBlocker) / 110);
     } else {
       bonus -= 3;
     }
@@ -3760,8 +3760,8 @@ int riverControlBonus(const Board& board, int square, int piece, int totalPieceC
   const int forwardBlocker = rayBlocker(board, square, side == kRed ? 0 : 2);
   if (forwardBlocker == 0) {
     bonus += 7;
-  } else if (sideOf(forwardBlocker) != side) {
-    bonus += std::min(10, pieceValue(forwardBlocker) / 70);
+  } else if (pieceCodeSide(forwardBlocker) != side) {
+    bonus += std::min(10, pieceCodeValue(forwardBlocker) / 70);
   } else {
     bonus -= 5;
   }
@@ -3771,7 +3771,7 @@ int riverControlBonus(const Board& board, int square, int piece, int totalPieceC
 }
 
 int cannonActivityBonus(const Board& board, int square, int piece) {
-  const int side = sideOf(piece);
+  const int side = pieceCodeSide(piece);
   int bonus = 0;
   const auto& rays = kRaySquares[static_cast<std::size_t>(square)];
   const auto& lengths = kRayLengths[static_cast<std::size_t>(square)];
@@ -3788,8 +3788,8 @@ int cannonActivityBonus(const Board& board, int square, int piece) {
           screen = true;
         }
       } else if (target != 0) {
-        if (sideOf(target) != side) {
-          bonus += typeOf(target) == King ? 160 : std::min(100, pieceValue(target) / 10);
+        if (pieceCodeSide(target) != side) {
+          bonus += pieceCodeType(target) == King ? 160 : std::min(100, pieceCodeValue(target) / 10);
         }
         break;
       }
@@ -3799,7 +3799,7 @@ int cannonActivityBonus(const Board& board, int square, int piece) {
 }
 
 int cannonBatteryBonus(const Board& board, int square, int piece) {
-  const int side = sideOf(piece);
+  const int side = pieceCodeSide(piece);
   int bonus = 0;
   const auto& rays = kRaySquares[static_cast<std::size_t>(square)];
   const auto& lengths = kRayLengths[static_cast<std::size_t>(square)];
@@ -3822,8 +3822,8 @@ int cannonBatteryBonus(const Board& board, int square, int piece) {
         for (int tail = step + 1; tail < length; tail += 1) {
           const int tailPiece = board.cells[ray[static_cast<std::size_t>(tail)]];
           if (tailPiece == 0) continue;
-          if (sideOf(tailPiece) != side) {
-            tailBonus = typeOf(tailPiece) == King ? 18 : std::min(12, pieceValue(tailPiece) / 80);
+          if (pieceCodeSide(tailPiece) != side) {
+            tailBonus = pieceCodeType(tailPiece) == King ? 18 : std::min(12, pieceCodeValue(tailPiece) / 80);
           }
           break;
         }
