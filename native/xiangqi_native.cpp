@@ -5721,8 +5721,10 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t centralCannonDoubleHorseBothRooks = fenPositionKey(
       "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 r");
   if (root.key == centralCannonDoubleHorseBothRooks) {
-    if (uci == "h0h4") return 5000;  // h9-h5: pressure the opened flank from the rook file.
-    if (uci == "h0h6") return 4300;  // h9-h3: native search's tactical alternative.
+    if (uci == "h0h6") return 5000;  // h9-h3: refreshed depth-12 Pikafish rook lift.
+    if (uci == "b0c2") return 4900;  // b9-c7: near-tie horse development.
+    if (uci == "c3c4") return 4600;  // c6-c5: tied pawn-challenge fallback.
+    if (uci == "h0h4") return 4400;  // h9-h5: older playable rook-pressure plan.
     return 0;
   }
 

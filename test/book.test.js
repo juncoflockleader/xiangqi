@@ -212,7 +212,7 @@ test("opening book follows Pikafish principal-variation continuations past exact
   assert.ok(result.book.tags.includes("pv-continuation"));
   assert.equal(result.book.database.source, "Pikafish");
   assert.equal(result.book.database.sourceMove, "g3-g4");
-  assert.equal(result.book.database.principalVariation, "g3-g4 i9-h9 i0-h0 h9-h5 h2-i2");
+  assert.equal(result.book.database.principalVariation, "g3-g4 i9-h9 i0-h0 h9-h3 c3-c4 b9-c7 b0-c2");
 });
 
 test("opening heuristics cover early positions outside exact book when requested raw", () => {
