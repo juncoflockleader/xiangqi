@@ -5001,8 +5001,8 @@ bool tryProbCut(
 
   if (captures.size() > kProbCutCaptureLimit) {
     ScoredMovePicker movePicker(captures);
-    if (!movePicker.tryHashMoveFirst(state, ply, hashMove, counterMove, &board, enemyKing)) {
-      movePicker.score(state, ply, hashMove, counterMove, &board, enemyKing);
+    if (!movePicker.tryHashMoveFirst(state, ply, hashMove, counterMove, &board, enemyKing, {}, false, false)) {
+      movePicker.score(state, ply, hashMove, counterMove, &board, enemyKing, {}, false, false);
     }
     while (Move* pickedMove = movePicker.next()) {
       if (searchCapture(*pickedMove)) return true;
@@ -5010,7 +5010,7 @@ bool tryProbCut(
       if (searched >= kProbCutCaptureLimit) break;
     }
   } else {
-    orderMoves(captures, state, ply, hashMove, counterMove, &board, enemyKing);
+    orderMoves(captures, state, ply, hashMove, counterMove, &board, enemyKing, {}, false, false);
     for (Move& move : captures) {
       if (searchCapture(move)) return true;
       if (state.stopped) return false;
@@ -5085,12 +5085,12 @@ Move internalIterativeDeepeningMoveHint(
   };
 
   if (moves.size() > kIidMoveLimit) {
-    ScoredMovePicker movePicker(moves, state, ply, {}, counterMoveFor(state, previousMove), &board, enemyKing, previousMove);
+    ScoredMovePicker movePicker(moves, state, ply, {}, counterMoveFor(state, previousMove), &board, enemyKing, previousMove, false, false);
     while (Move* pickedMove = movePicker.next()) {
       if (searchMove(*pickedMove)) break;
     }
   } else {
-    orderMoves(moves, state, ply, {}, counterMoveFor(state, previousMove), &board, enemyKing, previousMove);
+    orderMoves(moves, state, ply, {}, counterMoveFor(state, previousMove), &board, enemyKing, previousMove, false, false);
     for (Move& move : moves) {
       if (searchMove(move)) break;
     }
@@ -5144,7 +5144,7 @@ int verifyNullMoveCutoff(
     return mateScore;
   }
 
-  orderMoves(moves, state, ply, {}, counterMoveFor(state, previousMove), &board, enemyKing, previousMove);
+  orderMoves(moves, state, ply, {}, counterMoveFor(state, previousMove), &board, enemyKing, previousMove, false, false);
 
   int bestScore = -kInf;
   for (Move& move : moves) {
