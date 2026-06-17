@@ -2830,8 +2830,7 @@ MoveList generateLegalQsearchMoves(
     if ((move.captured > 0 ? move.captured : -move.captured) == King) continue;
 
     const int capturedValue = pieceValue(move.captured);
-    if (move.captured != 0
-        && standPat + capturedValue + kQDeltaPruneMargin <= alpha
+    if (standPat + capturedValue + kQDeltaPruneMargin <= alpha
         && !shouldGuardQDeltaCapture(state, move, standPat, capturedValue, alpha)) {
       const bool possibleCheck = maybeMoveCanGiveCheck(move, enemyKing);
       if (!possibleCheck || !moveGivesCheckAssumingPossible(board, move, enemyKing, state)) {
