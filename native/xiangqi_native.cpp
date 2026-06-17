@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -5230,18 +5231,20 @@ int negamax(
 
   int bestScore = -kInf;
   Move bestMove{};
-  std::vector<Move> bestLine;
+  std::optional<std::vector<Move>> bestLine;
   std::array<Move, kMaxStackOrderedMoves> searchedQuiets;
   std::array<Move, kMaxStackOrderedMoves> searchedQuietChecks;
   std::array<Move, kMaxStackOrderedMoves> searchedCaptures;
   std::size_t searchedQuietCount = 0;
   std::size_t searchedQuietCheckCount = 0;
   std::size_t searchedCaptureCount = 0;
-  std::vector<Move> childPv;
+  std::optional<std::vector<Move>> childPv;
   if (pv) {
     const std::size_t pvCapacity = static_cast<std::size_t>(std::max(1, depth));
-    bestLine.reserve(pvCapacity);
-    childPv.reserve(pvCapacity);
+    bestLine.emplace();
+    childPv.emplace();
+    bestLine->reserve(pvCapacity);
+    childPv->reserve(pvCapacity);
   }
   int moveIndex = 0;
   int moveOrdinal = 0;
@@ -5324,12 +5327,12 @@ int negamax(
 
     const int childOwnKing = (move.captured > 0 ? move.captured : -move.captured) == King ? -1 : enemyKing;
     const bool childInCheck = childOwnKing < 0 || givesCheck;
-    std::vector<Move>* childPvSink = pv ? &childPv : nullptr;
+    std::vector<Move>* childPvSink = childPv ? &*childPv : nullptr;
     const uint64_t childKey = keyAfterMove(board, move);
     prefetchMainSearchCaches(state, childKey, -board.side);
     recordSearchPathMove(state, ply, move);
     makeMoveWithKnownKey(board, move, childKey);
-    if (childPvSink) childPv.clear();
+    if (childPvSink) childPvSink->clear();
     int score;
     if (moveIndex == 0) {
       score = -negamax(board, depth - 1 + extension, -beta, -alpha, ply + 1, state, childPvSink, true, move, childExtensions, childOwnKing, childInCheck);
@@ -5347,7 +5350,7 @@ int negamax(
       }
       if (score > alpha && score < beta && !state.stopped) {
         state.pvsResearches += 1;
-        if (childPvSink) childPv.clear();
+        if (childPvSink) childPvSink->clear();
         score = -negamax(board, depth - 1 + extension, -beta, -alpha, ply + 1, state, childPvSink, true, move, childExtensions, childOwnKing, childInCheck);
       }
     }
@@ -5360,14 +5363,14 @@ int negamax(
     if (score > bestScore) {
       bestScore = score;
       bestMove = move;
-      if (pv) bestLine = childPv;
+      if (bestLine && childPv) *bestLine = *childPv;
     }
     if (score > alpha) {
       alpha = score;
       if (pv) {
         pv->clear();
         pv->push_back(move);
-        pv->insert(pv->end(), childPv.begin(), childPv.end());
+        if (childPv) pv->insert(pv->end(), childPv->begin(), childPv->end());
       }
     }
     if (alpha >= beta) {
@@ -5406,7 +5409,7 @@ int negamax(
 
   if (pv && pv->empty() && validMove(bestMove)) {
     pv->push_back(bestMove);
-    pv->insert(pv->end(), bestLine.begin(), bestLine.end());
+    if (bestLine) pv->insert(pv->end(), bestLine->begin(), bestLine->end());
   }
   return bestScore;
 }
