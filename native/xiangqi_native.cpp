@@ -77,6 +77,7 @@ constexpr int kQSeeCaptureHistoryGuard = 1024;
 constexpr int kQDeltaPruneMargin = 90;
 constexpr int kQDeltaCaptureHistoryGuard = 32768;
 constexpr int kQDeltaCaptureHistoryMargin = 120;
+constexpr int kQBadCaptureOrderingPenaltyScale = 8;
 constexpr int kQQuietCheckSecondLayerMargin = 190;
 constexpr int kAspirationInitialWindow = 80;
 constexpr int kAspirationRetryWindow = 320;
@@ -4223,6 +4224,9 @@ int moveOrderingScore(
     score += captureHistoryScore;
     if (useQsearchCaptureHistory) {
       score += qCaptureHistoryScore(state, move);
+      if (movingValue > capturedValue + kQSeePruneLossMargin) {
+        score -= (movingValue - capturedValue) * kQBadCaptureOrderingPenaltyScale;
+      }
     }
     if (board && !useQsearchCaptureHistory) {
       score -= captureRiskPenaltyForCapture(*board, move, state, movingValue, capturedValue, pieceSide);
