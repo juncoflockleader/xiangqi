@@ -4116,6 +4116,17 @@ bool friendlyPawnAt(const Board& board, int side, int file, int rank) {
   return inside(file, rank) && board.cells[indexOf(file, rank)] == side * Pawn;
 }
 
+bool pawnControlsSquare(const Board& board, int side, int square) {
+  const auto& lookup = kPawnAttackers[static_cast<std::size_t>(sideLookupIndex(side))];
+  const int count = lookup.counts[static_cast<std::size_t>(square)];
+  const auto& sources = lookup.sources[static_cast<std::size_t>(square)];
+  const int pawn = side * Pawn;
+  for (int index = 0; index < count; index += 1) {
+    if (board.cells[sources[static_cast<std::size_t>(index)]] == pawn) return true;
+  }
+  return false;
+}
+
 int pawnThreatBonus(const Board& board, int square, int piece) {
   const int side = pieceCodeSide(piece);
   int bonus = 0;
@@ -4164,6 +4175,11 @@ int pawnStructureBonus(const Board& board, int square, int side, int file, int r
   } else {
     bonus += std::min(18, pieceCodeValue(forwardBlocker) / 40);
   }
+
+  const bool enemyPawnAhead = forwardBlocker != 0
+      && pieceCodeSide(forwardBlocker) == enemy
+      && pieceCodeType(forwardBlocker) == Pawn;
+  if (!pawnControlsSquare(board, enemy, square) && !enemyPawnAhead) bonus += 12;
 
   if (palaceContains(enemy, file, rank)) {
     bonus += 36;
@@ -6859,6 +6875,8 @@ int main() {
       }
     } else if (command == "position") {
       handlePosition(position, line);
+    } else if (command == "eval") {
+      std::cout << "info string eval cp " << evaluateRed(position.board) * position.board.side << std::endl;
     } else if (command == "go") {
       const GoOptions options = parseGo(line);
       if (options.searchMoves.empty()) {
