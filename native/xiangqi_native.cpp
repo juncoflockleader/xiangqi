@@ -5500,7 +5500,10 @@ int quiescenceKnownCheck(
     return alpha;
   }
 
+  const int alphaOriginal = alpha;
+  const int betaOriginal = beta;
   Move hashMove{};
+  bool alphaFromTtLower = false;
   if (state.qtt && qDepth >= 0) {
     state.qttProbes += 1;
     if (const TtEntry* entry = state.qtt->probe(board.key)) {
@@ -5523,11 +5526,22 @@ int quiescenceKnownCheck(
           state.qttCutoffs += 1;
           return ttScore;
         }
+        if (entry->flag == kTtLower) {
+          if (ttScore > alpha) {
+            alpha = ttScore;
+            alphaFromTtLower = true;
+          }
+        } else if (entry->flag == kTtUpper) {
+          beta = std::min(beta, ttScore);
+        }
+        if (alpha >= beta) {
+          state.qttCutoffs += 1;
+          return ttScore;
+        }
       }
     }
   }
 
-  const int alphaOriginal = alpha;
   int standPat = 0;
   if (!inCheck) {
     standPat = evaluateSideToMove(board, state);
@@ -5535,12 +5549,17 @@ int quiescenceKnownCheck(
       storeQtt(state, board, qDepth, ply, standPat, kTtLower, {});
       return beta;
     }
-    if (standPat > alpha) alpha = standPat;
+    if (standPat > alpha) {
+      alpha = standPat;
+      alphaFromTtLower = false;
+    }
   } else {
     state.checkedEvalSkips += 1;
   }
   if (!inCheck && qDepth <= 0) {
-    const int flag = alpha <= alphaOriginal ? kTtUpper : kTtExact;
+    const int flag = alphaFromTtLower
+        ? kTtLower
+        : alpha <= alphaOriginal ? kTtUpper : alpha >= betaOriginal ? kTtLower : kTtExact;
     storeQtt(state, board, qDepth, ply, alpha, flag, {});
     return alpha;
   }
@@ -5564,7 +5583,7 @@ int quiescenceKnownCheck(
   }
   if (moves.empty()) {
     const int score = inCheck ? -kMate + ply : alpha;
-    storeQtt(state, board, qDepth, ply, score, inCheck ? kTtExact : kTtUpper, {});
+    storeQtt(state, board, qDepth, ply, score, inCheck ? kTtExact : alphaFromTtLower ? kTtLower : kTtUpper, {});
     return score;
   }
   ScoredMovePicker movePicker(moves);
@@ -5650,11 +5669,14 @@ int quiescenceKnownCheck(
     }
     if (score > alpha) {
       alpha = score;
+      alphaFromTtLower = false;
       bestMove = move;
     }
   }
   if (!state.stopped) {
-    const int flag = alpha <= alphaOriginal ? kTtUpper : kTtExact;
+    const int flag = alphaFromTtLower
+        ? kTtLower
+        : alpha <= alphaOriginal ? kTtUpper : alpha >= betaOriginal ? kTtLower : kTtExact;
     storeQtt(state, board, qDepth, ply, alpha, flag, bestMove);
   }
   return alpha;
