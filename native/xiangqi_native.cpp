@@ -5513,10 +5513,10 @@ int quiescenceKnownCheck(
   while (Move* pickedMove = movePicker.next()) {
     Move& move = *pickedMove;
     const bool possibleCheck = maybeMoveCanGiveCheck(move, enemyKing);
-    bool givesCheck = !inCheck && move.captured == 0;
     const bool captureMove = move.captured != 0;
-    const int capturedValue = pieceValue(move.captured);
-    if (!inCheck && move.captured != 0 && standPat + capturedValue + kQDeltaPruneMargin <= alpha) {
+    bool givesCheck = !inCheck && !captureMove;
+    const int capturedValue = captureMove ? pieceValue(move.captured) : 0;
+    if (!inCheck && captureMove && standPat + capturedValue + kQDeltaPruneMargin <= alpha) {
       if (shouldGuardQDeltaCapture(state, move, standPat, capturedValue, alpha)) {
         if (possibleCheck) givesCheck = moveGivesCheckAssumingPossible(board, move, enemyKing, state);
       } else if (!possibleCheck || !moveGivesCheckAssumingPossible(board, move, enemyKing, state)) {
@@ -5528,14 +5528,14 @@ int quiescenceKnownCheck(
     } else if (!givesCheck && possibleCheck) {
       givesCheck = moveGivesCheckAssumingPossible(board, move, enemyKing, state);
     }
-    const bool quietCheckMove = !inCheck && move.captured == 0 && givesCheck;
+    const bool quietCheckMove = !inCheck && !captureMove && givesCheck;
     const int alphaBeforeMove = alpha;
     if (!inCheck
         && qDepth <= kQSeePruneMaxDepth
         && state.rootPieceCount > 0
         && state.rootPieceCount <= kQSeePruneMaxRootPieces
         && alpha > standPat + kQSeePruneAlphaMargin
-        && move.captured != 0
+        && captureMove
         && !givesCheck
         && pieceValue(move.piece) > capturedValue + kQSeePruneLossMargin) {
       const int badCaptureLoss = badCaptureLossForCapture(board, move, state);
