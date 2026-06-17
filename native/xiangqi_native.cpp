@@ -55,6 +55,7 @@ constexpr int kHistoryPruningMarginScale = 32;
 constexpr int kLateMovePruningMaxDepth = 4;
 constexpr int kLateMovePruningDepthThreeTighten = 20;
 constexpr int kLateMovePruningDepthFourTighten = 35;
+constexpr int kReverseFutilityMaxDepth = 5;
 constexpr int kImprovingEvalMargin = 12;
 constexpr int kTimedOpeningPriorMaxLoss = 100;
 constexpr int kTimedSearchDepthLimit = 64;
@@ -3039,9 +3040,10 @@ int razorMargin(int depth) {
 }
 
 bool shouldPruneReverseFutility(int depth, bool inCheck, int alpha, int beta, int staticScore, StaticEvalTrend trend) {
-  if (inCheck || depth < 1 || depth > 4) return false;
+  if (inCheck || depth < 1 || depth > kReverseFutilityMaxDepth) return false;
   if (beta - alpha != 1) return false;
   if (isMateScore(alpha) || isMateScore(beta)) return false;
+  if (depth >= kReverseFutilityMaxDepth && isWorseningTrend(trend)) return false;
   return staticScore - reverseFutilityMargin(depth, trend) >= beta;
 }
 
