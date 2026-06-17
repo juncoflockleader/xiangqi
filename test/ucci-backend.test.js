@@ -186,6 +186,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.qDeltaPrefilterSkips, 15);
     assert.equal(result.stats.qSeePrunes, 13);
     assert.equal(result.stats.lateMovePrunes, 4);
+    assert.equal(result.stats.depthThreeLateMovePrunes, 2);
     assert.equal(result.stats.reductions, 7);
     assert.equal(result.stats.reductionPlies, 11);
     assert.equal(result.stats.deepReductions, 3);
@@ -273,6 +274,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.iterations[0].stats.qDeltaPrefilterSkips, 15);
     assert.equal(result.iterations[0].stats.qSeePrunes, 13);
     assert.equal(result.iterations[0].stats.lateMovePrunes, 4);
+    assert.equal(result.iterations[0].stats.depthThreeLateMovePrunes, 2);
     assert.equal(result.iterations[0].stats.pvReductionGuards, 5);
     assert.equal(result.iterations[0].stats.cutNodeReductionBoosts, 6);
     assert.equal(result.iterations[0].stats.improvingNodes, 10);

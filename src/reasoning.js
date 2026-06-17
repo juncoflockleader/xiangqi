@@ -391,6 +391,7 @@ function searchTechniqueReasons(stats = {}) {
     (stats.reverseFutilityPrunes ?? 0) +
     (stats.futilityPrunes ?? 0) +
     (stats.lateMovePrunes ?? 0) +
+    (stats.depthThreeLateMovePrunes ?? 0) +
     (stats.razorPrunes ?? 0) +
     (stats.deltaPrunes ?? 0) +
     (stats.qDeltaPrefilterSkips ?? 0) +
@@ -526,6 +527,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
     (stats.reverseFutilityPrunes ?? 0) +
     (stats.futilityPrunes ?? 0) +
     (stats.lateMovePrunes ?? 0) +
+    (stats.depthThreeLateMovePrunes ?? 0) +
     (stats.razorPrunes ?? 0) +
     (stats.deltaPrunes ?? 0) +
     (stats.qDeltaPrefilterSkips ?? 0) +
@@ -557,6 +559,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   if ((stats.extensions ?? 0) > 0) supports.push("tactical extensions");
   if ((stats.recaptureExtensions ?? 0) > 0) supports.push("recapture extensions");
   if ((stats.deepReductions ?? 0) > 0) supports.push("adaptive late-move reductions");
+  if ((stats.depthThreeLateMovePrunes ?? 0) > 0) supports.push("depth-3 late-move pruning");
   if ((stats.pvReductionGuards ?? 0) > 0 || (stats.cutNodeReductionBoosts ?? 0) > 0) {
     supports.push("node-type LMR tuning");
   }

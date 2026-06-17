@@ -52,6 +52,8 @@ constexpr int kSingularExtensionMargin = 90;
 constexpr int kHistoryPruningMaxDepth = 3;
 constexpr int kHistoryPruningBaseIndex = 8;
 constexpr int kHistoryPruningMarginScale = 32;
+constexpr int kLateMovePruningMaxDepth = 3;
+constexpr int kLateMovePruningDepthThreeTighten = 20;
 constexpr int kImprovingEvalMargin = 12;
 constexpr int kTimedOpeningPriorMaxLoss = 100;
 constexpr int kTimedSearchDepthLimit = 64;
@@ -730,6 +732,7 @@ struct SearchState {
   int64_t qDeltaPrefilterSkips = 0;
   int64_t qSeePrunes = 0;
   int64_t lateMovePrunes = 0;
+  int64_t depthThreeLateMovePrunes = 0;
   int64_t lmrReductions = 0;
   int64_t reductionPlies = 0;
   int64_t deepReductions = 0;
@@ -870,6 +873,7 @@ struct SearchState {
     qDeltaPrefilterSkips = 0;
     qSeePrunes = 0;
     lateMovePrunes = 0;
+    depthThreeLateMovePrunes = 0;
     lmrReductions = 0;
     reductionPlies = 0;
     deepReductions = 0;
@@ -2703,6 +2707,12 @@ enum StaticEvalTrend {
   TrendStable = 3
 };
 
+enum LateMovePruneDecision {
+  LateMoveKeep = 0,
+  LateMovePruneShallow = 1,
+  LateMovePruneDepthThree = 2
+};
+
 bool isImprovingTrend(StaticEvalTrend trend) {
   return trend == TrendImproving;
 }
@@ -2838,7 +2848,7 @@ bool shouldPruneBadHistory(
   return historyScore <= threshold || continuationScore <= threshold / 2;
 }
 
-bool shouldPruneLateMove(
+LateMovePruneDecision shouldPruneLateMove(
     const Move& move,
     SearchState& state,
     int depth,
@@ -2854,27 +2864,38 @@ bool shouldPruneLateMove(
     int beta,
     StaticEvalTrend trend,
     const Move& previousMove) {
-  if (depth < 1 || depth > 2) return false;
+  if (depth < 1 || depth > kLateMovePruningMaxDepth) return LateMoveKeep;
   const int baseThreshold = lateMovePruningBaseThreshold(depth);
-  const int threshold = lateMovePruningThreshold(depth, trend);
+  const bool depthThreeCandidate = depth == kLateMovePruningMaxDepth;
+  const int threshold = std::max(
+      1,
+      lateMovePruningThreshold(depth, trend)
+          - (depthThreeCandidate ? kLateMovePruningDepthThreeTighten : 0));
   if (orderedIndex < threshold) {
     if (isImprovingTrend(trend) && orderedIndex >= baseThreshold) {
       state.improvingLateMoveGuards += 1;
     }
-    return false;
+    return LateMoveKeep;
   }
-  if (beta - alpha != 1) return false;
-  if (inCheck || givesCheck || extension > 0) return false;
-  if (!quietMove || killerCandidate || hashCandidate || counterCandidate) return false;
-  if (isMateScore(alpha) || isMateScore(beta)) return false;
+  if (beta - alpha != 1) return LateMoveKeep;
+  if (inCheck || givesCheck || extension > 0) return LateMoveKeep;
+  if (!quietMove || killerCandidate || hashCandidate || counterCandidate) return LateMoveKeep;
+  if (isMateScore(alpha) || isMateScore(beta)) return LateMoveKeep;
   const int historyScore = state.quietHistory[move.from][move.to];
   const int continuationScore = continuationHistoryValue(state, previousMove, move, quietMove);
   const int positiveThreshold = depth * depth;
-  if (historyScore > positiveThreshold || continuationScore > positiveThreshold) return false;
+  if (historyScore > positiveThreshold || continuationScore > positiveThreshold) return LateMoveKeep;
+  if (depthThreeCandidate) {
+    if (isImprovingTrend(trend)) {
+      state.improvingLateMoveGuards += 1;
+      return LateMoveKeep;
+    }
+    return historyScore < 0 || continuationScore < 0 ? LateMovePruneDepthThree : LateMoveKeep;
+  }
   if (isWorseningTrend(trend) && orderedIndex < baseThreshold) {
     state.nonImprovingLateMovePrunes += 1;
   }
-  return historyScore < 0 || continuationScore < 0;
+  return historyScore < 0 || continuationScore < 0 ? LateMovePruneShallow : LateMoveKeep;
 }
 
 bool shouldPruneBadCapture(
@@ -4818,8 +4839,10 @@ int negamax(
       state.badHistoryPrunes += 1;
       continue;
     }
-    if (shouldPruneLateMove(move, state, depth, orderedIndex, quietMove, inCheck, givesCheck, extension, killerCandidate, hashCandidate, counterCandidate, alpha, beta, trend, previousMove)) {
+    const LateMovePruneDecision lateMovePruneDecision = shouldPruneLateMove(move, state, depth, orderedIndex, quietMove, inCheck, givesCheck, extension, killerCandidate, hashCandidate, counterCandidate, alpha, beta, trend, previousMove);
+    if (lateMovePruneDecision != LateMoveKeep) {
       state.lateMovePrunes += 1;
+      if (lateMovePruneDecision == LateMovePruneDepthThree) state.depthThreeLateMovePrunes += 1;
       continue;
     }
     if (counterCandidate) state.countermoveHits += 1;
@@ -5856,7 +5879,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " hpguard " << state.badHistoryPruneGuards << " delta " << state.deltaPrunes
               << " qdskip " << state.qDeltaPrefilterSkips
               << " qsee " << state.qSeePrunes
-              << " lmp " << state.lateMovePrunes << " lmr " << state.lmrReductions << "/" << state.lmrResearches
+              << " lmp " << state.lateMovePrunes << " lmp3 " << state.depthThreeLateMovePrunes
+              << " lmr " << state.lmrReductions << "/" << state.lmrResearches
               << " redply " << state.reductionPlies << " deepred " << state.deepReductions
               << " pvguard " << state.pvReductionGuards << " cutboost " << state.cutNodeReductionBoosts
               << " imp " << state.improvingNodes << " nimp " << state.nonImprovingNodes
@@ -5928,7 +5952,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " hpguard " << state.badHistoryPruneGuards << " delta " << state.deltaPrunes
               << " qdskip " << state.qDeltaPrefilterSkips
               << " qsee " << state.qSeePrunes
-              << " lmp " << state.lateMovePrunes << " lmr " << state.lmrReductions << "/" << state.lmrResearches
+              << " lmp " << state.lateMovePrunes << " lmp3 " << state.depthThreeLateMovePrunes
+              << " lmr " << state.lmrReductions << "/" << state.lmrResearches
               << " redply " << state.reductionPlies << " deepred " << state.deepReductions
               << " pvguard " << state.pvReductionGuards << " cutboost " << state.cutNodeReductionBoosts
               << " imp " << state.improvingNodes << " nimp " << state.nonImprovingNodes

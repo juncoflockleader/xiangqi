@@ -359,6 +359,7 @@ function maybeBookResult(position, options, tableSize) {
       badHistoryPrunes: 0,
       badHistoryPruneGuards: 0,
       lateMovePrunes: 0,
+      depthThreeLateMovePrunes: 0,
       deltaPrunes: 0,
       reductions: 0,
       reductionPlies: 0,
