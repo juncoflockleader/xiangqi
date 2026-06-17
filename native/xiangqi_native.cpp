@@ -811,6 +811,10 @@ struct SearchState {
   int64_t continuationHistoryHits = 0;
   int64_t continuationReductionBoosts = 0;
   int64_t continuationReductionMaluses = 0;
+  int64_t followupHistoryStores = 0;
+  int64_t followupHistoryHits = 0;
+  int64_t followupReductionBoosts = 0;
+  int64_t followupReductionMaluses = 0;
   int64_t checkEvasionOrderHits = 0;
   int64_t checkEvasionCaptures = 0;
   int64_t checkEvasionBlocks = 0;
@@ -889,6 +893,8 @@ struct SearchState {
   std::array<Move, kMaxGeneratedMoves> rootOrderMoves{};
   std::array<int, kMaxPly> staticEvalStack{};
   std::array<bool, kMaxPly> staticEvalKnown{};
+  std::array<Move, kMaxPly> pathMoves{};
+  std::array<bool, kMaxPly> pathMoveKnown{};
   std::array<uint64_t, kMaxPly> pathKeys{};
   std::array<bool, kMaxPly> pathKeyKnown{};
   std::vector<CheckCacheEntry> checkCache = std::vector<CheckCacheEntry>(kCheckCacheSize);
@@ -962,6 +968,10 @@ struct SearchState {
     continuationHistoryHits = 0;
     continuationReductionBoosts = 0;
     continuationReductionMaluses = 0;
+    followupHistoryStores = 0;
+    followupHistoryHits = 0;
+    followupReductionBoosts = 0;
+    followupReductionMaluses = 0;
     checkEvasionOrderHits = 0;
     checkEvasionCaptures = 0;
     checkEvasionBlocks = 0;
@@ -1030,6 +1040,8 @@ struct SearchState {
     killers = {};
     staticEvalStack.fill(0);
     staticEvalKnown.fill(false);
+    pathMoves = {};
+    pathMoveKnown.fill(false);
     pathKeys.fill(0);
     pathKeyKnown.fill(false);
   }
@@ -1061,6 +1073,8 @@ struct SearchState {
     std::fill(leastAttackerCache.begin(), leastAttackerCache.end(), LeastAttackerCacheEntry{});
     staticEvalStack.fill(0);
     staticEvalKnown.fill(false);
+    pathMoves = {};
+    pathMoveKnown.fill(false);
     pathKeys.fill(0);
     pathKeyKnown.fill(false);
   }
@@ -1943,6 +1957,30 @@ bool validMove(const Move& move) {
   return move.from >= 0 && move.from < kSquares
       && move.to >= 0 && move.to < kSquares
       && move.from != move.to;
+}
+
+void recordSearchPathMove(SearchState& state, int ply, const Move& move) {
+  if (ply < 0 || ply >= kMaxPly) return;
+  const auto pathIndex = static_cast<std::size_t>(ply);
+  state.pathMoves[pathIndex] = move;
+  state.pathMoveKnown[pathIndex] = validMove(move);
+}
+
+void clearSearchPathMove(SearchState& state, int ply) {
+  if (ply < 0 || ply >= kMaxPly) return;
+  const auto pathIndex = static_cast<std::size_t>(ply);
+  state.pathMoves[pathIndex] = {};
+  state.pathMoveKnown[pathIndex] = false;
+}
+
+Move searchPathMoveAt(const SearchState& state, int ply) {
+  if (ply < 0 || ply >= kMaxPly) return {};
+  const auto pathIndex = static_cast<std::size_t>(ply);
+  return state.pathMoveKnown[pathIndex] ? state.pathMoves[pathIndex] : Move{};
+}
+
+Move previousOwnMoveFor(const SearchState& state, int ply) {
+  return searchPathMoveAt(state, ply - 2);
 }
 
 void setPvToMove(std::vector<Move>* pv, const Move& move) {
@@ -2972,6 +3010,7 @@ int historyPruningMargin(int depth, StaticEvalTrend trend) {
 }
 
 int continuationHistoryValue(const SearchState& state, const Move& previousMove, const Move& move, bool quietMove);
+int followupHistoryValue(const SearchState& state, const Move& previousOwnMove, const Move& move, bool quietMove);
 
 bool shouldPruneBadHistory(
     const Move& move,
@@ -2988,7 +3027,8 @@ bool shouldPruneBadHistory(
     int alpha,
     int beta,
     StaticEvalTrend trend,
-    const Move& previousMove) {
+    const Move& previousMove,
+    const Move& previousOwnMove) {
   if (depth < 1 || depth > kHistoryPruningMaxDepth) return false;
   if (orderedIndex < historyPruningMoveIndex(depth, trend)) return false;
   if (beta - alpha != 1) return false;
@@ -2998,9 +3038,11 @@ bool shouldPruneBadHistory(
 
   const int historyScore = state.quietHistory[move.from][move.to];
   const int continuationScore = continuationHistoryValue(state, previousMove, move, quietMove);
+  const int followupScore = followupHistoryValue(state, previousOwnMove, move, quietMove);
   if (historyScore >= 0 && continuationScore >= 0) return false;
+  if (followupScore > depth * depth * 128) return false;
 
-  const int combinedHistory = historyScore + continuationScore / 2;
+  const int combinedHistory = historyScore + continuationScore / 2 + std::min(0, followupScore / 8);
   const int threshold = -historyPruningMargin(depth, trend);
   if (combinedHistory > threshold) return false;
 
@@ -3027,7 +3069,8 @@ LateMovePruneDecision shouldPruneLateMove(
     int alpha,
     int beta,
     StaticEvalTrend trend,
-    const Move& previousMove) {
+    const Move& previousMove,
+    const Move& previousOwnMove) {
   if (depth < 1 || depth > kLateMovePruningMaxDepth) return LateMoveKeep;
   const int baseThreshold = lateMovePruningBaseThreshold(depth);
   const bool depthThreeCandidate = depth == 3;
@@ -3050,8 +3093,9 @@ LateMovePruneDecision shouldPruneLateMove(
   if (isMateScore(alpha) || isMateScore(beta)) return LateMoveKeep;
   const int historyScore = state.quietHistory[move.from][move.to];
   const int continuationScore = continuationHistoryValue(state, previousMove, move, quietMove);
+  const int followupScore = followupHistoryValue(state, previousOwnMove, move, quietMove);
   const int positiveThreshold = depth * depth;
-  if (historyScore > positiveThreshold || continuationScore > positiveThreshold) return LateMoveKeep;
+  if (historyScore > positiveThreshold || continuationScore > positiveThreshold || followupScore > positiveThreshold * 64) return LateMoveKeep;
   if (depthThreeCandidate) {
     if (isImprovingTrend(trend)) {
       state.improvingLateMoveGuards += 1;
@@ -3207,6 +3251,23 @@ void addContinuationHistoryScore(SearchState& state, const Move& previousMove, c
   state.continuationHistoryStores += 1;
 }
 
+int followupHistoryValue(const SearchState& state, const Move& previousOwnMove, const Move& move, bool quietMove) {
+  if (!validMove(previousOwnMove) || !quietMove) return 0;
+  return state.continuationHistory[previousOwnMove.to][move.from][move.to];
+}
+
+int followupHistoryScore(SearchState& state, const Move& previousOwnMove, const Move& move, bool quietMove) {
+  const int score = followupHistoryValue(state, previousOwnMove, move, quietMove);
+  if (score != 0) state.followupHistoryHits += 1;
+  return score;
+}
+
+void addFollowupHistoryScore(SearchState& state, const Move& previousOwnMove, const Move& move, int bonus, bool quietMove) {
+  if (!validMove(previousOwnMove) || !quietMove) return;
+  addHistoryScore(state.continuationHistory[previousOwnMove.to], move, bonus);
+  state.followupHistoryStores += 1;
+}
+
 int checkHistoryScore(SearchState& state, const Move& move, bool quietMove) {
   if (!quietMove) return 0;
   const int score = state.checkHistory[move.from][move.to];
@@ -3236,6 +3297,7 @@ int lateMoveReduction(
     bool counterCandidate,
     bool quietMove,
     const Move& previousMove,
+    const Move& previousOwnMove,
     int alpha,
     int beta,
     StaticEvalTrend trend) {
@@ -3246,6 +3308,7 @@ int lateMoveReduction(
 
   const int historyScore = state.quietHistory[move.from][move.to];
   const int continuationScore = continuationHistoryValue(state, previousMove, move, quietMove);
+  const int followupScore = followupHistoryValue(state, previousOwnMove, move, quietMove);
   const int historyScale = depth * depth;
   if (counterCandidate && reduction > 1) reduction -= 1;
   if (historyScore > historyScale * 96 && depth >= 6) reduction -= 1;
@@ -3257,6 +3320,14 @@ int lateMoveReduction(
   if (continuationScore < -historyScale * 64 && depth >= 5 && moveIndex >= 8) {
     reduction += 1;
     state.continuationReductionMaluses += 1;
+  }
+  if (followupScore > historyScale * 256 && reduction > 1) {
+    reduction -= 1;
+    state.followupReductionBoosts += 1;
+  }
+  if (followupScore < -historyScale * 96 && depth >= 5 && moveIndex >= 8) {
+    reduction += 1;
+    state.followupReductionMaluses += 1;
   }
   if (beta - alpha > 1 && depth >= 8 && moveIndex >= 16 && reduction > 1) {
     reduction -= 1;
@@ -3285,6 +3356,7 @@ void rememberBetaCutoff(
     bool bestMoveCapture,
     bool bestMoveGivesCheck,
     const Move& previousMove,
+    const Move& previousOwnMove,
     const Move* quiets,
     std::size_t quietCount,
     const Move* quietChecks,
@@ -3301,11 +3373,13 @@ void rememberBetaCutoff(
       state.countermoveStores += 1;
     }
     addContinuationHistoryScore(state, previousMove, bestMove, bonus / 2, bestMoveQuiet);
+    addFollowupHistoryScore(state, previousOwnMove, bestMove, bonus / 3, bestMoveQuiet);
     for (std::size_t index = 0; index < quietCount; index += 1) {
       const Move& move = quiets[index];
       if (!sameMove(move, bestMove)) {
         addHistoryScore(state.quietHistory, move, -bonus / 2);
         addContinuationHistoryScore(state, previousMove, move, -bonus / 4, true);
+        addFollowupHistoryScore(state, previousOwnMove, move, -bonus / 6, true);
       }
     }
   } else if (bestMoveCapture) {
@@ -4029,6 +4103,7 @@ int moveOrderingScore(
     const Board* board = nullptr,
     int enemyKing = -1,
     const Move& previousMove = {},
+    const Move& previousOwnMove = {},
     bool inCheck = false,
     bool scoreChecks = true,
     bool countHashMoveHit = true,
@@ -4078,6 +4153,7 @@ int moveOrderingScore(
     }
     score += state.quietHistory[move.from][move.to];
     score += continuationHistoryScore(state, previousMove, move, true);
+    score += followupHistoryScore(state, previousOwnMove, move, true) / 2;
     if (useQsearchCaptureHistory && !inCheck) {
       score += qCheckHistoryScore(state, move) * 2;
       score += state.checkHistory[move.from][move.to] / 4;
@@ -4112,11 +4188,12 @@ void orderMoves(
 
   const bool hashMoveValid = validMove(hashMove);
   const bool counterMoveValid = validMove(counterMove);
+  const Move previousOwnMove = previousOwnMoveFor(state, ply);
 
   if (moveCount <= kMaxStackScoredMoves) {
     std::array<int, kMaxStackScoredMoves> scores;
     for (std::size_t index = 0; index < moveCount; index += 1) {
-      scores[index] = moveOrderingScore(moves[index], state, ply, hashMove, hashMoveValid, counterMove, counterMoveValid, board, enemyKing, previousMove, inCheck, scoreChecks, countHashMoveHit, useQsearchCaptureHistory);
+      scores[index] = moveOrderingScore(moves[index], state, ply, hashMove, hashMoveValid, counterMove, counterMoveValid, board, enemyKing, previousMove, previousOwnMove, inCheck, scoreChecks, countHashMoveHit, useQsearchCaptureHistory);
     }
     if (moveCount <= kInsertionSortMoveLimit) {
       for (std::size_t index = 1; index < moveCount; index += 1) {
@@ -4165,7 +4242,7 @@ void orderMoves(
   std::vector<ScoredMove> scored;
   scored.reserve(moveCount);
   for (int index = 0; index < static_cast<int>(moveCount); index += 1) {
-    const int score = moveOrderingScore(moves[index], state, ply, hashMove, hashMoveValid, counterMove, counterMoveValid, board, enemyKing, previousMove, inCheck, scoreChecks, countHashMoveHit, useQsearchCaptureHistory);
+    const int score = moveOrderingScore(moves[index], state, ply, hashMove, hashMoveValid, counterMove, counterMoveValid, board, enemyKing, previousMove, previousOwnMove, inCheck, scoreChecks, countHashMoveHit, useQsearchCaptureHistory);
     scored.push_back({moves[index], score, index});
   }
 
@@ -4224,6 +4301,7 @@ class ScoredMovePicker {
     preserveCurrentOrder_ = false;
     const bool hashMoveValid = validMove(hashMove);
     const bool counterMoveValid = validMove(counterMove);
+    const Move previousOwnMove = previousOwnMoveFor(state, ply);
     for (std::size_t index = 0; index < moveCount_; index += 1) {
       ordinals_[index] = index;
       scores_[index] = moveOrderingScore(
@@ -4237,6 +4315,7 @@ class ScoredMovePicker {
           board,
           enemyKing,
           previousMove,
+          previousOwnMove,
           inCheck,
           scoreChecks,
           countHashMoveHit,
@@ -4270,6 +4349,7 @@ class ScoredMovePicker {
       scoreBoard_ = board;
       scoreEnemyKing_ = enemyKing;
       scorePreviousMove_ = previousMove;
+      scorePreviousOwnMove_ = previousOwnMoveFor(state, ply);
       scoreInCheck_ = inCheck;
       scoreChecks_ = scoreChecks;
       useQsearchCaptureHistory_ = useQsearchCaptureHistory;
@@ -4323,6 +4403,7 @@ class ScoredMovePicker {
           scoreBoard_,
           scoreEnemyKing_,
           scorePreviousMove_,
+          scorePreviousOwnMove_,
           scoreInCheck_,
           scoreChecks_,
           false,
@@ -4341,6 +4422,7 @@ class ScoredMovePicker {
   const Board* scoreBoard_ = nullptr;
   Move scoreCounterMove_{};
   Move scorePreviousMove_{};
+  Move scorePreviousOwnMove_{};
   int scorePly_ = 0;
   int scoreEnemyKing_ = -1;
   bool scoreInCheck_ = false;
@@ -4502,6 +4584,7 @@ bool tryProbCut(
     state.probCutSearches += 1;
     const KnownChildState child = knownChildStateAfterMove(board, move, enemyKing, state);
     prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
+    recordSearchPathMove(state, ply, move);
     makeMove(board, move);
     const int score = -negamax(
         board,
@@ -4517,6 +4600,7 @@ bool tryProbCut(
         child.ownKing,
         child.inCheck);
     undoMove(board, move);
+    clearSearchPathMove(state, ply);
     if (state.stopped) return false;
     searched += 1;
 
@@ -4561,6 +4645,7 @@ Move internalIterativeDeepeningMoveHint(
 
     const KnownChildState child = knownChildStateAfterMove(board, move, enemyKing, state);
     prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
+    recordSearchPathMove(state, ply, move);
     makeMove(board, move);
     const int score = -negamax(
         board,
@@ -4576,6 +4661,7 @@ Move internalIterativeDeepeningMoveHint(
         child.ownKing,
         child.inCheck);
     undoMove(board, move);
+    clearSearchPathMove(state, ply);
     if (state.stopped) break;
 
     if (score > bestScore) {
@@ -4647,6 +4733,7 @@ int verifyNullMoveCutoff(
 
     const KnownChildState child = knownChildStateAfterMove(board, move, enemyKing, state);
     prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
+    recordSearchPathMove(state, ply, move);
     makeMove(board, move);
     const int score = -negamax(
         board,
@@ -4662,6 +4749,7 @@ int verifyNullMoveCutoff(
         child.ownKing,
         child.inCheck);
     undoMove(board, move);
+    clearSearchPathMove(state, ply);
     if (state.stopped) break;
 
     if (score > bestScore) bestScore = score;
@@ -4689,6 +4777,7 @@ int searchExcludedMoveBestScore(
 
     const KnownChildState child = knownChildStateAfterMove(board, move, enemyKing, state);
     prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
+    recordSearchPathMove(state, ply, move);
     makeMove(board, move);
     const int score = -negamax(
         board,
@@ -4704,6 +4793,7 @@ int searchExcludedMoveBestScore(
         child.ownKing,
         child.inCheck);
     undoMove(board, move);
+    clearSearchPathMove(state, ply);
     if (state.stopped) break;
 
     if (score > bestScore) bestScore = score;
@@ -4994,6 +5084,7 @@ int negamax(
   }
   int moveIndex = 0;
   int moveOrdinal = 0;
+  const Move previousOwnMove = previousOwnMoveFor(state, ply);
   while (Move* pickedMove = movePicker.next()) {
     Move& move = *pickedMove;
     const int orderedIndex = moveOrdinal;
@@ -5051,11 +5142,11 @@ int negamax(
       state.seePrunes += 1;
       continue;
     }
-    if (shouldPruneBadHistory(move, state, depth, orderedIndex, quietMove, inCheck, givesCheck, extension, killerCandidate, hashCandidate, counterCandidate, alpha, beta, trend, previousMove)) {
+    if (shouldPruneBadHistory(move, state, depth, orderedIndex, quietMove, inCheck, givesCheck, extension, killerCandidate, hashCandidate, counterCandidate, alpha, beta, trend, previousMove, previousOwnMove)) {
       state.badHistoryPrunes += 1;
       continue;
     }
-    const LateMovePruneDecision lateMovePruneDecision = shouldPruneLateMove(move, state, depth, orderedIndex, quietMove, inCheck, givesCheck, extension, killerCandidate, hashCandidate, counterCandidate, alpha, beta, trend, previousMove);
+    const LateMovePruneDecision lateMovePruneDecision = shouldPruneLateMove(move, state, depth, orderedIndex, quietMove, inCheck, givesCheck, extension, killerCandidate, hashCandidate, counterCandidate, alpha, beta, trend, previousMove, previousOwnMove);
     if (lateMovePruneDecision != LateMoveKeep) {
       state.lateMovePrunes += 1;
       if (lateMovePruneDecision == LateMovePruneDepthThree) state.depthThreeLateMovePrunes += 1;
@@ -5074,13 +5165,14 @@ int negamax(
     const bool childInCheck = childOwnKing < 0 || givesCheck;
     std::vector<Move>* childPvSink = pv ? &childPv : nullptr;
     prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
+    recordSearchPathMove(state, ply, move);
     makeMove(board, move);
     if (childPvSink) childPv.clear();
     int score;
     if (moveIndex == 0) {
       score = -negamax(board, depth - 1 + extension, -beta, -alpha, ply + 1, state, childPvSink, true, move, childExtensions, childOwnKing, childInCheck);
     } else {
-      const int reduction = extension > 0 ? 0 : lateMoveReduction(state, depth, moveIndex, move, inCheck, killerCandidate, counterCandidate, quietMove, previousMove, alpha, beta, trend);
+      const int reduction = extension > 0 ? 0 : lateMoveReduction(state, depth, moveIndex, move, inCheck, killerCandidate, counterCandidate, quietMove, previousMove, previousOwnMove, alpha, beta, trend);
       if (reduction > 0) {
         state.lmrReductions += 1;
         state.reductionPlies += reduction;
@@ -5098,6 +5190,7 @@ int negamax(
       }
     }
     undoMove(board, move);
+    clearSearchPathMove(state, ply);
     if (state.stopped) break;
     moveIndex += 1;
     if (killerCandidate) state.killerHits += 1;
@@ -5125,6 +5218,7 @@ int negamax(
           captureMove,
           givesCheck,
           previousMove,
+          previousOwnMove,
           searchedQuiets.data(),
           searchedQuietCount,
           searchedQuietChecks.data(),
@@ -5702,6 +5796,7 @@ std::vector<RootLine> searchRootDepth(
     }
     state.rootChildStateReuses += 1;
     prefetchMainSearchCaches(state, keyAfterMove(board, move), -board.side);
+    recordSearchPathMove(state, 0, move);
     makeMove(board, move);
     childPv.clear();
     const int childDepth = depth - 1 + moveExtension;
@@ -5820,6 +5915,7 @@ std::vector<RootLine> searchRootDepth(
       }
     }
     undoMove(board, move);
+    clearSearchPathMove(state, 0);
     if (state.stopped) break;
     state.rootMovesSearched += 1;
     moveIndex += 1;
@@ -6133,6 +6229,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " implmp " << state.improvingLateMoveGuards << " nimlmp " << state.nonImprovingLateMovePrunes
               << " cm " << state.countermoveHits << " ch " << state.continuationHistoryHits
               << " chred " << state.continuationReductionBoosts << " chredm " << state.continuationReductionMaluses
+              << " fch " << state.followupHistoryHits << " fchstores " << state.followupHistoryStores
+              << " fchred " << state.followupReductionBoosts << " fchredm " << state.followupReductionMaluses
               << " ce " << state.checkEvasionOrderHits << " cecap " << state.checkEvasionCaptures
               << " ceblock " << state.checkEvasionBlocks << " ceking " << state.checkEvasionKingMoves
               << " checkhist " << state.checkHistoryHits << " checkhstores " << state.checkHistoryStores
@@ -6211,6 +6309,8 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " implmp " << state.improvingLateMoveGuards << " nimlmp " << state.nonImprovingLateMovePrunes
               << " cm " << state.countermoveHits << " ch " << state.continuationHistoryHits
               << " chred " << state.continuationReductionBoosts << " chredm " << state.continuationReductionMaluses
+              << " fch " << state.followupHistoryHits << " fchstores " << state.followupHistoryStores
+              << " fchred " << state.followupReductionBoosts << " fchredm " << state.followupReductionMaluses
               << " ce " << state.checkEvasionOrderHits << " cecap " << state.checkEvasionCaptures
               << " ceblock " << state.checkEvasionBlocks << " ceking " << state.checkEvasionKingMoves
               << " checkhist " << state.checkHistoryHits << " checkhstores " << state.checkHistoryStores

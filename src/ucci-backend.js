@@ -927,6 +927,10 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     continuationHistoryHits: maxInfoValue(infos, "continuationHistoryHits"),
     continuationReductionBoosts: maxInfoValue(infos, "continuationReductionBoosts"),
     continuationReductionMaluses: maxInfoValue(infos, "continuationReductionMaluses"),
+    followupHistoryHits: maxInfoValue(infos, "followupHistoryHits"),
+    followupHistoryStores: maxInfoValue(infos, "followupHistoryStores"),
+    followupReductionBoosts: maxInfoValue(infos, "followupReductionBoosts"),
+    followupReductionMaluses: maxInfoValue(infos, "followupReductionMaluses"),
     checkEvasionOrderHits: maxInfoValue(infos, "checkEvasionOrderHits"),
     checkEvasionCaptures: maxInfoValue(infos, "checkEvasionCaptures"),
     checkEvasionBlocks: maxInfoValue(infos, "checkEvasionBlocks"),
@@ -1118,6 +1122,10 @@ function parseInfoLine(line) {
     continuationHistoryHits: 0,
     continuationReductionBoosts: 0,
     continuationReductionMaluses: 0,
+    followupHistoryHits: 0,
+    followupHistoryStores: 0,
+    followupReductionBoosts: 0,
+    followupReductionMaluses: 0,
     checkEvasionOrderHits: 0,
     checkEvasionCaptures: 0,
     checkEvasionBlocks: 0,
@@ -1313,6 +1321,18 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "chredm") {
       info.continuationReductionMaluses = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "fch") {
+      info.followupHistoryHits = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "fchstores") {
+      info.followupHistoryStores = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "fchred") {
+      info.followupReductionBoosts = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "fchredm") {
+      info.followupReductionMaluses = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "ce") {
       info.checkEvasionOrderHits = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -2139,6 +2159,10 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.captureHistoryPruneGuards ?? 0) > 0) parts.push(nativeCount(stats.captureHistoryPruneGuards, "capture-history prune guard"));
   if ((stats.countermoveHits ?? 0) > 0) parts.push(nativeCount(stats.countermoveHits, "countermove-order hit"));
   if ((stats.continuationHistoryHits ?? 0) > 0) parts.push(nativeCount(stats.continuationHistoryHits, "continuation-history hit"));
+  if ((stats.followupHistoryHits ?? 0) > 0) parts.push(nativeCount(stats.followupHistoryHits, "same-side follow-up history hit"));
+  if ((stats.followupHistoryStores ?? 0) > 0) parts.push(nativeCount(stats.followupHistoryStores, "same-side follow-up history update"));
+  if ((stats.followupReductionBoosts ?? 0) > 0) parts.push(nativeCount(stats.followupReductionBoosts, "follow-up reduction guard"));
+  if ((stats.followupReductionMaluses ?? 0) > 0) parts.push(nativeCount(stats.followupReductionMaluses, "follow-up reduction boost"));
   if ((stats.checkEvasionOrderHits ?? 0) > 0) parts.push(nativeCount(stats.checkEvasionOrderHits, "check-evasion ordering hint"));
   if ((stats.checkHistoryHits ?? 0) > 0) parts.push(nativeCount(stats.checkHistoryHits, "check-history hit"));
   if ((stats.iidMoveHits ?? 0) > 0) parts.push(nativeCount(stats.iidMoveHits, "internal-iterative-deepening move hint"));
@@ -2422,6 +2446,10 @@ function createNativeStats(parsed) {
     continuationHistoryHits: parsed.continuationHistoryHits ?? 0,
     continuationReductionBoosts: parsed.continuationReductionBoosts ?? 0,
     continuationReductionMaluses: parsed.continuationReductionMaluses ?? 0,
+    followupHistoryHits: parsed.followupHistoryHits ?? 0,
+    followupHistoryStores: parsed.followupHistoryStores ?? 0,
+    followupReductionBoosts: parsed.followupReductionBoosts ?? 0,
+    followupReductionMaluses: parsed.followupReductionMaluses ?? 0,
     checkEvasionOrderHits: parsed.checkEvasionOrderHits ?? 0,
     checkEvasionCaptures: parsed.checkEvasionCaptures ?? 0,
     checkEvasionBlocks: parsed.checkEvasionBlocks ?? 0,
@@ -2567,6 +2595,10 @@ function createEmptyStats() {
     continuationHistoryHits: 0,
     continuationReductionBoosts: 0,
     continuationReductionMaluses: 0,
+    followupHistoryStores: 0,
+    followupHistoryHits: 0,
+    followupReductionBoosts: 0,
+    followupReductionMaluses: 0,
     checkEvasionOrderHits: 0,
     checkEvasionCaptures: 0,
     checkEvasionBlocks: 0,
