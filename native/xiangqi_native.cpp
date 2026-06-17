@@ -5665,9 +5665,9 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t earlyPawnChallenge = fenPositionKey(
       "rheakaehr/9/1c5c1/p3p1p1p/2p6/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r");
   if (root.key == earlyPawnChallenge) {
-    if (uci == "b0a2") return 5000;  // b9-a7: refreshed Pikafish top horse shift.
-    if (uci == "b2c2") return 4700;  // b7-c7: tied cannon regroup alternative.
-    if (uci == "h0g2") return 4600;  // h9-g7: tied horse-development alternative.
+    if (uci == "b2c2") return 5000;  // b7-c7: refreshed depth-12 Pikafish top cannon regroup.
+    if (uci == "b0a2") return 4700;  // b9-a7: near-tie horse-shift alternative.
+    if (uci == "h0g2") return 4600;  // h9-g7: playable horse-development alternative.
     return 0;
   }
 

@@ -177,9 +177,9 @@ test("opening book covers generated early-pawn side branches", () => {
 
   const pawnChallenge = engine.chooseMove(position);
   assert.equal(pawnChallenge.source, "opening-book");
-  assert.equal(pawnChallenge.bestMove.notation, "b9-a7");
-  assert.equal(pawnChallenge.book.name, "Pikafish best: b9-a7");
-  assert.equal(pawnChallenge.book.database.engineScore, 34);
+  assert.equal(pawnChallenge.bestMove.notation, "b7-c7");
+  assert.equal(pawnChallenge.book.name, "Pikafish best: b7-c7");
+  assert.equal(pawnChallenge.book.database.engineScore, 31);
 });
 
 test("opening book covers the c3-c4 central cannon candidate branch", () => {

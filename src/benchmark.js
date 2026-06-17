@@ -195,7 +195,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     id: "oracle-opening-early-pawn-challenge",
     name: "Oracle Opening: Early Pawn Challenge",
     fen: "rheakaehr/9/1c5c1/p3p1p1p/2p6/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r",
-    expectedMoves: Object.freeze(["b9-a7", "b7-c7", "h9-g7"]),
+    expectedMoves: Object.freeze(["b7-c7", "b9-a7", "h9-g7"]),
     tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn"]),
     options: Object.freeze({
       depth: 8,
@@ -203,7 +203,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
       useBook: false,
       lines: 5
     }),
-    lesson: "When Black challenges the early pawn, the native engine should keep the Pikafish horse shift and tied regrouping moves ahead of shallow flank play."
+    lesson: "When Black challenges the early pawn, the native engine should keep Pikafish's refreshed cannon regroup and near-tie horse-shift moves ahead of shallow flank play."
   }),
   Object.freeze({
     id: "oracle-opening-refreshed-pawn-continuation",
