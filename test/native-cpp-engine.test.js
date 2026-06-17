@@ -574,6 +574,40 @@ test("local C++ engine reuses quiescence TT cutoffs across repeated searches", (
   assert.ok(qttStores.every((stores, index) => stores <= qttStats[index].probes), result.stdout);
 });
 
+test("local C++ engine reuses eval cache across side-to-move flips", (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const placement = "4k4/9/4r4/9/9/9/9/9/9/3KR4";
+  const input = [
+    "uci",
+    `position fen ${placement} r`,
+    "go depth 1",
+    `position fen ${placement} b`,
+    "go depth 1",
+    "quit"
+  ].join("\n");
+  const result = spawnSync(build.output, {
+    input,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const evalStats = [...result.stdout.matchAll(/\beval\s+(\d+)\/(\d+)\s+evalstores\s+(\d+)/g)].map((match) => ({
+    hits: Number(match[1]),
+    probes: Number(match[2]),
+    stores: Number(match[3])
+  }));
+
+  assert.ok(evalStats.length >= 2, result.stdout);
+  assert.equal(evalStats[0].hits, 0, result.stdout);
+  assert.ok(evalStats.at(-1).hits > 0, result.stdout);
+  assert.ok(evalStats.at(-1).stores < evalStats.at(-1).probes, result.stdout);
+});
+
 test("local C++ engine keeps piece lists valid through repeated piece moves", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {

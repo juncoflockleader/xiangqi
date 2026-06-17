@@ -3863,8 +3863,9 @@ int evaluateRed(const Board& board) {
 
 int evaluateRedCached(const Board& board, SearchState& state) {
   state.evalCacheProbes += 1;
+  const uint64_t key = board.side == kBlack ? board.key ^ sideHash() : board.key;
   if (state.evalCache) {
-    if (const EvalEntry* entry = state.evalCache->probe(board.key)) {
+    if (const EvalEntry* entry = state.evalCache->probe(key)) {
       state.evalCacheHits += 1;
       return entry->score;
     }
@@ -3872,7 +3873,7 @@ int evaluateRedCached(const Board& board, SearchState& state) {
 
   const int score = evaluateRed(board);
   if (state.evalCache) {
-    state.evalCache->store(board.key, score);
+    state.evalCache->store(key, score);
     state.evalCacheStores += 1;
   }
   return score;
