@@ -80,6 +80,10 @@ constexpr int kQSeePruneMaxDepth = 4;
 constexpr int kQSeePruneMaxRootPieces = 32;
 constexpr int kQSeePruneAlphaMargin = 32;
 constexpr int kQSeePruneLossMargin = 80;
+constexpr int kBadCapturePruneMaxDepth = 3;
+constexpr int kBadCapturePruneLossMargin = 120;
+constexpr int kBadCapturePruneDepthThreeMinIndex = 2;
+constexpr int kBadCapturePruneDepthThreeLossMargin = 240;
 constexpr int kQSeeCaptureHistoryGuard = 1024;
 constexpr int kQDeltaPruneMargin = 90;
 constexpr int kQDeltaCaptureHistoryGuard = 32768;
@@ -854,6 +858,7 @@ struct SearchState {
   int64_t razorPrunes = 0;
   int64_t razorResearches = 0;
   int64_t seePrunes = 0;
+  int64_t depthThreeSeePrunes = 0;
   int64_t captureRiskProbes = 0;
   int64_t favorableCaptureRiskSkips = 0;
   int64_t leastAttackerCacheProbes = 0;
@@ -1018,6 +1023,7 @@ struct SearchState {
     razorPrunes = 0;
     razorResearches = 0;
     seePrunes = 0;
+    depthThreeSeePrunes = 0;
     captureRiskProbes = 0;
     favorableCaptureRiskSkips = 0;
     leastAttackerCacheProbes = 0;
@@ -3319,15 +3325,18 @@ bool shouldPruneBadCapture(
     bool counterCandidate,
     int alpha,
     int beta) {
-  if (!captureMove || depth < 1 || depth > 2) return false;
+  if (!captureMove || depth < 1 || depth > kBadCapturePruneMaxDepth) return false;
   if (orderedIndex == 0 || hashCandidate || counterCandidate) return false;
+  if (depth >= 3 && orderedIndex < kBadCapturePruneDepthThreeMinIndex) return false;
   if (inCheck || givesCheck || extension > 0) return false;
   if (beta - alpha != 1) return false;
   if (isMateScore(alpha) || isMateScore(beta)) return false;
   const int badCaptureLoss = badCaptureLossForCapture(board, move, state);
-  if (badCaptureLoss <= 120) return false;
+  const int lossMargin = depth >= 3 ? kBadCapturePruneDepthThreeLossMargin : kBadCapturePruneLossMargin;
+  if (badCaptureLoss <= lossMargin) return false;
   const int captureHistoryScore = state.captureHistory[move.from][move.to];
-  if (captureHistoryScore > 1024 && badCaptureLoss <= 240) {
+  const int historyGuardLoss = depth >= 3 ? kBadCapturePruneDepthThreeLossMargin * 2 : kBadCapturePruneLossMargin * 2;
+  if (captureHistoryScore > kQSeeCaptureHistoryGuard && badCaptureLoss <= historyGuardLoss) {
     state.captureHistoryPruneGuards += 1;
     return false;
   }
@@ -5757,6 +5766,7 @@ int negamax(
     }
     if (shouldPruneBadCapture(board, move, state, depth, orderedIndex, captureMove, inCheck, givesCheck, extension, hashCandidate, counterCandidate, alpha, beta)) {
       state.seePrunes += 1;
+      if (depth >= 3) state.depthThreeSeePrunes += 1;
       continue;
     }
     if (shouldPruneBadHistory(move, state, depth, orderedIndex, quietMove, inCheck, givesCheck, extension, killerCandidate, hashCandidate, counterCandidate, alpha, beta, trend, previousMove, previousOwnMove)) {
@@ -6996,6 +7006,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " rfp " << state.reverseFutilityPrunes
               << " mdp " << state.mateDistancePrunes << " razor " << state.razorPrunes << "/" << state.razorResearches
               << " see " << state.seePrunes << " crisk " << state.captureRiskProbes << "/" << state.favorableCaptureRiskSkips
+              << " see3 " << state.depthThreeSeePrunes
               << " lacache " << state.leastAttackerCacheHits << "/" << state.leastAttackerCacheProbes
               << " lastores " << state.leastAttackerCacheStores
               << " pcut " << state.probCutPrunes << " pcsearch " << state.probCutSearches
@@ -7082,6 +7093,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " rfp " << state.reverseFutilityPrunes
               << " mdp " << state.mateDistancePrunes << " razor " << state.razorPrunes << "/" << state.razorResearches
               << " see " << state.seePrunes << " crisk " << state.captureRiskProbes << "/" << state.favorableCaptureRiskSkips
+              << " see3 " << state.depthThreeSeePrunes
               << " lacache " << state.leastAttackerCacheHits << "/" << state.leastAttackerCacheProbes
               << " lastores " << state.leastAttackerCacheStores
               << " pcut " << state.probCutPrunes << " pcsearch " << state.probCutSearches
