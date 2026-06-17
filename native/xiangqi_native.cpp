@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <chrono>
 #include <cctype>
 #include <cmath>
@@ -1444,6 +1445,10 @@ std::array<int, kSquares>& pieceSlots(Board& board, int side) {
   return side == kRed ? board.redPieceSlots : board.blackPieceSlots;
 }
 
+const std::array<int, kSquares>& pieceSlots(const Board& board, int side) {
+  return side == kRed ? board.redPieceSlots : board.blackPieceSlots;
+}
+
 int& pieceCount(Board& board, int side) {
   return side == kRed ? board.redPieceCount : board.blackPieceCount;
 }
@@ -1477,21 +1482,34 @@ void addPieceSquare(Board& board, int side, int square) {
   count += 1;
 }
 
-void removePieceSquare(Board& board, int side, int square) {
+int findPieceSquareSlot(const std::array<int, kSquares>& squares, const std::array<int, kSquares>& slots, int count, int square) {
+  if (square >= 0 && square < kSquares) {
+    const int index = slots[square];
+    if (index >= 0 && index < count && squares[index] == square) return index;
+  }
+
+  for (int candidate = 0; candidate < count; candidate += 1) {
+    if (squares[candidate] == square) return candidate;
+  }
+
+  return -1;
+}
+
+int trackedPieceSquareSlot(const Board& board, int side, int square) {
+  assert(square >= 0 && square < kSquares);
+  const auto& squares = pieceSquares(board, side);
+  const auto& slots = pieceSlots(board, side);
+  const int count = pieceCount(board, side);
+  const int index = slots[square];
+  assert(index >= 0 && index < count);
+  assert(squares[index] == square);
+  return index;
+}
+
+void removePieceSquareAt(Board& board, int side, int square, int index) {
   auto& squares = pieceSquares(board, side);
   auto& slots = pieceSlots(board, side);
   int& count = pieceCount(board, side);
-  int index = square >= 0 && square < kSquares ? slots[square] : -1;
-  if (index < 0 || index >= count || squares[index] != square) {
-    index = -1;
-    for (int candidate = 0; candidate < count; candidate += 1) {
-      if (squares[candidate] == square) {
-        index = candidate;
-        break;
-      }
-    }
-  }
-  if (index < 0) return;
 
   slots[square] = -1;
   for (int next = index + 1; next < count; next += 1) {
@@ -1502,24 +1520,24 @@ void removePieceSquare(Board& board, int side, int square) {
   squares[count] = 0;
 }
 
-void movePieceSquare(Board& board, int side, int from, int to) {
+[[maybe_unused]] void removePieceSquare(Board& board, int side, int square) {
   auto& squares = pieceSquares(board, side);
   auto& slots = pieceSlots(board, side);
   int& count = pieceCount(board, side);
-  int index = from >= 0 && from < kSquares ? slots[from] : -1;
-  if (index < 0 || index >= count || squares[index] != from) {
-    index = -1;
-    for (int candidate = 0; candidate < count; candidate += 1) {
-      if (squares[candidate] == from) {
-        index = candidate;
-        break;
-      }
-    }
-  }
-  if (index < 0) {
-    addPieceSquare(board, side, to);
-    return;
-  }
+  const int index = findPieceSquareSlot(squares, slots, count, square);
+  if (index < 0) return;
+
+  removePieceSquareAt(board, side, square, index);
+}
+
+void removeTrackedPieceSquare(Board& board, int side, int square) {
+  removePieceSquareAt(board, side, square, trackedPieceSquareSlot(board, side, square));
+}
+
+void movePieceSquareAt(Board& board, int side, int from, int to, int index) {
+  auto& squares = pieceSquares(board, side);
+  auto& slots = pieceSlots(board, side);
+  int& count = pieceCount(board, side);
 
   slots[from] = -1;
   squares[index] = to;
@@ -1540,6 +1558,23 @@ void movePieceSquare(Board& board, int side, int from, int to) {
     slots[squares[index]] = index;
     index += 1;
   }
+}
+
+[[maybe_unused]] void movePieceSquare(Board& board, int side, int from, int to) {
+  auto& squares = pieceSquares(board, side);
+  auto& slots = pieceSlots(board, side);
+  const int count = pieceCount(board, side);
+  const int index = findPieceSquareSlot(squares, slots, count, from);
+  if (index < 0) {
+    addPieceSquare(board, side, to);
+    return;
+  }
+
+  movePieceSquareAt(board, side, from, to, index);
+}
+
+void moveTrackedPieceSquare(Board& board, int side, int from, int to) {
+  movePieceSquareAt(board, side, from, to, trackedPieceSquareSlot(board, side, from));
 }
 
 bool palaceContains(int side, int file, int rank) {
@@ -1981,14 +2016,16 @@ void setKingSquare(Board& board, int side, int square) {
 
 void addNonPawnMaterialByPiece(Board& board, int piece, int delta) {
   if (!countsAsNonPawnMaterial(piece)) return;
-  if (piece > 0) board.redNonPawnMaterial += delta;
-  else if (piece < 0) board.blackNonPawnMaterial += delta;
+  const int side = pieceCodeSide(piece);
+  if (side == kRed) board.redNonPawnMaterial += delta;
+  else if (side == kBlack) board.blackNonPawnMaterial += delta;
 }
 
 void addNullMoveMaterialByPiece(Board& board, int piece, int delta) {
   if (!countsAsNullMoveMaterial(piece)) return;
-  if (piece > 0) board.redNullMoveMaterial += delta;
-  else if (piece < 0) board.blackNullMoveMaterial += delta;
+  const int side = pieceCodeSide(piece);
+  if (side == kRed) board.redNullMoveMaterial += delta;
+  else if (side == kBlack) board.blackNullMoveMaterial += delta;
 }
 
 void addMaterialByPiece(Board& board, int piece, int delta) {
@@ -2015,7 +2052,7 @@ void makeMoveImpl(Board& board, Move& move, uint64_t knownKey) {
   if (captured != 0) {
     const int capturedSide = pieceCodeSide(captured);
     const int capturedType = pieceCodeType(captured);
-    removePieceSquare(board, capturedSide, move.to);
+    removeTrackedPieceSquare(board, capturedSide, move.to);
     board.totalPieceCount -= 1;
     if (capturedType == King) setKingSquare(board, capturedSide, -1);
     addNonPawnMaterialByPiece(board, captured, -1);
@@ -2024,7 +2061,7 @@ void makeMoveImpl(Board& board, Move& move, uint64_t knownKey) {
     board.positionalScore -= positionalScoreForPieceSquare(captured, move.to);
     addGuardPairCountBySideType(board, capturedSide, capturedType, -1);
   }
-  movePieceSquare(board, movingSide, move.from, move.to);
+  moveTrackedPieceSquare(board, movingSide, move.from, move.to);
   board.cells[move.to] = move.piece;
   board.cells[move.from] = 0;
   if (movingType == King) setKingSquare(board, movingSide, move.to);
@@ -2050,7 +2087,7 @@ void undoMove(Board& board, const Move& move) {
   board.key ^= pieceHash(move.from, move.piece);
   board.positionalScore -= positionalScoreForPieceSquare(move.piece, move.to);
   board.positionalScore += positionalScoreForPieceSquare(move.piece, move.from);
-  movePieceSquare(board, movingSide, move.to, move.from);
+  moveTrackedPieceSquare(board, movingSide, move.to, move.from);
   if (captured != 0) {
     const int capturedSide = pieceCodeSide(captured);
     const int capturedType = pieceCodeType(captured);
@@ -2222,8 +2259,8 @@ template <bool hasMove>
 int blockersBetweenAfterMove(const Board& board, const Move& move, int from, int to, int movingPiece);
 
 bool movedPieceDirectlyChecksAfterMove(const Board& board, const Move& move, int enemyKing, int movingPiece) {
-  const int type = movingPiece > 0 ? movingPiece : -movingPiece;
-  const int side = movingPiece > 0 ? kRed : kBlack;
+  const int type = pieceCodeType(movingPiece);
+  const int side = pieceCodeSide(movingPiece);
 
   if (type == Horse) {
     const int legSquare = kHorseLegSquareBySourceTarget[static_cast<std::size_t>(move.to)][static_cast<std::size_t>(enemyKing)];
@@ -2261,7 +2298,7 @@ bool movedPieceDirectlyChecksAfterMove(const Board& board, const Move& move, int
 }
 
 bool discoveredMoveGivesCheck(const Board& board, const Move& move, int enemyKing, int movingPiece) {
-  const int side = (movingPiece > 0) - (movingPiece < 0);
+  const int side = pieceCodeSide(movingPiece);
   if (side == 0 || enemyKing < 0) return true;
 
   const auto from = static_cast<std::size_t>(move.from);
@@ -2348,7 +2385,7 @@ bool isInCheckAfterGeneratedMoveKnownKing(const Board& board, const Move& move, 
   if (king < 0) return true;
 
   const int movingPiece = move.piece;
-  if ((movingPiece > 0 ? movingPiece : -movingPiece) == King) king = move.to;
+  if (pieceCodeType(movingPiece) == King) king = move.to;
 
   const int attacker = -side;
   return lineCheckAfterMove<true>(board, move, attacker, king, movingPiece)
