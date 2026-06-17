@@ -5572,7 +5572,8 @@ int negamax(
         && !checkEvasion
         && depth > 1
         && isPawnPressureExtensionMove(move, enemyKing, state.rootPieceCount);
-    const bool kingLinePressure = extensionsRemaining > 0
+    const bool kingLinePressure = allowNullMove
+        && extensionsRemaining > 0
         && !singular
         && !givesCheck
         && !recapture
