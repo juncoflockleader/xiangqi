@@ -932,6 +932,7 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     rootTtStores: maxInfoValue(infos, "rootTtStores"),
     rootOrderHits: maxInfoValue(infos, "rootOrderHits"),
     rootOrderStores: maxInfoValue(infos, "rootOrderStores"),
+    rootTimeGuardStops: maxInfoValue(infos, "rootTimeGuardStops"),
     openingPreferencePromotions: maxInfoValue(infos, "openingPreferencePromotions"),
     pvsResearches: maxInfoValue(infos, "pvsResearches"),
     aspirationSearches: maxInfoValue(infos, "aspirationSearches"),
@@ -1089,6 +1090,7 @@ function parseInfoLine(line) {
     rootTtStores: 0,
     rootOrderHits: 0,
     rootOrderStores: 0,
+    rootTimeGuardStops: 0,
     openingPreferencePromotions: 0,
     aspirationWidenedSearches: 0,
     continuationHistoryHits: 0,
@@ -1330,6 +1332,9 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "rootordstores") {
       info.rootOrderStores = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "tguard") {
+      info.rootTimeGuardStops = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "opref") {
       info.openingPreferencePromotions = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -2061,6 +2066,7 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.rootReductionResearches ?? 0) > 0) parts.push(nativeCount(stats.rootReductionResearches, "root reduction re-search"));
   if ((stats.rootTtHits ?? 0) > 0) parts.push(nativeCount(stats.rootTtHits, "root transposition-table ordering hint"));
   if ((stats.rootOrderHits ?? 0) > 0) parts.push(nativeCount(stats.rootOrderHits, "persisted root-order hint"));
+  if ((stats.rootTimeGuardStops ?? 0) > 0) parts.push(nativeCount(stats.rootTimeGuardStops, "root time-guard stop"));
   if ((stats.openingPreferencePromotions ?? 0) > 0) parts.push(nativeCount(stats.openingPreferencePromotions, "opening/root preference promotion"));
   if ((stats.rootTtStores ?? 0) > 0) parts.push(nativeCount(stats.rootTtStores, "root transposition-table store"));
   if ((stats.ttMoveHits ?? 0) > 0) parts.push(nativeCount(stats.ttMoveHits, "transposition hash-move ordering hint"));
@@ -2364,6 +2370,7 @@ function createNativeStats(parsed) {
     rootTtStores: parsed.rootTtStores ?? 0,
     rootOrderHits: parsed.rootOrderHits ?? 0,
     rootOrderStores: parsed.rootOrderStores ?? 0,
+    rootTimeGuardStops: parsed.rootTimeGuardStops ?? 0,
     openingPreferencePromotions: parsed.openingPreferencePromotions ?? 0,
     pvsResearches: parsed.pvsResearches ?? 0,
     aspirationSearches: parsed.aspirationSearches ?? 0,
@@ -2485,6 +2492,7 @@ function createEmptyStats() {
     rootRankOrderHits: 0,
     rootOrderHits: 0,
     rootOrderStores: 0,
+    rootTimeGuardStops: 0,
     openingPreferencePromotions: 0,
     iidSearches: 0,
     iidMoveHits: 0,

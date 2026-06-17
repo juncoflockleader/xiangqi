@@ -222,6 +222,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.rootTtStores, 3);
     assert.equal(result.stats.rootOrderHits, 7);
     assert.equal(result.stats.rootOrderStores, 8);
+    assert.equal(result.stats.rootTimeGuardStops, 4);
     assert.equal(result.stats.openingPreferencePromotions, 6);
     assert.equal(result.stats.pvsResearches, 3);
     assert.equal(result.stats.aspirationSearches, 5);
@@ -303,6 +304,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.iterations[0].stats.rootTtStores, 3);
     assert.equal(result.iterations[0].stats.rootOrderHits, 7);
     assert.equal(result.iterations[0].stats.rootOrderStores, 8);
+    assert.equal(result.iterations[0].stats.rootTimeGuardStops, 4);
     assert.equal(result.iterations[0].stats.openingPreferencePromotions, 6);
     assert.equal(result.iterations[0].stats.pvsResearches, 3);
     assert.equal(result.iterations[0].stats.aspirationSearches, 5);
@@ -326,6 +328,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("root child-state reuse")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("root transposition-table ordering hint")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("persisted root-order hint")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("root time-guard stop")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("opening/root preference promotion")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("checked-node eval skip")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("tactical extension")));

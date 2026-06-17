@@ -68,6 +68,9 @@ constexpr int kQSeePruneLossMargin = 120;
 constexpr int kQSeeCaptureHistoryGuard = 1024;
 constexpr int kAspirationInitialWindow = 80;
 constexpr int kAspirationRetryWindow = 320;
+constexpr int kRootTimeGuardMinMs = 8;
+constexpr int kRootTimeGuardMaxMs = 250;
+constexpr int kRootTimeGuardDivisor = 3;
 constexpr int kDefaultHashMb = 64;
 constexpr int kHistoryCountLookupThreshold = 64;
 constexpr int64_t kTimeCheckNodeMask = 16383;
@@ -764,6 +767,7 @@ struct SearchState {
   int64_t aspirationWidenedSearches = 0;
   int64_t aspirationFailHigh = 0;
   int64_t aspirationFailLow = 0;
+  int64_t rootTimeGuardStops = 0;
   int64_t openingPreferencePromotions = 0;
   int64_t rootMovesSearched = 0;
   int64_t rootChildStateReuses = 0;
@@ -903,6 +907,7 @@ struct SearchState {
     aspirationWidenedSearches = 0;
     aspirationFailHigh = 0;
     aspirationFailLow = 0;
+    rootTimeGuardStops = 0;
     openingPreferencePromotions = 0;
     rootMovesSearched = 0;
     rootChildStateReuses = 0;
@@ -5381,6 +5386,32 @@ struct RootReportCutoffTracker {
   int count = 0;
 };
 
+int remainingMs(const SearchState& state) {
+  if (!state.hasDeadline) return kInf;
+  const auto remaining = state.deadline - std::chrono::steady_clock::now();
+  return static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(remaining).count());
+}
+
+bool shouldStopBeforeRootDepth(SearchState& state, int depth, int lastDepthElapsedMs) {
+  if (!state.hasDeadline || depth <= 1) return false;
+
+  const int remaining = remainingMs(state);
+  if (remaining <= 0) {
+    state.rootTimeGuardStops += 1;
+    return true;
+  }
+  if (lastDepthElapsedMs <= 0) return false;
+
+  const int guardMs = std::clamp(
+      lastDepthElapsedMs / kRootTimeGuardDivisor,
+      kRootTimeGuardMinMs,
+      kRootTimeGuardMaxMs);
+  if (remaining > guardMs) return false;
+
+  state.rootTimeGuardStops += 1;
+  return true;
+}
+
 std::vector<RootLine> searchRootDepth(
     const Board& root,
     std::vector<RootMove>& rootMoves,
@@ -5616,7 +5647,11 @@ std::vector<RootLine> searchRoot(
   }
   if (orderedRootMoves.empty()) return bestLines;
 
+  int lastDepthElapsedMs = 0;
   for (int depth = 1; depth <= maxDepth; depth += 1) {
+    if (shouldStopBeforeRootDepth(state, depth, lastDepthElapsedMs)) break;
+
+    const auto depthStarted = std::chrono::steady_clock::now();
     const bool useAspiration = multiPv <= 1
         && depth >= 3
         && !bestLines.empty()
@@ -5674,6 +5709,9 @@ std::vector<RootLine> searchRoot(
     for (const RootLine& line : depthLines) orderedRootMoves.push_back({line.move, line.child});
     bestLines = std::move(depthLines);
     state.completedDepth = depth;
+    lastDepthElapsedMs = static_cast<int>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - depthStarted).count());
   }
 
   const int limit = std::max(1, std::min<int>(multiPv, bestLines.size()));
@@ -5841,6 +5879,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " pvs " << state.pvsResearches
               << " asp " << state.aspirationSearches << " aspwide " << state.aspirationWidenedSearches
               << " asphi " << state.aspirationFailHigh << " asplo " << state.aspirationFailLow
+              << " tguard " << state.rootTimeGuardStops
               << " opref " << state.openingPreferencePromotions
               << " ext " << state.extensions << " recext " << state.recaptureExtensions << " recorder " << state.recaptureOrderHits
               << " singtry " << state.singularExtensionSearches << " singext " << state.singularExtensions
@@ -5912,6 +5951,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " pvs " << state.pvsResearches
               << " asp " << state.aspirationSearches << " aspwide " << state.aspirationWidenedSearches
               << " asphi " << state.aspirationFailHigh << " asplo " << state.aspirationFailLow
+              << " tguard " << state.rootTimeGuardStops
               << " opref " << state.openingPreferencePromotions
               << " ext " << state.extensions << " recext " << state.recaptureExtensions << " recorder " << state.recaptureOrderHits
               << " singtry " << state.singularExtensionSearches << " singext " << state.singularExtensions
