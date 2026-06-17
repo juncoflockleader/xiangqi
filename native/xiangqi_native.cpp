@@ -4561,21 +4561,6 @@ bool tryProbCut(
     int& scoreOut) {
   const int threshold = beta + kProbCutMargin;
   const int reducedDepth = std::max(0, depth - 1 - kProbCutReduction);
-  MoveList captures;
-  for (const Move& move : legalMoves) {
-    if (!isCapture(move)) continue;
-    if (!isProbCutCaptureCandidate(move)) {
-      state.probCutCaptureSkips += 1;
-      continue;
-    }
-    if (!shouldVerifyProbCutCapture(board, move, state)) {
-      state.probCutCaptureSkips += 1;
-      continue;
-    }
-    captures.push_back(move);
-  }
-  if (captures.empty()) return false;
-
   int searched = 0;
   auto searchCapture = [&](Move& move) {
     if (timeExpired(state)) return false;
@@ -4610,6 +4595,36 @@ bool tryProbCut(
     }
     return false;
   };
+
+  bool searchedHashCapture = false;
+  if (validMove(hashMove) && isCapture(hashMove) && isProbCutCaptureCandidate(hashMove)) {
+    for (const Move& legalMove : legalMoves) {
+      if (!sameMove(legalMove, hashMove)) continue;
+      Move hashCapture = legalMove;
+      if (shouldVerifyProbCutCapture(board, hashCapture, state)) {
+        searchedHashCapture = true;
+        if (searchCapture(hashCapture)) return true;
+        if (state.stopped) return false;
+      }
+      break;
+    }
+  }
+
+  MoveList captures;
+  for (const Move& move : legalMoves) {
+    if (searchedHashCapture && sameMove(move, hashMove)) continue;
+    if (!isCapture(move)) continue;
+    if (!isProbCutCaptureCandidate(move)) {
+      state.probCutCaptureSkips += 1;
+      continue;
+    }
+    if (!shouldVerifyProbCutCapture(board, move, state)) {
+      state.probCutCaptureSkips += 1;
+      continue;
+    }
+    captures.push_back(move);
+  }
+  if (captures.empty()) return false;
 
   if (captures.size() > kProbCutCaptureLimit) {
     ScoredMovePicker movePicker(captures);
