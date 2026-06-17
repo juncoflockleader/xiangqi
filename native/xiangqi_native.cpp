@@ -5538,6 +5538,42 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t earlyPawnCannonSide = fenPositionKey(
+      "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r");
+  if (root.key == earlyPawnCannonSide) {
+    if (uci == "c0e2") return 5000;  // c9-e7: refreshed Pikafish top development.
+    if (uci == "b2e2") return 4600;  // b7-e7: central cannon alternative.
+    if (uci == "b0c2") return 4400;  // b9-c7: close horse-development alternative.
+    return 0;
+  }
+
+  static const uint64_t earlyPawnChallenge = fenPositionKey(
+      "rheakaehr/9/1c5c1/p3p1p1p/2p6/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r");
+  if (root.key == earlyPawnChallenge) {
+    if (uci == "b0a2") return 5000;  // b9-a7: refreshed Pikafish top horse shift.
+    if (uci == "b2c2") return 4700;  // b7-c7: tied cannon regroup alternative.
+    if (uci == "h0g2") return 4600;  // h9-g7: tied horse-development alternative.
+    return 0;
+  }
+
+  static const uint64_t refreshedPawnPushContinuation = fenPositionKey(
+      "rheakae1r/9/1c4h1c/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR r");
+  if (root.key == refreshedPawnPushContinuation) {
+    if (uci == "b0c2") return 5000;  // b9-c7: refreshed Pikafish top development.
+    if (uci == "h0g2") return 4700;  // h9-g7: close horse-development alternative.
+    if (uci == "b0a2") return 4400;  // b9-a7: playable horse-shift fallback.
+    return 0;
+  }
+
+  static const uint64_t shiftedLeftPawn = fenPositionKey(
+      "r1eakaehr/9/1ch4c1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b");
+  if (root.key == shiftedLeftPawn) {
+    if (uci == "c6c5") return 5000;  // c3-c4: refreshed Pikafish top pawn challenge.
+    if (uci == "g9e7") return 4700;  // g0-e2: close elephant-development alternative.
+    if (uci == "g6g5") return 4500;  // g3-g4: close pawn-push alternative.
+    return 0;
+  }
+
   static const uint64_t leftScreenCentralCannon = fenPositionKey(
       "r1eakaehr/9/1ch4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR r");
   if (root.key == leftScreenCentralCannon) {

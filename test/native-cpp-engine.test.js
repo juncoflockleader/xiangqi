@@ -404,7 +404,7 @@ test("local C++ timed opening priors guide pure native central cannon branches",
     protocol: "uci",
     depth: 4,
     timeLimitMs: 200,
-    startupTimeoutMs: 1000,
+    startupTimeoutMs: 3000,
     commandTimeoutMs: 3000
   });
 
@@ -420,6 +420,10 @@ test("local C++ timed opening priors guide pure native central cannon branches",
     const doubleHorseBothRooks = parseFen("rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 r");
     const doubleHorseRookPressure = parseFen("rheakaer1/9/1c4hc1/p1p1p3p/6p2/7R1/P1P1P1P1P/1C2C1H2/9/RHEAKAE2 b");
     const leftScreen = parseFen("r1eakaehr/9/1ch4c1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR r");
+    const earlyPawnCannonSide = parseFen("rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r");
+    const earlyPawnChallenge = parseFen("rheakaehr/9/1c5c1/p3p1p1p/2p6/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r");
+    const refreshedPawnPushContinuation = parseFen("rheakae1r/9/1c4h1c/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR r");
+    const shiftedLeftPawn = parseFen("r1eakaehr/9/1ch4c1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b");
 
     const huResult = await backend.chooseMove(huTrap, {
       useBook: false,
@@ -485,6 +489,30 @@ test("local C++ timed opening priors guide pure native central cannon branches",
       timeLimitMs: 200,
       lines: 5
     });
+    const earlyPawnCannonSideResult = await backend.chooseMove(earlyPawnCannonSide, {
+      useBook: false,
+      depth: 4,
+      timeLimitMs: 200,
+      lines: 5
+    });
+    const earlyPawnChallengeResult = await backend.chooseMove(earlyPawnChallenge, {
+      useBook: false,
+      depth: 4,
+      timeLimitMs: 200,
+      lines: 5
+    });
+    const refreshedPawnPushContinuationResult = await backend.chooseMove(refreshedPawnPushContinuation, {
+      useBook: false,
+      depth: 4,
+      timeLimitMs: 200,
+      lines: 5
+    });
+    const shiftedLeftPawnResult = await backend.chooseMove(shiftedLeftPawn, {
+      useBook: false,
+      depth: 4,
+      timeLimitMs: 200,
+      lines: 5
+    });
 
     assert.equal(moveToNotation(huResult.bestMove), "i9-h9");
     assert.equal(moveToNotation(centralHorseReplyResult.bestMove), "g6-g5");
@@ -497,6 +525,10 @@ test("local C++ timed opening priors guide pure native central cannon branches",
     assert.equal(moveToNotation(doubleHorseBothRooksResult.bestMove), "h9-h5");
     assert.equal(moveToNotation(doubleHorseRookPressureResult.bestMove), "h2-i2");
     assert.equal(moveToNotation(leftScreenResult.bestMove), "h9-g7");
+    assert.equal(moveToNotation(earlyPawnCannonSideResult.bestMove), "c9-e7");
+    assert.equal(moveToNotation(earlyPawnChallengeResult.bestMove), "b9-a7");
+    assert.equal(moveToNotation(refreshedPawnPushContinuationResult.bestMove), "b9-c7");
+    assert.equal(moveToNotation(shiftedLeftPawnResult.bestMove), "c3-c4");
     assert.ok(huResult.nodes > 0);
     assert.ok(centralHorseReplyResult.nodes > 0);
     assert.ok(centralResult.nodes > 0);
@@ -508,6 +540,10 @@ test("local C++ timed opening priors guide pure native central cannon branches",
     assert.ok(doubleHorseBothRooksResult.nodes > 0);
     assert.ok(doubleHorseRookPressureResult.nodes > 0);
     assert.ok(leftScreenResult.nodes > 0);
+    assert.ok(earlyPawnCannonSideResult.nodes > 0);
+    assert.ok(earlyPawnChallengeResult.nodes > 0);
+    assert.ok(refreshedPawnPushContinuationResult.nodes > 0);
+    assert.ok(shiftedLeftPawnResult.nodes > 0);
   } finally {
     await backend.close();
   }

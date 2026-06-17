@@ -122,6 +122,62 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     lesson: "After Black's screen-horse reply, the refreshed Pikafish prior promotes the early g-pawn push while keeping horse development as a close accepted alternative."
   }),
   Object.freeze({
+    id: "oracle-opening-early-pawn-cannon-side",
+    name: "Oracle Opening: Early Pawn Cannon-Side Development",
+    fen: "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r",
+    expectedMoves: Object.freeze(["c9-e7", "b7-e7", "b9-c7"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "After Red starts with the g-pawn and Black develops both cannons, the native engine should prefer Pikafish's c-file elephant development or close central alternatives."
+  }),
+  Object.freeze({
+    id: "oracle-opening-early-pawn-challenge",
+    name: "Oracle Opening: Early Pawn Challenge",
+    fen: "rheakaehr/9/1c5c1/p3p1p1p/2p6/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR r",
+    expectedMoves: Object.freeze(["b9-a7", "b7-c7", "h9-g7"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "When Black challenges the early pawn, the native engine should keep the Pikafish horse shift and tied regrouping moves ahead of shallow flank play."
+  }),
+  Object.freeze({
+    id: "oracle-opening-refreshed-pawn-continuation",
+    name: "Oracle Opening: Refreshed Pawn Continuation",
+    fen: "rheakae1r/9/1c4h1c/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR r",
+    expectedMoves: Object.freeze(["b9-c7", "h9-g7", "b9-a7"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn", "central-cannon"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "In the refreshed pawn-push continuation, the native engine should develop the b-horse before chasing activity with cannons."
+  }),
+  Object.freeze({
+    id: "oracle-opening-shifted-left-pawn",
+    name: "Oracle Opening: Shifted Left-Screen Pawn",
+    fen: "r1eakaehr/9/1ch4c1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b",
+    expectedMoves: Object.freeze(["c3-c4", "g0-e2", "g3-g4"]),
+    tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn", "central-cannon"]),
+    options: Object.freeze({
+      depth: 8,
+      timeLimitMs: 1000,
+      useBook: false,
+      lines: 5
+    }),
+    lesson: "After the left-screen structure meets Red's early pawn, the native engine should challenge the center before drifting into cannon lifts."
+  }),
+  Object.freeze({
     id: "oracle-opening-central-cannon-double-horse",
     name: "Oracle Opening: Central Cannon Double Horse",
     fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R b",
