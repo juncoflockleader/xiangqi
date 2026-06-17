@@ -428,6 +428,7 @@ function buildDefaultOpeningBook() {
   for (const position of PIKAFISH_OPENING_POSITIONS) {
     addEntries(positions, position.fen, position.entries);
   }
+  addPikafishPrincipalVariationContinuations(positions);
 
   return freezeOpeningPositions(positions);
 }
@@ -443,9 +444,59 @@ function pikafishEntry(move, rank, weight, engineScore, pv) {
     tags: ["oracle", "pikafish", "generated", "opening", rank === 1 ? "best" : "alternative"],
     database: {
       source: "Pikafish",
-      engineScore
-    }
+      engineScore,
+      principalVariation: pv
+    },
+    principalVariation: pv
   });
+}
+
+function addPikafishPrincipalVariationContinuations(positions) {
+  for (const position of PIKAFISH_OPENING_POSITIONS) {
+    for (const entry of position.entries) {
+      const moves = extractMoveTokens(entry.principalVariation ?? "");
+      if (moves.length < 2) continue;
+      addLegalPikafishContinuationPrefix(positions, parseFen(position.fen), entry, moves);
+    }
+  }
+}
+
+function addLegalPikafishContinuationPrefix(positions, initialPosition, entry, moves) {
+  let position = initialPosition;
+
+  for (let index = 0; index < moves.length; index += 1) {
+    const continuation = pikafishContinuationEntry(entry, moves[index], index);
+    let normalized;
+    let nextPosition;
+
+    try {
+      normalized = freezeBookEntry(continuation, { position });
+      nextPosition = applyBookMove(position, normalized.move);
+    } catch {
+      break;
+    }
+
+    addEntries(positions, positionKey(position), [normalized]);
+    position = nextPosition;
+  }
+}
+
+function pikafishContinuationEntry(entry, move, index) {
+  if (index === 0) return entry;
+
+  return {
+    move,
+    name: `Pikafish PV continuation: ${move}`,
+    weight: Math.max(1, entry.weight - index * 8),
+    idea: `Continues the Pikafish principal variation after ${entry.move}. Source PV: ${entry.principalVariation}.`,
+    tags: uniqueTags([...entry.tags, "pv-continuation"]),
+    database: {
+      ...entry.database,
+      sourceMove: entry.move,
+      pvPly: index + 1
+    },
+    principalVariation: entry.principalVariation
+  };
 }
 
 function addOpeningLine(positions, line, options = {}) {

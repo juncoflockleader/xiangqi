@@ -106,6 +106,24 @@ test("opening book covers the c3-c4 central cannon candidate branch", () => {
   assert.equal(result.book.database.engineScore, 27);
 });
 
+test("opening book follows Pikafish principal-variation continuations past exact oracle nodes", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  let position = createInitialPosition();
+  for (const move of ["h7-e7", "h0-g2", "h9-g7", "g3-g4", "i9-h9"]) {
+    position = engine.play(position, move);
+  }
+
+  const result = engine.chooseMove(position, { openingHeuristics: false });
+
+  assert.equal(result.source, "opening-book");
+  assert.equal(result.bestMove.notation, "i0-h0");
+  assert.equal(result.book.name, "Pikafish PV continuation: i0-h0");
+  assert.ok(result.book.tags.includes("pv-continuation"));
+  assert.equal(result.book.database.source, "Pikafish");
+  assert.equal(result.book.database.sourceMove, "g3-g4");
+  assert.equal(result.book.database.principalVariation, "g3-g4 i9-h9 i0-h0 h9-h5 h2-i2");
+});
+
 test("opening heuristics cover early positions outside exact book when requested raw", () => {
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });
   const position = engine.play(createInitialPosition(), "a9-a8");
