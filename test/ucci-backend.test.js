@@ -222,6 +222,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.stats.rootTtStores, 3);
     assert.equal(result.stats.rootOrderHits, 7);
     assert.equal(result.stats.rootOrderStores, 8);
+    assert.equal(result.stats.openingPreferencePromotions, 6);
     assert.equal(result.stats.pvsResearches, 3);
     assert.equal(result.stats.aspirationSearches, 5);
     assert.equal(result.stats.aspirationWidenedSearches, 2);
@@ -302,6 +303,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.equal(result.iterations[0].stats.rootTtStores, 3);
     assert.equal(result.iterations[0].stats.rootOrderHits, 7);
     assert.equal(result.iterations[0].stats.rootOrderStores, 8);
+    assert.equal(result.iterations[0].stats.openingPreferencePromotions, 6);
     assert.equal(result.iterations[0].stats.pvsResearches, 3);
     assert.equal(result.iterations[0].stats.aspirationSearches, 5);
     assert.equal(result.iterations[0].stats.aspirationWidenedSearches, 2);
@@ -324,6 +326,7 @@ test("native backend preserves search telemetry from info lines", async () => {
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("root child-state reuse")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("root transposition-table ordering hint")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("persisted root-order hint")));
+    assert.ok(result.explanation.reasons.some((reason) => reason.includes("opening/root preference promotion")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("checked-node eval skip")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("tactical extension")));
     assert.ok(result.explanation.reasons.some((reason) => reason.includes("singular extension")));
@@ -763,6 +766,44 @@ test("UCCI backend explains near-tied native alternatives", async () => {
     assert.equal(result.explanation.comparison.planComparison.classification, "near-tie");
     assert.equal(result.explanation.comparison.planComparison.centipawnLoss, 4);
     assert.match(result.explanation.comparison.planComparison.summary, /near-tie gap of 4 centipawns/);
+  } finally {
+    await backend.close();
+  }
+});
+
+test("UCCI backend explains opening preference promotions over raw MultiPV score", async () => {
+  const backend = createUcciEngineBackend({
+    command: process.execPath,
+    args: [MOCK_UCCI_PATH.pathname],
+    depth: 2,
+    timeLimitMs: 500,
+    startupTimeoutMs: 1000,
+    commandTimeoutMs: 1000,
+    engineOptions: {
+      MockOpeningPreference: true
+    }
+  });
+
+  try {
+    const result = await backend.chooseMove(createInitialPosition(), {
+      useBook: false,
+      lines: 2
+    });
+
+    assert.equal(result.bestMove.notation, "h7-e7");
+    assert.equal(result.stats.openingPreferencePromotions, 1);
+    assert.equal(result.explanation.comparison.bestMove, "h7-e7");
+    assert.equal(result.explanation.comparison.nextMove, "h9-g7");
+    assert.equal(result.explanation.comparison.scoreGap, 40);
+    assert.equal(result.explanation.comparison.selectedScoreTrails, true);
+    assert.equal(result.explanation.comparison.openingPreferencePromotions, 1);
+    assert.match(result.explanation.comparison.reason, /preference promoted h7-e7/i);
+    assert.match(result.explanation.comparison.reason, /h9-g7.*40 centipawns higher/);
+    assert.equal(result.explanation.alternatives[1].move, "h9-g7");
+    assert.equal(result.explanation.alternatives[1].scoresAboveSelected, true);
+    assert.equal(result.explanation.alternatives[1].scoreGapFromSelected, 40);
+    assert.equal(result.explanation.alternatives[1].centipawnLoss, 0);
+    assert.ok(result.explanation.alternatives[1].reasons[0].includes("scores 40 centipawns above"));
   } finally {
     await backend.close();
   }

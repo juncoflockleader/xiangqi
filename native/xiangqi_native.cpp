@@ -764,6 +764,7 @@ struct SearchState {
   int64_t aspirationWidenedSearches = 0;
   int64_t aspirationFailHigh = 0;
   int64_t aspirationFailLow = 0;
+  int64_t openingPreferencePromotions = 0;
   int64_t rootMovesSearched = 0;
   int64_t rootChildStateReuses = 0;
   int64_t rootReductions = 0;
@@ -902,6 +903,7 @@ struct SearchState {
     aspirationWidenedSearches = 0;
     aspirationFailHigh = 0;
     aspirationFailLow = 0;
+    openingPreferencePromotions = 0;
     rootMovesSearched = 0;
     rootChildStateReuses = 0;
     rootReductions = 0;
@@ -5243,7 +5245,7 @@ void applyTimedOpeningRootBias(std::vector<Move>& rootMoves, const Board& root, 
   });
 }
 
-void applyTimedOpeningFinalPreference(std::vector<RootLine>& lines, const Board& root, bool enabled) {
+void applyTimedOpeningFinalPreference(std::vector<RootLine>& lines, const Board& root, bool enabled, SearchState& state) {
   if (!enabled || lines.size() <= 1) return;
   const int bestScore = lines.front().score;
   const int maxLoss = timedOpeningRootMaxLoss(root);
@@ -5261,6 +5263,7 @@ void applyTimedOpeningFinalPreference(std::vector<RootLine>& lines, const Board&
 
   if (preferred != lines.begin() && preferredBonus > 0) {
     std::rotate(lines.begin(), preferred, preferred + 1);
+    state.openingPreferencePromotions += 1;
   }
 }
 
@@ -5661,7 +5664,7 @@ std::vector<RootLine> searchRoot(
     std::stable_sort(depthLines.begin(), depthLines.end(), [](const RootLine& left, const RootLine& right) {
       return left.score > right.score;
     });
-    applyTimedOpeningFinalPreference(depthLines, root, useTimedOpeningPriors);
+    applyTimedOpeningFinalPreference(depthLines, root, useTimedOpeningPriors, state);
     if (validMove(depthLines.front().move)) {
       tt.store(root.key, depth, scoreToTt(depthLines.front().score, 0), kTtExact, depthLines.front().move);
       state.rootTtStores += 1;
@@ -5674,7 +5677,7 @@ std::vector<RootLine> searchRoot(
   }
 
   const int limit = std::max(1, std::min<int>(multiPv, bestLines.size()));
-  applyTimedOpeningFinalPreference(bestLines, root, useTimedOpeningPriors);
+  applyTimedOpeningFinalPreference(bestLines, root, useTimedOpeningPriors, state);
   storeRootOrderMemory(state, root.key, bestLines, searchMoves.empty() && !state.stopped);
   bestLines.resize(limit);
   state.ttHashfull = tt.hashfull();
@@ -5838,6 +5841,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " pvs " << state.pvsResearches
               << " asp " << state.aspirationSearches << " aspwide " << state.aspirationWidenedSearches
               << " asphi " << state.aspirationFailHigh << " asplo " << state.aspirationFailLow
+              << " opref " << state.openingPreferencePromotions
               << " ext " << state.extensions << " recext " << state.recaptureExtensions << " recorder " << state.recaptureOrderHits
               << " singtry " << state.singularExtensionSearches << " singext " << state.singularExtensions
               << " singrej " << state.singularExtensionRejects
@@ -5908,6 +5912,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " pvs " << state.pvsResearches
               << " asp " << state.aspirationSearches << " aspwide " << state.aspirationWidenedSearches
               << " asphi " << state.aspirationFailHigh << " asplo " << state.aspirationFailLow
+              << " opref " << state.openingPreferencePromotions
               << " ext " << state.extensions << " recext " << state.recaptureExtensions << " recorder " << state.recaptureOrderHits
               << " singtry " << state.singularExtensionSearches << " singext " << state.singularExtensions
               << " singrej " << state.singularExtensionRejects

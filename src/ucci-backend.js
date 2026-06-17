@@ -932,6 +932,7 @@ function parseUcciSearch(lines, position, protocol = "ucci") {
     rootTtStores: maxInfoValue(infos, "rootTtStores"),
     rootOrderHits: maxInfoValue(infos, "rootOrderHits"),
     rootOrderStores: maxInfoValue(infos, "rootOrderStores"),
+    openingPreferencePromotions: maxInfoValue(infos, "openingPreferencePromotions"),
     pvsResearches: maxInfoValue(infos, "pvsResearches"),
     aspirationSearches: maxInfoValue(infos, "aspirationSearches"),
     aspirationWidenedSearches: maxInfoValue(infos, "aspirationWidenedSearches"),
@@ -1088,6 +1089,7 @@ function parseInfoLine(line) {
     rootTtStores: 0,
     rootOrderHits: 0,
     rootOrderStores: 0,
+    openingPreferencePromotions: 0,
     aspirationWidenedSearches: 0,
     continuationHistoryHits: 0,
     continuationReductionBoosts: 0,
@@ -1328,6 +1330,9 @@ function parseInfoLine(line) {
       index += 1;
     } else if (token === "rootordstores") {
       info.rootOrderStores = Number.parseInt(tokens[index + 1], 10) || 0;
+      index += 1;
+    } else if (token === "opref") {
+      info.openingPreferencePromotions = Number.parseInt(tokens[index + 1], 10) || 0;
       index += 1;
     } else if (token === "pvs") {
       info.pvsResearches = Number.parseInt(tokens[index + 1], 10) || 0;
@@ -1752,10 +1757,12 @@ function buildNativeComparisonEvidence(result, position) {
   const nextMove = next.move.notation ?? moveToNotation(next.move);
   const bestScore = Math.round(best.score);
   const nextScore = Math.round(next.score);
-  const scoreGap = Math.max(0, bestScore - nextScore);
+  const selectedScoreTrails = nextScore > bestScore;
+  const scoreGap = Math.abs(bestScore - nextScore);
   const bestScoreText = best.scoreDetail?.text ?? formatScore(bestScore);
   const nextScoreText = next.scoreDetail?.text ?? formatScore(nextScore);
   const boundLimited = Boolean(best.scoreDetail?.bound || next.scoreDetail?.bound);
+  const openingPreferencePromotions = result.stats?.openingPreferencePromotions ?? 0;
   const bestLine = (best.principalVariation ?? []).map((move) => move.notation ?? moveToNotation(move));
   const nextLine = (next.principalVariation ?? []).map((move) => move.notation ?? moveToNotation(move));
   const bestPlan = buildLinePlan(position, best.principalVariation ?? [best.move], {
@@ -1785,7 +1792,9 @@ function buildNativeComparisonEvidence(result, position) {
     nextScoreText,
     scoreGap,
     nearlyTied,
-    boundLimited
+    boundLimited,
+    selectedScoreTrails,
+    openingPreferencePromotions
   });
 
   return {
@@ -1793,6 +1802,8 @@ function buildNativeComparisonEvidence(result, position) {
     nextMove,
     scoreGap,
     scoreGapText: `${scoreGap} cp`,
+    selectedScoreTrails,
+    openingPreferencePromotions,
     bestScore,
     nextScore,
     bestScoreText,
@@ -1816,6 +1827,10 @@ function buildNativeComparisonEvidence(result, position) {
 
 function explainNativeAlternatives(position, result, backendName, protocolLabel) {
   const bestScore = result.candidates[0]?.score ?? result.score ?? 0;
+  const selectedMove = result.candidates[0]?.move
+    ? (result.candidates[0].move.notation ?? moveToNotation(result.candidates[0].move))
+    : null;
+  const openingPreferencePromotions = result.stats?.openingPreferencePromotions ?? 0;
   const bestLinePlan = result.candidates[0]
     ? buildLinePlan(position, result.candidates[0].principalVariation ?? [result.candidates[0].move], {
         perspective: position.turn
@@ -1830,9 +1845,19 @@ function explainNativeAlternatives(position, result, backendName, protocolLabel)
       backendName
     });
     const linePlan = explanation.linePlan;
-    const centipawnLoss = explanation.centipawnLoss;
-    const verdict = nativeAlternativeVerdict(index, centipawnLoss);
-    const contrast = nativeAlternativeContrast(index, centipawnLoss);
+    const scoreGapFromSelected = Math.abs(Math.round(bestScore - candidate.score));
+    const scoresAboveSelected = index > 0 && candidate.score > bestScore;
+    const centipawnLoss = scoresAboveSelected ? 0 : explanation.centipawnLoss;
+    const verdict = nativeAlternativeVerdict(index, scoresAboveSelected ? scoreGapFromSelected : centipawnLoss);
+    const contrast = nativeAlternativeContrast(index, centipawnLoss, {
+      scoresAboveSelected,
+      scoreGapFromSelected,
+      selectedMove,
+      openingPreferencePromotions
+    });
+    const candidateReasons = scoresAboveSelected
+      ? explanation.reasons.filter((reason) => !/trails|effectively tied/i.test(reason))
+      : explanation.reasons;
 
     return {
       rank: index + 1,
@@ -1841,18 +1866,20 @@ function explainNativeAlternatives(position, result, backendName, protocolLabel)
       scoreDetail: candidate.scoreDetail ?? null,
       wdl: candidate.wdl ?? null,
       centipawnLoss,
+      scoreGapFromSelected,
+      scoresAboveSelected,
       verdict,
       summary: explanation.summary,
       reasons: unique([
         contrast,
-        ...explanation.reasons
+        ...candidateReasons
       ]).slice(0, 5),
       expectedReply: linePlan.expectedReply,
       motifs: linePlan.motifs,
       linePlanSummary: linePlan.summary,
       planComparison: nativeAlternativePlanComparison(linePlan, bestLinePlan, {
         index,
-        centipawnLoss,
+        centipawnLoss: scoresAboveSelected ? scoreGapFromSelected : centipawnLoss,
         verdict
       }),
       principalVariation: explanation.principalVariation,
@@ -1914,15 +1941,43 @@ function nativeAlternativeVerdict(index, centipawnLoss) {
   return "poor";
 }
 
-function nativeAlternativeContrast(index, centipawnLoss) {
+function nativeAlternativeContrast(index, centipawnLoss, options = {}) {
   if (index === 0) return "top native line";
+  if (options.scoresAboveSelected) {
+    const selected = options.selectedMove ? ` ${options.selectedMove}` : "";
+    const source = options.openingPreferencePromotions > 0
+      ? "the opening/root preference"
+      : "native root ordering";
+    return `scores ${options.scoreGapFromSelected} centipawns above the selected native line${selected}, but ${source} kept the selected line first`;
+  }
   if (centipawnLoss <= 15) return `roughly tied with the top native line, trailing by ${centipawnLoss} centipawns`;
   return `trails the top native line by ${centipawnLoss} centipawns`;
 }
 
-function nativeComparisonReason({ bestMove, nextMove, bestScoreText, nextScoreText, scoreGap, nearlyTied, boundLimited }) {
+function capitalizeFirst(text) {
+  return `${String(text ?? "").slice(0, 1).toUpperCase()}${String(text ?? "").slice(1)}`;
+}
+
+function nativeComparisonReason({
+  bestMove,
+  nextMove,
+  bestScoreText,
+  nextScoreText,
+  scoreGap,
+  nearlyTied,
+  boundLimited,
+  selectedScoreTrails,
+  openingPreferencePromotions
+}) {
   if (boundLimited) {
     return `Native MultiPV reports bound-limited scores: ${bestMove} is ${bestScoreText}, while ${nextMove} is ${nextScoreText}; the displayed gap is ${scoreGap} centipawns, but the exact margin may differ.`;
+  }
+
+  if (selectedScoreTrails) {
+    const source = openingPreferencePromotions > 0
+      ? "a native opening/root preference"
+      : "the native root ordering";
+    return `${capitalizeFirst(source)} promoted ${bestMove} even though ${nextMove}'s raw MultiPV score is ${scoreGap} centipawns higher (${bestScoreText} vs ${nextScoreText}).`;
   }
 
   return nearlyTied
@@ -2006,6 +2061,7 @@ function nativeSelectiveSearchReason(stats = {}) {
   if ((stats.rootReductionResearches ?? 0) > 0) parts.push(nativeCount(stats.rootReductionResearches, "root reduction re-search"));
   if ((stats.rootTtHits ?? 0) > 0) parts.push(nativeCount(stats.rootTtHits, "root transposition-table ordering hint"));
   if ((stats.rootOrderHits ?? 0) > 0) parts.push(nativeCount(stats.rootOrderHits, "persisted root-order hint"));
+  if ((stats.openingPreferencePromotions ?? 0) > 0) parts.push(nativeCount(stats.openingPreferencePromotions, "opening/root preference promotion"));
   if ((stats.rootTtStores ?? 0) > 0) parts.push(nativeCount(stats.rootTtStores, "root transposition-table store"));
   if ((stats.ttMoveHits ?? 0) > 0) parts.push(nativeCount(stats.ttMoveHits, "transposition hash-move ordering hint"));
   if ((stats.captureHistoryHits ?? 0) > 0) parts.push(nativeCount(stats.captureHistoryHits, "capture-history hit"));
@@ -2308,6 +2364,7 @@ function createNativeStats(parsed) {
     rootTtStores: parsed.rootTtStores ?? 0,
     rootOrderHits: parsed.rootOrderHits ?? 0,
     rootOrderStores: parsed.rootOrderStores ?? 0,
+    openingPreferencePromotions: parsed.openingPreferencePromotions ?? 0,
     pvsResearches: parsed.pvsResearches ?? 0,
     aspirationSearches: parsed.aspirationSearches ?? 0,
     aspirationWidenedSearches: parsed.aspirationWidenedSearches ?? 0,
@@ -2428,6 +2485,7 @@ function createEmptyStats() {
     rootRankOrderHits: 0,
     rootOrderHits: 0,
     rootOrderStores: 0,
+    openingPreferencePromotions: 0,
     iidSearches: 0,
     iidMoveHits: 0,
     rootMovesSearched: 0,
