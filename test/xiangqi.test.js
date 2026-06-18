@@ -10,6 +10,7 @@ import {
   createInitialPosition,
   generateCaptures,
   generateLegalMoves,
+  generateQuietMoves,
   indexOf,
   isInCheck,
   parseFen,
@@ -101,6 +102,29 @@ test("capture generation matches legal capture subset", () => {
         .sort();
 
       assert.deepEqual(directCaptures, legalCaptures);
+    }
+  }
+});
+
+test("quiet generation matches legal non-capture subset", () => {
+  const positions = [
+    createInitialPosition(),
+    parseFen("4k4/9/9/4r4/9/4P4/9/9/9/3KC4 r"),
+    parseFen("2eakae2/9/4c4/4C4/9/4P4/9/9/9/2EAKAE2 b"),
+    parseFen("4k4/9/4r4/9/9/9/9/9/9/3KR4 r")
+  ];
+
+  for (const position of positions) {
+    for (const side of [SIDES.RED, SIDES.BLACK]) {
+      const legalQuiets = generateLegalMoves(position, side)
+        .filter((move) => !move.captured)
+        .map((move) => move.notation)
+        .sort();
+      const directQuiets = generateQuietMoves(position, side)
+        .map((move) => move.notation)
+        .sort();
+
+      assert.deepEqual(directQuiets, legalQuiets);
     }
   }
 });

@@ -39,6 +39,10 @@ const HORSE_DELTAS = Object.freeze([
   [-1, 2]
 ]);
 
+const MOVE_FILTER_ALL = 0;
+const MOVE_FILTER_CAPTURES = 1;
+const MOVE_FILTER_QUIETS = 2;
+
 export function generateLegalMoves(position, side = position.turn) {
   return generatePseudoMoves(position, side).filter((move) => {
     return isLegalGeneratedMove(position, move, side);
@@ -51,44 +55,21 @@ export function generateCaptures(position, side = position.turn) {
   });
 }
 
+export function generateQuietMoves(position, side = position.turn) {
+  return generatePseudoMovesByFilter(position, side, MOVE_FILTER_QUIETS).filter((move) => {
+    return isLegalGeneratedMove(position, move, side);
+  });
+}
+
 export function generatePseudoMoves(position, side = position.turn) {
-  const moves = [];
-
-  for (let square = 0; square < position.board.length; square += 1) {
-    const piece = position.board[square];
-    if (!piece || piece.side !== side) continue;
-
-    switch (piece.type) {
-      case PIECES.KING:
-        addKingMoves(position, square, piece, moves);
-        break;
-      case PIECES.ADVISOR:
-        addAdvisorMoves(position, square, piece, moves);
-        break;
-      case PIECES.ELEPHANT:
-        addElephantMoves(position, square, piece, moves);
-        break;
-      case PIECES.HORSE:
-        addHorseMoves(position, square, piece, moves);
-        break;
-      case PIECES.ROOK:
-        addRookMoves(position, square, piece, moves);
-        break;
-      case PIECES.CANNON:
-        addCannonMoves(position, square, piece, moves);
-        break;
-      case PIECES.PAWN:
-        addPawnMoves(position, square, piece, moves);
-        break;
-      default:
-        throw new Error(`Unsupported piece type: ${piece.type}`);
-    }
-  }
-
-  return moves;
+  return generatePseudoMovesByFilter(position, side, MOVE_FILTER_ALL);
 }
 
 function generatePseudoCaptures(position, side = position.turn) {
+  return generatePseudoMovesByFilter(position, side, MOVE_FILTER_CAPTURES);
+}
+
+function generatePseudoMovesByFilter(position, side, moveFilter) {
   const moves = [];
 
   for (let square = 0; square < position.board.length; square += 1) {
@@ -97,25 +78,25 @@ function generatePseudoCaptures(position, side = position.turn) {
 
     switch (piece.type) {
       case PIECES.KING:
-        addKingMoves(position, square, piece, moves, true);
+        addKingMoves(position, square, piece, moves, moveFilter);
         break;
       case PIECES.ADVISOR:
-        addAdvisorMoves(position, square, piece, moves, true);
+        addAdvisorMoves(position, square, piece, moves, moveFilter);
         break;
       case PIECES.ELEPHANT:
-        addElephantMoves(position, square, piece, moves, true);
+        addElephantMoves(position, square, piece, moves, moveFilter);
         break;
       case PIECES.HORSE:
-        addHorseMoves(position, square, piece, moves, true);
+        addHorseMoves(position, square, piece, moves, moveFilter);
         break;
       case PIECES.ROOK:
-        addRookMoves(position, square, piece, moves, true);
+        addRookMoves(position, square, piece, moves, moveFilter);
         break;
       case PIECES.CANNON:
-        addCannonMoves(position, square, piece, moves, true);
+        addCannonMoves(position, square, piece, moves, moveFilter);
         break;
       case PIECES.PAWN:
-        addPawnMoves(position, square, piece, moves, true);
+        addPawnMoves(position, square, piece, moves, moveFilter);
         break;
       default:
         throw new Error(`Unsupported piece type: ${piece.type}`);
@@ -299,10 +280,11 @@ function makeMoveWithTurn(position, move, side) {
   return { ...next, turn: opponent(side), fullmove: originalTurn === SIDES.BLACK ? (position.fullmove ?? 1) + 1 : position.fullmove ?? 1 };
 }
 
-function addMove(position, moves, from, to, piece, capturesOnly = false) {
+function addMove(position, moves, from, to, piece, moveFilter = MOVE_FILTER_ALL) {
   const captured = position.board[to];
   if (captured?.side === piece.side) return;
-  if (capturesOnly && !captured) return;
+  if (moveFilter === MOVE_FILTER_CAPTURES && !captured) return;
+  if (moveFilter === MOVE_FILTER_QUIETS && captured) return;
 
   moves.push({
     from,
@@ -313,7 +295,7 @@ function addMove(position, moves, from, to, piece, capturesOnly = false) {
   });
 }
 
-function addKingMoves(position, from, piece, moves, capturesOnly = false) {
+function addKingMoves(position, from, piece, moves, moveFilter = MOVE_FILTER_ALL) {
   const file = fileOf(from);
   const rank = rankOf(from);
 
@@ -321,11 +303,11 @@ function addKingMoves(position, from, piece, moves, capturesOnly = false) {
     const targetFile = file + dx;
     const targetRank = rank + dy;
     if (!palaceContains(piece.side, targetFile, targetRank)) continue;
-    addMove(position, moves, from, indexOf(targetFile, targetRank), piece, capturesOnly);
+    addMove(position, moves, from, indexOf(targetFile, targetRank), piece, moveFilter);
   }
 }
 
-function addAdvisorMoves(position, from, piece, moves, capturesOnly = false) {
+function addAdvisorMoves(position, from, piece, moves, moveFilter = MOVE_FILTER_ALL) {
   const file = fileOf(from);
   const rank = rankOf(from);
 
@@ -333,11 +315,11 @@ function addAdvisorMoves(position, from, piece, moves, capturesOnly = false) {
     const targetFile = file + dx;
     const targetRank = rank + dy;
     if (!palaceContains(piece.side, targetFile, targetRank)) continue;
-    addMove(position, moves, from, indexOf(targetFile, targetRank), piece, capturesOnly);
+    addMove(position, moves, from, indexOf(targetFile, targetRank), piece, moveFilter);
   }
 }
 
-function addElephantMoves(position, from, piece, moves, capturesOnly = false) {
+function addElephantMoves(position, from, piece, moves, moveFilter = MOVE_FILTER_ALL) {
   const file = fileOf(from);
   const rank = rankOf(from);
 
@@ -351,11 +333,11 @@ function addElephantMoves(position, from, piece, moves, capturesOnly = false) {
     if (!ownRiverSide(piece.side, targetRank)) continue;
     if (position.board[indexOf(eyeFile, eyeRank)]) continue;
 
-    addMove(position, moves, from, indexOf(targetFile, targetRank), piece, capturesOnly);
+    addMove(position, moves, from, indexOf(targetFile, targetRank), piece, moveFilter);
   }
 }
 
-function addHorseMoves(position, from, piece, moves, capturesOnly = false) {
+function addHorseMoves(position, from, piece, moves, moveFilter = MOVE_FILTER_ALL) {
   const file = fileOf(from);
   const rank = rankOf(from);
 
@@ -368,19 +350,19 @@ function addHorseMoves(position, from, piece, moves, capturesOnly = false) {
     const legRank = Math.abs(dy) === 2 ? rank + Math.sign(dy) : rank;
     if (position.board[indexOf(legFile, legRank)]) continue;
 
-    addMove(position, moves, from, indexOf(targetFile, targetRank), piece, capturesOnly);
+    addMove(position, moves, from, indexOf(targetFile, targetRank), piece, moveFilter);
   }
 }
 
-function addRookMoves(position, from, piece, moves, capturesOnly = false) {
-  addSlidingMoves(position, from, piece, moves, false, capturesOnly);
+function addRookMoves(position, from, piece, moves, moveFilter = MOVE_FILTER_ALL) {
+  addSlidingMoves(position, from, piece, moves, false, moveFilter);
 }
 
-function addCannonMoves(position, from, piece, moves, capturesOnly = false) {
-  addSlidingMoves(position, from, piece, moves, true, capturesOnly);
+function addCannonMoves(position, from, piece, moves, moveFilter = MOVE_FILTER_ALL) {
+  addSlidingMoves(position, from, piece, moves, true, moveFilter);
 }
 
-function addSlidingMoves(position, from, piece, moves, isCannon, capturesOnly = false) {
+function addSlidingMoves(position, from, piece, moves, isCannon, moveFilter = MOVE_FILTER_ALL) {
   const file = fileOf(from);
   const rank = rankOf(from);
 
@@ -395,29 +377,29 @@ function addSlidingMoves(position, from, piece, moves, isCannon, capturesOnly = 
 
       if (!isCannon) {
         if (!occupant) {
-          if (capturesOnly) {
+          if (moveFilter === MOVE_FILTER_CAPTURES) {
             targetFile += dx;
             targetRank += dy;
             continue;
           }
-          addMove(position, moves, from, target, piece);
+          addMove(position, moves, from, target, piece, moveFilter);
         } else {
-          if (occupant.side !== piece.side) addMove(position, moves, from, target, piece);
+          if (occupant.side !== piece.side) addMove(position, moves, from, target, piece, moveFilter);
           break;
         }
       } else if (!screenFound) {
         if (!occupant) {
-          if (capturesOnly) {
+          if (moveFilter === MOVE_FILTER_CAPTURES) {
             targetFile += dx;
             targetRank += dy;
             continue;
           }
-          addMove(position, moves, from, target, piece);
+          addMove(position, moves, from, target, piece, moveFilter);
         } else {
           screenFound = true;
         }
       } else if (occupant) {
-        if (occupant.side !== piece.side) addMove(position, moves, from, target, piece);
+        if (occupant.side !== piece.side) addMove(position, moves, from, target, piece, moveFilter);
         break;
       }
 
@@ -427,7 +409,7 @@ function addSlidingMoves(position, from, piece, moves, isCannon, capturesOnly = 
   }
 }
 
-function addPawnMoves(position, from, piece, moves, capturesOnly = false) {
+function addPawnMoves(position, from, piece, moves, moveFilter = MOVE_FILTER_ALL) {
   const file = fileOf(from);
   const rank = rankOf(from);
   const directions = [[0, forwardDelta(piece.side)]];
@@ -440,6 +422,6 @@ function addPawnMoves(position, from, piece, moves, capturesOnly = false) {
     const targetFile = file + dx;
     const targetRank = rank + dy;
     if (!isInside(targetFile, targetRank)) continue;
-    addMove(position, moves, from, indexOf(targetFile, targetRank), piece, capturesOnly);
+    addMove(position, moves, from, indexOf(targetFile, targetRank), piece, moveFilter);
   }
 }

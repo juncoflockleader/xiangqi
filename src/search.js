@@ -26,6 +26,7 @@ import {
   generateCaptures,
   generateLegalMoves,
   generatePseudoMoves,
+  generateQuietMoves,
   isInCheck
 } from "./movegen.js";
 import { evaluatePosition } from "./evaluate.js";
@@ -1317,8 +1318,8 @@ function quiescenceTranspositionKey(position, qChecksRemaining) {
 function quietCheckingMoves(position, context, qChecksRemaining) {
   if (!context.useQuiescenceChecks || qChecksRemaining <= 0) return [];
 
-  const checks = generateLegalMoves(position, position.turn)
-    .filter((move) => !move.captured && moveGivesCheck(position, move, context));
+  const checks = generateQuietMoves(position, position.turn)
+    .filter((move) => moveGivesCheck(position, move, context));
 
   context.stats.qchecks += checks.length;
   return checks;
