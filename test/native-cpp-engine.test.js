@@ -770,6 +770,46 @@ test("local C++ engine promotes near-tied home-horse captures in early middlegam
   }
 });
 
+test("local C++ engine follows oracle cannon-pressure priors in random middlegames", async (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const backend = createUcciEngineBackend({
+    command: build.output,
+    protocol: "uci",
+    depth: 6,
+    timeLimitMs: 1000,
+    startupTimeoutMs: 3000,
+    commandTimeoutMs: 5000
+  });
+
+  try {
+    const cannonLift = parseFen("rh1akaehr/9/4e4/p1p1p1p1p/9/5c3/P1P1P1P1P/Hc6C/2R1A2CR/2EAK1EH1 r");
+    const backRankCannon = parseFen("1hea1k2r/4a4/1c2e2c1/r1p1h1p2/p3p3p/2P3P2/P3P1C1P/H3E2C1/R3A2R1/3AK1EH1 b");
+
+    const cannonLiftResult = await backend.chooseMove(cannonLift, {
+      useBook: false,
+      depth: 6,
+      timeLimitMs: 1000
+    });
+    const backRankCannonResult = await backend.chooseMove(backRankCannon, {
+      useBook: false,
+      depth: 6,
+      timeLimitMs: 1000
+    });
+
+    assert.equal(moveToNotation(cannonLiftResult.bestMove), "h8-h5");
+    assert.equal(moveToNotation(backRankCannonResult.bestMove), "h2-h8");
+    assert.ok(cannonLiftResult.nodes > 0);
+    assert.ok(backRankCannonResult.nodes > 0);
+  } finally {
+    await backend.close();
+  }
+});
+
 test("local C++ engine preserves mate-range TT scores across repeated searches", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {

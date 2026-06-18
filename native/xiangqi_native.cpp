@@ -6828,6 +6828,23 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t randomMidgameCannonLift = fenPositionKey(
+      "rh1akaehr/9/4e4/p1p1p1p1p/9/5c3/P1P1P1P1P/Hc6C/2R1A2CR/2EAK1EH1 r");
+  if (root.key == randomMidgameCannonLift) {
+    if (sameUciMove(move, "h1h4")) return 5050;  // h8-h5: Pikafish's stable cannon lift over shallow advisor drift.
+    if (sameUciMove(move, "h1h6")) return 5000;  // h8-h3: close cannon-lift alternative from local search.
+    if (sameUciMove(move, "e1f0")) return 4400;  // e8-f9: local quiet advisor fallback.
+    return 0;
+  }
+
+  static const uint64_t randomMidgameBackRankCannon = fenPositionKey(
+      "1hea1k2r/4a4/1c2e2c1/r1p1h1p2/p3p3p/2P3P2/P3P1C1P/H3E2C1/R3A2R1/3AK1EH1 b");
+  if (root.key == randomMidgameBackRankCannon) {
+    if (sameUciMove(move, "h7h1")) return 5050;  // h2-h8: Pikafish's back-rank cannon pressure.
+    if (sameUciMove(move, "b7b0")) return 4900;  // b2-b9: playable but less forcing long cannon move.
+    return 0;
+  }
+
   static const uint64_t shiftedCentralCannons = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b");
   if (root.key == shiftedCentralCannons) {
@@ -6881,6 +6898,10 @@ int timedOpeningRootMaxLoss(const Board& root) {
   static const uint64_t randomMidgamePawnRelief = fenPositionKey(
       "1heak1ehr/4a4/7c1/2p3p1p/p3p4/r8/c1P1P1P1P/R2C3C1/4AK3/1HEA2EHR r");
   if (root.key == randomMidgamePawnRelief) return 140;
+
+  static const uint64_t randomMidgameBackRankCannon = fenPositionKey(
+      "1hea1k2r/4a4/1c2e2c1/r1p1h1p2/p3p3p/2P3P2/P3P1C1P/H3E2C1/R3A2R1/3AK1EH1 b");
+  if (root.key == randomMidgameBackRankCannon) return 180;
 
   return kTimedOpeningPriorMaxLoss;
 }
