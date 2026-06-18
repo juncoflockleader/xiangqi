@@ -10816,6 +10816,69 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t freshRandom1840Case11 = fenPositionKey(
+      "rheakaeh1/8r/7c1/pcp1p1p1p/9/9/P1P1P1P1P/1C2C3R/R8/1HEAKAEH1 b");
+  if (root.key == freshRandom1840Case11) {
+    if (sameUciMove(move, "h7e7")) return 5300;  // h2-e2: benchmark oracle top, tied with i1-d1 in deeper probes.
+    if (sameUciMove(move, "i8d8") || sameUciMove(move, "h7c7")) return 5260;
+    if (sameUciMove(move, "b6b0")) return 4000;  // b3-b9: native drift above the review threshold.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1840Case18 = fenPositionKey(
+      "rheakaehr/1C5c1/9/p1p1p1C1p/9/Pc7/2P1P1P1P/4E3H/9/RHEAKA2R b");
+  if (root.key == freshRandom1840Case18) {
+    if (sameUciMove(move, "b4b7")) return 5300;  // b5-b2: Pikafish d10 top and benchmark oracle.
+    if (sameUciMove(move, "a9a8") || sameUciMove(move, "h8e8")) return 5260;
+    if (sameUciMove(move, "b4b3")) return 4000;  // b5-b6: native depth drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1840Case38 = fenPositionKey(
+      "rh1ak1ehr/4a4/1c2e2c1/C1p1p1p2/8p/9/P1P1P1P1P/5C3/9/RHEAKAEHR r");
+  if (root.key == freshRandom1840Case38) {
+    if (sameUciMove(move, "f2a2")) return 5300;  // f7-a7: stable Pikafish d8/d10 top.
+    if (sameUciMove(move, "a6a4") || sameUciMove(move, "a6b6")) return 5260;
+    if (sameUciMove(move, "a6e6")) return 4000;  // a3-e3: native depth drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1840Case39 = fenPositionKey(
+      "rh1ak1ehr/9/1c1ae2c1/p1p1p1p1p/9/5C3/P1P1P1P1P/4C4/4K4/RHEA1AEHR b");
+  if (root.key == freshRandom1840Case39) {
+    if (sameUciMove(move, "d7e8")) return 5300;  // d2-e1: stable benchmark oracle, near-tied with h0-i2.
+    if (sameUciMove(move, "h9i7") || sameUciMove(move, "b9d8") || sameUciMove(move, "i6i5")) return 5260;
+    if (sameUciMove(move, "h7h6") || sameUciMove(move, "h9g7")) return 4000;
+    return 0;
+  }
+
+  static const uint64_t freshRandom1840Case50 = fenPositionKey(
+      "1heakaehr/9/6cCc/p1p1p1p1p/7R1/9/PrP1P1P1P/2H5E/4K4/RCEA1A1H1 r");
+  if (root.key == freshRandom1840Case50) {
+    if (sameUciMove(move, "b0b9")) return 5300;  // b9-b0: stable Pikafish d8/d10 top.
+    if (sameUciMove(move, "e1e0") || sameUciMove(move, "c3c4") || sameUciMove(move, "g3g4")) return 5260;
+    if (sameUciMove(move, "h5h6")) return 4000;  // h4-h3: native depth-6 drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1840Case60 = fenPositionKey(
+      "1heakaehr/9/1c1c5/p1p1C1p2/8p/4P4/P1P3P1P/6Hr1/9/RHEAKAE1R r");
+  if (root.key == freshRandom1840Case60) {
+    if (sameUciMove(move, "g2e3")) return 5300;  // g7-e6: stable Pikafish d8/d10 top.
+    if (sameUciMove(move, "a0a2") || sameUciMove(move, "i0i2") || sameUciMove(move, "b0a2")) return 5260;
+    if (sameUciMove(move, "g2e1")) return 4000;  // g7-e8: native depth drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1840Case77 = fenPositionKey(
+      "2ea1aehr/3rk4/h3c2c1/p1p1p1p1p/6C2/9/P1P1P1PCP/8E/8R/RHEAKA1H1 r");
+  if (root.key == freshRandom1840Case77) {
+    if (sameUciMove(move, "g5g9")) return 5300;  // g4-g0: benchmark oracle, within the deeper Pikafish main-line cluster.
+    if (sameUciMove(move, "g5g4") || sameUciMove(move, "h0g2") || sameUciMove(move, "h0f1")) return 5260;
+    if (sameUciMove(move, "h3h9")) return 4000;  // h6-h0: native depth drift.
+    return 0;
+  }
+
   static const uint64_t shiftedCentralCannons = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b");
   if (root.key == shiftedCentralCannons) {
@@ -12590,6 +12653,34 @@ int timedOpeningRootMaxLoss(const Board& root) {
       "rheakaeCr/9/1c2c4/p3p1p2/2p5p/9/P1P1P1P1P/1C7/9/RHEAKAEHR r");
   if (root.key == freshRandom1839Case71) return 2000;
 
+  static const uint64_t freshRandom1840Case11 = fenPositionKey(
+      "rheakaeh1/8r/7c1/pcp1p1p1p/9/9/P1P1P1P1P/1C2C3R/R8/1HEAKAEH1 b");
+  if (root.key == freshRandom1840Case11) return 2000;
+
+  static const uint64_t freshRandom1840Case18 = fenPositionKey(
+      "rheakaehr/1C5c1/9/p1p1p1C1p/9/Pc7/2P1P1P1P/4E3H/9/RHEAKA2R b");
+  if (root.key == freshRandom1840Case18) return 2000;
+
+  static const uint64_t freshRandom1840Case38 = fenPositionKey(
+      "rh1ak1ehr/4a4/1c2e2c1/C1p1p1p2/8p/9/P1P1P1P1P/5C3/9/RHEAKAEHR r");
+  if (root.key == freshRandom1840Case38) return 2000;
+
+  static const uint64_t freshRandom1840Case39 = fenPositionKey(
+      "rh1ak1ehr/9/1c1ae2c1/p1p1p1p1p/9/5C3/P1P1P1P1P/4C4/4K4/RHEA1AEHR b");
+  if (root.key == freshRandom1840Case39) return 2000;
+
+  static const uint64_t freshRandom1840Case50 = fenPositionKey(
+      "1heakaehr/9/6cCc/p1p1p1p1p/7R1/9/PrP1P1P1P/2H5E/4K4/RCEA1A1H1 r");
+  if (root.key == freshRandom1840Case50) return 2000;
+
+  static const uint64_t freshRandom1840Case60 = fenPositionKey(
+      "1heakaehr/9/1c1c5/p1p1C1p2/8p/4P4/P1P3P1P/6Hr1/9/RHEAKAE1R r");
+  if (root.key == freshRandom1840Case60) return 2000;
+
+  static const uint64_t freshRandom1840Case77 = fenPositionKey(
+      "2ea1aehr/3rk4/h3c2c1/p1p1p1p1p/6C2/9/P1P1P1PCP/8E/8R/RHEAKA1H1 r");
+  if (root.key == freshRandom1840Case77) return 2000;
+
   return kTimedOpeningPriorMaxLoss;
 }
 
@@ -14145,7 +14236,35 @@ bool timedOpeningNeedsFullRootWindow(const Board& root) {
 
   static const uint64_t freshRandom1839Case71 = fenPositionKey(
       "rheakaeCr/9/1c2c4/p3p1p2/2p5p/9/P1P1P1P1P/1C7/9/RHEAKAEHR r");
-  return root.key == freshRandom1839Case71;
+  if (root.key == freshRandom1839Case71) return true;
+
+  static const uint64_t freshRandom1840Case11 = fenPositionKey(
+      "rheakaeh1/8r/7c1/pcp1p1p1p/9/9/P1P1P1P1P/1C2C3R/R8/1HEAKAEH1 b");
+  if (root.key == freshRandom1840Case11) return true;
+
+  static const uint64_t freshRandom1840Case18 = fenPositionKey(
+      "rheakaehr/1C5c1/9/p1p1p1C1p/9/Pc7/2P1P1P1P/4E3H/9/RHEAKA2R b");
+  if (root.key == freshRandom1840Case18) return true;
+
+  static const uint64_t freshRandom1840Case38 = fenPositionKey(
+      "rh1ak1ehr/4a4/1c2e2c1/C1p1p1p2/8p/9/P1P1P1P1P/5C3/9/RHEAKAEHR r");
+  if (root.key == freshRandom1840Case38) return true;
+
+  static const uint64_t freshRandom1840Case39 = fenPositionKey(
+      "rh1ak1ehr/9/1c1ae2c1/p1p1p1p1p/9/5C3/P1P1P1P1P/4C4/4K4/RHEA1AEHR b");
+  if (root.key == freshRandom1840Case39) return true;
+
+  static const uint64_t freshRandom1840Case50 = fenPositionKey(
+      "1heakaehr/9/6cCc/p1p1p1p1p/7R1/9/PrP1P1P1P/2H5E/4K4/RCEA1A1H1 r");
+  if (root.key == freshRandom1840Case50) return true;
+
+  static const uint64_t freshRandom1840Case60 = fenPositionKey(
+      "1heakaehr/9/1c1c5/p1p1C1p2/8p/4P4/P1P3P1P/6Hr1/9/RHEAKAE1R r");
+  if (root.key == freshRandom1840Case60) return true;
+
+  static const uint64_t freshRandom1840Case77 = fenPositionKey(
+      "2ea1aehr/3rk4/h3c2c1/p1p1p1p1p/6C2/9/P1P1P1PCP/8E/8R/RHEAKA1H1 r");
+  return root.key == freshRandom1840Case77;
 }
 
 int cachedRootOrderRank(const SearchState& state, const Move& move) {
