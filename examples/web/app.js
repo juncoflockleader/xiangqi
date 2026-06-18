@@ -331,6 +331,7 @@ const zhTwTranslations = {
   moveWaitingReview: "已落子，等待評價。",
   yourLastMove: "你的上一手",
   engineLastMove: "引擎上一手",
+  teachingTurn: "本回合覆盤",
   thinking: "引擎思考中...",
   thinkingShort: "思考中",
   requestTimedOut: "請求等待時間過長，請重試。",
@@ -409,6 +410,7 @@ const zhCnTranslations = {
   reviewPending: "正在复盘你的上一手...",
   replyPending: "引擎正在思考应手...",
   moveWaitingReview: "已落子，等待评价。",
+  teachingTurn: "本回合复盘",
   thinking: "引擎思考中...",
   thinkingShort: "思考中",
   requestTimedOut: "请求等待时间过长，请重试。",
@@ -515,6 +517,7 @@ const translations = {
     player: "player",
     yourLastMove: "Your last move",
     engineLastMove: "Engine last move",
+    teachingTurn: "Turn review",
     engineActor: "engine",
     emptyPoint: "empty point"
   }
@@ -646,7 +649,7 @@ async function holdTeachingReviewBeforeEngineReply(game) {
 
 function shouldHoldTeachingReview(game) {
   if (!shouldRequestEngineMove(game)) return false;
-  const pair = latestTeachingPair(game);
+  const pair = activeTeachingPair(game);
   return Boolean(pair?.playerMove && pair.playerReview && !pair.engineMove && pair.engineThinking);
 }
 
@@ -1001,7 +1004,7 @@ function renderLastMove() {
   const teachingPair = treeNode?.kind === "main"
     ? teachingPairForMove(state.game, treeNode.move)
     : !treeNode
-      ? latestTeachingPair(state.game)
+      ? activeTeachingPair(state.game)
       : null;
   if (teachingPair) {
     renderTeachingPairSummary(teachingPair);
@@ -1071,7 +1074,10 @@ function renderTeachingPairSummary(pair) {
 
   elements.lastMovePanel.className = "stack teaching-stack";
   elements.lastMovePanel.innerHTML = cards.length
-    ? `<div class="teaching-pair-grid teaching-pair-summary">${cards.join("")}</div>`
+    ? [
+      `<div class="teaching-turn-title">${escapeHtml(t("teachingTurn"))}</div>`,
+      `<div class="teaching-pair-grid teaching-pair-summary">${cards.join("")}</div>`
+    ].join("")
     : t("noMoves");
 }
 
@@ -1282,7 +1288,10 @@ function renderTeachingPairReasoning(pair) {
 
   elements.reasoningPanel.className = "stack teaching-stack";
   elements.reasoningPanel.innerHTML = cards.length
-    ? `<div class="teaching-pair-grid teaching-pair-reasoning">${cards.join("")}</div>`
+    ? [
+      `<div class="teaching-turn-title">${escapeHtml(t("teachingTurn"))}</div>`,
+      `<div class="teaching-pair-grid teaching-pair-reasoning">${cards.join("")}</div>`
+    ].join("")
     : t("noDecision");
 }
 
@@ -1310,6 +1319,8 @@ function teachingReviewSummaryParts(review) {
   const parts = [
     escapeHtml(localizedReviewSummary(review))
   ];
+  const score = teachingReviewScoreText(review);
+  if (score) parts.push(escapeHtml(score));
   const comparison = localizedPlanComparisonSummary(review.planComparison);
   if (comparison) parts.push(escapeHtml(comparison));
   return parts;
@@ -1320,6 +1331,8 @@ function teachingReviewParts(review) {
     escapeHtml(localizedReviewSummary(review))
   ];
   if (review.planComparison?.summary) parts.push(escapeHtml(localizedPlanComparisonSummary(review.planComparison)));
+  const score = teachingReviewScoreText(review);
+  if (score) parts.push(escapeHtml(score));
   if (review.practiceFocus) {
     const focus = localizedPracticeFocus(review.practiceFocus);
     parts.push(`<strong>${escapeHtml(focus.title)}</strong> ${escapeHtml(focus.text)}`);
@@ -1329,6 +1342,18 @@ function teachingReviewParts(review) {
     parts.push(`<ul class="teaching-reason-list">${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>`);
   }
   return parts;
+}
+
+function teachingReviewScoreText(review) {
+  const played = review.playedScoreDetail?.text
+    ?? (Number.isFinite(review.playedScore) ? formatCentipawns(review.playedScore) : "");
+  const best = review.bestScoreDetail?.text
+    ?? (Number.isFinite(review.bestScore) ? formatCentipawns(review.bestScore) : "");
+  if (!played && !best) return "";
+  if (played && best && played !== best) {
+    return `${t("scorePrefix")} ${played} · ${t("bestAlternative")} ${best}`;
+  }
+  return `${t("scorePrefix")} ${played || best}`;
 }
 
 function teachingDecisionSummaryParts(decision) {
@@ -2142,7 +2167,7 @@ function renderSelectedMoves() {
 }
 
 function panelFromMove(game) {
-  const pair = latestTeachingPair(game);
+  const pair = activeTeachingPair(game);
   if (pair) return { kind: "teachingPair", ...pair };
   const last = game?.lastMove;
   if (last?.decision) return { kind: "move", decision: last.decision };
@@ -2153,13 +2178,22 @@ function panelFromMove(game) {
 }
 
 function latestTeachingPair(game) {
-  const serializedPair = normalizeTeachingPair(game?.teachingPair);
+  return activeTeachingPair(game);
+}
+
+function activeTeachingPair(game, anchorMove = null) {
+  const serializedPair = !anchorMove
+    ? normalizeTeachingPair(game?.teachingTurn ?? game?.teachingPair)
+    : null;
   if (serializedPair) return serializedPair;
 
   const history = game?.history ?? [];
   if (!history.length) return null;
 
-  return teachingPairForMove(game, history.at(-1));
+  const anchor = anchorMove
+    ?? latestActorMove(history, "player")
+    ?? history.at(-1);
+  return teachingPairForMove(game, anchor);
 }
 
 function teachingPairForMove(game, anchorMove) {

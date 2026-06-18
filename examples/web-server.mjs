@@ -522,6 +522,7 @@ function serializeState(session, engine, config = {}) {
   const lastPlayerPosition = positionBeforeEntry(lastPlayerMove);
   const lastEnginePosition = positionBeforeEntry(lastEngineMove);
   const history = session.game.moves.map(summarizeHistoryMove);
+  const teachingTurn = summarizeTeachingPair(history, session, status);
 
   return {
     sessionId: session.id,
@@ -539,7 +540,8 @@ function serializeState(session, engine, config = {}) {
     lastMove: lastMove ? summarizeHistoryMove(lastMove) : null,
     lastPlayerReview: lastPlayerMove?.review ? summarizeReview(lastPlayerMove.review, lastPlayerPosition) : null,
     lastEngineDecision: lastEngineMove?.decision ? summarizeDecision(lastEngineMove.decision, lastEnginePosition) : null,
-    teachingPair: summarizeTeachingPair(history, session, status),
+    teachingPair: teachingTurn,
+    teachingTurn,
     backend: describeEngineBackend(engine),
     web: {
       commandTimeoutMs: config.commandTimeoutMs ?? null,

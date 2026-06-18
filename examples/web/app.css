@@ -717,6 +717,13 @@ h2 {
   align-items: stretch;
 }
 
+.teaching-turn-title {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 780;
+  line-height: 1.15;
+}
+
 .teaching-pair-reasoning {
   grid-template-columns: repeat(auto-fit, minmax(min(168px, 100%), 1fr));
 }
