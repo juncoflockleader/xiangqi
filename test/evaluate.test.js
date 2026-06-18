@@ -240,6 +240,18 @@ test("evaluation discourages opening cannon raids into an enemy rook file", () =
   assert.ok(delta.delta.openingDiscipline <= -300);
 });
 
+test("evaluation caps opening cannon discipline after a major material win", () => {
+  const position = parseFen("rc1akaeh1/7r1/2h1e4/p1p1p1p1p/9/8P/P1P1P1PcR/E5CC1/4K4/RH1A1AEH1 r");
+  const rookCapture = makeMove(position, parseMoveNotation("h7-h1"));
+  const delta = evaluateMoveDelta(position, rookCapture, SIDES.RED);
+  const afterEval = evaluatePosition(rookCapture, SIDES.RED, { detailed: true });
+
+  assert.ok(delta.delta.material >= 900);
+  assert.ok(delta.delta.openingDiscipline > -750);
+  assert.ok(delta.deltaScore > 250);
+  assert.ok(afterEval.score > 0);
+});
+
 test("evaluation discourages repeated wing-cannon lifts after the wing horse develops", () => {
   const position = parseFen("r1eakae1r/9/1ch3hc1/p1p1p1p1p/9/9/P1P1P1P1P/2HCC4/9/R1EAKAEHR b");
   const shortLift = makeMove(position, parseMoveNotation("b2-b3"));

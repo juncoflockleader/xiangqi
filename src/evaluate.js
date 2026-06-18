@@ -82,6 +82,8 @@ const OPENING_ADVISOR_BEFORE_DEVELOPMENT_PENALTY = 70;
 const OPENING_EDGE_PAWN_DRIFT_PENALTY = 70;
 const OPENING_WING_CANNON_STEP_PENALTY = 70;
 const OPENING_CANNON_WING_CROWDING_PENALTY = 50;
+const OPENING_MAJOR_MATERIAL_LEAD_THRESHOLD = PIECE_VALUES[PIECES.ROOK] - PIECE_VALUES[PIECES.PAWN];
+const OPENING_CANNON_MAJOR_WIN_PENALTY_CAP = PIECE_VALUES[PIECES.CANNON];
 
 export function evaluatePosition(position, perspective = position.turn, options = {}) {
   const openingPhase = openingPhaseValue(position);
@@ -915,6 +917,7 @@ function openingDisciplineValue(position, piece, square, openingPhase) {
   }
 
   if (penalty <= 0) return 0;
+  penalty = capOpeningCannonPenaltyForMaterialLead(position, piece.side, progress, penalty);
 
   return -Math.round(penalty * openingPhase);
 }
@@ -981,6 +984,13 @@ function openingCannonWingCrowdingPenalty(position, piece, square, homeCannonRan
     });
 
   return sameWingCannon ? OPENING_CANNON_WING_CROWDING_PENALTY : 0;
+}
+
+function capOpeningCannonPenaltyForMaterialLead(position, side, progress, penalty) {
+  if (progress < 5) return penalty;
+  if (materialLead(position, side) < OPENING_MAJOR_MATERIAL_LEAD_THRESHOLD) return penalty;
+
+  return Math.min(penalty, OPENING_CANNON_MAJOR_WIN_PENALTY_CAP);
 }
 
 function openingCannonFarCampPenalty(piece, rank, progress) {
@@ -1055,6 +1065,21 @@ function bothWingHorsesDeveloped(position, side) {
 
 function hasHomeWingHorse(position, side) {
   return sameWingHorseIsHome(position, side, 1) || sameWingHorseIsHome(position, side, 7);
+}
+
+function materialLead(position, side) {
+  let own = 0;
+  let enemy = 0;
+  const enemySide = opponent(side);
+
+  for (const piece of position.board) {
+    if (!piece) continue;
+    const value = PIECE_VALUES[piece.type] ?? 0;
+    if (piece.side === side) own += value;
+    else if (piece.side === enemySide) enemy += value;
+  }
+
+  return own - enemy;
 }
 
 function enemyBackRank(side) {

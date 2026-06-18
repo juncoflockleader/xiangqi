@@ -93,6 +93,10 @@ const ROOT_DEEP_REDUCTION_MOVE_INDEX = 12;
 const ROOT_HISTORY_REDUCTION_BOOST_MIN_DEPTH = 7;
 const ROOT_HISTORY_REDUCTION_BOOST_MOVE_INDEX = 8;
 const ROOT_BAD_CAPTURE_REDUCTION_LOSS_MARGIN = 120;
+const ROOT_TACTICAL_VERIFICATION_MIN_DEPTH = 5;
+const ROOT_TACTICAL_VERIFICATION_SCORE_MARGIN = 220;
+const ROOT_TACTICAL_VERIFICATION_MAX_MOVES = 12;
+const ROOT_TACTICAL_VERIFICATION_CAPTURE_VALUE = PIECE_VALUES[PIECES.CANNON];
 const DEFAULT_ROOT_TIME_GUARD_MIN_MS = 8;
 const DEFAULT_ROOT_TIME_GUARD_MAX_MS = 250;
 const DEFAULT_ROOT_TIME_GUARD_DIVISOR = 3;
@@ -224,6 +228,11 @@ export function searchBestMove(position, options = {}) {
       usePvs: options.usePvs !== false,
       useRootPvs: options.useRootPvs !== false,
       useRootReductions: options.useRootReductions !== false,
+      useRootTacticalVerification: options.useRootTacticalVerification !== false,
+      rootTacticalVerificationMinDepth: options.rootTacticalVerificationMinDepth ?? ROOT_TACTICAL_VERIFICATION_MIN_DEPTH,
+      rootTacticalVerificationScoreMargin: options.rootTacticalVerificationScoreMargin ?? ROOT_TACTICAL_VERIFICATION_SCORE_MARGIN,
+      rootTacticalVerificationMaxMoves: options.rootTacticalVerificationMaxMoves ?? ROOT_TACTICAL_VERIFICATION_MAX_MOVES,
+      rootTacticalVerificationCaptureValue: options.rootTacticalVerificationCaptureValue ?? ROOT_TACTICAL_VERIFICATION_CAPTURE_VALUE,
       useKillerMoves: options.useKillerMoves !== false,
       useCountermoves: options.useCountermoves !== false,
       useContinuationHistory: options.useContinuationHistory !== false,
@@ -289,7 +298,8 @@ export function searchBestMove(position, options = {}) {
       timedOut: false
     };
 
-    const root = searchDepthRoot(position, depth, previousBest, previousScore, context, rootMoves);
+    let root = searchDepthRoot(position, depth, previousBest, previousScore, context, rootMoves);
+    root = verifyRootTacticalCandidates(position, depth, root, context, rootMoves);
 
     if (context.timedOut) {
       nodes += context.nodes;
@@ -536,6 +546,166 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
     candidates: candidates.slice(0, context.candidateLimit),
     rootMoveScores: createRootMoveScoreMap(candidates)
   };
+}
+
+function verifyRootTacticalCandidates(position, depth, root, context, rootMoves) {
+  if (!shouldVerifyRootTacticalCandidates(depth, root, context, rootMoves)) return root;
+
+  const moves = rootTacticalVerificationMoves(root, rootMoves, context);
+  if (moves.length <= 1) return root;
+
+  context.stats.rootTacticalVerifications += 1;
+  context.stats.rootTacticalVerificationMoves += moves.length;
+
+  const candidateByKey = new Map((root.candidates ?? []).map((candidate) => [
+    moveKey(candidate.move),
+    candidate
+  ]));
+  const verifiedKeys = new Set();
+  const originalTable = context.table;
+  const originalQuiescenceTable = context.quiescenceTable;
+
+  context.table = createTranspositionTable({
+    maxEntries: context.rootTacticalVerificationTableEntries
+  });
+  context.quiescenceTable = createTranspositionTable({
+    maxEntries: context.rootTacticalVerificationQuiescenceEntries
+  });
+
+  try {
+    for (const move of moves) {
+      if (isTimedOut(context)) {
+        context.timedOut = true;
+        break;
+      }
+
+      const childState = rootChildState(position, move, context);
+      const next = childState?.next ?? makeMove(position, move);
+      const line = [];
+      const score = normalizeScore(-negamax(
+        next,
+        Math.max(0, depth - 1),
+        -INFINITY_SCORE,
+        INFINITY_SCORE,
+        1,
+        context,
+        line,
+        context.maxExtensions,
+        true,
+        move
+      ));
+      if (context.timedOut) break;
+
+      const annotated = annotateMove(position, move);
+      const key = moveKey(annotated);
+      const previous = candidateByKey.get(key);
+      const tieBreak = rootTieBreakScore(position, annotated, next, context, score);
+      const verified = {
+        move: annotated,
+        score,
+        tieBreak,
+        repetition: previous?.repetition ?? rootRepetitionInfo(context, childState?.positionKey ?? positionKey(next)),
+        principalVariation: [annotated, ...line],
+        verified: "root-tactical"
+      };
+
+      candidateByKey.set(key, verified);
+      verifiedKeys.add(key);
+    }
+  } finally {
+    context.table = originalTable;
+    context.quiescenceTable = originalQuiescenceTable;
+  }
+
+  if (verifiedKeys.size === 0) return root;
+
+  const candidates = [...candidateByKey.values()]
+    .sort((a, b) => (b.score - a.score) || (b.tieBreak - a.tieBreak));
+  const best = candidates[0];
+  const oldBestKey = root.bestMove ? moveKey(root.bestMove) : null;
+  const newBestKey = best?.move ? moveKey(best.move) : null;
+
+  if (oldBestKey && newBestKey && oldBestKey !== newBestKey && verifiedKeys.has(newBestKey)) {
+    context.stats.rootTacticalVerificationUpdates += 1;
+  }
+
+  return {
+    ...root,
+    bestMove: best?.move ?? root.bestMove,
+    score: best?.score ?? root.score,
+    principalVariation: best?.principalVariation ?? root.principalVariation,
+    candidates: candidates.slice(0, context.candidateLimit),
+    rootMoveScores: mergeVerifiedRootMoveScores(root.rootMoveScores, candidates)
+  };
+}
+
+function shouldVerifyRootTacticalCandidates(depth, root, context, rootMoves) {
+  if (!context.useRootTacticalVerification) return false;
+  if (context.exactRootScores) return false;
+  if (context.timedOut) return false;
+  if (depth < context.rootTacticalVerificationMinDepth) return false;
+  if (!root?.bestMove || !root.rootMoveScores) return false;
+  if (isMateSearchBound(root.score)) return false;
+  if (!hasMajorRootTacticalCandidate(rootMoves, context)) return false;
+  return true;
+}
+
+function rootTacticalVerificationMoves(root, rootMoves, context) {
+  const selected = new Map();
+  const margin = context.rootTacticalVerificationScoreMargin;
+  const floor = root.score - margin;
+  const maxMoves = Math.max(1, Math.floor(context.rootTacticalVerificationMaxMoves));
+  const scoredMoves = rootMoves
+    .map((move) => ({
+      move,
+      entry: root.rootMoveScores.get(moveKey(move))
+    }))
+    .filter((candidate) => candidate.entry);
+
+  const addMove = (move) => selected.set(moveKey(move), move);
+  if (root.bestMove) addMove(root.bestMove);
+
+  for (const { move } of scoredMoves.filter(({ move }) => isMajorRootTacticalMove(move, context))) {
+    addMove(move);
+  }
+
+  for (const { move } of scoredMoves
+    .filter(({ entry }) => entry.score >= floor)
+    .sort(compareRootVerificationEntries)) {
+    addMove(move);
+    if (selected.size >= maxMoves) break;
+  }
+
+  return [...selected.values()].slice(0, maxMoves);
+}
+
+function compareRootVerificationEntries(left, right) {
+  return (right.entry.score - left.entry.score) || (left.entry.rank - right.entry.rank);
+}
+
+function isMajorRootTacticalMove(move, context) {
+  if (move.captured && (PIECE_VALUES[move.captured.type] ?? 0) >= context.rootTacticalVerificationCaptureValue) {
+    return true;
+  }
+  return false;
+}
+
+function hasMajorRootTacticalCandidate(rootMoves, context) {
+  for (const move of rootMoves) {
+    if (isMajorRootTacticalMove(move, context)) return true;
+  }
+  return false;
+}
+
+function mergeVerifiedRootMoveScores(rootMoveScores, candidates) {
+  const merged = new Map(rootMoveScores ?? []);
+  for (const [rank, candidate] of candidates.entries()) {
+    merged.set(moveKey(candidate.move), {
+      score: candidate.score,
+      rank
+    });
+  }
+  return merged;
 }
 
 function shouldUseRootPvs(index, depth, alpha, beta, context) {
@@ -2700,6 +2870,9 @@ function createSearchStats() {
     rootTimeGuardStops: 0,
     rootPvsSearches: 0,
     rootPvsResearches: 0,
+    rootTacticalVerifications: 0,
+    rootTacticalVerificationMoves: 0,
+    rootTacticalVerificationUpdates: 0,
     iidSearches: 0,
     iidMoveHits: 0,
     rootMovesSearched: 0,
@@ -2810,6 +2983,9 @@ function mergeSearchStats(total, next) {
     rootTimeGuardStops: total.rootTimeGuardStops + next.rootTimeGuardStops,
     rootPvsSearches: total.rootPvsSearches + next.rootPvsSearches,
     rootPvsResearches: total.rootPvsResearches + next.rootPvsResearches,
+    rootTacticalVerifications: total.rootTacticalVerifications + next.rootTacticalVerifications,
+    rootTacticalVerificationMoves: total.rootTacticalVerificationMoves + next.rootTacticalVerificationMoves,
+    rootTacticalVerificationUpdates: total.rootTacticalVerificationUpdates + next.rootTacticalVerificationUpdates,
     iidSearches: total.iidSearches + next.iidSearches,
     iidMoveHits: total.iidMoveHits + next.iidMoveHits,
     rootMovesSearched: total.rootMovesSearched + next.rootMovesSearched,

@@ -585,13 +585,15 @@ test("search uses internal iterative deepening when hash move ordering is unavai
     depth: 5,
     timeLimitMs: 5000,
     maxTranspositionEntries: 1,
-    useSoftTimeManagement: false
+    useSoftTimeManagement: false,
+    useRootTacticalVerification: false
   });
   const disabled = searchBestMove(position, {
     depth: 5,
     timeLimitMs: 5000,
     maxTranspositionEntries: 1,
     useSoftTimeManagement: false,
+    useRootTacticalVerification: false,
     useInternalIterativeDeepening: false
   });
 
@@ -601,6 +603,20 @@ test("search uses internal iterative deepening when hash move ordering is unavai
   assert.ok(result.stats.iidMoveHits > 0);
   assert.equal(disabled.stats.iidSearches, 0);
   assert.equal(disabled.stats.iidMoveHits, 0);
+});
+
+test("search verifies near-tied root tactics before missing a major capture", () => {
+  const position = parseFen("rc1akaeh1/7r1/2h1e4/p1p1p1p1p/9/8P/P1P1P1PcR/E5CC1/4K4/RH1A1AEH1 r");
+  const result = searchBestMove(position, {
+    depth: 5,
+    timeLimitMs: 5000,
+    useBook: false
+  });
+
+  assert.equal(result.bestMove.notation, "h7-h1");
+  assert.ok(result.stats.rootTacticalVerifications > 0);
+  assert.ok(result.stats.rootTacticalVerificationMoves > 0);
+  assert.ok(result.stats.rootTacticalVerificationUpdates > 0);
 });
 
 test("search orders transposition-table hash moves before generic replies", () => {
