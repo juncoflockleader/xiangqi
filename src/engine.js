@@ -413,6 +413,7 @@ function maybeBookResult(position, options, tableSize) {
       rootReductionResearches: 0,
       rootHistoryReductionGuards: 0,
       rootHistoryReductionBoosts: 0,
+      rootTimeGuardStops: 0,
       iidSearches: 0,
       iidMoveHits: 0,
       rootMovesSearched: 0,

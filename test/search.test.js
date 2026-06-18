@@ -416,6 +416,41 @@ test("search can soft-stop after a stable completed depth", () => {
   assert.ok(explained.explanation.confidence.factors.some((factor) => factor.text.includes("Soft time management")));
 });
 
+test("search can stop before a likely over-budget root depth", () => {
+  const position = parseFen("4k4/9/4r4/9/9/9/9/9/9/3KR4 r");
+  const commonOptions = {
+    depth: 5,
+    timeLimitMs: 1000,
+    useAspiration: false,
+    useSoftTimeManagement: false,
+    rootTimeGuardMinMs: 2000,
+    rootTimeGuardMaxMs: 2000
+  };
+  const result = searchBestMove(position, commonOptions);
+  const disabled = searchBestMove(position, {
+    ...commonOptions,
+    useRootTimeGuard: false
+  });
+
+  assert.equal(result.depth, 1);
+  assert.equal(result.stopReason, "root-time-guard");
+  assert.equal(result.timedOut, false);
+  assert.equal(result.stats.rootTimeGuardStops, 1);
+  assert.ok(result.bestMove);
+  assert.equal(disabled.depth, 5);
+  assert.equal(disabled.stopReason, null);
+  assert.equal(disabled.stats.rootTimeGuardStops, 0);
+
+  const engine = createEngine({ depth: 5, timeLimitMs: 1000 });
+  const explained = engine.chooseMove(position, {
+    ...commonOptions,
+    useBook: false
+  });
+
+  assert.equal(explained.explanation.search.stopReason, "root-time-guard");
+  assert.ok(explained.explanation.confidence.factors.some((factor) => factor.text.includes("Root time guard")));
+});
+
 test("search reuses previous root scores for iterative move ordering", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const result = searchBestMove(position, {

@@ -91,6 +91,9 @@ const ROOT_DEEP_REDUCTION_MOVE_INDEX = 12;
 const ROOT_HISTORY_REDUCTION_BOOST_MIN_DEPTH = 7;
 const ROOT_HISTORY_REDUCTION_BOOST_MOVE_INDEX = 8;
 const ROOT_BAD_CAPTURE_REDUCTION_LOSS_MARGIN = 120;
+const DEFAULT_ROOT_TIME_GUARD_MIN_MS = 8;
+const DEFAULT_ROOT_TIME_GUARD_MAX_MS = 250;
+const DEFAULT_ROOT_TIME_GUARD_DIVISOR = 3;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -161,8 +164,20 @@ export function searchBestMove(position, options = {}) {
   let previousRootScores = new Map();
   let stopReason = null;
   const iterations = [];
+  let lastDepthElapsedMs = 0;
 
   for (let depth = 1; depth <= depthLimit; depth += 1) {
+    if (shouldStopBeforeRootDepth(depth, {
+      deadline,
+      lastDepthElapsedMs,
+      options
+    })) {
+      stats.rootTimeGuardStops += 1;
+      stopReason = "root-time-guard";
+      break;
+    }
+
+    const depthStartedAt = performanceNow();
     const context = {
       startedAt,
       deadline,
@@ -281,6 +296,7 @@ export function searchBestMove(position, options = {}) {
       break;
     }
 
+    lastDepthElapsedMs = performanceNow() - depthStartedAt;
     bestMove = root.bestMove;
     bestScore = root.score;
     bestLine = root.principalVariation;
@@ -638,6 +654,25 @@ function trailingStableDepths(iterations) {
 function rootCandidateGap(candidates) {
   if ((candidates?.length ?? 0) < 2) return null;
   return candidates[0].score - candidates[1].score;
+}
+
+function shouldStopBeforeRootDepth(depth, { deadline, lastDepthElapsedMs, options }) {
+  if (options.useRootTimeGuard === false) return false;
+  if (depth <= 1) return false;
+
+  const remainingMs = deadline - performanceNow();
+  if (remainingMs <= 0) return true;
+
+  const guardMs = rootTimeGuardMs(lastDepthElapsedMs, options);
+  return remainingMs <= guardMs;
+}
+
+function rootTimeGuardMs(lastDepthElapsedMs, options) {
+  const divisor = Math.max(1, numberOption(options.rootTimeGuardDivisor, DEFAULT_ROOT_TIME_GUARD_DIVISOR));
+  const minMs = Math.max(0, numberOption(options.rootTimeGuardMinMs, DEFAULT_ROOT_TIME_GUARD_MIN_MS));
+  const maxMs = Math.max(minMs, numberOption(options.rootTimeGuardMaxMs, DEFAULT_ROOT_TIME_GUARD_MAX_MS));
+  const scaled = lastDepthElapsedMs > 0 ? lastDepthElapsedMs / divisor : 0;
+  return Math.min(maxMs, Math.max(minMs, scaled));
 }
 
 function createIterationRecord(position, depth, root, context, previousBest) {
@@ -2631,6 +2666,7 @@ function createSearchStats() {
     rootReductionResearches: 0,
     rootHistoryReductionGuards: 0,
     rootHistoryReductionBoosts: 0,
+    rootTimeGuardStops: 0,
     rootPvsSearches: 0,
     rootPvsResearches: 0,
     iidSearches: 0,
@@ -2740,6 +2776,7 @@ function mergeSearchStats(total, next) {
     rootReductionResearches: total.rootReductionResearches + next.rootReductionResearches,
     rootHistoryReductionGuards: total.rootHistoryReductionGuards + next.rootHistoryReductionGuards,
     rootHistoryReductionBoosts: total.rootHistoryReductionBoosts + next.rootHistoryReductionBoosts,
+    rootTimeGuardStops: total.rootTimeGuardStops + next.rootTimeGuardStops,
     rootPvsSearches: total.rootPvsSearches + next.rootPvsSearches,
     rootPvsResearches: total.rootPvsResearches + next.rootPvsResearches,
     iidSearches: total.iidSearches + next.iidSearches,

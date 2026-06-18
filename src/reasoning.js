@@ -338,6 +338,13 @@ export function assessSearchConfidence(result, context = {}) {
       impact: 3,
       text: `Soft time management stopped after a completed depth (${result.stopReason}).`
     });
+  } else if (result.stopReason === "root-time-guard") {
+    score += 3;
+    factors.push({
+      kind: "time",
+      impact: 3,
+      text: "Root time guard stopped before starting a likely over-budget depth."
+    });
   } else if (result.timedOut) {
     score -= 20;
     factors.push({
@@ -473,6 +480,9 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.rootReductionResearches ?? 0) > 0) {
     orderingParts.push(formatCount(stats.rootReductionResearches, "root reduction re-search"));
   }
+  if ((stats.rootTimeGuardStops ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.rootTimeGuardStops, "root time-guard stop"));
+  }
   if ((stats.rootTtHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.rootTtHits, "root transposition-table ordering hint"));
   }
@@ -565,6 +575,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   if ((stats.rootChildStateReuses ?? 0) > 0) supports.push("root child-state reuse");
   if ((stats.rootReductions ?? 0) > 0) supports.push("root late-move reductions");
   if ((stats.rootBadCaptureReductions ?? 0) > 0) supports.push("root bad-capture reductions");
+  if ((stats.rootTimeGuardStops ?? 0) > 0) supports.push("root time guard");
   if ((stats.rootTtHits ?? 0) > 0) supports.push("root transposition-table ordering");
   if ((stats.historyGravityUpdates ?? 0) > 0) supports.push("history-gravity learning");
   if ((stats.captureHistoryHits ?? 0) > 0) supports.push("capture-history ordering");
