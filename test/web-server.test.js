@@ -109,8 +109,9 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /engineThinking/);
     assert.match(script, /function normalizeTeachingPair/);
     assert.match(script, /function renderTeachingMoveCard/);
+    assert.match(script, /compact: true/);
     assert.match(script, /function renderTeachingPairReasoning/);
-    assert.match(script, /TEACHING_REVIEW_HOLD_MS = 2400/);
+    assert.match(script, /TEACHING_REVIEW_HOLD_MS = 3600/);
     assert.match(script, /function holdTeachingReviewBeforeEngineReply/);
     assert.match(script, /function shouldHoldTeachingReview/);
     assert.match(script, /function teachingPairForMove/);
@@ -170,6 +171,10 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(stylesheet, /\.tree-panel/);
     assert.match(stylesheet, /\.tree-restore-button/);
     assert.match(stylesheet, /\.teaching-pair-grid/);
+    assert.match(stylesheet, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+    assert.match(stylesheet, /\.teaching-pair-reasoning/);
+    assert.match(stylesheet, /\.teaching-card\.pending/);
+    assert.match(stylesheet, /\.teaching-card\.compact/);
     assert.match(stylesheet, /\.teaching-card/);
     assert.match(stylesheet, /\.board-wrap\.tree-preview/);
     assert.match(stylesheet, /\.move-label/);

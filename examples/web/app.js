@@ -6,7 +6,7 @@ const DEFAULT_CLIENT_REQUEST_TIMEOUT_MS = 15 * 60 * 1000;
 const CLIENT_REQUEST_TIMEOUT_BUFFER_MS = 5000;
 const CLIENT_STATE_REFRESH_TIMEOUT_MS = 15000;
 const PENDING_STATUS_INTERVAL_MS = 1000;
-const TEACHING_REVIEW_HOLD_MS = 2400;
+const TEACHING_REVIEW_HOLD_MS = 3600;
 const TREE_NODE_WIDTH = 188;
 const TREE_NODE_HEIGHT = 96;
 const TREE_LEVEL_GAP = 96;
@@ -1043,7 +1043,10 @@ function renderTeachingPairSummary(pair) {
       kind: "player",
       label: t("yourLastMove"),
       move: pair.playerMove,
-      body: [escapeHtml(pair.playerReview ? localizedReviewSummary(pair.playerReview) : t("moveWaitingReview"))]
+      compact: true,
+      body: pair.playerReview
+        ? teachingReviewSummaryParts(pair.playerReview)
+        : [escapeHtml(pair.playerReviewPending ? t("reviewPending") : t("moveWaitingReview"))]
     }));
   }
   if (pair.engineMove) {
@@ -1051,12 +1054,17 @@ function renderTeachingPairSummary(pair) {
       kind: "engine",
       label: t("engineLastMove"),
       move: pair.engineMove,
-      body: [escapeHtml(pair.engineDecision ? localizedDecisionSummary(pair.engineDecision) : t("noDecision"))]
+      compact: true,
+      body: pair.engineDecision
+        ? teachingDecisionSummaryParts(pair.engineDecision)
+        : [escapeHtml(t("noDecision"))]
     }));
   } else if (pair.engineThinking) {
     cards.push(renderTeachingMoveCard({
       kind: "engine",
       label: t("engineLastMove"),
+      pending: true,
+      compact: true,
       body: [escapeHtml(t("replyPending"))]
     }));
   }
@@ -1252,6 +1260,7 @@ function renderTeachingPairReasoning(pair) {
       kind: "player",
       label: t("yourLastMove"),
       move: pair.playerMove,
+      pending: pair.playerReviewPending,
       body: pair.playerReview ? teachingReviewParts(pair.playerReview) : [escapeHtml(t(pair.playerReviewPending ? "reviewPending" : "moveWaitingReview"))]
     }));
   }
@@ -1266,6 +1275,7 @@ function renderTeachingPairReasoning(pair) {
     cards.push(renderTeachingMoveCard({
       kind: "engine",
       label: t("engineLastMove"),
+      pending: true,
       body: [escapeHtml(t("replyPending"))]
     }));
   }
@@ -1276,19 +1286,33 @@ function renderTeachingPairReasoning(pair) {
     : t("noDecision");
 }
 
-function renderTeachingMoveCard({ kind, label, move = null, body = [] }) {
+function renderTeachingMoveCard({ kind, label, move = null, body = [], pending = false, compact = false }) {
   const meta = move ? `${sideName(move.side)} · ${actorName(move.actor)}` : t("thinkingShort");
   const content = body.filter(Boolean);
+  const moveHtml = move
+    ? compact
+      ? `<span class="move-notation">${escapeHtml(moveText(move.notation, move.zhNotation))}</span>`
+      : formatMoveHtml(move.notation, move.zhNotation)
+    : "";
   return [
-    `<section class="teaching-card ${escapeHtml(kind)}">`,
+    `<section class="teaching-card ${escapeHtml(kind)}${pending ? " pending" : ""}${compact ? " compact" : ""}">`,
     `<div class="teaching-card-head">`,
     `<strong>${escapeHtml(label)}</strong>`,
     `<span class="score">${escapeHtml(meta)}</span>`,
     `</div>`,
-    move ? `<div class="teaching-card-move">${formatMoveHtml(move.notation, move.zhNotation)}</div>` : "",
+    moveHtml ? `<div class="teaching-card-move">${moveHtml}</div>` : "",
     content.length ? `<div class="teaching-card-body">${content.map((part) => `<div>${part}</div>`).join("")}</div>` : "",
     `</section>`
   ].join("");
+}
+
+function teachingReviewSummaryParts(review) {
+  const parts = [
+    escapeHtml(localizedReviewSummary(review))
+  ];
+  const comparison = localizedPlanComparisonSummary(review.planComparison);
+  if (comparison) parts.push(escapeHtml(comparison));
+  return parts;
 }
 
 function teachingReviewParts(review) {
@@ -1304,6 +1328,15 @@ function teachingReviewParts(review) {
   if (reasons.length) {
     parts.push(`<ul class="teaching-reason-list">${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>`);
   }
+  return parts;
+}
+
+function teachingDecisionSummaryParts(decision) {
+  const parts = [
+    escapeHtml(localizedDecisionSummary(decision))
+  ];
+  const linePlanSummary = localizedLinePlanSummary(decision.linePlan);
+  if (linePlanSummary) parts.push(escapeHtml(linePlanSummary));
   return parts;
 }
 
