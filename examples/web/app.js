@@ -1182,7 +1182,10 @@ function renderReasoning() {
   }
 
   const panel = state.panel;
-  if (!panel) return;
+  if (!panel) {
+    renderReasoningPrompt();
+    return;
+  }
 
   if (panel.kind === "hint") {
     renderHint(panel.hint);
@@ -1217,6 +1220,10 @@ function renderReasoning() {
     return;
   }
 
+  renderReasoningPrompt();
+}
+
+function renderReasoningPrompt() {
   elements.reasoningPanel.className = "stack muted";
   elements.reasoningPanel.textContent = t("askPrompt");
 }

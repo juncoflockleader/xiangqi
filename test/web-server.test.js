@@ -124,6 +124,8 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function normalizeTeachingPair/);
     assert.match(script, /function renderTeachingMoveCard/);
     assert.match(script, /function teachingReviewScoreText/);
+    assert.match(script, /function renderReasoningPrompt/);
+    assert.match(script, /if \(!panel\) {\n    renderReasoningPrompt\(\);/);
     assert.match(script, /teachingTurn: "本回合复盘"/);
     assert.match(script, /compact: true/);
     assert.match(script, /function renderTeachingPairReasoning/);
