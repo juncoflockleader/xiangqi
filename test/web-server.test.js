@@ -111,7 +111,12 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function latestPlayerTeachingPairFromGame/);
     assert.match(script, /function updatePreservedTeachingPair/);
     assert.match(script, /function focusLatestPlayerTeachingTurn/);
-    assert.match(script, /focusLatestPlayerTeachingTurn\(result\.state\)/);
+    assert.match(script, /function focusLatestMainlineTeachingView/);
+    assert.match(script, /function panelFromLatestPlayerTeaching/);
+    assert.match(script, /focusLatestMainlineTeachingView\(result\.state\)/);
+    assert.match(script, /focusLatestPlayerTeachingTurn\(game\)/);
+    assert.match(script, /state\.panel = panelFromLatestPlayerTeaching\(game\)/);
+    assert.match(script, /state\.panel = panelFromLatestPlayerTeaching\(game\) \?\? panelFromTeachingFocus\(game\)/);
     assert.match(script, /function teachingPairForSelectedTreeNode/);
     assert.match(script, /function teachingPairForMainlineNode/);
     assert.match(script, /function activeTeachingPair/);
