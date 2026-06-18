@@ -93,8 +93,8 @@ test("UCCI go uses the opening book from startpos by default", () => {
   session.handleLine("position startpos");
   const output = session.handleLine("go depth 2 movetime 1000");
 
-  assert.ok(output.some((line) => line.includes("book Central Cannon")));
-  assert.ok(output.includes("bestmove h7e7"));
+  assert.ok(output.some((line) => line.includes("book Pikafish best: b7-e7")));
+  assert.ok(output.includes("bestmove b7e7"));
 });
 
 test("UCCI UseBook option disables book selection", () => {
@@ -343,9 +343,9 @@ test("UCCI hint returns progressive coach levels and reveal", () => {
   assert.ok(output.some((line) => line.includes("hint side red source opening-book")));
   assert.ok(output.some((line) => line.includes("hint level 1 concept Opening Idea")));
   assert.ok(output.some((line) => line.includes("hint level 4 reveal Best Move")));
-  assert.ok(output.some((line) => line.includes("hint candidate 1 h7e7")));
-  assert.ok(output.some((line) => line.includes("hint best h7e7 pv h7e7")));
-  assert.ok(output.includes("bestmove h7e7"));
+  assert.ok(output.some((line) => line.includes("hint candidate 1 b7e7")));
+  assert.ok(output.some((line) => line.includes("hint best b7e7 pv b7e7")));
+  assert.ok(output.includes("bestmove b7e7"));
 });
 
 test("UCCI hint can stop before revealing the best move", () => {

@@ -473,7 +473,7 @@ export function lookupOpeningBook(position, options = {}) {
   const legalEntries = entries
     .map((entry) => resolveBookEntry(position, entry, legalMoves))
     .filter((entry) => entry && !bannedMoveKeys.has(moveKey(entry.move)))
-    .sort((a, b) => b.weight - a.weight || a.move.notation.localeCompare(b.move.notation));
+    .sort(compareBookEntries);
 
   if (legalEntries.length === 0) return null;
 
@@ -651,9 +651,17 @@ function freezeOpeningPositions(positions) {
   return Object.freeze(Object.fromEntries(
     [...positions.entries()].map(([key, entries]) => [
       key,
-      Object.freeze([...entries.values()].sort((a, b) => b.weight - a.weight || a.move.localeCompare(b.move)))
+      Object.freeze([...entries.values()].sort(compareBookEntries))
     ])
   ));
+}
+
+function compareBookEntries(a, b) {
+  return b.weight - a.weight || bookEntryMove(a).localeCompare(bookEntryMove(b));
+}
+
+function bookEntryMove(entry) {
+  return entry.move?.notation ?? entry.notation ?? entry.move ?? "";
 }
 
 function addBookPositions(positions, book, options = {}) {

@@ -616,6 +616,10 @@ h2 {
   scrollbar-width: thin;
 }
 
+.command-panel .stack.teaching-stack {
+  max-height: 96px;
+}
+
 .command-panel .meta-list {
   max-height: 43px;
   overflow: auto;
@@ -704,6 +708,74 @@ h2 {
 
 .line strong {
   color: var(--ink);
+}
+
+.teaching-pair-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(156px, 1fr));
+  gap: 5px;
+  align-items: stretch;
+}
+
+.teaching-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--target);
+  border-radius: 7px;
+  background: rgba(248, 250, 247, 0.84);
+  padding: 5px 6px;
+}
+
+.teaching-card.engine {
+  border-left-color: var(--focus);
+}
+
+.teaching-card-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.teaching-card-head strong,
+.teaching-card-head .score {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teaching-card-move {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.25;
+}
+
+.teaching-card-body {
+  display: grid;
+  gap: 3px;
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 11.5px;
+  line-height: 1.25;
+}
+
+.teaching-pair-summary .teaching-card-body {
+  color: var(--muted);
+}
+
+.teaching-reason-list {
+  margin: 0;
+  padding-left: 15px;
+}
+
+.teaching-reason-list li {
+  margin: 2px 0;
 }
 
 .reason-list,
@@ -1030,6 +1102,10 @@ h2 {
     max-height: 42px;
   }
 
+  .command-panel .stack.teaching-stack {
+    max-height: 78px;
+  }
+
   .command-panel .meta-list {
     max-height: 34px;
   }
@@ -1103,6 +1179,10 @@ h2 {
   .tree-panel-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .teaching-pair-grid {
+    grid-template-columns: 1fr;
   }
 
   .move-tree-node {

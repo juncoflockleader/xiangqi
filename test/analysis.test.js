@@ -162,7 +162,8 @@ test("move explanations surface check-history ordering diagnostics", () => {
     depth: 3,
     timeLimitMs: 2000,
     useAspiration: false,
-    useSoftTimeManagement: false
+    useSoftTimeManagement: false,
+    useRootPvs: false
   });
   const selectivityFactor = result.explanation.confidence.factors
     .find((factor) => factor.kind === "selectivity");

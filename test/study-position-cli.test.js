@@ -20,7 +20,7 @@ test("study position CLI prints a readable default study", async () => {
   ]);
 
   assert.match(stdout, /Study backend: JavaScript Reference Engine \(javascript\)/);
-  assert.match(stdout, /Position study: Red to move, best h7-e7/);
+  assert.match(stdout, /Position study: Red to move, best b7-e7/);
   assert.match(stdout, /Hints:/);
   assert.match(stdout, /Candidates:/);
   assert.match(stdout, /Reasons:/);
@@ -49,14 +49,14 @@ test("study position CLI can print a Chinese localized report", async () => {
   ]);
 
   assert.match(stdout, /研習引擎：JavaScript Reference Engine \(javascript\)/);
-  assert.match(stdout, /局面研習：紅方走棋，最佳 炮二平五/);
+  assert.match(stdout, /局面研習：紅方走棋，最佳 炮八平五/);
   assert.match(stdout, /開局候選：/);
   assert.match(stdout, /候選著法：/);
   assert.match(stdout, /理由：/);
-  assert.match(stdout, /開局庫優先推薦 炮二平五/);
-  assert.match(stdout, /開局方向: 先考慮 炮二平五/);
+  assert.match(stdout, /開局庫優先推薦 炮八平五/);
+  assert.match(stdout, /開局方向: 先考慮 炮八平五/);
   assert.match(stdout, /主題：牽制、製造威脅/);
-  assert.match(stdout, /主線: 炮二平五/);
+  assert.match(stdout, /主線: 炮八平五/);
   assert.doesNotMatch(stdout, /^Reasons:/m);
   assert.doesNotMatch(stdout, /Opening Idea/);
   assert.match(stdout, /下一步：/);
@@ -160,7 +160,7 @@ test("study position CLI can attach oracle review evidence", async () => {
 
   assert.equal(report.backend.kind, "oracle-reviewed");
   assert.equal(report.options.oracleProtocol, "ucci");
-  assert.equal(report.study.decision.bestMove, "h7-e7");
+  assert.equal(report.study.decision.bestMove, "b7-e7");
   assert.equal(report.study.oracleReview.bestMove, "h9-g7");
   assert.equal(report.study.playedMoveReview.reviewBackend.name, "Study Oracle");
   assert.equal(report.study.playedMoveReview.oracleReview.bestMove, "h9-g7");

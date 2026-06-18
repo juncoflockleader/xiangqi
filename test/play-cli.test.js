@@ -232,7 +232,7 @@ test("play CLI can show an oracle review for the current engine pick", async () 
   assert.equal(result.code, 0, result.stderr);
   assert.match(result.stdout, /Engine backend: .*Oracle Review/);
   assert.match(result.stdout, /Oracle reviewer: ucci /);
-  assert.match(result.stdout, /Engine played h7-e7/);
+  assert.match(result.stdout, /Engine played b7-e7/);
   assert.match(result.stdout, /Oracle review: good, 59 cp loss; oracle preferred h9-g7\./);
 });
 

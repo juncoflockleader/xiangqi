@@ -104,7 +104,12 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /deferEngine: true/);
     assert.match(script, /kind: "teachingPair"/);
     assert.match(script, /function latestTeachingPair/);
+    assert.match(script, /playerReviewPending/);
+    assert.match(script, /engineThinking/);
+    assert.match(script, /function renderTeachingMoveCard/);
     assert.match(script, /function renderTeachingPairReasoning/);
+    assert.match(script, /reviewPending: "正在复盘你的上一手\.\.\."/);
+    assert.match(script, /replyPending: "引擎正在思考应手\.\.\."/);
     assert.match(script, /function fitTreeView/);
     assert.match(script, /function zoomTreeView/);
     assert.match(script, /function handleTreeWheel/);
@@ -156,6 +161,8 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(stylesheet, /\.tree-toolbar/);
     assert.match(stylesheet, /\.tree-panel/);
     assert.match(stylesheet, /\.tree-restore-button/);
+    assert.match(stylesheet, /\.teaching-pair-grid/);
+    assert.match(stylesheet, /\.teaching-card/);
     assert.match(stylesheet, /\.board-wrap\.tree-preview/);
     assert.match(stylesheet, /\.move-label/);
     assert.match(stylesheet, /width: var\(--board-play-width\)/);
@@ -306,12 +313,16 @@ test("web server defers engine replies and can continue from tree nodes", async 
     assert.equal(deferred.ok, true);
     assert.equal(deferred.state.history.length, 1);
     assert.equal(deferred.state.history[0].notation, "h7-e7");
+    assert.equal(deferred.state.history[0].review.move, "h7-e7");
+    assert.equal(deferred.state.lastPlayerReview.move, "h7-e7");
     assert.equal(deferred.state.turn, "black");
     assert.equal(deferred.state.playerTurn, false);
 
     const engineReply = await postJson(`${app.url}/api/engine-move`, { sessionId });
     assert.equal(engineReply.ok, true);
     assert.equal(engineReply.state.history.length, 2);
+    assert.equal(engineReply.state.lastPlayerReview.move, "h7-e7");
+    assert.equal(engineReply.state.lastEngineDecision.bestMove, engineReply.state.history[1].notation);
     assert.equal(engineReply.state.playerTurn, true);
 
     const alternative = engineReply.state.history[1].decision.alternatives[0];

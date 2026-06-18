@@ -179,6 +179,7 @@ export function searchBestMove(position, options = {}) {
       useNullMove: options.useNullMove !== false,
       useNullMoveVerification: options.useNullMoveVerification !== false,
       usePvs: options.usePvs !== false,
+      useRootPvs: options.useRootPvs !== false,
       useKillerMoves: options.useKillerMoves !== false,
       useCountermoves: options.useCountermoves !== false,
       useContinuationHistory: options.useContinuationHistory !== false,
@@ -341,7 +342,8 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
   const checkInfo = isInCheck(position, position.turn) ? checkEvasionInfo(position) : null;
   const moves = orderMoves(position, rootMoves, previousBest, context, 0, null, checkInfo);
 
-  for (const move of moves) {
+  for (let index = 0; index < moves.length; index += 1) {
+    const move = moves[index];
     if (isTimedOut(context)) {
       context.timedOut = true;
       break;
@@ -350,10 +352,22 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
     const next = makeMove(position, move);
     const repetition = rootRepetitionInfo(context, positionKey(next));
     const line = [];
-    const childAlpha = context.exactRootScores ? -INFINITY_SCORE : -beta;
-    const childBeta = context.exactRootScores ? INFINITY_SCORE : -alpha;
     context.stats.rootMovesSearched += 1;
-    const score = normalizeScore(-negamax(next, depth - 1, childAlpha, childBeta, 1, context, line, context.maxExtensions, true, move));
+    let score;
+
+    if (shouldUseRootPvs(index, depth, alpha, beta, context)) {
+      context.stats.rootPvsSearches += 1;
+      score = normalizeScore(-negamax(next, depth - 1, -alpha - 1, -alpha, 1, context, line, context.maxExtensions, true, move));
+      if (score >= alpha && score < beta && !context.timedOut) {
+        context.stats.rootPvsResearches += 1;
+        line.length = 0;
+        score = normalizeScore(-negamax(next, depth - 1, -beta, -alpha, 1, context, line, context.maxExtensions, true, move));
+      }
+    } else {
+      const childAlpha = context.exactRootScores ? -INFINITY_SCORE : -beta;
+      const childBeta = context.exactRootScores ? INFINITY_SCORE : -alpha;
+      score = normalizeScore(-negamax(next, depth - 1, childAlpha, childBeta, 1, context, line, context.maxExtensions, true, move));
+    }
     const annotated = annotateMove(position, move);
     const tieBreak = rootTieBreakScore(annotated);
 
@@ -388,6 +402,15 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
     candidates: candidates.slice(0, context.candidateLimit),
     rootMoveScores: createRootMoveScoreMap(candidates)
   };
+}
+
+function shouldUseRootPvs(index, depth, alpha, beta, context) {
+  if (!context.useRootPvs || !context.usePvs || context.exactRootScores) return false;
+  if (index === 0) return false;
+  if (depth < 3) return false;
+  if (beta - alpha <= 1) return false;
+  if (alpha <= -INFINITY_SCORE + 1) return false;
+  return true;
 }
 
 function rootTieBreakScore(move) {
@@ -2391,6 +2414,8 @@ function createSearchStats() {
     historyGravityUpdates: 0,
     rootScoreOrderHits: 0,
     rootRankOrderHits: 0,
+    rootPvsSearches: 0,
+    rootPvsResearches: 0,
     iidSearches: 0,
     iidMoveHits: 0,
     rootMovesSearched: 0,
@@ -2488,6 +2513,8 @@ function mergeSearchStats(total, next) {
     historyGravityUpdates: total.historyGravityUpdates + next.historyGravityUpdates,
     rootScoreOrderHits: total.rootScoreOrderHits + next.rootScoreOrderHits,
     rootRankOrderHits: total.rootRankOrderHits + next.rootRankOrderHits,
+    rootPvsSearches: total.rootPvsSearches + next.rootPvsSearches,
+    rootPvsResearches: total.rootPvsResearches + next.rootPvsResearches,
     iidSearches: total.iidSearches + next.iidSearches,
     iidMoveHits: total.iidMoveHits + next.iidMoveHits,
     rootMovesSearched: total.rootMovesSearched + next.rootMovesSearched,

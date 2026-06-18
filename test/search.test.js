@@ -357,6 +357,40 @@ test("search reuses previous root scores for iterative move ordering", () => {
   assert.ok(explained.explanation.confidence.factors.some((factor) => factor.text.includes("previous-root-rank ordering")));
 });
 
+test("search uses root principal variation scouts for ordered root moves", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const commonOptions = {
+    depth: 4,
+    timeLimitMs: 5000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  };
+  const result = searchBestMove(position, commonOptions);
+  const disabled = searchBestMove(position, {
+    ...commonOptions,
+    useRootPvs: false
+  });
+  const exactRoot = searchBestMove(position, {
+    ...commonOptions,
+    exactRootScores: true
+  });
+
+  assert.equal(result.depth, 4);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.equal(Math.round(result.score), Math.round(disabled.score));
+  assert.ok(result.stats.rootPvsSearches > 0);
+  assert.equal(disabled.stats.rootPvsSearches, 0);
+  assert.equal(exactRoot.stats.rootPvsSearches, 0);
+  assert.ok(result.nodes < disabled.nodes);
+
+  const engine = createEngine({ depth: 4, timeLimitMs: 5000 });
+  const explained = engine.chooseMove(position, {
+    ...commonOptions,
+    useBook: false
+  });
+  assert.ok(explained.explanation.confidence.factors.some((factor) => factor.text.includes("root PVS scout searches")));
+});
+
 test("search uses internal iterative deepening when hash move ordering is unavailable", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const result = searchBestMove(position, {
@@ -534,12 +568,14 @@ test("search extends immediate recaptures", () => {
   const result = searchBestMove(position, {
     depth: 3,
     timeLimitMs: 1000,
-    useAspiration: false
+    useAspiration: false,
+    useRootPvs: false
   });
   const disabled = searchBestMove(position, {
     depth: 3,
     timeLimitMs: 1000,
     useAspiration: false,
+    useRootPvs: false,
     useRecaptureExtensions: false
   });
 
@@ -743,7 +779,8 @@ test("search prunes clearly losing shallow captures with static exchange", () =>
     timeLimitMs: 5000,
     useAspiration: false,
     useSoftTimeManagement: false,
-    useImprovingHeuristics: false
+    useImprovingHeuristics: false,
+    useRootPvs: false
   });
   const withoutPruning = searchBestMove(position, {
     depth: 5,
@@ -751,6 +788,7 @@ test("search prunes clearly losing shallow captures with static exchange", () =>
     useAspiration: false,
     useSoftTimeManagement: false,
     useImprovingHeuristics: false,
+    useRootPvs: false,
     useSeePruning: false
   });
 

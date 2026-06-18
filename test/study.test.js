@@ -26,14 +26,14 @@ test("engine position study bundles decision, hints, candidates, and pressure", 
 
   assert.equal(study.type, "position-study");
   assert.equal(study.side, "red");
-  assert.equal(study.bestMove, "h7-e7");
-  assert.equal(study.decision.bestMove, "h7-e7");
+  assert.equal(study.bestMove, "b7-e7");
+  assert.equal(study.decision.bestMove, "b7-e7");
   assert.equal(study.decision.source, "opening-book");
   assert.equal(study.candidateLines.length, 2);
   assert.equal(study.hints.at(-1).kind, "reveal");
   assert.ok(Array.isArray(study.pressure.threats));
   assert.ok(study.nextSteps.length > 0);
-  assert.match(text, /Position study: Red to move, best h7-e7/);
+  assert.match(text, /Position study: Red to move, best b7-e7/);
 });
 
 test("position study exposes Chinese learning notation and formatted report", () => {
@@ -45,20 +45,20 @@ test("position study exposes Chinese learning notation and formatted report", ()
   });
   const text = formatPositionStudy(study, { locale: "zh" });
 
-  assert.equal(study.zhBestMove, "炮二平五");
-  assert.equal(study.decision.zhBestMove, "炮二平五");
-  assert.deepEqual(study.decision.zhPrincipalVariation, ["炮二平五"]);
-  assert.equal(study.decision.linePlan.zhFirstMove, "炮二平五");
-  assert.ok(study.decision.linePlan.zhSummary.includes("炮二平五"));
-  assert.ok(study.decision.zhReasons.some((reason) => reason.includes("開局庫優先推薦 炮二平五")));
+  assert.equal(study.zhBestMove, "炮八平五");
+  assert.equal(study.decision.zhBestMove, "炮八平五");
+  assert.deepEqual(study.decision.zhPrincipalVariation, ["炮八平五"]);
+  assert.equal(study.decision.linePlan.zhFirstMove, "炮八平五");
+  assert.ok(study.decision.linePlan.zhSummary.includes("炮八平五"));
+  assert.ok(study.decision.zhReasons.some((reason) => reason.includes("開局庫優先推薦 炮八平五")));
   assert.equal(typeof study.candidateLines[0].zhMove, "string");
-  assert.equal(study.coach.zhBestMove, "炮二平五");
-  assert.ok(study.coach.zhLevels[0].text.includes("炮二平五"));
-  assert.equal(study.openingCandidates[0].zhMove, "炮二平五");
+  assert.equal(study.coach.zhBestMove, "炮八平五");
+  assert.ok(study.coach.zhLevels[0].text.includes("炮八平五"));
+  assert.equal(study.openingCandidates[0].zhMove, "炮八平五");
   assert.equal(typeof study.pressure.threats[0].zhSummary, "string");
-  assert.ok(study.zhSummary.includes("炮二平五"));
-  assert.ok(study.zhNextSteps.some((step) => step.text.includes("炮二平五")));
-  assert.match(text, /局面研習：紅方走棋，最佳 炮二平五/);
+  assert.ok(study.zhSummary.includes("炮八平五"));
+  assert.ok(study.zhNextSteps.some((step) => step.text.includes("炮八平五")));
+  assert.match(text, /局面研習：紅方走棋，最佳 炮八平五/);
   assert.match(text, /理由：/);
   assert.match(text, /開局方向/);
   assert.match(text, /製造威脅/);
@@ -164,7 +164,7 @@ test("backend position study preserves oracle review evidence", async () => {
       playedMove: "h7-e7"
     });
 
-    assert.equal(study.decision.bestMove, "h7-e7");
+    assert.equal(study.decision.bestMove, "b7-e7");
     assert.equal(study.decision.oracleReview.bestMove, "h9-g7");
     assert.equal(study.oracleReview.bestMove, "h9-g7");
     assert.equal(study.playedMoveReview.reviewBackend.name, "Mock Oracle");
@@ -197,17 +197,17 @@ test("backend position study turns oracle disagreement into a learning step", as
     });
     const text = formatPositionStudy(study);
 
-    assert.equal(study.bestMove, "h7-e7");
+    assert.equal(study.bestMove, "b7-e7");
     assert.equal(study.oracleDisagreement.kind, "oracle-disagreement");
-    assert.equal(study.oracleDisagreement.move, "h7-e7");
+    assert.equal(study.oracleDisagreement.move, "b7-e7");
     assert.equal(study.oracleDisagreement.bestMove, "h9-g7");
     assert.equal(study.oracleDisagreement.classification, "good");
     assert.equal(study.oracleDisagreement.centipawnLoss, 59);
     assert.equal(study.oracleDisagreement.backend.name, "Mock Oracle");
     assert.equal(study.nextSteps[0].kind, "oracle-disagreement");
-    assert.match(study.nextSteps[0].text, /Mock Oracle prefers h9-g7 over h7-e7/);
+    assert.match(study.nextSteps[0].text, /Mock Oracle prefers h9-g7 over b7-e7/);
     assert.match(study.summary, /oracle prefers h9-g7 by 59 cp/);
-    assert.match(text, /Oracle correction: h7-e7 trails h9-g7 by 59 cp \(good\)/);
+    assert.match(text, /Oracle correction: b7-e7 trails h9-g7 by 59 cp \(good\)/);
   } finally {
     await backend.close();
   }

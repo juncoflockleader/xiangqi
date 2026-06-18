@@ -154,6 +154,7 @@ const simplifiedChineseMap = Object.freeze({
   "畫": "画",
   "牽": "牵",
   "約": "约",
+  "從": "从",
   "實": "实",
   "議": "议",
   "慮": "虑",
@@ -233,6 +234,7 @@ const traditionalChineseMap = Object.freeze({
   "胁": "脅",
   "牵": "牽",
   "约": "約",
+  "从": "從",
   "静": "靜",
   "势": "勢",
   "护": "護",
@@ -323,6 +325,9 @@ const zhTwTranslations = {
   noDecision: "尚無決策。",
   engineSelected: "引擎已選擇一手。",
   moveReviewed: "已覆盤此手。",
+  reviewPending: "正在覆盤你的上一手...",
+  replyPending: "引擎正在思考應手...",
+  moveWaitingReview: "已落子，等待評價。",
   yourLastMove: "你的上一手",
   engineLastMove: "引擎上一手",
   thinking: "引擎思考中...",
@@ -400,6 +405,9 @@ const zhCnTranslations = {
   noDecision: "尚无决策。",
   engineSelected: "引擎已选择一手。",
   moveReviewed: "已复盘此手。",
+  reviewPending: "正在复盘你的上一手...",
+  replyPending: "引擎正在思考应手...",
+  moveWaitingReview: "已落子，等待评价。",
   thinking: "引擎思考中...",
   thinkingShort: "思考中",
   requestTimedOut: "请求等待时间过长，请重试。",
@@ -484,6 +492,9 @@ const translations = {
     noDecision: "No decision yet.",
     engineSelected: "Engine selected a move.",
     moveReviewed: "Move reviewed.",
+    reviewPending: "Reviewing your last move...",
+    replyPending: "Engine is thinking about the reply...",
+    moveWaitingReview: "Move played; waiting for review.",
     thinking: "Engine thinking...",
     thinkingShort: "Thinking",
     requestTimedOut: "The request waited too long. Please try again.",
@@ -639,16 +650,47 @@ function renderOptimisticPlayerMove(notation) {
   const to = board.find((cell) => cell.coord === move.toCoord);
   if (!from || !to || !from.piece) return;
 
+  const boardBefore = game.board.map((cell) => ({
+    ...cell,
+    piece: cell.piece ? { ...cell.piece } : null
+  }));
   to.piece = { ...from.piece };
   from.piece = null;
+  const ply = (game.history?.length ?? game.moveCount ?? 0) + 1;
+  const optimisticMove = {
+    ply,
+    moveNumber: Math.floor((ply + 1) / 2),
+    side: move.piece?.side ?? game.playerSide,
+    actor: "player",
+    notation: move.notation,
+    zhNotation: move.zhNotation,
+    boardBefore,
+    boardAfter: board
+  };
   state.game = {
     ...game,
     board,
     turn: oppositeSide(game.turn),
+    history: [
+      ...(game.history ?? []),
+      optimisticMove
+    ],
+    lastMove: optimisticMove,
+    moveCount: ply,
     legalMoves: [],
     playerTurn: false
   };
   state.selected = null;
+  state.treeSelectedId = mainlineNodeId(ply);
+  state.panel = {
+    kind: "teachingPair",
+    playerMove: optimisticMove,
+    playerReview: null,
+    playerReviewPending: true,
+    engineMove: null,
+    engineDecision: null,
+    engineThinking: true
+  };
   render();
 }
 
@@ -973,26 +1015,34 @@ function renderLastMove() {
 }
 
 function renderTeachingPairSummary(pair) {
-  const details = [];
-  if (pair.playerMove && pair.playerReview) {
-    details.push(renderTeachingSummaryLine(t("yourLastMove"), pair.playerMove, localizedReviewSummary(pair.playerReview)));
+  const cards = [];
+  if (pair.playerMove) {
+    cards.push(renderTeachingMoveCard({
+      kind: "player",
+      label: t("yourLastMove"),
+      move: pair.playerMove,
+      body: [escapeHtml(pair.playerReview ? localizedReviewSummary(pair.playerReview) : t("moveWaitingReview"))]
+    }));
   }
-  if (pair.engineMove && pair.engineDecision) {
-    details.push(renderTeachingSummaryLine(t("engineLastMove"), pair.engineMove, localizedDecisionSummary(pair.engineDecision)));
+  if (pair.engineMove) {
+    cards.push(renderTeachingMoveCard({
+      kind: "engine",
+      label: t("engineLastMove"),
+      move: pair.engineMove,
+      body: [escapeHtml(pair.engineDecision ? localizedDecisionSummary(pair.engineDecision) : t("noDecision"))]
+    }));
+  } else if (pair.engineThinking) {
+    cards.push(renderTeachingMoveCard({
+      kind: "engine",
+      label: t("engineLastMove"),
+      body: [escapeHtml(t("replyPending"))]
+    }));
   }
 
-  elements.lastMovePanel.className = "stack";
-  elements.lastMovePanel.innerHTML = details.join("");
-}
-
-function renderTeachingSummaryLine(label, move, summary) {
-  const side = sideName(move.side);
-  return [
-    `<div class="line">`,
-    `<strong>${escapeHtml(label)}</strong> ${formatMoveHtml(move.notation, move.zhNotation)} <span class="score">${escapeHtml(side)} · ${escapeHtml(actorName(move.actor))}</span>`,
-    summary ? `<br><span>${escapeHtml(summary)}</span>` : "",
-    `</div>`
-  ].join("");
+  elements.lastMovePanel.className = "stack teaching-stack";
+  elements.lastMovePanel.innerHTML = cards.length
+    ? `<div class="teaching-pair-grid teaching-pair-summary">${cards.join("")}</div>`
+    : t("noMoves");
 }
 
 function renderTreeAnalysisSummary(node) {
@@ -1174,22 +1224,81 @@ function renderAlternativeReasoning(node) {
 }
 
 function renderTeachingPairReasoning(pair) {
-  const parts = [];
-  if (pair.playerMove && pair.playerReview) {
-    parts.push(renderTeachingSectionHeading(t("yourLastMove"), pair.playerMove));
-    parts.push(...reviewDetailParts(pair.playerReview, { includeMove: false }));
+  const cards = [];
+  if (pair.playerMove) {
+    cards.push(renderTeachingMoveCard({
+      kind: "player",
+      label: t("yourLastMove"),
+      move: pair.playerMove,
+      body: pair.playerReview ? teachingReviewParts(pair.playerReview) : [escapeHtml(t(pair.playerReviewPending ? "reviewPending" : "moveWaitingReview"))]
+    }));
   }
-  if (pair.engineMove && pair.engineDecision) {
-    parts.push(renderTeachingSectionHeading(t("engineLastMove"), pair.engineMove));
-    parts.push(...decisionDetailParts(pair.engineDecision, { includeBestMove: false }));
+  if (pair.engineMove) {
+    cards.push(renderTeachingMoveCard({
+      kind: "engine",
+      label: t("engineLastMove"),
+      move: pair.engineMove,
+      body: pair.engineDecision ? teachingDecisionParts(pair.engineDecision) : [escapeHtml(t("noDecision"))]
+    }));
+  } else if (pair.engineThinking) {
+    cards.push(renderTeachingMoveCard({
+      kind: "engine",
+      label: t("engineLastMove"),
+      body: [escapeHtml(t("replyPending"))]
+    }));
   }
 
-  elements.reasoningPanel.className = "stack";
-  elements.reasoningPanel.innerHTML = parts.length ? parts.join("") : t("noDecision");
+  elements.reasoningPanel.className = "stack teaching-stack";
+  elements.reasoningPanel.innerHTML = cards.length
+    ? `<div class="teaching-pair-grid teaching-pair-reasoning">${cards.join("")}</div>`
+    : t("noDecision");
 }
 
-function renderTeachingSectionHeading(label, move) {
-  return `<div class="line"><strong>${escapeHtml(label)}</strong> ${formatMoveHtml(move.notation, move.zhNotation)} <span class="score">${escapeHtml(sideName(move.side))} · ${escapeHtml(actorName(move.actor))}</span></div>`;
+function renderTeachingMoveCard({ kind, label, move = null, body = [] }) {
+  const meta = move ? `${sideName(move.side)} · ${actorName(move.actor)}` : t("thinkingShort");
+  const content = body.filter(Boolean);
+  return [
+    `<section class="teaching-card ${escapeHtml(kind)}">`,
+    `<div class="teaching-card-head">`,
+    `<strong>${escapeHtml(label)}</strong>`,
+    `<span class="score">${escapeHtml(meta)}</span>`,
+    `</div>`,
+    move ? `<div class="teaching-card-move">${formatMoveHtml(move.notation, move.zhNotation)}</div>` : "",
+    content.length ? `<div class="teaching-card-body">${content.map((part) => `<div>${part}</div>`).join("")}</div>` : "",
+    `</section>`
+  ].join("");
+}
+
+function teachingReviewParts(review) {
+  const parts = [
+    escapeHtml(localizedReviewSummary(review))
+  ];
+  if (review.planComparison?.summary) parts.push(escapeHtml(localizedPlanComparisonSummary(review.planComparison)));
+  if (review.practiceFocus) {
+    const focus = localizedPracticeFocus(review.practiceFocus);
+    parts.push(`<strong>${escapeHtml(focus.title)}</strong> ${escapeHtml(focus.text)}`);
+  }
+  const reasons = localizedReviewReasons(review).slice(0, 2);
+  if (reasons.length) {
+    parts.push(`<ul class="teaching-reason-list">${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>`);
+  }
+  return parts;
+}
+
+function teachingDecisionParts(decision) {
+  const parts = [
+    escapeHtml(localizedDecisionSummary(decision))
+  ];
+  const linePlanSummary = localizedLinePlanSummary(decision.linePlan);
+  if (linePlanSummary) parts.push(escapeHtml(linePlanSummary));
+  if (decision.confidence?.label) {
+    parts.push(`${escapeHtml(t("confidence"))}: ${escapeHtml(confidenceLabel(decision.confidence))} (${Math.round(decision.confidence.score ?? 0)}/100)`);
+  }
+  const reasons = localizedReasons(decision).slice(0, 2);
+  if (reasons.length) {
+    parts.push(`<ul class="teaching-reason-list">${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>`);
+  }
+  return parts;
 }
 
 function renderDecision(decision) {
@@ -1984,19 +2093,31 @@ function latestTeachingPair(game) {
   const history = game?.history ?? [];
   if (!history.length) return null;
 
-  const playerMove = [...history].reverse().find((move) => move.actor === "player" && move.review) ?? null;
+  const playerMove = latestActorMove(history, "player");
   const latestEngineMove = [...history].reverse().find((move) => move.actor === "engine" && move.decision) ?? null;
   const engineMove = latestEngineMove && (!playerMove || latestEngineMove.ply > playerMove.ply)
     ? latestEngineMove
     : null;
+  const engineThinking = Boolean(
+    playerMove
+    && (!latestEngineMove || latestEngineMove.ply < playerMove.ply)
+    && game?.status?.state === "playing"
+    && game.turn === game.engineSide
+  );
 
-  if (!playerMove && !engineMove) return null;
+  if (!playerMove && !engineMove && !engineThinking) return null;
   return {
     playerMove,
     playerReview: playerMove?.review ?? null,
+    playerReviewPending: Boolean(playerMove && !playerMove.review),
     engineMove,
-    engineDecision: engineMove?.decision ?? null
+    engineDecision: engineMove?.decision ?? null,
+    engineThinking
   };
+}
+
+function latestActorMove(history, actor) {
+  return [...history].reverse().find((move) => move.actor === actor) ?? null;
 }
 
 function updateDisabled() {
@@ -2179,10 +2300,11 @@ function localizedDecisionSummary(decision) {
 function localizedReviewSummary(review) {
   if (!isChineseLocale()) return review.summary ?? t("moveReviewed");
   const move = moveText(review.move, review.zhMove);
-  if (review.isBestMove) return move ? `${move}${t("bestAgreement")}。` : t("moveReviewed");
+  if (review.isBestMove) return localizedChineseText(move ? `${move}${t("bestAgreement")}。` : t("moveReviewed"));
   const best = moveText(review.bestMove, review.zhBestMove);
   const loss = Number.isFinite(review.centipawnLoss) ? `，${t("loss")}約 ${review.centipawnLoss} cp` : "";
-  return move && best ? `${move}：${t("bestAlternative")} ${best}${loss}。` : t("moveReviewed");
+  const summary = move && best ? `${move}：${t("bestAlternative")} ${best}${loss}。` : t("moveReviewed");
+  return localizedChineseText(summary);
 }
 
 function moveText(notation, zhNotation) {
