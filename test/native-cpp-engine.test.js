@@ -878,7 +878,11 @@ test("local C++ engine follows fresh random oracle priors", async (t) => {
       ["1hea1ke2/r8/4c2cr/p1p1C1p1p/9/9/P1P1P1P1P/9/9/RHEAKAEHR r", "h9-g7"],
       ["2e1k1e2/8r/2c6/p1p5p/3rp1pR1/9/PCP1P1P1P/6H2/9/R1EcKAE2 r", "c9-e7"],
       ["2ea1a3/3ck4/6h1e/p3p1p1p/2p6/8P/P3r4/E7E/1R2A4/R3K4 b", "e6-d6"],
-      ["rheaka1hr/c8/4e4/p1p1p1p2/7cp/2E1P1P2/P1P1H3P/5C3/4K2C1/R1EA1A1HR b", "b0-c2"]
+      ["rheaka1hr/c8/4e4/p1p1p1p2/7cp/2E1P1P2/P1P1H3P/5C3/4K2C1/R1EA1A1HR b", "b0-c2"],
+      ["rh1a2e1r/4k4/4e2R1/p1p3p1p/9/P4p3/2P3P1P/2R6/1C1c5/2EAKAcH1 r", "f9-e8"],
+      ["1reakae1r/5c3/8h/p1p3p1p/4p4/8P/P1P1P1P2/7C1/9/RHEAKAE1R r", "i9-i8"],
+      ["rheaka1hr/9/3C3Ce/p1p3p1p/7R1/4p4/P1P1H1P1P/E8/R8/3AKAE2 b", "e5-e6"],
+      ["1heakaehr/7C1/r8/p1p1p1p1p/9/9/PCP1P1P1P/4E4/9/1R1AKAER1 b", "a2-b2"]
     ];
 
     for (const [fen, expected] of cases) {

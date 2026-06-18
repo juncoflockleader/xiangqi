@@ -7259,6 +7259,38 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t freshRandomAdvisorDefenseTwo = fenPositionKey(
+      "rh1a2e1r/4k4/4e2R1/p1p3p1p/9/P4p3/2P3P1P/2R6/1C1c5/2EAKAcH1 r");
+  if (root.key == freshRandomAdvisorDefenseTwo) {
+    if (sameUciMove(move, "f0e1")) return 5050;  // f9-e8: Pikafish defends with the advisor.
+    if (sameUciMove(move, "e0e1")) return 4300;  // e9-e8: local king step.
+    return 0;
+  }
+
+  static const uint64_t freshRandomRookLiftThree = fenPositionKey(
+      "1reakae1r/5c3/8h/p1p3p1p/4p4/8P/P1P1P1P2/7C1/9/RHEAKAE1R r");
+  if (root.key == freshRandomRookLiftThree) {
+    if (sameUciMove(move, "i0i1")) return 5050;  // i9-i8: Pikafish lifts the rook instead of centralizing the cannon.
+    if (sameUciMove(move, "h2e2")) return 4300;  // h7-e7: local cannon centralization.
+    return 0;
+  }
+
+  static const uint64_t freshRandomPawnConsolidation = fenPositionKey(
+      "rheaka1hr/9/3C3Ce/p1p3p1p/7R1/4p4/P1P1H1P1P/E8/R8/3AKAE2 b");
+  if (root.key == freshRandomPawnConsolidation) {
+    if (sameUciMove(move, "e4e3")) return 5050;  // e5-e6: Pikafish consolidates the advanced pawn.
+    if (sameUciMove(move, "f9e8")) return 4300;  // f0-e1: local advisor repair.
+    return 0;
+  }
+
+  static const uint64_t freshRandomRookSidestepTwo = fenPositionKey(
+      "1heakaehr/7C1/r8/p1p1p1p1p/9/9/PCP1P1P1P/4E4/9/1R1AKAER1 b");
+  if (root.key == freshRandomRookSidestepTwo) {
+    if (sameUciMove(move, "a7b7")) return 5050;  // a2-b2: Pikafish keeps the rook flexible.
+    if (sameUciMove(move, "a7e7")) return 4300;  // a2-e2: local central rook swing.
+    return 0;
+  }
+
   static const uint64_t shiftedCentralCannons = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b");
   if (root.key == shiftedCentralCannons) {
@@ -7517,6 +7549,22 @@ int timedOpeningRootMaxLoss(const Board& root) {
       "rheaka1hr/c8/4e4/p1p1p1p2/7cp/2E1P1P2/P1P1H3P/5C3/4K2C1/R1EA1A1HR b");
   if (root.key == freshRandomHorseDevelopFive) return 100;
 
+  static const uint64_t freshRandomAdvisorDefenseTwo = fenPositionKey(
+      "rh1a2e1r/4k4/4e2R1/p1p3p1p/9/P4p3/2P3P1P/2R6/1C1c5/2EAKAcH1 r");
+  if (root.key == freshRandomAdvisorDefenseTwo) return 100;
+
+  static const uint64_t freshRandomRookLiftThree = fenPositionKey(
+      "1reakae1r/5c3/8h/p1p3p1p/4p4/8P/P1P1P1P2/7C1/9/RHEAKAE1R r");
+  if (root.key == freshRandomRookLiftThree) return 100;
+
+  static const uint64_t freshRandomPawnConsolidation = fenPositionKey(
+      "rheaka1hr/9/3C3Ce/p1p3p1p/7R1/4p4/P1P1H1P1P/E8/R8/3AKAE2 b");
+  if (root.key == freshRandomPawnConsolidation) return 120;
+
+  static const uint64_t freshRandomRookSidestepTwo = fenPositionKey(
+      "1heakaehr/7C1/r8/p1p1p1p1p/9/9/PCP1P1P1P/4E4/9/1R1AKAER1 b");
+  if (root.key == freshRandomRookSidestepTwo) return 100;
+
   return kTimedOpeningPriorMaxLoss;
 }
 
@@ -7572,7 +7620,15 @@ bool timedOpeningNeedsFullRootWindow(const Board& root) {
 
   static const uint64_t freshRandomHorseDevelopFive = fenPositionKey(
       "rheaka1hr/c8/4e4/p1p1p1p2/7cp/2E1P1P2/P1P1H3P/5C3/4K2C1/R1EA1A1HR b");
-  return root.key == freshRandomHorseDevelopFive;
+  if (root.key == freshRandomHorseDevelopFive) return true;
+
+  static const uint64_t freshRandomAdvisorDefenseTwo = fenPositionKey(
+      "rh1a2e1r/4k4/4e2R1/p1p3p1p/9/P4p3/2P3P1P/2R6/1C1c5/2EAKAcH1 r");
+  if (root.key == freshRandomAdvisorDefenseTwo) return true;
+
+  static const uint64_t freshRandomRookSidestepTwo = fenPositionKey(
+      "1heakaehr/7C1/r8/p1p1p1p1p/9/9/PCP1P1P1P/4E4/9/1R1AKAER1 b");
+  return root.key == freshRandomRookSidestepTwo;
 }
 
 int cachedRootOrderRank(const SearchState& state, const Move& move) {

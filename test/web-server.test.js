@@ -107,6 +107,8 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function latestPlayerTeachingPair/);
     assert.match(script, /function focusLatestPlayerTeachingTurn/);
     assert.match(script, /focusLatestPlayerTeachingTurn\(result\.state\)/);
+    assert.match(script, /function teachingPairForSelectedTreeNode/);
+    assert.match(script, /function teachingPairForMainlineNode/);
     assert.match(script, /function activeTeachingPair/);
     assert.match(script, /teachingTurnFocusId/);
     assert.match(script, /function focusTeachingTurnForMove/);
@@ -130,7 +132,7 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /teachingTurn: "本回合复盘"/);
     assert.match(script, /compact: true/);
     assert.match(script, /function renderTeachingPairReasoning/);
-    assert.match(script, /TEACHING_REVIEW_HOLD_MS = 3600/);
+    assert.match(script, /TEACHING_REVIEW_HOLD_MS = 5000/);
     assert.match(script, /function holdTeachingReviewBeforeEngineReply/);
     assert.match(script, /function shouldHoldTeachingReview/);
     assert.match(script, /function teachingPairForMove/);

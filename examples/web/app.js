@@ -6,7 +6,7 @@ const DEFAULT_CLIENT_REQUEST_TIMEOUT_MS = 15 * 60 * 1000;
 const CLIENT_REQUEST_TIMEOUT_BUFFER_MS = 5000;
 const CLIENT_STATE_REFRESH_TIMEOUT_MS = 15000;
 const PENDING_STATUS_INTERVAL_MS = 1000;
-const TEACHING_REVIEW_HOLD_MS = 3600;
+const TEACHING_REVIEW_HOLD_MS = 5000;
 const TREE_NODE_WIDTH = 188;
 const TREE_NODE_HEIGHT = 96;
 const TREE_LEVEL_GAP = 96;
@@ -1013,14 +1013,7 @@ function renderLastMove() {
     return;
   }
 
-  const latestMainline = treeNode?.kind === "main" && treeNode.id === latestMainlineNodeId();
-  const teachingPair = treeNode?.kind === "main"
-    ? latestMainline
-      ? latestTeachingPair(state.game) ?? teachingPairForMove(state.game, treeNode.move)
-      : teachingPairForMove(state.game, treeNode.move)
-    : !treeNode
-      ? latestTeachingPair(state.game)
-      : null;
+  const teachingPair = teachingPairForSelectedTreeNode(treeNode);
   if (teachingPair) {
     renderTeachingPairSummary(teachingPair, treeNode?.kind === "main" ? treeNode : null);
     return;
@@ -2087,11 +2080,11 @@ function findTreeNodeInSubtree(node, id) {
 function panelFromTreeSelection() {
   const node = selectedTreeNode();
   if (!node) return null;
-  if (node.kind === "main" && node.id === latestMainlineNodeId()) return null;
   if (state.treeAnalysis.has(node.id)) return { kind: "treeAnalysis", nodeId: node.id };
   if (node.kind === "main") {
-    const pair = teachingPairForMove(state.game, node.move);
+    const pair = teachingPairForMainlineNode(state.game, node);
     if (pair) return { kind: "teachingPair", ...pair };
+    if (node.id === latestMainlineNodeId()) return null;
   }
   if (node.kind === "analysis") return { kind: "treeBranch", nodeId: node.id };
   if (node.kind === "alternative") return { kind: "treeAlternative", node };
@@ -2207,6 +2200,21 @@ function panelFromMove(game) {
   if (game?.lastEngineDecision) return { kind: "move", decision: game.lastEngineDecision };
   if (game?.lastPlayerReview) return { kind: "move", review: game.lastPlayerReview };
   return null;
+}
+
+function teachingPairForSelectedTreeNode(node = selectedTreeNode()) {
+  if (node?.kind === "main") {
+    return teachingPairForMainlineNode(state.game, node);
+  }
+  if (!node) return latestTeachingPair(state.game);
+  return null;
+}
+
+function teachingPairForMainlineNode(game, node) {
+  if (!node || node.kind !== "main") return null;
+  const pair = teachingPairForMove(game, node.move);
+  if (pair) return pair;
+  return node.id === latestMainlineNodeId(game) ? latestTeachingPair(game) : null;
 }
 
 function latestTeachingPair(game) {
