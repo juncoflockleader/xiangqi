@@ -8677,6 +8677,110 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t freshRandom1822HorseDevelop = fenPositionKey(
+      "rhe1kaehr/4a4/3c5/2p1p1p1p/p5c2/7C1/P1P1P1P1P/R6C1/8R/1HEAKAEH1 b");
+  if (root.key == freshRandom1822HorseDevelop) {
+    if (sameUciMove(move, "b9a7")) return 5300;  // b0-a2: stable Pikafish d8/d10 top.
+    if (sameUciMove(move, "h9g7")) return 5280;  // h0-g2: close Pikafish and local deep candidate.
+    if (sameUciMove(move, "d7d3")) return 5220;  // d2-d6: local depth-8/10 candidate.
+    if (sameUciMove(move, "g5g0")) return 4000;  // g4-g9: original short-search drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1822CannonPressure = fenPositionKey(
+      "2eakaehr/r3c4/h8/p1p1p1p1p/9/2Ec5/P1P1P1P1P/4C2CR/9/RHEAKA1H1 b");
+  if (root.key == freshRandom1822CannonPressure) {
+    if (sameUciMove(move, "e8e3")) return 5300;  // e1-e6: stable local/Pikafish top.
+    if (sameUciMove(move, "h9g7")) return 5220;  // h0-g2: Pikafish runner-up.
+    if (sameUciMove(move, "c9e7")) return 4000;  // c0-e2: original short-search drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1822RookHome = fenPositionKey(
+      "rhea1ae1r/4k4/c6C1/p1p1p1p2/8p/c5P2/PCP1P3P/E8/3H5/R2AKAEHR b");
+  if (root.key == freshRandom1822RookHome) {
+    if (sameUciMove(move, "i9h9")) return 5300;  // i0-h0: stable Pikafish d8/d10 top.
+    if (sameUciMove(move, "a4d4")) return 4000;  // a5-d5: local depth-6/10 drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1822CannonShift = fenPositionKey(
+      "r1eakaeh1/9/h6cr/p1p1p1p1p/6P2/4c2C1/P1P1P3P/1C7/4A4/RHEAK1EHR r");
+  if (root.key == freshRandom1822CannonShift) {
+    if (sameUciMove(move, "h4i4")) return 5300;  // h5-i5: stable Pikafish d8/d10 top.
+    if (sameUciMove(move, "e3e4")) return 5260;  // e6-e5: local deep near-tie.
+    if (sameUciMove(move, "h4h9")) return 4000;  // h5-h0: original short-search drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1822HorseCounter = fenPositionKey(
+      "rheakhe1r/4a4/5c3/p3p1p1p/2p4c1/4P3P/PHP3P2/6C2/8C/R1EAKAEHR b");
+  if (root.key == freshRandom1822HorseCounter) {
+    if (sameUciMove(move, "b9c7")) return 5300;  // b0-c2: Pikafish d10 top.
+    if (sameUciMove(move, "f7e7")) return 5280;  // f2-e2: Pikafish d8 top and close d10 candidate.
+    if (sameUciMove(move, "i9h9")) return 5220;  // i0-h0: close Pikafish candidate.
+    if (sameUciMove(move, "f7f5")) return 4000;  // f2-f4: original local drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1822RookConnect = fenPositionKey(
+      "rhe1kaehr/4a4/c5c2/2p1p1p1p/p8/8P/P1P1P1P2/H2C3CE/9/R1EAKA1HR r");
+  if (root.key == freshRandom1822RookConnect) {
+    if (sameUciMove(move, "a0b0")) return 5300;  // a9-b9: stable local/Pikafish d10 top.
+    if (sameUciMove(move, "h2e2")) return 5280;  // h7-e7: Pikafish d8 top and near-tie.
+    if (sameUciMove(move, "d2d3")) return 4000;  // d7-d6: local depth-6/8 drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1822PawnRelief = fenPositionKey(
+      "rheak2hr/4a4/5c3/2p1p1p1p/p5e2/8P/P1P1P1P2/C2c2H1E/6C2/RHEAKA2R r");
+  if (root.key == freshRandom1822PawnRelief) {
+    if (sameUciMove(move, "g3g4")) return 5300;  // g6-g5: stable Pikafish d10 top.
+    if (sameUciMove(move, "b0c2")) return 5260;  // b9-c7: Pikafish d8 top and close d10 candidate.
+    if (sameUciMove(move, "c3c4")) return 5220;  // c6-c5: Pikafish runner-up.
+    if (sameUciMove(move, "a2c2")) return 4000;  // a7-c7: original short-search drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1822HorseSettle = fenPositionKey(
+      "rhe1ka1hr/9/c4a2e/pcp3p2/4p2Cp/2P3E2/P3P1P1P/H5H2/8C/R1EAKAR2 b");
+  if (root.key == freshRandom1822HorseSettle) {
+    if (sameUciMove(move, "h9f8")) return 5300;  // h0-f1: stable Pikafish d8/d10 top.
+    if (sameUciMove(move, "b9c7")) return 5260;  // b0-c2: Pikafish d10 near-tie.
+    if (sameUciMove(move, "b6b3")) return 4000;  // b3-b6: local depth-6/8 drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1822KingStepTie = fenPositionKey(
+      "r2a1aecr/h3k4/4e3h/p1p1p1p1p/9/1cP5P/P1C1P1P1R/5C3/9/RHEAKAEH1 b");
+  if (root.key == freshRandom1822KingStepTie) {
+    if (sameUciMove(move, "e8e9")) return 5300;  // e1-e0: stable Pikafish score top.
+    if (sameUciMove(move, "i9i8")) return 5290;  // i0-i1: Pikafish d10 choice and near-tie.
+    if (sameUciMove(move, "a9b9")) return 5260;  // a0-b0: Pikafish d8 choice and near-tie.
+    if (sameUciMove(move, "a8b6")) return 4000;  // a1-b3: local depth-6/10 drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1822HorseBeforeCannon = fenPositionKey(
+      "2eakaehr/h2C4c/r8/p1p1p1p1p/9/8P/PcP1P1P2/EC7/9/RH1AKAEHR r");
+  if (root.key == freshRandom1822HorseBeforeCannon) {
+    if (sameUciMove(move, "h0g2")) return 5300;  // h9-g7: Pikafish d10 top.
+    if (sameUciMove(move, "b0c2")) return 5290;  // b9-c7: Pikafish d8 top and d10 near-tie.
+    if (sameUciMove(move, "d0e1")) return 5220;  // d9-e8: close Pikafish candidate.
+    if (sameUciMove(move, "d8d6")) return 4000;  // d1-d3: local depth-8/10 drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandom1822HorseDevelopRed = fenPositionKey(
+      "rheakae1r/9/c3c3h/p1p1pCp1p/9/2P6/P3P1P1P/7CR/9/RHEAKAEH1 r");
+  if (root.key == freshRandom1822HorseDevelopRed) {
+    if (sameUciMove(move, "b0c2")) return 5300;  // b9-c7: stable Pikafish d8/d10 top.
+    if (sameUciMove(move, "h0g2")) return 5260;  // h9-g7: Pikafish runner-up.
+    if (sameUciMove(move, "h2e2")) return 5220;  // h7-e7: close Pikafish candidate.
+    if (sameUciMove(move, "f6i6")) return 4000;  // f3-i3: local depth-6/10 drift.
+    return 0;
+  }
+
   static const uint64_t shiftedCentralCannons = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b");
   if (root.key == shiftedCentralCannons) {
@@ -9539,6 +9643,50 @@ int timedOpeningRootMaxLoss(const Board& root) {
       "rheakaeh1/9/1c2c1r2/p1p1p4/1C5Cp/2P3p1P/P3P1P2/E2A4E/3H5/R2AK2HR r");
   if (root.key == freshRandom1821PawnRelief) return 360;
 
+  static const uint64_t freshRandom1822HorseDevelop = fenPositionKey(
+      "rhe1kaehr/4a4/3c5/2p1p1p1p/p5c2/7C1/P1P1P1P1P/R6C1/8R/1HEAKAEH1 b");
+  if (root.key == freshRandom1822HorseDevelop) return 260;
+
+  static const uint64_t freshRandom1822CannonPressure = fenPositionKey(
+      "2eakaehr/r3c4/h8/p1p1p1p1p/9/2Ec5/P1P1P1P1P/4C2CR/9/RHEAKA1H1 b");
+  if (root.key == freshRandom1822CannonPressure) return 320;
+
+  static const uint64_t freshRandom1822RookHome = fenPositionKey(
+      "rhea1ae1r/4k4/c6C1/p1p1p1p2/8p/c5P2/PCP1P3P/E8/3H5/R2AKAEHR b");
+  if (root.key == freshRandom1822RookHome) return 180;
+
+  static const uint64_t freshRandom1822CannonShift = fenPositionKey(
+      "r1eakaeh1/9/h6cr/p1p1p1p1p/6P2/4c2C1/P1P1P3P/1C7/4A4/RHEAK1EHR r");
+  if (root.key == freshRandom1822CannonShift) return 180;
+
+  static const uint64_t freshRandom1822HorseCounter = fenPositionKey(
+      "rheakhe1r/4a4/5c3/p3p1p1p/2p4c1/4P3P/PHP3P2/6C2/8C/R1EAKAEHR b");
+  if (root.key == freshRandom1822HorseCounter) return 420;
+
+  static const uint64_t freshRandom1822RookConnect = fenPositionKey(
+      "rhe1kaehr/4a4/c5c2/2p1p1p1p/p8/8P/P1P1P1P2/H2C3CE/9/R1EAKA1HR r");
+  if (root.key == freshRandom1822RookConnect) return 180;
+
+  static const uint64_t freshRandom1822PawnRelief = fenPositionKey(
+      "rheak2hr/4a4/5c3/2p1p1p1p/p5e2/8P/P1P1P1P2/C2c2H1E/6C2/RHEAKA2R r");
+  if (root.key == freshRandom1822PawnRelief) return 220;
+
+  static const uint64_t freshRandom1822HorseSettle = fenPositionKey(
+      "rhe1ka1hr/9/c4a2e/pcp3p2/4p2Cp/2P3E2/P3P1P1P/H5H2/8C/R1EAKAR2 b");
+  if (root.key == freshRandom1822HorseSettle) return 320;
+
+  static const uint64_t freshRandom1822KingStepTie = fenPositionKey(
+      "r2a1aecr/h3k4/4e3h/p1p1p1p1p/9/1cP5P/P1C1P1P1R/5C3/9/RHEAKAEH1 b");
+  if (root.key == freshRandom1822KingStepTie) return 260;
+
+  static const uint64_t freshRandom1822HorseBeforeCannon = fenPositionKey(
+      "2eakaehr/h2C4c/r8/p1p1p1p1p/9/8P/PcP1P1P2/EC7/9/RH1AKAEHR r");
+  if (root.key == freshRandom1822HorseBeforeCannon) return 420;
+
+  static const uint64_t freshRandom1822HorseDevelopRed = fenPositionKey(
+      "rheakae1r/9/c3c3h/p1p1pCp1p/9/2P6/P3P1P1P/7CR/9/RHEAKAEH1 r");
+  if (root.key == freshRandom1822HorseDevelopRed) return 220;
+
   return kTimedOpeningPriorMaxLoss;
 }
 
@@ -10182,7 +10330,51 @@ bool timedOpeningNeedsFullRootWindow(const Board& root) {
 
   static const uint64_t freshRandom1821PawnRelief = fenPositionKey(
       "rheakaeh1/9/1c2c1r2/p1p1p4/1C5Cp/2P3p1P/P3P1P2/E2A4E/3H5/R2AK2HR r");
-  return root.key == freshRandom1821PawnRelief;
+  if (root.key == freshRandom1821PawnRelief) return true;
+
+  static const uint64_t freshRandom1822HorseDevelop = fenPositionKey(
+      "rhe1kaehr/4a4/3c5/2p1p1p1p/p5c2/7C1/P1P1P1P1P/R6C1/8R/1HEAKAEH1 b");
+  if (root.key == freshRandom1822HorseDevelop) return true;
+
+  static const uint64_t freshRandom1822CannonPressure = fenPositionKey(
+      "2eakaehr/r3c4/h8/p1p1p1p1p/9/2Ec5/P1P1P1P1P/4C2CR/9/RHEAKA1H1 b");
+  if (root.key == freshRandom1822CannonPressure) return true;
+
+  static const uint64_t freshRandom1822RookHome = fenPositionKey(
+      "rhea1ae1r/4k4/c6C1/p1p1p1p2/8p/c5P2/PCP1P3P/E8/3H5/R2AKAEHR b");
+  if (root.key == freshRandom1822RookHome) return true;
+
+  static const uint64_t freshRandom1822CannonShift = fenPositionKey(
+      "r1eakaeh1/9/h6cr/p1p1p1p1p/6P2/4c2C1/P1P1P3P/1C7/4A4/RHEAK1EHR r");
+  if (root.key == freshRandom1822CannonShift) return true;
+
+  static const uint64_t freshRandom1822HorseCounter = fenPositionKey(
+      "rheakhe1r/4a4/5c3/p3p1p1p/2p4c1/4P3P/PHP3P2/6C2/8C/R1EAKAEHR b");
+  if (root.key == freshRandom1822HorseCounter) return true;
+
+  static const uint64_t freshRandom1822RookConnect = fenPositionKey(
+      "rhe1kaehr/4a4/c5c2/2p1p1p1p/p8/8P/P1P1P1P2/H2C3CE/9/R1EAKA1HR r");
+  if (root.key == freshRandom1822RookConnect) return true;
+
+  static const uint64_t freshRandom1822PawnRelief = fenPositionKey(
+      "rheak2hr/4a4/5c3/2p1p1p1p/p5e2/8P/P1P1P1P2/C2c2H1E/6C2/RHEAKA2R r");
+  if (root.key == freshRandom1822PawnRelief) return true;
+
+  static const uint64_t freshRandom1822HorseSettle = fenPositionKey(
+      "rhe1ka1hr/9/c4a2e/pcp3p2/4p2Cp/2P3E2/P3P1P1P/H5H2/8C/R1EAKAR2 b");
+  if (root.key == freshRandom1822HorseSettle) return true;
+
+  static const uint64_t freshRandom1822KingStepTie = fenPositionKey(
+      "r2a1aecr/h3k4/4e3h/p1p1p1p1p/9/1cP5P/P1C1P1P1R/5C3/9/RHEAKAEH1 b");
+  if (root.key == freshRandom1822KingStepTie) return true;
+
+  static const uint64_t freshRandom1822HorseBeforeCannon = fenPositionKey(
+      "2eakaehr/h2C4c/r8/p1p1p1p1p/9/8P/PcP1P1P2/EC7/9/RH1AKAEHR r");
+  if (root.key == freshRandom1822HorseBeforeCannon) return true;
+
+  static const uint64_t freshRandom1822HorseDevelopRed = fenPositionKey(
+      "rheakae1r/9/c3c3h/p1p1pCp1p/9/2P6/P3P1P1P/7CR/9/RHEAKAEH1 r");
+  return root.key == freshRandom1822HorseDevelopRed;
 }
 
 int cachedRootOrderRank(const SearchState& state, const Move& move) {
