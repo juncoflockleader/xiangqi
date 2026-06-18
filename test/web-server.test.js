@@ -158,8 +158,8 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(stylesheet, /--grid-inset-x: calc\(100% \/ 18\)/);
     assert.match(stylesheet, /--grid-inset-y: calc\(100% \/ 20\)/);
     assert.match(stylesheet, /--edge-label-offset: clamp\(14px, 3\.6%, 20px\)/);
-    assert.match(stylesheet, /grid-template-rows: minmax\(300px, 42vh\) minmax\(0, 1fr\)/);
-    assert.match(stylesheet, /width: min\(100%, 300px\)/);
+    assert.match(stylesheet, /grid-template-rows: minmax\(280px, 40vh\) minmax\(0, 1fr\)/);
+    assert.match(stylesheet, /width: min\(100%, 270px\)/);
     assert.match(stylesheet, /--grid-files: 8/);
     assert.match(stylesheet, /--grid-ranks: 9/);
     assert.match(stylesheet, /--point-size: clamp\(31px, 8\.7%, 43px\)/);
