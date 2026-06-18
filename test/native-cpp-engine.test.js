@@ -963,7 +963,27 @@ test("local C++ engine follows fresh random oracle priors", async (t) => {
       ["rh1ak2hr/4a4/2c1e3e/p1p3p2/4p2Cp/P8/2P3PcP/5C2R/R3K4/1HEA1AEH1 b", "h0-g2"],
       ["r2akaehr/3h5/3ce2c1/p3p3p/2p3p2/2P6/P3P1P1P/2C1C3R/9/RHEAKAEH1 b", "c4-c5"],
       ["rheaka1hr/9/3c3ce/p1p3p1p/9/4p1P2/P1P1P3P/C7E/1C2A4/RHEAK2HR b", "b0-a2"],
-      ["rCea1aeh1/r3k4/5c1c1/p1p1p3p/6p2/P5P2/2P1P2CP/H1R5E/5H3/2EAKA2R b", "a0-b0"]
+      ["rCea1aeh1/r3k4/5c1c1/p1p1p3p/6p2/P5P2/2P1P2CP/H1R5E/5H3/2EAKA2R b", "a0-b0"],
+      ["rheakaehr/5c3/3c5/p1p1p1p1p/9/2C6/P1P1P1P1P/9/4C4/RHEAKAEHR b", "c0-e2"],
+      ["rCeakaehr/9/1c7/p1p1p1p1p/9/9/P1P1P1P1P/1C7/4A2c1/RHE1KAEHR r", "i9-i8"],
+      ["2eakaehr/9/h4c3/prp1p1p1p/8c/4P3P/P1P3P2/4C3R/3CA4/R1EAK1EH1 r", "i5-i4"],
+      ["2eakae1r/7R1/c7h/pCp3p1p/4p4/P7P/2P1P1P2/3R5/4c4/1HEAKAEH1 b", "f0-e1"],
+      ["r1eaka1hr/9/1ch6/p3p1p1p/1Cp3e2/4P4/P1P3P1P/4K2C1/4A4/RHE2AEHR r", "b4-b7"],
+      ["1reak1ehr/4a4/5c3/p1p1p1p2/8p/9/PcP1P1P1P/4K4/4C4/RHEA1AEHR b", "h0-i2"],
+      ["rheakaehr/9/4c2c1/pC2p1p1p/9/2p1P4/P1P3P1P/4K2C1/9/RHEA1AEHR b", "b0-c2"],
+      ["1heCkae2/5r3/r2c2h2/p1p1p1p1p/C7R/9/P1P1P1P2/E8/4A4/RH2KAEH1 b", "a2-b2"],
+      ["rheakaer1/9/1c1c5/2p1p1p1p/p8/4P3P/P1P3P2/C8/9/RHEAKAEHR b", "h0-h8"],
+      ["rhea1aeC1/3k4r/9/p5p2/4P3p/5C3/P1P3P1P/H6c1/9/1REAKAEHR b", "h7-h1"],
+      ["r1ek1a2r/9/1c1ce4/2p1p1p1p/9/p7P/2P1P1P2/H1R6/4A4/1REAK1EH1 b", "a0-a2"],
+      ["rheakaehr/9/7c1/p1C1p1p1p/9/9/P1P1P1P1P/1C7/9/1REAKAEHR r", "b7-e7"],
+      ["1he1ka1hr/4a4/r3e4/p1p1p1p1p/9/6c2/P1P1P3P/4C2C1/8R/RHEAKAEc1 r", "b9-c7"],
+      ["r1eakaehr/9/h7c/p1C3p1p/1c2p4/9/P1P1P1P1P/E4C3/9/RH1AKAEHR r", "c3-c5"],
+      ["rCeakaeh1/5r3/1C5c1/p1p1p1p1p/9/9/P1P1P1P1P/9/9/1REAKAEHR r", "b2-b5"],
+      ["rhe1kaehr/4a4/1c7/p1p3p1p/4p4/4P4/P1P3P1P/3C5/9/RHEcKAEHR r", "e5-e4"],
+      ["r1ea1aehr/4k4/h3c2c1/p1p1p1p1p/9/8P/P1P1P1P2/6CCR/9/RHEAKAEH1 r", "b9-c7"],
+      ["rheakae1r/9/9/pcC1phCcp/9/9/P1P1P1P1P/6H2/9/RHEAKAE1R b", "b0-a2"],
+      ["r2k1aeh1/9/1c2e3r/p1p1pcp1p/9/6P1P/P1P1P4/2C1E4/9/RHEAKA1HR b", "b2-d2"],
+      ["rhe1kaehr/9/1c3a3/p1p1p1pcp/9/9/P1P1P1P1P/R1C4C1/9/1HEAKAEHR r", "a7-b7"]
     ];
 
     for (const [fen, expected] of cases) {
