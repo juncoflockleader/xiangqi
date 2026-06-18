@@ -257,13 +257,14 @@ test("opening heuristics cover early positions outside exact book when requested
   assert.ok(result.explanation.reasons.some((reason) => reason.includes("Opening heuristic")));
 });
 
-test("opening heuristic validation rejects immediate tactical losses", () => {
+test("opening heuristic validation rejects losses above the configured threshold", () => {
   const engine = createEngine({ depth: 2, timeLimitMs: 2000 });
   const position = engine.play(createInitialPosition(), "a9-a8");
   const raw = engine.chooseMove(position, { validateOpeningHeuristics: false });
   const result = engine.chooseMove(position, {
-    openingHeuristicValidationDepth: 1,
-    openingHeuristicValidationTimeMs: 2000
+    openingHeuristicValidationDepth: 2,
+    openingHeuristicValidationTimeMs: 2000,
+    openingHeuristicMaxCentipawnLoss: 40
   });
 
   assert.equal(raw.source, "opening-heuristic");

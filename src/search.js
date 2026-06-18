@@ -67,6 +67,7 @@ const DEFAULT_SOFT_SCORE_GAP = 80;
 const DEFAULT_SEE_PRUNE_MARGIN = 120;
 const DEFAULT_PROBCUT_MARGIN = 170;
 const DEFAULT_TACTICAL_MOVE_ORDERING_MAX_PLY = 0;
+const QUIESCENCE_CHECK_OPENING_MIN_PIECES = 28;
 const PROBCUT_MIN_DEPTH = 4;
 const PROBCUT_REDUCTION = 2;
 const PROBCUT_CAPTURE_LIMIT = 6;
@@ -1318,12 +1319,22 @@ function quiescenceTranspositionKey(position, qChecksRemaining) {
 
 function quietCheckingMoves(position, context, qChecksRemaining) {
   if (!context.useQuiescenceChecks || qChecksRemaining <= 0) return [];
+  if (isPieceRichOpening(position)) return [];
 
   const checks = generateQuietMoves(position, position.turn)
     .filter((move) => moveGivesCheck(position, move, context));
 
   context.stats.qchecks += checks.length;
   return checks;
+}
+
+function isPieceRichOpening(position) {
+  let pieceCount = 0;
+  for (const piece of position.board) {
+    if (piece) pieceCount += 1;
+  }
+
+  return pieceCount >= QUIESCENCE_CHECK_OPENING_MIN_PIECES;
 }
 
 function moveGivesCheck(position, move, context = null, nextPosition = null, options = {}) {

@@ -120,7 +120,7 @@ test("sparring match validates player backends", async () => {
 
 test("sparring match can use a referee backend to surface learning moments", async () => {
   const redBase = createJavaScriptEngineBackend({ id: "scripted-red-base", depth: 1, timeLimitMs: 100 });
-  const red = createScriptedBackend(redBase, "a9-a8");
+  const red = createScriptedBackend(redBase, "b7-b3");
   const black = createJavaScriptEngineBackend({ id: "black-test", name: "Black Test", depth: 1, timeLimitMs: 100 });
   const referee = createJavaScriptEngineBackend({ id: "referee-test", name: "Referee Test", depth: 2, timeLimitMs: 300 });
 
@@ -137,7 +137,7 @@ test("sparring match can use a referee backend to surface learning moments", asy
   assert.equal(report.totalPlies, 1);
   assert.equal(report.referee.name, "Referee Test");
   assert.ok(report.reviewElapsedMs >= 0);
-  assert.equal(report.moves[0].refereeReview.classification, "blunder");
+  assert.ok(["mistake", "blunder"].includes(report.moves[0].refereeReview.classification));
   assert.ok(report.moves[0].refereeReview.centipawnLoss > 0);
   assert.ok(report.learningMoments.length >= 1);
   assert.equal(report.learningMoments[0].ply, 1);

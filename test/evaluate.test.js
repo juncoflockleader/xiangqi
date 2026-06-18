@@ -4,9 +4,12 @@ import {
   SIDES,
   applyLegalMove,
   coordToIndex,
+  createInitialPosition,
   describeEvaluationTerms,
   evaluateMoveDelta,
   evaluatePosition,
+  makeMove,
+  parseMoveNotation,
   parseFen
 } from "../src/index.js";
 
@@ -123,6 +126,25 @@ test("evaluation descriptions surface cannon platform pressure", () => {
 
   assert.ok(delta.delta.cannonPlatform >= 45);
   assert.ok(notes.some((note) => note.term === "cannonPlatform" && note.text.includes("cannon platform pressure")));
+});
+
+test("evaluation discourages early cannon lifts before horse development", () => {
+  const position = createInitialPosition();
+  const central = makeMove(position, parseMoveNotation("b7-e7"));
+  const lifted = makeMove(position, parseMoveNotation("b7-b5"));
+  const deepCapture = makeMove(position, parseMoveNotation("b7-b0"));
+  const centralEval = evaluatePosition(central, SIDES.RED, { detailed: true });
+  const liftedEval = evaluatePosition(lifted, SIDES.RED, { detailed: true });
+  const deepEval = evaluatePosition(deepCapture, SIDES.RED, { detailed: true });
+  const liftedDelta = evaluateMoveDelta(position, lifted, SIDES.RED);
+  const notes = describeEvaluationTerms(liftedDelta.delta);
+
+  assert.equal(centralEval.terms.red.openingDiscipline, 0);
+  assert.ok(liftedEval.terms.red.openingDiscipline <= -70);
+  assert.ok(deepEval.terms.red.openingDiscipline <= -540);
+  assert.ok(centralEval.score > liftedEval.score);
+  assert.ok(centralEval.score > deepEval.score);
+  assert.ok(notes.some((note) => note.term === "openingDiscipline" && note.text.includes("opening piece discipline")));
 });
 
 test("evaluation rewards direct rook pins to the general", () => {

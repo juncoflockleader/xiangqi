@@ -64,7 +64,14 @@ const KING_ATTACK_WEIGHTS = Object.freeze({
   [PIECES.PAWN]: 14
 });
 
+const OPENING_FULL_PIECE_COUNT = 30;
+const OPENING_MIN_PIECE_COUNT = 26;
+const OPENING_CANNON_FILE_PENALTY = 36;
+const OPENING_CANNON_DEEP_CAMP_PENALTY = 100;
+const OPENING_CANNON_BACK_RANK_PENALTY = 220;
+
 export function evaluatePosition(position, perspective = position.turn, options = {}) {
+  const openingPhase = openingPhaseValue(position);
   const terms = {
     [SIDES.RED]: createTerms(),
     [SIDES.BLACK]: createTerms()
@@ -95,6 +102,7 @@ export function evaluatePosition(position, perspective = position.turn, options 
     terms[piece.side].rookActivity += rookActivityValue(position, piece, square);
     terms[piece.side].riverControl += riverControlValue(position, piece, square);
     terms[piece.side].horsePressure += horsePressureValue(position, piece, square);
+    terms[piece.side].openingDiscipline += openingDisciplineValue(position, piece, square, openingPhase);
   }
 
   for (const side of [SIDES.RED, SIDES.BLACK]) {
@@ -183,7 +191,8 @@ function createTerms() {
     batteryPressure: 0,
     rookActivity: 0,
     riverControl: 0,
-    horsePressure: 0
+    horsePressure: 0,
+    openingDiscipline: 0
   };
 }
 
@@ -842,6 +851,46 @@ function isHorsePalaceOutpost(defendingSide, file, rank) {
   return Math.abs(file - 4) === 1 || Math.abs(file - 4) === 2;
 }
 
+function openingPhaseValue(position) {
+  let pieceCount = 0;
+  for (const piece of position.board) {
+    if (piece) pieceCount += 1;
+  }
+
+  if (pieceCount >= OPENING_FULL_PIECE_COUNT) return 1;
+  if (pieceCount <= OPENING_MIN_PIECE_COUNT) return 0;
+  return (pieceCount - OPENING_MIN_PIECE_COUNT) / (OPENING_FULL_PIECE_COUNT - OPENING_MIN_PIECE_COUNT);
+}
+
+function openingDisciplineValue(position, piece, square, openingPhase) {
+  if (openingPhase <= 0 || piece.type !== PIECES.CANNON) return 0;
+
+  const file = fileOf(square);
+  if (file !== 1 && file !== 7) return 0;
+
+  const rank = rankOf(square);
+  const homeCannonRank = piece.side === SIDES.RED ? 7 : 2;
+  const progress = piece.side === SIDES.RED ? homeCannonRank - rank : rank - homeCannonRank;
+  if (progress <= 0) return 0;
+  if (!sameWingHorseIsHome(position, piece.side, file)) return 0;
+
+  let penalty = progress * OPENING_CANNON_FILE_PENALTY;
+  if (progress >= 5) penalty += OPENING_CANNON_DEEP_CAMP_PENALTY;
+  if (rank === enemyBackRank(piece.side)) penalty += OPENING_CANNON_BACK_RANK_PENALTY;
+
+  return -Math.round(penalty * openingPhase);
+}
+
+function sameWingHorseIsHome(position, side, file) {
+  const homeRank = side === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  const piece = position.board[indexOf(file, homeRank)];
+  return piece?.side === side && piece.type === PIECES.HORSE;
+}
+
+function enemyBackRank(side) {
+  return side === SIDES.RED ? 0 : BOARD_RANKS - 1;
+}
+
 function countLineBlockers(position, from, to) {
   const fromFile = fileOf(from);
   const fromRank = rankOf(from);
@@ -1435,7 +1484,8 @@ function readableTerm(term) {
     batteryPressure: "rook-cannon battery pressure",
     rookActivity: "rook activity",
     riverControl: "river-rank control",
-    horsePressure: "horse outpost pressure"
+    horsePressure: "horse outpost pressure",
+    openingDiscipline: "opening piece discipline"
   };
 
   return labels[term] ?? term;

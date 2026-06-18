@@ -59,6 +59,17 @@ test("search move ordering does not leak private score metadata", () => {
   assert.ok(moves.every((move) => Object.getOwnPropertySymbols(move).length === 0));
 });
 
+test("search keeps opening cannon development aligned without book help", () => {
+  const result = searchBestMove(createInitialPosition(), {
+    depth: 5,
+    timeLimitMs: 10000,
+    useBook: false,
+    useSoftTimeManagement: false
+  });
+
+  assert.ok(["b7-e7", "h7-e7"].includes(result.bestMove.notation));
+});
+
 test("engine explanations surface tactical-motif ordering diagnostics", () => {
   const position = parseFen("4r4/9/4k4/9/3R5/9/4P4/9/9/4K4 r");
   const engine = createEngine({ depth: 1, timeLimitMs: 1000 });
