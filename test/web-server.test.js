@@ -99,6 +99,9 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function renderTreeNode/);
     assert.match(script, /function renderMiniBoard/);
     assert.match(script, /function recomputeTreeNode/);
+    assert.match(script, /"\/api\/engine-move"/);
+    assert.match(script, /"\/api\/select-node"/);
+    assert.match(script, /deferEngine: true/);
     assert.match(script, /function fitTreeView/);
     assert.match(script, /function zoomTreeView/);
     assert.match(script, /function handleTreeWheel/);
@@ -162,10 +165,10 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(stylesheet, /width: min\(100%, 270px\)/);
     assert.match(stylesheet, /--grid-files: 8/);
     assert.match(stylesheet, /--grid-ranks: 9/);
-    assert.match(stylesheet, /--point-size: clamp\(31px, 8\.7%, 43px\)/);
-    assert.match(stylesheet, /--piece-size: clamp\(30px, 88%, 38px\)/);
-    assert.match(stylesheet, /--piece-font-size: 12\.5px/);
-    assert.match(stylesheet, /--piece-inner-inset: clamp\(5px, 15%, 7px\)/);
+    assert.match(stylesheet, /--point-size: clamp\(24px, 8\.1%, 34px\)/);
+    assert.match(stylesheet, /--piece-size: clamp\(22px, 80%, 30px\)/);
+    assert.match(stylesheet, /--piece-font-size: 11px/);
+    assert.match(stylesheet, /--piece-inner-inset: clamp\(4px, 13%, 6px\)/);
     assert.match(stylesheet, /\.turn-pill\.thinking/);
     assert.match(stylesheet, /\.piece-glyph/);
     assert.match(stylesheet, /width: 62%/);
@@ -273,6 +276,56 @@ test("web server plays a player move, engine reply, hints, best move, and undo",
     assert.equal(jumped.state.history.length, 0);
     assert.equal(jumped.state.playerTurn, true);
     assert.equal(jumped.state.canUndo, true);
+  } finally {
+    await app.close();
+  }
+});
+
+test("web server defers engine replies and can continue from tree nodes", async () => {
+  const app = await startWebServer({
+    port: 0,
+    native: false,
+    depth: 1,
+    timeLimitMs: 50,
+    lines: 2,
+    useBook: false
+  });
+
+  try {
+    const created = await postJson(`${app.url}/api/new`, { side: "red" });
+    const sessionId = created.state.sessionId;
+    const deferred = await postJson(`${app.url}/api/move`, {
+      sessionId,
+      move: "h7-e7",
+      deferEngine: true
+    });
+
+    assert.equal(deferred.ok, true);
+    assert.equal(deferred.state.history.length, 1);
+    assert.equal(deferred.state.history[0].notation, "h7-e7");
+    assert.equal(deferred.state.turn, "black");
+    assert.equal(deferred.state.playerTurn, false);
+
+    const engineReply = await postJson(`${app.url}/api/engine-move`, { sessionId });
+    assert.equal(engineReply.ok, true);
+    assert.equal(engineReply.state.history.length, 2);
+    assert.equal(engineReply.state.playerTurn, true);
+
+    const alternative = engineReply.state.history[1].decision.alternatives[0];
+    const selected = await postJson(`${app.url}/api/select-node`, {
+      sessionId,
+      node: {
+        kind: "alternative",
+        parentPly: 2,
+        move: alternative.move
+      }
+    });
+
+    assert.equal(selected.ok, true);
+    assert.equal(selected.state.history.length, 2);
+    assert.equal(selected.state.lastMove.notation, alternative.move);
+    assert.equal(selected.state.playerTurn, true);
+    assert.equal(selected.state.legalMoves.length > 0, true);
   } finally {
     await app.close();
   }

@@ -186,10 +186,10 @@ h2 {
   --grid-inset-x: calc(100% / 18);
   --grid-inset-y: calc(100% / 20);
   --edge-label-offset: clamp(14px, 3.6%, 20px);
-  --point-size: clamp(31px, 8.7%, 43px);
-  --piece-size: clamp(30px, 88%, 38px);
-  --piece-font-size: 12.5px;
-  --piece-inner-inset: clamp(5px, 15%, 7px);
+  --point-size: clamp(24px, 8.1%, 34px);
+  --piece-size: clamp(22px, 80%, 30px);
+  --piece-font-size: 11px;
+  --piece-inner-inset: clamp(4px, 13%, 6px);
   --marker-size: clamp(15px, 3.4%, 22px);
   --marker-arm: clamp(5px, 1.35%, 7px);
   width: min(100%, 270px);
@@ -610,14 +610,16 @@ h2 {
 
 .command-panel .stack {
   max-height: 58px;
-  overflow: hidden;
+  overflow: auto;
   font-size: 12px;
   line-height: 1.25;
+  scrollbar-width: thin;
 }
 
 .command-panel .meta-list {
   max-height: 43px;
-  overflow: hidden;
+  overflow: auto;
+  scrollbar-width: thin;
 }
 
 .tree-panel {
@@ -1035,9 +1037,9 @@ h2 {
   .board-wrap {
     --board-padding: 12px;
     --edge-label-offset: 10px;
-    --point-size: clamp(19px, 8.6%, 27px);
-    --piece-size: clamp(18px, 84%, 25px);
-    --piece-font-size: 9px;
+    --point-size: clamp(16px, 7.8%, 24px);
+    --piece-size: clamp(15px, 78%, 22px);
+    --piece-font-size: 8px;
     --piece-inner-inset: 3px;
     --marker-size: clamp(10px, 3.1%, 15px);
     --marker-arm: clamp(3px, 1.1%, 5px);

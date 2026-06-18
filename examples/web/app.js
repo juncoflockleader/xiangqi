@@ -591,14 +591,57 @@ async function newGame() {
 
 async function playMove(notation) {
   await runRequest(async () => {
+    renderOptimisticPlayerMove(notation);
     const result = await api("/api/move", {
       sessionId: state.sessionId,
-      move: notation
+      move: notation,
+      deferEngine: true
     });
     state.treeSelectedId = latestMainlineNodeId(result.state);
     state.panel = panelFromMove(result.state);
     setGame(result.state);
+    await requestEngineMoveIfNeeded(result.state);
   });
+}
+
+async function requestEngineMoveIfNeeded(game = state.game) {
+  if (!shouldRequestEngineMove(game)) return;
+  const result = await api("/api/engine-move", {
+    sessionId: state.sessionId
+  });
+  state.treeSelectedId = latestMainlineNodeId(result.state);
+  state.panel = panelFromMove(result.state);
+  setGame(result.state);
+}
+
+function shouldRequestEngineMove(game) {
+  return game?.status?.state === "playing" && game.turn === game.engineSide;
+}
+
+function renderOptimisticPlayerMove(notation) {
+  const game = state.game;
+  const move = game?.legalMoves?.find((candidate) => candidate.notation === notation);
+  if (!game || !move) return;
+
+  const board = game.board.map((cell) => ({
+    ...cell,
+    piece: cell.piece ? { ...cell.piece } : null
+  }));
+  const from = board.find((cell) => cell.coord === move.fromCoord);
+  const to = board.find((cell) => cell.coord === move.toCoord);
+  if (!from || !to || !from.piece) return;
+
+  to.piece = { ...from.piece };
+  from.piece = null;
+  state.game = {
+    ...game,
+    board,
+    turn: oppositeSide(game.turn),
+    legalMoves: [],
+    playerTurn: false
+  };
+  state.selected = null;
+  render();
 }
 
 async function undoMove() {
@@ -1489,12 +1532,23 @@ function analysisBranchSummaryText(branch) {
   return parts.join(" · ");
 }
 
-function selectTreeNode(id) {
+async function selectTreeNode(id) {
   if (!id) return;
-  state.treeSelectedId = id;
-  state.selected = null;
-  state.panel = panelFromTreeSelection() ?? panelFromMove(state.game);
-  render();
+  const node = findTreeNode(id);
+  const requestNode = analysisRequestForTreeNode(node);
+  if (!requestNode) return;
+
+  await runRequest(async () => {
+    const result = await api("/api/select-node", {
+      sessionId: state.sessionId,
+      node: requestNode
+    });
+    state.treeSelectedId = latestMainlineNodeId(result.state);
+    state.panel = panelFromMove(result.state);
+    state.selected = null;
+    setGame(result.state);
+    await requestEngineMoveIfNeeded(result.state);
+  });
 }
 
 async function recomputeTreeNode(id) {
@@ -1994,6 +2048,10 @@ function pieceSymbol(piece) {
 
 function sideName(side) {
   return side === "black" ? t("black") : t("red");
+}
+
+function oppositeSide(side) {
+  return side === "black" ? "red" : "black";
 }
 
 function actorName(actor) {

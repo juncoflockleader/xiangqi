@@ -249,8 +249,16 @@ async function handleApiPost(context, url) {
         reviewOptions: resolveWebPlayerReviewOptions(session)
       });
       session.undoStack.push(before);
-      await maybePlayEngineTurn(session, context.engine);
+      if (body.deferEngine !== true) {
+        await maybePlayEngineTurn(session, context.engine);
+      }
     });
+    return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine, context.config) });
+  }
+
+  if (url.pathname === "/api/engine-move") {
+    const session = requireSession(context.sessions, body.sessionId);
+    await enqueueSession(session, () => maybePlayEngineTurn(session, context.engine));
     return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine, context.config) });
   }
 
@@ -296,6 +304,16 @@ async function handleApiPost(context, url) {
       analysis,
       state: serializeState(session, context.engine, context.config)
     });
+  }
+
+  if (url.pathname === "/api/select-node") {
+    const session = requireSession(context.sessions, body.sessionId);
+    await enqueueSession(session, async () => {
+      const before = session.game;
+      session.game = await gameFromTreeNode(session, context.engine, body.node ?? body);
+      session.undoStack.push(before);
+    });
+    return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine, context.config) });
   }
 
   if (url.pathname === "/api/undo") {
@@ -424,6 +442,26 @@ function truncateGameAtPly(game, ply) {
     positions,
     positionCounts: countPositions(positions)
   };
+}
+
+async function gameFromTreeNode(session, engine, node = {}) {
+  if (node.fen) {
+    return createGame(parseFen(String(node.fen)));
+  }
+
+  if (node.kind === "alternative") {
+    const parentPly = parsePly(node.parentPly, session.game.moves.length);
+    if (parentPly < 1) throw httpError(400, "Alternative nodes require a parent move.");
+    const game = truncateGameAtPly(session.game, parentPly - 1);
+    const actor = game.position.turn === session.playerSide ? "player" : "engine";
+    return playGameMoveAsync(game, engine, String(node.move ?? ""), {
+      actor,
+      review: false
+    });
+  }
+
+  const ply = parsePly(node.ply, session.game.moves.length);
+  return truncateGameAtPly(session.game, ply);
 }
 
 function resolveTreeAnalysisTarget(game, node = {}) {
