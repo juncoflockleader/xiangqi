@@ -623,6 +623,7 @@ async function playMove(notation) {
       deferEngine: true
     });
     focusTeachingTurnForMove(result.state, optimisticMove);
+    focusLatestPlayerTeachingTurn(result.state);
     state.treeSelectedId = latestMainlineNodeId(result.state);
     state.panel = panelFromTeachingFocus(result.state) ?? panelFromMove(result.state);
     setGame(result.state);
@@ -636,6 +637,7 @@ async function requestEngineMoveIfNeeded(game = state.game) {
   const result = await api("/api/engine-move", {
     sessionId: state.sessionId
   });
+  focusLatestPlayerTeachingTurn(result.state);
   state.treeSelectedId = latestMainlineNodeId(result.state);
   state.panel = panelFromTeachingFocus(result.state) ?? panelFromMove(result.state);
   setGame(result.state);
@@ -1014,10 +1016,10 @@ function renderLastMove() {
   const latestMainline = treeNode?.kind === "main" && treeNode.id === latestMainlineNodeId();
   const teachingPair = treeNode?.kind === "main"
     ? latestMainline
-      ? focusedTeachingPair(state.game) ?? teachingPairForMove(state.game, treeNode.move)
+      ? latestTeachingPair(state.game) ?? teachingPairForMove(state.game, treeNode.move)
       : teachingPairForMove(state.game, treeNode.move)
     : !treeNode
-      ? focusedTeachingPair(state.game) ?? activeTeachingPair(state.game)
+      ? latestTeachingPair(state.game)
       : null;
   if (teachingPair) {
     renderTeachingPairSummary(teachingPair, treeNode?.kind === "main" ? treeNode : null);
@@ -2190,7 +2192,7 @@ function renderSelectedMoves() {
 }
 
 function panelFromMove(game) {
-  const pair = focusedTeachingPair(game) ?? activeTeachingPair(game);
+  const pair = latestTeachingPair(game);
   if (pair) return { kind: "teachingPair", ...pair };
   const last = game?.lastMove;
   if (last?.decision) return { kind: "move", decision: last.decision };
@@ -2201,7 +2203,7 @@ function panelFromMove(game) {
 }
 
 function latestTeachingPair(game) {
-  return focusedTeachingPair(game) ?? activeTeachingPair(game);
+  return focusedTeachingPair(game) ?? latestPlayerTeachingPair(game) ?? activeTeachingPair(game);
 }
 
 function panelFromTeachingFocus(game) {
@@ -2217,6 +2219,11 @@ function focusedTeachingPair(game) {
 function focusTeachingTurnForMove(game, moveOrPly) {
   const id = teachingTurnIdForMove(moveOrPly, game);
   if (id) state.teachingTurnFocusId = id;
+}
+
+function focusLatestPlayerTeachingTurn(game) {
+  const pair = latestPlayerTeachingPair(game);
+  if (pair?.id) state.teachingTurnFocusId = pair.id;
 }
 
 function syncTeachingFocus() {
@@ -2252,6 +2259,13 @@ function activeTeachingPair(game, anchorMove = null) {
     ?? latestActorMove(history, "player")
     ?? history.at(-1);
   return teachingPairForMove(game, anchor);
+}
+
+function latestPlayerTeachingPair(game) {
+  return [...normalizeTeachingTurns(game?.teachingTurns)]
+    .reverse()
+    .find((turn) => turn.playerMove || turn.playerReview)
+    ?? null;
 }
 
 function teachingPairForMove(game, anchorMove) {

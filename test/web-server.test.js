@@ -104,6 +104,9 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /deferEngine: true/);
     assert.match(script, /kind: "teachingPair"/);
     assert.match(script, /function latestTeachingPair/);
+    assert.match(script, /function latestPlayerTeachingPair/);
+    assert.match(script, /function focusLatestPlayerTeachingTurn/);
+    assert.match(script, /focusLatestPlayerTeachingTurn\(result\.state\)/);
     assert.match(script, /function activeTeachingPair/);
     assert.match(script, /teachingTurnFocusId/);
     assert.match(script, /function focusTeachingTurnForMove/);
