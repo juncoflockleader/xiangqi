@@ -144,7 +144,13 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /teachingTurn: "本回合复盘"/);
     assert.match(script, /compact: true/);
     assert.match(script, /function renderTeachingPairReasoning/);
-    assert.match(script, /TEACHING_REVIEW_HOLD_MS = 5000/);
+    assert.match(script, /TEACHING_REVIEW_HOLD_MS = 8000/);
+    assert.match(script, /pendingStage: null/);
+    assert.match(script, /state\.pendingStage = "player-review"/);
+    assert.match(script, /state\.pendingStage = "teaching-hold"/);
+    assert.match(script, /state\.pendingStage = "engine-reply"/);
+    assert.match(script, /function pendingStageLabel/);
+    assert.match(script, /reviewHoldReady: "已保留你的上一手评价。"/);
     assert.match(script, /function holdTeachingReviewBeforeEngineReply/);
     assert.match(script, /function shouldHoldTeachingReview/);
     assert.match(script, /function teachingPairForMove/);

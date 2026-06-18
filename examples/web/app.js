@@ -6,7 +6,7 @@ const DEFAULT_CLIENT_REQUEST_TIMEOUT_MS = 15 * 60 * 1000;
 const CLIENT_REQUEST_TIMEOUT_BUFFER_MS = 5000;
 const CLIENT_STATE_REFRESH_TIMEOUT_MS = 15000;
 const PENDING_STATUS_INTERVAL_MS = 1000;
-const TEACHING_REVIEW_HOLD_MS = 5000;
+const TEACHING_REVIEW_HOLD_MS = 8000;
 const TREE_NODE_WIDTH = 188;
 const TREE_NODE_HEIGHT = 96;
 const TREE_LEVEL_GAP = 96;
@@ -328,6 +328,7 @@ const zhTwTranslations = {
   moveReviewed: "已覆盤此手。",
   reviewPending: "正在覆盤你的上一手...",
   replyPending: "引擎正在思考應手...",
+  reviewHoldReady: "已保留你的上一手評價。",
   moveWaitingReview: "已落子，等待評價。",
   yourLastMove: "你的上一手",
   engineLastMove: "引擎上一手",
@@ -409,6 +410,7 @@ const zhCnTranslations = {
   moveReviewed: "已复盘此手。",
   reviewPending: "正在复盘你的上一手...",
   replyPending: "引擎正在思考应手...",
+  reviewHoldReady: "已保留你的上一手评价。",
   moveWaitingReview: "已落子，等待评价。",
   teachingTurn: "本回合复盘",
   thinking: "引擎思考中...",
@@ -497,6 +499,7 @@ const translations = {
     moveReviewed: "Move reviewed.",
     reviewPending: "Reviewing your last move...",
     replyPending: "Engine is thinking about the reply...",
+    reviewHoldReady: "Your last-move review is preserved.",
     moveWaitingReview: "Move played; waiting for review.",
     thinking: "Engine thinking...",
     thinkingShort: "Thinking",
@@ -551,6 +554,7 @@ const state = {
   game: null,
   selected: null,
   pending: false,
+  pendingStage: null,
   pendingSince: null,
   errorMessage: null,
   panel: null,
@@ -618,6 +622,7 @@ async function newGame() {
 
 async function playMove(notation) {
   await runRequest(async () => {
+    state.pendingStage = "player-review";
     const optimisticMove = renderOptimisticPlayerMove(notation);
     const result = await api("/api/move", {
       sessionId: state.sessionId,
@@ -629,6 +634,8 @@ async function playMove(notation) {
     state.treeSelectedId = latestMainlineNodeId(result.state);
     state.panel = panelFromTeachingFocus(result.state) ?? panelFromMove(result.state);
     setGame(result.state);
+    state.pendingStage = "teaching-hold";
+    renderStatus();
     await holdTeachingReviewBeforeEngineReply(result.state);
     await requestEngineMoveIfNeeded(result.state);
   });
@@ -636,6 +643,8 @@ async function playMove(notation) {
 
 async function requestEngineMoveIfNeeded(game = state.game) {
   if (!shouldRequestEngineMove(game)) return;
+  state.pendingStage = "engine-reply";
+  renderStatus();
   const result = await api("/api/engine-move", {
     sessionId: state.sessionId
   });
@@ -768,6 +777,7 @@ async function requestBest() {
 async function runRequest(task) {
   if (state.pending) return;
   state.pending = true;
+  state.pendingStage = null;
   state.pendingSince = Date.now();
   state.errorMessage = null;
   startPendingTicker();
@@ -782,6 +792,7 @@ async function runRequest(task) {
       : error.message;
   } finally {
     state.pending = false;
+    state.pendingStage = null;
     state.pendingSince = null;
     stopPendingTicker();
     if (state.game) render();
@@ -2472,8 +2483,16 @@ function gameOverText(status) {
 
 function pendingStatusText() {
   const elapsedMs = state.pendingSince ? Date.now() - state.pendingSince : 0;
-  if (elapsedMs < PENDING_STATUS_INTERVAL_MS) return t("thinking");
-  return `${t("thinking")} ${formatDuration(elapsedMs)}`;
+  const label = pendingStageLabel();
+  if (elapsedMs < PENDING_STATUS_INTERVAL_MS) return label;
+  return `${label} ${formatDuration(elapsedMs)}`;
+}
+
+function pendingStageLabel() {
+  if (state.pendingStage === "player-review") return t("reviewPending");
+  if (state.pendingStage === "teaching-hold") return t("reviewHoldReady");
+  if (state.pendingStage === "engine-reply") return t("replyPending");
+  return t("thinking");
 }
 
 function formatDuration(ms) {
