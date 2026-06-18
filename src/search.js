@@ -11,6 +11,7 @@ import {
 import {
   makeMove,
   fileOf,
+  hasCrossedRiver,
   indexOf,
   moveKey,
   moveToNotation,
@@ -129,7 +130,7 @@ const ROOT_OPENING_PRESSURE_UNDEVELOPED_FLANK_PAWN_PENALTY = 120;
 const ROOT_REPEATED_EARLY_FLANK_PAWN_PUSH_PENALTY = 80;
 const ROOT_SHIFTED_CANNON_WING_CANNON_LIFT_PENALTY = 120;
 const ROOT_THREAT_RESPONSE_MIN_BASELINE = PIECE_VALUES[PIECES.HORSE];
-const ROOT_THREAT_RESPONSE_MAX_PIECES = 31;
+const ROOT_THREAT_RESPONSE_MAX_PIECES = 32;
 const ROOT_THREAT_RESPONSE_ORDERING_WEIGHT = 250;
 const ROOT_THREAT_RESPONSE_RESIDUAL_ORDERING_WEIGHT = 100;
 const ROOT_THREAT_RESPONSE_TIE_WEIGHT = 3;
@@ -235,7 +236,8 @@ export function searchBestMove(position, options = {}) {
   )));
   const rootPieceCountValue = position.board.reduce((count, piece) => count + (piece ? 1 : 0), 0);
   const rootThreatResponseEnabled = options.useRootThreatResponse !== false
-    && rootPieceCountValue <= rootThreatResponseMaxPieces;
+    && rootPieceCountValue <= rootThreatResponseMaxPieces
+    && (rootPieceCountValue < 32 || hasCrossedRiverNonPawn(position));
   const rootHasSafeMajorCapture = rootThreatResponseEnabled && hasSafeMajorCapture(position, rootMoves);
   let bestMove = rootMoves[0];
   let bestScore = evaluatePosition(position, position.turn).score;
@@ -2839,6 +2841,15 @@ function hasSafeMajorCapture(position, moves) {
     const capture = analyzeCapture(position, move);
     return Boolean(capture?.isSafe && capture.exchangeScore >= PIECE_VALUES[PIECES.HORSE]);
   });
+}
+
+function hasCrossedRiverNonPawn(position) {
+  for (let square = 0; square < position.board.length; square += 1) {
+    const piece = position.board[square];
+    if (!piece || piece.type === PIECES.PAWN || piece.type === PIECES.KING) continue;
+    if (hasCrossedRiver(piece.side, rankOf(square))) return true;
+  }
+  return false;
 }
 
 function rootThreatResponseOrderingAdjustment(response, context) {

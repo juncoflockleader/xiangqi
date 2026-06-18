@@ -70,6 +70,30 @@ test("search answers root opponent threats before speculative checking captures"
   assert.equal(disabled.stats.rootThreatResponseTieHits, 0);
 });
 
+test("search answers threats in developed full-piece positions", () => {
+  const position = parseFen("rheakaehr/9/2c4c1/2pC2p1p/p3p4/9/P1P1P1P1P/7C1/4A4/RHEAK1EHR b");
+  const result = searchBestMove(position, {
+    depth: 5,
+    timeLimitMs: 5000,
+    useBook: false,
+    candidateLimit: 20
+  });
+  const disabled = searchBestMove(position, {
+    depth: 5,
+    timeLimitMs: 5000,
+    useBook: false,
+    candidateLimit: 20,
+    useRootThreatResponse: false
+  });
+
+  assert.equal(result.depth, 5);
+  assert.equal(result.timedOut, false);
+  assert.equal(result.bestMove.notation, "b0-a2");
+  assert.equal(disabled.bestMove.notation, "e4-e5");
+  assert.ok(result.stats.rootThreatResponseOrderHits > 0);
+  assert.ok(result.stats.rootThreatResponseTieHits > 0);
+});
+
 test("search move ordering does not leak private score metadata", () => {
   const result = searchBestMove(createInitialPosition(), {
     depth: 2,
