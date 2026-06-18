@@ -106,6 +106,8 @@ const ROOT_CENTRAL_CANNON_ROOK_CONNECT_SCORE_BONUS = 70;
 const ROOT_MIRRORED_HOME_RANK_ROOK_CONNECT_SCORE_BONUS = 170;
 const ROOT_EARLY_PAWN_DEVELOPMENT_SCORE_BONUS = 60;
 const ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_SCORE_BONUS = 100;
+const ROOT_CENTRAL_CANNON_RIGHT_HORSE_SCORE_BONUS = 30;
+const ROOT_CENTRAL_CANNON_RIGHT_HORSE_TIE_BONUS = 100;
 const ROOT_DEVELOPED_CENTRAL_CANNON_FLANK_PAWN_SCORE_BONUS = 80;
 const ROOT_DEVELOPED_CENTRAL_CANNON_FLANK_PAWN_TIE_BONUS = 90;
 const ROOT_SINGLE_SCREEN_HORSE_FAR_ELEPHANT_TIE_BONUS = 40;
@@ -753,6 +755,9 @@ function rootTieBreakScore(position, move, next, context, searchScore) {
   if (isEarlyPawnShiftedCannonAnchorElephant(position, move)) {
     score += ROOT_EARLY_PAWN_SHIFTED_CANNON_ANCHOR_ELEPHANT_TIE_BONUS;
   }
+  if (isCentralCannonRightHorseDevelopment(position, move)) {
+    score += ROOT_CENTRAL_CANNON_RIGHT_HORSE_TIE_BONUS;
+  }
   if (isDevelopedCentralCannonFlankPawnChallenge(position, move)) {
     score += ROOT_DEVELOPED_CENTRAL_CANNON_FLANK_PAWN_TIE_BONUS;
   }
@@ -792,6 +797,9 @@ function rootMoveStrategicPriorScore(position, move) {
   }
   if (isEarlyPawnCentralCannonThirdFileCounter(position, move)) {
     score += ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_SCORE_BONUS;
+  }
+  if (isCentralCannonRightHorseDevelopment(position, move)) {
+    score += ROOT_CENTRAL_CANNON_RIGHT_HORSE_SCORE_BONUS;
   }
   if (isDevelopedCentralCannonFlankPawnChallenge(position, move)) {
     score += ROOT_DEVELOPED_CENTRAL_CANNON_FLANK_PAWN_SCORE_BONUS;
@@ -987,6 +995,27 @@ function isEarlyPawnCentralCannonThirdFileCounter(position, move) {
   const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 4 : 3;
   const progress = piece.side === SIDES.RED ? fromRank - toRank : toRank - fromRank;
   return fromRank === homeRank && progress === 1;
+}
+
+function isCentralCannonRightHorseDevelopment(position, move) {
+  const piece = move.piece ?? position.board[move.from];
+  if (!piece || piece.type !== PIECES.HORSE) return false;
+  if (!hasOwnCentralCannon(position, piece.side)) return false;
+  if (!bothWingHorsesHomeForSearch(position, piece.side)) return false;
+  if (hasAdvancedOwnFlankPawn(position, piece.side)) return false;
+  if (singleScreenHorseFile(position, opponent(piece.side)) === null) return false;
+
+  const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  const fromFile = fileOf(move.from);
+  const fromRank = rankOf(move.from);
+  const toFile = fileOf(move.to);
+  const toRank = rankOf(move.to);
+  const progress = piece.side === SIDES.RED ? fromRank - toRank : toRank - fromRank;
+
+  return fromFile === BOARD_FILES - 2
+    && fromRank === homeRank
+    && toFile === BOARD_FILES - 3
+    && progress > 0;
 }
 
 function isDevelopedCentralCannonFlankPawnChallenge(position, move) {
