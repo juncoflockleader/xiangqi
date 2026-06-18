@@ -102,6 +102,9 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /"\/api\/engine-move"/);
     assert.match(script, /"\/api\/select-node"/);
     assert.match(script, /deferEngine: true/);
+    assert.match(script, /kind: "teachingPair"/);
+    assert.match(script, /function latestTeachingPair/);
+    assert.match(script, /function renderTeachingPairReasoning/);
     assert.match(script, /function fitTreeView/);
     assert.match(script, /function zoomTreeView/);
     assert.match(script, /function handleTreeWheel/);

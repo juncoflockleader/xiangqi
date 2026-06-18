@@ -152,6 +152,8 @@ const simplifiedChineseMap = Object.freeze({
   "領": "领",
   "計": "计",
   "畫": "画",
+  "牽": "牵",
+  "約": "约",
   "實": "实",
   "議": "议",
   "慮": "虑",
@@ -229,6 +231,8 @@ const traditionalChineseMap = Object.freeze({
   "系": "係",
   "制": "製",
   "胁": "脅",
+  "牵": "牽",
+  "约": "約",
   "静": "靜",
   "势": "勢",
   "护": "護",
@@ -319,6 +323,8 @@ const zhTwTranslations = {
   noDecision: "尚無決策。",
   engineSelected: "引擎已選擇一手。",
   moveReviewed: "已覆盤此手。",
+  yourLastMove: "你的上一手",
+  engineLastMove: "引擎上一手",
   thinking: "引擎思考中...",
   thinkingShort: "思考中",
   requestTimedOut: "請求等待時間過長，請重試。",
@@ -495,6 +501,8 @@ const translations = {
     bestAgreement: "matches the best move",
     bestAlternative: "best was",
     player: "player",
+    yourLastMove: "Your last move",
+    engineLastMove: "Engine last move",
     engineActor: "engine",
     emptyPoint: "empty point"
   }
@@ -929,6 +937,13 @@ function renderLastMove() {
     return;
   }
 
+  const showDefaultTeachingPair = !treeNode || treeNode.id === latestMainlineNodeId();
+  const teachingPair = showDefaultTeachingPair ? latestTeachingPair(state.game) : null;
+  if (teachingPair) {
+    renderTeachingPairSummary(teachingPair);
+    return;
+  }
+
   const last = treeNode?.kind === "main" ? treeNode.move : state.game?.lastMove;
   if (!last) {
     elements.lastMovePanel.className = "stack muted";
@@ -955,6 +970,29 @@ function renderLastMove() {
   elements.lastMovePanel.innerHTML = details.join("");
   bindTreeRestoreAction();
   bindTreeRecomputeActions(elements.lastMovePanel);
+}
+
+function renderTeachingPairSummary(pair) {
+  const details = [];
+  if (pair.playerMove && pair.playerReview) {
+    details.push(renderTeachingSummaryLine(t("yourLastMove"), pair.playerMove, localizedReviewSummary(pair.playerReview)));
+  }
+  if (pair.engineMove && pair.engineDecision) {
+    details.push(renderTeachingSummaryLine(t("engineLastMove"), pair.engineMove, localizedDecisionSummary(pair.engineDecision)));
+  }
+
+  elements.lastMovePanel.className = "stack";
+  elements.lastMovePanel.innerHTML = details.join("");
+}
+
+function renderTeachingSummaryLine(label, move, summary) {
+  const side = sideName(move.side);
+  return [
+    `<div class="line">`,
+    `<strong>${escapeHtml(label)}</strong> ${formatMoveHtml(move.notation, move.zhNotation)} <span class="score">${escapeHtml(side)} · ${escapeHtml(actorName(move.actor))}</span>`,
+    summary ? `<br><span>${escapeHtml(summary)}</span>` : "",
+    `</div>`
+  ].join("");
 }
 
 function renderTreeAnalysisSummary(node) {
@@ -1052,6 +1090,10 @@ function renderReasoning() {
     renderReview(panel.review);
     return;
   }
+  if (panel.kind === "teachingPair") {
+    renderTeachingPairReasoning(panel);
+    return;
+  }
   if (panel.kind === "treeAlternative") {
     renderAlternativeReasoning(panel.node);
     return;
@@ -1131,6 +1173,25 @@ function renderAlternativeReasoning(node) {
   elements.reasoningPanel.innerHTML = parts.join("");
 }
 
+function renderTeachingPairReasoning(pair) {
+  const parts = [];
+  if (pair.playerMove && pair.playerReview) {
+    parts.push(renderTeachingSectionHeading(t("yourLastMove"), pair.playerMove));
+    parts.push(...reviewDetailParts(pair.playerReview, { includeMove: false }));
+  }
+  if (pair.engineMove && pair.engineDecision) {
+    parts.push(renderTeachingSectionHeading(t("engineLastMove"), pair.engineMove));
+    parts.push(...decisionDetailParts(pair.engineDecision, { includeBestMove: false }));
+  }
+
+  elements.reasoningPanel.className = "stack";
+  elements.reasoningPanel.innerHTML = parts.length ? parts.join("") : t("noDecision");
+}
+
+function renderTeachingSectionHeading(label, move) {
+  return `<div class="line"><strong>${escapeHtml(label)}</strong> ${formatMoveHtml(move.notation, move.zhNotation)} <span class="score">${escapeHtml(sideName(move.side))} · ${escapeHtml(actorName(move.actor))}</span></div>`;
+}
+
 function renderDecision(decision) {
   if (!decision) {
     elements.reasoningPanel.className = "stack muted";
@@ -1138,8 +1199,15 @@ function renderDecision(decision) {
     return;
   }
 
+  const parts = decisionDetailParts(decision);
+  elements.reasoningPanel.className = "stack";
+  elements.reasoningPanel.innerHTML = parts.join("");
+}
+
+function decisionDetailParts(decision, options = {}) {
+  const includeBestMove = options.includeBestMove !== false;
   const parts = [];
-  if (decision.bestMove) {
+  if (includeBestMove && decision.bestMove) {
     parts.push(`<div class="line"><strong>${t("bestMove")}</strong> ${formatMoveHtml(decision.bestMove, decision.zhBestMove)}</div>`);
   }
   parts.push(`<div>${escapeHtml(localizedDecisionSummary(decision))}</div>`);
@@ -1156,23 +1224,31 @@ function renderDecision(decision) {
   if (reasons.length) {
     parts.push(`<ul class="reason-list">${reasons.slice(0, 5).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>`);
   }
+  return parts;
+}
 
+function renderReview(review) {
+  const parts = reviewDetailParts(review);
   elements.reasoningPanel.className = "stack";
   elements.reasoningPanel.innerHTML = parts.join("");
 }
 
-function renderReview(review) {
+function reviewDetailParts(review, options = {}) {
+  const includeMove = options.includeMove !== false;
   const parts = [
     `<div>${escapeHtml(localizedReviewSummary(review))}</div>`
   ];
-  if (review.move) parts.unshift(`<div class="line">${formatMoveHtml(review.move, review.zhMove)}</div>`);
+  if (includeMove && review.move) parts.unshift(`<div class="line">${formatMoveHtml(review.move, review.zhMove)}</div>`);
   if (review.planComparison?.summary) parts.push(`<div class="line">${escapeHtml(localizedPlanComparisonSummary(review.planComparison))}</div>`);
   if (review.practiceFocus) {
     const focus = localizedPracticeFocus(review.practiceFocus);
     parts.push(`<div class="line"><strong>${escapeHtml(focus.title)}</strong><br>${escapeHtml(focus.text)}</div>`);
   }
-  elements.reasoningPanel.className = "stack";
-  elements.reasoningPanel.innerHTML = parts.join("");
+  const reasons = localizedReviewReasons(review);
+  if (reasons.length) {
+    parts.push(`<ul class="reason-list">${reasons.slice(0, 4).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>`);
+  }
+  return parts;
 }
 
 function renderHint(hint) {
@@ -1786,6 +1862,7 @@ function findTreeNodeInSubtree(node, id) {
 function panelFromTreeSelection() {
   const node = selectedTreeNode();
   if (!node) return null;
+  if (node.kind === "main" && node.id === latestMainlineNodeId()) return null;
   if (state.treeAnalysis.has(node.id)) return { kind: "treeAnalysis", nodeId: node.id };
   if (node.kind === "analysis") return { kind: "treeBranch", nodeId: node.id };
   if (node.kind === "alternative") return { kind: "treeAlternative", node };
@@ -1893,12 +1970,33 @@ function renderSelectedMoves() {
 }
 
 function panelFromMove(game) {
-  const last = game.lastMove;
+  const pair = latestTeachingPair(game);
+  if (pair) return { kind: "teachingPair", ...pair };
+  const last = game?.lastMove;
   if (last?.decision) return { kind: "move", decision: last.decision };
   if (last?.review) return { kind: "move", review: last.review };
-  if (game.lastEngineDecision) return { kind: "move", decision: game.lastEngineDecision };
-  if (game.lastPlayerReview) return { kind: "move", review: game.lastPlayerReview };
+  if (game?.lastEngineDecision) return { kind: "move", decision: game.lastEngineDecision };
+  if (game?.lastPlayerReview) return { kind: "move", review: game.lastPlayerReview };
   return null;
+}
+
+function latestTeachingPair(game) {
+  const history = game?.history ?? [];
+  if (!history.length) return null;
+
+  const playerMove = [...history].reverse().find((move) => move.actor === "player" && move.review) ?? null;
+  const latestEngineMove = [...history].reverse().find((move) => move.actor === "engine" && move.decision) ?? null;
+  const engineMove = latestEngineMove && (!playerMove || latestEngineMove.ply > playerMove.ply)
+    ? latestEngineMove
+    : null;
+
+  if (!playerMove && !engineMove) return null;
+  return {
+    playerMove,
+    playerReview: playerMove?.review ?? null,
+    engineMove,
+    engineDecision: engineMove?.decision ?? null
+  };
 }
 
 function updateDisabled() {
@@ -2119,6 +2217,11 @@ function localizedReasons(decision) {
   return decision.reasons ?? [];
 }
 
+function localizedReviewReasons(review) {
+  if (isChineseLocale() && review.zhReasons?.length) return review.zhReasons.map(localizedChineseText);
+  return review.reasons ?? [];
+}
+
 function localizedPlanComparisonSummary(comparison) {
   if (!comparison) return "";
   const text = isChineseLocale()
@@ -2143,7 +2246,11 @@ function localizedPracticeFocus(focus) {
 
 function localizedChineseText(text) {
   const value = String(text ?? "");
-  if (state.locale === "zh-CN") return value.replace(/[\u3400-\u9fff]/g, (char) => simplifiedChineseMap[char] ?? char);
+  if (state.locale === "zh-CN") {
+    return value
+      .replace(/計畫|计画/g, "计划")
+      .replace(/[\u3400-\u9fff]/g, (char) => simplifiedChineseMap[char] ?? char);
+  }
   if (state.locale === "zh-TW") return value.replace(/[\u3400-\u9fff]/g, (char) => traditionalChineseMap[char] ?? char);
   return value;
 }
