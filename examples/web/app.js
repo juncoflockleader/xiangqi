@@ -2090,6 +2090,9 @@ function panelFromMove(game) {
 }
 
 function latestTeachingPair(game) {
+  const serializedPair = normalizeTeachingPair(game?.teachingPair);
+  if (serializedPair) return serializedPair;
+
   const history = game?.history ?? [];
   if (!history.length) return null;
 
@@ -2118,6 +2121,22 @@ function latestTeachingPair(game) {
 
 function latestActorMove(history, actor) {
   return [...history].reverse().find((move) => move.actor === actor) ?? null;
+}
+
+function normalizeTeachingPair(pair) {
+  if (!pair) return null;
+  const playerMove = pair.playerMove ?? null;
+  const engineMove = pair.engineMove ?? null;
+  const engineThinking = Boolean(pair.engineThinking);
+  if (!playerMove && !engineMove && !engineThinking) return null;
+  return {
+    playerMove,
+    playerReview: pair.playerReview ?? playerMove?.review ?? null,
+    playerReviewPending: Boolean(pair.playerReviewPending ?? (playerMove && !playerMove.review)),
+    engineMove,
+    engineDecision: pair.engineDecision ?? engineMove?.decision ?? null,
+    engineThinking
+  };
 }
 
 function updateDisabled() {

@@ -519,6 +519,7 @@ function serializeState(session, engine, config = {}) {
   const lastEngineMove = [...session.game.moves].reverse().find((move) => move.actor === "engine") ?? null;
   const lastPlayerPosition = positionBeforeEntry(lastPlayerMove);
   const lastEnginePosition = positionBeforeEntry(lastEngineMove);
+  const history = session.game.moves.map(summarizeHistoryMove);
 
   return {
     sessionId: session.id,
@@ -532,15 +533,46 @@ function serializeState(session, engine, config = {}) {
     playerTurn: status.state === "playing" && session.game.position.turn === session.playerSide,
     canUndo: session.undoStack.length > 0,
     moveCount: session.game.moves.length,
-    history: session.game.moves.map(summarizeHistoryMove),
+    history,
     lastMove: lastMove ? summarizeHistoryMove(lastMove) : null,
     lastPlayerReview: lastPlayerMove?.review ? summarizeReview(lastPlayerMove.review, lastPlayerPosition) : null,
     lastEngineDecision: lastEngineMove?.decision ? summarizeDecision(lastEngineMove.decision, lastEnginePosition) : null,
+    teachingPair: summarizeTeachingPair(history, session, status),
     backend: describeEngineBackend(engine),
     web: {
       commandTimeoutMs: config.commandTimeoutMs ?? null,
       requestTimeoutMs: config.requestTimeoutMs ?? null
     }
+  };
+}
+
+function summarizeTeachingPair(history, session, status) {
+  if (!history.length) return null;
+
+  const last = history.at(-1);
+  const playerMove = last?.actor === "player"
+    ? last
+    : [...history].reverse().find((move) => move.actor === "player" && move.ply < last.ply) ?? null;
+  const engineMove = last?.actor === "engine"
+    ? last
+    : playerMove
+      ? history.find((move) => move.actor === "engine" && move.ply > playerMove.ply) ?? null
+      : [...history].reverse().find((move) => move.actor === "engine") ?? null;
+  const engineThinking = Boolean(
+    playerMove
+    && !engineMove
+    && status.state === "playing"
+    && session.game.position.turn === session.engineSide
+  );
+
+  if (!playerMove && !engineMove && !engineThinking) return null;
+  return {
+    playerMove,
+    playerReview: playerMove?.review ?? null,
+    playerReviewPending: Boolean(playerMove && !playerMove.review),
+    engineMove,
+    engineDecision: engineMove?.decision ?? null,
+    engineThinking
   };
 }
 

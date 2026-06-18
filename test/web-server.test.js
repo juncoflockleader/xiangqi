@@ -104,8 +104,10 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /deferEngine: true/);
     assert.match(script, /kind: "teachingPair"/);
     assert.match(script, /function latestTeachingPair/);
+    assert.match(script, /game\?\.teachingPair/);
     assert.match(script, /playerReviewPending/);
     assert.match(script, /engineThinking/);
+    assert.match(script, /function normalizeTeachingPair/);
     assert.match(script, /function renderTeachingMoveCard/);
     assert.match(script, /function renderTeachingPairReasoning/);
     assert.match(script, /reviewPending: "正在复盘你的上一手\.\.\."/);
@@ -268,6 +270,10 @@ test("web server plays a player move, engine reply, hints, best move, and undo",
     assert.equal(moved.state.playerTurn, true);
     assert.equal(moved.state.lastPlayerReview.move, "h7-e7");
     assert.equal(moved.state.lastPlayerReview.zhMove, "炮二平五");
+    assert.equal(moved.state.teachingPair.playerMove.notation, "h7-e7");
+    assert.equal(moved.state.teachingPair.playerReview.move, "h7-e7");
+    assert.equal(moved.state.teachingPair.engineMove.notation, moved.state.history[1].notation);
+    assert.equal(moved.state.teachingPair.engineDecision.bestMove, moved.state.history[1].notation);
     if (moved.state.lastPlayerReview.planComparison) {
       assert.equal(typeof moved.state.lastPlayerReview.planComparison.zhSummary, "string");
     }
@@ -315,6 +321,11 @@ test("web server defers engine replies and can continue from tree nodes", async 
     assert.equal(deferred.state.history[0].notation, "h7-e7");
     assert.equal(deferred.state.history[0].review.move, "h7-e7");
     assert.equal(deferred.state.lastPlayerReview.move, "h7-e7");
+    assert.equal(deferred.state.teachingPair.playerMove.notation, "h7-e7");
+    assert.equal(deferred.state.teachingPair.playerReview.move, "h7-e7");
+    assert.equal(deferred.state.teachingPair.engineMove, null);
+    assert.equal(deferred.state.teachingPair.engineDecision, null);
+    assert.equal(deferred.state.teachingPair.engineThinking, true);
     assert.equal(deferred.state.turn, "black");
     assert.equal(deferred.state.playerTurn, false);
 
@@ -323,6 +334,10 @@ test("web server defers engine replies and can continue from tree nodes", async 
     assert.equal(engineReply.state.history.length, 2);
     assert.equal(engineReply.state.lastPlayerReview.move, "h7-e7");
     assert.equal(engineReply.state.lastEngineDecision.bestMove, engineReply.state.history[1].notation);
+    assert.equal(engineReply.state.teachingPair.playerReview.move, "h7-e7");
+    assert.equal(engineReply.state.teachingPair.engineMove.notation, engineReply.state.history[1].notation);
+    assert.equal(engineReply.state.teachingPair.engineDecision.bestMove, engineReply.state.history[1].notation);
+    assert.equal(engineReply.state.teachingPair.engineThinking, false);
     assert.equal(engineReply.state.playerTurn, true);
 
     const alternative = engineReply.state.history[1].decision.alternatives[0];
