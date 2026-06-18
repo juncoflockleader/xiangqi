@@ -102,7 +102,9 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function renderMiniBoard/);
     assert.match(script, /function recomputeTreeNode/);
     assert.match(script, /"\/api\/engine-move"/);
+    assert.match(script, /"\/api\/review-last-player-move"/);
     assert.match(script, /"\/api\/select-node"/);
+    assert.match(script, /reviewPlayer: false/);
     assert.match(script, /deferEngine: true/);
     assert.match(script, /kind: "teachingPair"/);
     assert.match(script, /function latestTeachingPair/);
@@ -389,39 +391,58 @@ test("web server defers engine replies and can continue from tree nodes", async 
     const deferred = await postJson(`${app.url}/api/move`, {
       sessionId,
       move: "h7-e7",
+      reviewPlayer: false,
       deferEngine: true
     });
 
     assert.equal(deferred.ok, true);
     assert.equal(deferred.state.history.length, 1);
     assert.equal(deferred.state.history[0].notation, "h7-e7");
-    assert.equal(deferred.state.history[0].review.move, "h7-e7");
-    assert.equal(deferred.state.lastPlayerReview.move, "h7-e7");
+    assert.equal(deferred.state.history[0].review, null);
+    assert.equal(deferred.state.lastPlayerReview, null);
     assert.equal(deferred.state.teachingPair.playerMove.notation, "h7-e7");
     assert.equal(deferred.state.teachingPair.id, "turn-1");
-    assert.equal(deferred.state.teachingPair.playerReview.move, "h7-e7");
+    assert.equal(deferred.state.teachingPair.playerReview, null);
+    assert.equal(deferred.state.teachingPair.playerReviewPending, true);
     assert.equal(deferred.state.teachingPair.engineMove, null);
     assert.equal(deferred.state.teachingPair.engineDecision, null);
     assert.equal(deferred.state.teachingPair.engineThinking, true);
     assert.equal(deferred.state.teachingTurns.length, 1);
     assert.equal(deferred.state.teachingTurns[0].id, "turn-1");
     assert.equal(deferred.state.teachingTurns[0].playerMove.notation, "h7-e7");
-    assert.equal(deferred.state.teachingTurns[0].playerReview.move, "h7-e7");
+    assert.equal(deferred.state.teachingTurns[0].playerReview, null);
+    assert.equal(deferred.state.teachingTurns[0].playerReviewPending, true);
     assert.equal(deferred.state.teachingTurns[0].engineMove, null);
     assert.equal(deferred.state.teachingTurns[0].engineDecision, null);
     assert.equal(deferred.state.teachingTurns[0].engineThinking, true);
     assert.equal(deferred.state.latestPlayerTeachingTurn.id, "turn-1");
-    assert.equal(deferred.state.latestPlayerTeachingTurn.playerReview.move, "h7-e7");
+    assert.equal(deferred.state.latestPlayerTeachingTurn.playerReview, null);
+    assert.equal(deferred.state.latestPlayerTeachingTurn.playerReviewPending, true);
     assert.equal(deferred.state.latestPlayerTeachingTurn.engineMove, null);
     assert.equal(deferred.state.latestPlayerTeachingTurn.engineThinking, true);
     assert.equal(deferred.state.teachingTurn.playerMove.notation, "h7-e7");
     assert.equal(deferred.state.teachingTurn.id, "turn-1");
-    assert.equal(deferred.state.teachingTurn.playerReview.move, "h7-e7");
+    assert.equal(deferred.state.teachingTurn.playerReview, null);
+    assert.equal(deferred.state.teachingTurn.playerReviewPending, true);
     assert.equal(deferred.state.teachingTurn.engineMove, null);
     assert.equal(deferred.state.teachingTurn.engineDecision, null);
     assert.equal(deferred.state.teachingTurn.engineThinking, true);
     assert.equal(deferred.state.turn, "black");
     assert.equal(deferred.state.playerTurn, false);
+
+    const reviewed = await postJson(`${app.url}/api/review-last-player-move`, { sessionId });
+    assert.equal(reviewed.ok, true);
+    assert.equal(reviewed.state.history.length, 1);
+    assert.equal(reviewed.state.history[0].review.move, "h7-e7");
+    assert.equal(reviewed.state.lastPlayerReview.move, "h7-e7");
+    assert.equal(reviewed.state.teachingPair.id, "turn-1");
+    assert.equal(reviewed.state.teachingPair.playerReview.move, "h7-e7");
+    assert.equal(reviewed.state.teachingPair.playerReviewPending, false);
+    assert.equal(reviewed.state.teachingPair.engineMove, null);
+    assert.equal(reviewed.state.teachingPair.engineThinking, true);
+    assert.equal(reviewed.state.latestPlayerTeachingTurn.playerReview.move, "h7-e7");
+    assert.equal(reviewed.state.teachingTurn.playerReview.move, "h7-e7");
+    assert.equal(reviewed.state.playerTurn, false);
 
     const engineReply = await postJson(`${app.url}/api/engine-move`, { sessionId });
     assert.equal(engineReply.ok, true);
@@ -482,6 +503,11 @@ test("web server defers engine replies and can continue from tree nodes", async 
     assert.equal(deferredJump.state.teachingPair.engineThinking, true);
     assert.equal(deferredJump.state.playerTurn, false);
 
+    const reviewedAgain = await postJson(`${app.url}/api/review-last-player-move`, { sessionId });
+    assert.equal(reviewedAgain.ok, true);
+    assert.equal(reviewedAgain.state.history[0].review.move, "h7-e7");
+    assert.equal(reviewedAgain.state.teachingTurn.playerReview.move, "h7-e7");
+
     const continued = await postJson(`${app.url}/api/engine-move`, { sessionId });
     assert.equal(continued.ok, true);
     assert.equal(continued.state.history.length, 2);
@@ -526,6 +552,7 @@ test("web server preserves teaching turns when the engine opens first", async ()
     const deferred = await postJson(`${app.url}/api/move`, {
       sessionId,
       move: playerMove,
+      reviewPlayer: false,
       deferEngine: true
     });
 
@@ -535,16 +562,26 @@ test("web server preserves teaching turns when the engine opens first", async ()
     assert.equal(deferred.state.teachingTurns[1].id, "turn-2");
     assert.equal(deferred.state.teachingTurns[0].engineMove.notation, created.state.history[0].notation);
     assert.equal(deferred.state.teachingTurns[1].playerMove.notation, playerMove);
-    assert.equal(deferred.state.teachingTurns[1].playerReview.move, playerMove);
+    assert.equal(deferred.state.teachingTurns[1].playerReview, null);
+    assert.equal(deferred.state.teachingTurns[1].playerReviewPending, true);
     assert.equal(deferred.state.teachingTurns[1].engineMove, null);
     assert.equal(deferred.state.teachingTurns[1].engineThinking, true);
     assert.equal(deferred.state.latestPlayerTeachingTurn.id, "turn-2");
     assert.equal(deferred.state.latestPlayerTeachingTurn.playerMove.notation, playerMove);
-    assert.equal(deferred.state.latestPlayerTeachingTurn.playerReview.move, playerMove);
+    assert.equal(deferred.state.latestPlayerTeachingTurn.playerReview, null);
+    assert.equal(deferred.state.latestPlayerTeachingTurn.playerReviewPending, true);
     assert.equal(deferred.state.latestPlayerTeachingTurn.engineMove, null);
     assert.equal(deferred.state.teachingPair.playerMove.notation, playerMove);
     assert.equal(deferred.state.teachingPair.id, "turn-2");
-    assert.equal(deferred.state.teachingPair.playerReview.move, playerMove);
+    assert.equal(deferred.state.teachingPair.playerReview, null);
+    assert.equal(deferred.state.teachingPair.playerReviewPending, true);
+
+    const reviewed = await postJson(`${app.url}/api/review-last-player-move`, { sessionId });
+    assert.equal(reviewed.state.history.length, 2);
+    assert.equal(reviewed.state.history[1].review.move, playerMove);
+    assert.equal(reviewed.state.teachingTurns[1].playerReview.move, playerMove);
+    assert.equal(reviewed.state.latestPlayerTeachingTurn.playerReview.move, playerMove);
+    assert.equal(reviewed.state.teachingPair.playerReview.move, playerMove);
 
     const replied = await postJson(`${app.url}/api/engine-move`, { sessionId });
     assert.equal(replied.state.history.length, 3);

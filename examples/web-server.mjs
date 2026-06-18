@@ -244,8 +244,10 @@ async function handleApiPost(context, url) {
     await enqueueSession(session, async () => {
       ensurePlayerTurn(session);
       const before = session.game;
+      const reviewPlayer = body.reviewPlayer ?? body.review;
       session.game = await playGameMoveAsync(session.game, context.engine, String(body.move ?? ""), {
         actor: "player",
+        review: reviewPlayer === false ? false : undefined,
         reviewOptions: resolveWebPlayerReviewOptions(session)
       });
       session.undoStack.push(before);
@@ -259,6 +261,12 @@ async function handleApiPost(context, url) {
   if (url.pathname === "/api/engine-move") {
     const session = requireSession(context.sessions, body.sessionId);
     await enqueueSession(session, () => maybePlayEngineTurn(session, context.engine));
+    return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine, context.config) });
+  }
+
+  if (url.pathname === "/api/review-last-player-move") {
+    const session = requireSession(context.sessions, body.sessionId);
+    await enqueueSession(session, () => reviewLastPlayerMove(session, context.engine));
     return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine, context.config) });
   }
 
@@ -393,6 +401,37 @@ async function maybePlayEngineTurn(session, engine) {
     review: false,
     searchOptions: searchOptions(session)
   });
+}
+
+async function reviewLastPlayerMove(session, engine) {
+  const moveIndex = findLastPlayerMoveIndex(session.game);
+  if (moveIndex < 0) throw httpError(400, "No player move to review.");
+
+  const entry = session.game.moves[moveIndex];
+  if (entry.review) return;
+
+  const before = session.game.positions[moveIndex] ?? positionBeforeEntry(entry);
+  if (!before) throw httpError(400, `No position before player move ${entry.notation}.`);
+
+  const review = await engine.reviewMove(before, entry.move ?? parseMoveNotation(entry.notation), {
+    ...resolveWebPlayerReviewOptions(session),
+    history: session.game.positions.slice(0, moveIndex + 1).map(positionKey),
+    initialPosition: session.game.initialPosition,
+    moveHistory: session.game.moves.slice(0, moveIndex).map((move) => move.notation)
+  });
+  session.game = {
+    ...session.game,
+    moves: session.game.moves.map((move, index) => (
+      index === moveIndex ? { ...move, review } : move
+    ))
+  };
+}
+
+function findLastPlayerMoveIndex(game) {
+  for (let index = game.moves.length - 1; index >= 0; index -= 1) {
+    if (game.moves[index]?.actor === "player") return index;
+  }
+  return -1;
 }
 
 function searchOptions(session) {

@@ -633,15 +633,23 @@ async function playMove(notation) {
     const result = await api("/api/move", {
       sessionId: state.sessionId,
       move: notation,
+      reviewPlayer: false,
       deferEngine: true
     });
     focusTeachingTurnForMove(result.state, optimisticMove);
     focusLatestMainlineTeachingView(result.state);
     setGame(result.state);
+    state.pendingStage = "player-review";
+    renderStatus();
+    const reviewed = await api("/api/review-last-player-move", {
+      sessionId: state.sessionId
+    });
+    focusLatestMainlineTeachingView(reviewed.state);
+    setGame(reviewed.state);
     state.pendingStage = "teaching-hold";
     renderStatus();
-    await holdTeachingReviewBeforeEngineReply(result.state);
-    await requestEngineMoveIfNeeded(result.state);
+    await holdTeachingReviewBeforeEngineReply(reviewed.state);
+    await requestEngineMoveIfNeeded(reviewed.state);
   });
 }
 
