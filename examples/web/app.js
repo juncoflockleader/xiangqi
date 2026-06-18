@@ -1212,17 +1212,21 @@ function buildMoveTree() {
   }));
 
   mainline.forEach((node, index) => {
-    const continuation = mainline[index + 1] ? [mainline[index + 1]] : [];
-    node.children = [
-      ...continuation,
-      ...treeAlternativesForMove(node.move, node.id)
-    ];
+    const next = mainline[index + 1];
+    node.children = next ? moveOptionsForPly(next) : [];
   });
 
-  return [attachAnalyzedChildren(mainline[0])];
+  return moveOptionsForPly(mainline[0]).map(attachAnalyzedChildren);
 }
 
-function treeAlternativesForMove(move, parentId) {
+function moveOptionsForPly(mainNode) {
+  return [
+    mainNode,
+    ...treeAlternativesForMove(mainNode.move, mainNode.id)
+  ];
+}
+
+function treeAlternativesForMove(move, siblingOfId) {
   const sources = [{
     kind: "decision",
     alternatives: move.decision?.alternatives ?? []
@@ -1240,7 +1244,7 @@ function treeAlternativesForMove(move, parentId) {
       alternatives.push({
         id: `alt-${move.ply}-${source.kind}-${index}`,
         kind: "alternative",
-        parentId,
+        siblingOfId,
         parentMove: move,
         source: source.kind,
         alternative,

@@ -92,6 +92,7 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(page, /role="tree"/);
     assert.match(script, /function renderBoard/);
     assert.match(script, /function buildMoveTree/);
+    assert.match(script, /function moveOptionsForPly/);
     assert.match(script, /function layoutMoveTree/);
     assert.match(script, /function renderTreeEdges/);
     assert.match(script, /function renderTreeEdgeLabel/);
