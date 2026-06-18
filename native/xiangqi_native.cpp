@@ -78,6 +78,15 @@ constexpr int kRootMultiPvQuietBoostMinDepth = 7;
 constexpr int kRootMultiPvQuietBoostMoveIndex = 5;
 constexpr int kFollowupReductionMalusScale = 48;
 constexpr int kRootBadCaptureReductionLossMargin = 120;
+constexpr int kRootThreatResponseMaxPieces = 32;
+constexpr int kRootThreatResponseMinBaseline = 450;
+constexpr int kRootThreatResponseOrderingWeight = 250;
+constexpr int kRootThreatResponseResidualOrderingWeight = 100;
+constexpr int kRootThreatCheckBonus = 250;
+constexpr int kRootThreatSafeCaptureBonus = 80;
+constexpr int kRootThreatExchangeClampMin = -200;
+constexpr int kRootThreatExchangeClampMax = 400;
+constexpr int kRootThreatResponseFinalMaxLoss = 120;
 constexpr int kRootTrackedMultiPvLimit = 8;
 constexpr int kRootMultiPvReductionMargin = 5;
 constexpr int kQSeePruneMaxDepth = 4;
@@ -758,6 +767,16 @@ struct RootMove {
   KnownChildState child;
 };
 
+struct RootThreatProfile {
+  int top = 0;
+  int burden = 0;
+};
+
+struct RootThreatResponse {
+  int relief = 0;
+  int residual = 0;
+};
+
 class TranspositionTable;
 class EvalCache;
 
@@ -937,6 +956,8 @@ struct SearchState {
   int64_t rootBadCaptureReductions = 0;
   int64_t rootOrderHits = 0;
   int64_t rootOrderStores = 0;
+  int64_t rootThreatResponseOrderHits = 0;
+  int64_t rootThreatResponsePromotions = 0;
   int64_t extensions = 0;
   int64_t recaptureExtensions = 0;
   int64_t pawnThreatExtensions = 0;
@@ -1103,6 +1124,8 @@ struct SearchState {
     rootBadCaptureReductions = 0;
     rootOrderHits = 0;
     rootOrderStores = 0;
+    rootThreatResponseOrderHits = 0;
+    rootThreatResponsePromotions = 0;
     extensions = 0;
     recaptureExtensions = 0;
     pawnThreatExtensions = 0;
@@ -3220,6 +3243,150 @@ bool isKingLinePressureExtensionMove(const Board& board, const Move& move, int e
   return blockers == 2 && (advancedAttacker || centralFilePressure || rootPieceCount <= 10);
 }
 
+bool hasCrossedRiverNonPawn(const Board& board) {
+  for (int square = 0; square < kSquares; square += 1) {
+    const int piece = board.cells[square];
+    if (piece == 0) continue;
+    const int type = pieceCodeType(piece);
+    if (type == King || type == Pawn) continue;
+    if (crossedRiver(pieceCodeSide(piece), rankOf(square))) return true;
+  }
+  return false;
+}
+
+bool hasSafeMajorRootCapture(const Board& root, const std::vector<Move>& rootMoves, SearchState& state) {
+  for (const Move& move : rootMoves) {
+    if (move.captured == 0 || pieceCodeType(move.captured) == King) continue;
+    const bool capturedMajor = pieceCodeValue(move.captured) >= pieceTypeValue(Rook);
+    const bool rookWinsInvader = pieceCodeType(move.piece) == Rook
+        && pieceCodeValue(move.captured) >= pieceTypeValue(Horse)
+        && crossedRiver(pieceCodeSide(move.captured), rankOf(move.to));
+    if (!capturedMajor && !rookWinsInvader) continue;
+    const int exchangeScore = pieceCodeValue(move.captured) - badCaptureLossForCapture(root, move, state);
+    if (capturedMajor && exchangeScore >= pieceTypeValue(Horse)) return true;
+    if (rookWinsInvader && exchangeScore >= 0) return true;
+  }
+  return false;
+}
+
+bool shouldUseRootThreatResponse(const Board& root, const std::vector<Move>& rootMoves, SearchState& state) {
+  if (root.totalPieceCount <= 0 || root.totalPieceCount > kRootThreatResponseMaxPieces) return false;
+  if (root.totalPieceCount >= kRootThreatResponseMaxPieces && !hasCrossedRiverNonPawn(root)) return false;
+  return !hasSafeMajorRootCapture(root, rootMoves, state);
+}
+
+int rootThreatMoveScore(const Board& board, const Move& move, int enemyKing, SearchState& state) {
+  int score = 0;
+  if (moveGivesCheck(board, move, enemyKing, state)) score += kRootThreatCheckBonus;
+
+  if (move.captured != 0) {
+    if (pieceCodeType(move.captured) == King) return kMate - 1;
+
+    const int capturedValue = pieceCodeValue(move.captured);
+    const int badLoss = badCaptureLossForCapture(board, move, state);
+    const int exchangeScore = capturedValue - badLoss;
+    score += capturedValue;
+    score += std::clamp(exchangeScore, kRootThreatExchangeClampMin, kRootThreatExchangeClampMax);
+    if (badLoss <= 0) score += kRootThreatSafeCaptureBonus;
+  }
+
+  return score;
+}
+
+RootThreatProfile rootThreatProfile(Board& board, int side, SearchState& state) {
+  RootThreatProfile profile;
+  const int ownKing = trackedKingSquare(board, side);
+  const bool inCheck = isInCheckKnownKing(board, side, ownKing);
+  auto moves = generateLegalMoves(board, side, false, ownKing, inCheck);
+  const int enemyKing = trackedKingSquare(board, -side);
+  std::array<int, 4> topScores{};
+
+  for (Move& move : moves) {
+    const int score = rootThreatMoveScore(board, move, enemyKing, state);
+    if (score <= 0 || score <= topScores.back()) continue;
+
+    int index = static_cast<int>(topScores.size()) - 1;
+    while (index > 0 && score > topScores[static_cast<std::size_t>(index - 1)]) {
+      topScores[static_cast<std::size_t>(index)] = topScores[static_cast<std::size_t>(index - 1)];
+      index -= 1;
+    }
+    topScores[static_cast<std::size_t>(index)] = score;
+  }
+
+  profile.top = topScores[0];
+  for (int score : topScores) profile.burden += score;
+  return profile;
+}
+
+RootThreatResponse rootThreatResponseForMove(
+    const Board& root,
+    const Move& move,
+    const RootThreatProfile& baseline,
+    SearchState& state) {
+  Board child = root;
+  Move childMove = move;
+  makeMoveWithKnownKey(child, childMove, keyAfterMove(root, childMove));
+  const RootThreatProfile after = rootThreatProfile(child, child.side, state);
+
+  RootThreatResponse response;
+  response.relief = std::max(0, baseline.top - after.top);
+  response.residual = std::max(0, after.burden - after.top);
+  return response;
+}
+
+int rootThreatResponseOrderingScore(
+    const Board& root,
+    const Move& move,
+    const RootThreatProfile& baseline,
+    bool enabled,
+    SearchState& state) {
+  if (!enabled || baseline.top < kRootThreatResponseMinBaseline) return 0;
+
+  const RootThreatResponse response = rootThreatResponseForMove(root, move, baseline, state);
+  const int score = response.relief * kRootThreatResponseOrderingWeight
+      - response.residual * kRootThreatResponseResidualOrderingWeight;
+  if (score <= 0) return 0;
+
+  state.rootThreatResponseOrderHits += 1;
+  return score;
+}
+
+void applyRootThreatResponseFinalPreference(
+    std::vector<RootLine>& lines,
+    const Board& root,
+    bool enabled,
+    SearchState& state) {
+  if (!enabled || lines.size() <= 1) return;
+
+  Board baselineBoard = root;
+  const RootThreatProfile baseline = rootThreatProfile(baselineBoard, -root.side, state);
+  if (baseline.top < kRootThreatResponseMinBaseline) return;
+
+  const int bestScore = lines.front().score;
+  auto preferred = lines.begin();
+  auto responseScore = [&](const Move& move) {
+    const RootThreatResponse response = rootThreatResponseForMove(root, move, baseline, state);
+    if (response.relief < baseline.top) return 0;
+    return response.relief * kRootThreatResponseOrderingWeight
+        - response.residual * kRootThreatResponseResidualOrderingWeight;
+  };
+  int preferredResponse = responseScore(preferred->move);
+
+  for (auto it = lines.begin() + 1; it != lines.end(); ++it) {
+    if (bestScore - it->score > kRootThreatResponseFinalMaxLoss) continue;
+    const int response = responseScore(it->move);
+    if (response > preferredResponse || (response == preferredResponse && response > 0 && it->score > preferred->score)) {
+      preferred = it;
+      preferredResponse = response;
+    }
+  }
+
+  if (preferred != lines.begin() && preferredResponse > 0) {
+    std::rotate(lines.begin(), preferred, preferred + 1);
+    state.rootThreatResponsePromotions += 1;
+  }
+}
+
 bool hasNullMoveMaterial(const Board& board, int side) {
   return side == kRed ? board.redNullMoveMaterial > 0 : board.blackNullMoveMaterial > 0;
 }
@@ -4845,7 +5012,8 @@ void orderRootMoves(
     const Board& root,
     int rootEnemyKing,
     const Move& rootPreviousMove,
-    bool rootInCheck) {
+    bool rootInCheck,
+    bool useRootThreatResponse) {
   if (rootMoves.size() <= 1) return;
 
   struct ScoredRootMove {
@@ -4856,12 +5024,19 @@ void orderRootMoves(
   const bool hashMoveValid = validMove(rootHashMove);
   const bool counterMoveValid = validMove(rootCounterMove);
   const Move previousOwnMove = previousOwnMoveFor(state, 0);
+  RootThreatProfile threatBaseline;
+  bool threatResponseEnabled = false;
+  if (useRootThreatResponse) {
+    Board baselineBoard = root;
+    threatBaseline = rootThreatProfile(baselineBoard, -root.side, state);
+    threatResponseEnabled = threatBaseline.top >= kRootThreatResponseMinBaseline;
+  }
   std::vector<ScoredRootMove> scored;
   scored.reserve(rootMoves.size());
 
   for (int index = 0; index < static_cast<int>(rootMoves.size()); index += 1) {
     const RootMove& rootMove = rootMoves[static_cast<std::size_t>(index)];
-    const int score = moveOrderingScore(
+    int score = moveOrderingScore(
         rootMove.move,
         state,
         0,
@@ -4878,6 +5053,7 @@ void orderRootMoves(
         true,
         false,
         rootMove.child.inCheck ? 1 : 0);
+    score += rootThreatResponseOrderingScore(root, rootMove.move, threatBaseline, threatResponseEnabled, state);
     scored.push_back({rootMove, score, index});
   }
 
@@ -7112,7 +7288,17 @@ std::vector<RootLine> searchRoot(
   for (Move& move : rootMoves) {
     orderedRootMoves.push_back({move, knownChildStateAfterMove(root, move, rootEnemyKing, state)});
   }
-  orderRootMoves(orderedRootMoves, state, rootHashMove, rootCounterMove, root, rootEnemyKing, rootPreviousMove, rootInCheck);
+  const bool useRootThreatResponse = shouldUseRootThreatResponse(root, rootMoves, state);
+  orderRootMoves(
+      orderedRootMoves,
+      state,
+      rootHashMove,
+      rootCounterMove,
+      root,
+      rootEnemyKing,
+      rootPreviousMove,
+      rootInCheck,
+      useRootThreatResponse);
   applyRootOrderMemory(orderedRootMoves, state, root.key, rootHashMove, unrestrictedRootSearch);
   applyTimedOpeningRootBias(orderedRootMoves, root, useTimedOpeningPriors);
   std::vector<RootLine> bestLines;
@@ -7181,6 +7367,7 @@ std::vector<RootLine> searchRoot(
     std::stable_sort(depthLines.begin(), depthLines.end(), [](const RootLine& left, const RootLine& right) {
       return left.score > right.score;
     });
+    applyRootThreatResponseFinalPreference(depthLines, root, useRootThreatResponse, state);
     applyTimedOpeningFinalPreference(depthLines, root, useTimedOpeningPriors, state);
     if (unrestrictedRootSearch && validMove(depthLines.front().move)) {
       if (tt.store(root.key, depth, scoreToTt(depthLines.front().score, 0), kTtExact, depthLines.front().move)) {
@@ -7198,6 +7385,7 @@ std::vector<RootLine> searchRoot(
   }
 
   const int limit = std::max(1, std::min<int>(multiPv, bestLines.size()));
+  applyRootThreatResponseFinalPreference(bestLines, root, useRootThreatResponse, state);
   applyTimedOpeningFinalPreference(bestLines, root, useTimedOpeningPriors, state);
   storeRootOrderMemory(state, root.key, bestLines, unrestrictedRootSearch && !state.stopped);
   bestLines.resize(limit);
@@ -7378,6 +7566,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " rootsee " << state.rootBadCaptureReductions
               << " roottt " << state.rootTtHits << " rootttstores " << state.rootTtStores
               << " rootord " << state.rootOrderHits << " rootordstores " << state.rootOrderStores
+              << " rthord " << state.rootThreatResponseOrderHits << " rthpref " << state.rootThreatResponsePromotions
               << " pvs " << state.pvsResearches
               << " asp " << state.aspirationSearches << " aspwide " << state.aspirationWidenedSearches
               << " asphi " << state.aspirationFailHigh << " asplo " << state.aspirationFailLow
@@ -7466,6 +7655,7 @@ void writeSearchResult(const std::vector<RootLine>& lines, const SearchState& st
               << " rootsee " << state.rootBadCaptureReductions
               << " roottt " << state.rootTtHits << " rootttstores " << state.rootTtStores
               << " rootord " << state.rootOrderHits << " rootordstores " << state.rootOrderStores
+              << " rthord " << state.rootThreatResponseOrderHits << " rthpref " << state.rootThreatResponsePromotions
               << " pvs " << state.pvsResearches
               << " asp " << state.aspirationSearches << " aspwide " << state.aspirationWidenedSearches
               << " asphi " << state.aspirationFailHigh << " asplo " << state.aspirationFailLow

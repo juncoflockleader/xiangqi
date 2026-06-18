@@ -651,6 +651,54 @@ test("local C++ engine keeps the refreshed Pikafish shifted-cannon central respo
   }
 });
 
+test("local C++ engine balances root threat response against invaded-piece captures", async (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const backend = createUcciEngineBackend({
+    command: build.output,
+    protocol: "uci",
+    depth: 6,
+    timeLimitMs: 1000,
+    startupTimeoutMs: 3000,
+    commandTimeoutMs: 5000
+  });
+
+  try {
+    const threatPressure = parseFen("1heak1ehr/3ra4/7c1/2p3p1p/p3p4/9/c1P1P1P1P/R2C3C1/4A4/1HEA1KEHR b");
+    const fullThreatNeutralization = parseFen("1heak1ehr/4a4/7c1/2C5p/p3p1p2/r8/c1P1P1P1P/R6C1/4AK3/1HEA2EHR b");
+    const invadedBackRank = parseFen("rCeak1ehr/4a4/c1h4c1/p1p3p1p/4p4/P8/2P1P1P1P/4E2C1/3H5/1R1AKAEHR b");
+
+    const threatPressureResult = await backend.chooseMove(threatPressure, {
+      useBook: false,
+      depth: 6,
+      timeLimitMs: 1000
+    });
+    const fullNeutralizationResult = await backend.chooseMove(fullThreatNeutralization, {
+      useBook: false,
+      depth: 6,
+      timeLimitMs: 1000
+    });
+    const invadedBackRankResult = await backend.chooseMove(invadedBackRank, {
+      useBook: false,
+      depth: 6,
+      timeLimitMs: 1000
+    });
+
+    assert.equal(moveToNotation(threatPressureResult.bestMove), "a4-a5");
+    assert.equal(moveToNotation(fullNeutralizationResult.bestMove), "a5-f5");
+    assert.equal(moveToNotation(invadedBackRankResult.bestMove), "a0-b0");
+    assert.ok(threatPressureResult.nodes > 0);
+    assert.ok(fullNeutralizationResult.nodes > 0);
+    assert.ok(invadedBackRankResult.nodes > 0);
+  } finally {
+    await backend.close();
+  }
+});
+
 test("local C++ engine preserves mate-range TT scores across repeated searches", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {
