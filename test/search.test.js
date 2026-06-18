@@ -188,6 +188,24 @@ test("search counters central-cannon early pawns before lifting the edge rook", 
   assert.ok(edgeRookLift.score < result.score || edgeRookLift.tieBreak < result.candidates[0].tieBreak);
 });
 
+test("search prioritizes the third-file pawn counter in central-cannon early-pawn lines", () => {
+  const position = parseFen("rheakae1r/9/1c4hc1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b");
+  const result = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 8000,
+    useBook: false,
+    candidateLimit: 99
+  });
+
+  assert.equal(result.depth, 6);
+  assert.equal(result.timedOut, false);
+  assert.equal(result.bestMove.notation, "c3-c4");
+
+  const leftHorse = result.candidates.find((item) => item.move.notation === "b0-c2");
+  assert.ok(leftHorse);
+  assert.ok(leftHorse.score < result.score || leftHorse.tieBreak < result.candidates[0].tieBreak);
+});
+
 test("search develops before loose cannon and pawn shifts under shifted-cannon pressure", () => {
   const position = parseFen("rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/4C2C1/9/RHEAKAEHR b");
   const result = searchBestMove(position, {

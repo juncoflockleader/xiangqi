@@ -106,6 +106,7 @@ const ROOT_CENTRAL_CANNON_ROOK_CONNECT_SCORE_BONUS = 70;
 const ROOT_MIRRORED_HOME_RANK_ROOK_CONNECT_SCORE_BONUS = 170;
 const ROOT_EARLY_PAWN_DEVELOPMENT_SCORE_BONUS = 60;
 const ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_SCORE_BONUS = 100;
+const ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_TIE_BONUS = 120;
 const ROOT_CENTRAL_CANNON_RIGHT_HORSE_SCORE_BONUS = 30;
 const ROOT_CENTRAL_CANNON_RIGHT_HORSE_TIE_BONUS = 100;
 const ROOT_DEVELOPED_CENTRAL_CANNON_FLANK_PAWN_SCORE_BONUS = 80;
@@ -758,6 +759,9 @@ function rootTieBreakScore(position, move, next, context, searchScore) {
   if (isCentralCannonRightHorseDevelopment(position, move)) {
     score += ROOT_CENTRAL_CANNON_RIGHT_HORSE_TIE_BONUS;
   }
+  if (isEarlyPawnCentralCannonOppositeHorseCounter(position, move)) {
+    score += ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_TIE_BONUS;
+  }
   if (isDevelopedCentralCannonFlankPawnChallenge(position, move)) {
     score += ROOT_DEVELOPED_CENTRAL_CANNON_FLANK_PAWN_TIE_BONUS;
   }
@@ -995,6 +999,14 @@ function isEarlyPawnCentralCannonThirdFileCounter(position, move) {
   const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 4 : 3;
   const progress = piece.side === SIDES.RED ? fromRank - toRank : toRank - fromRank;
   return fromRank === homeRank && progress === 1;
+}
+
+function isEarlyPawnCentralCannonOppositeHorseCounter(position, move) {
+  if (!isEarlyPawnCentralCannonThirdFileCounter(position, move)) return false;
+  const piece = move.piece ?? position.board[move.from];
+  const fromFile = fileOf(move.from);
+  const oppositeScreenFile = fromFile <= 2 ? BOARD_FILES - 3 : 2;
+  return hasDevelopedHorseOnFile(position, piece.side, oppositeScreenFile);
 }
 
 function isCentralCannonRightHorseDevelopment(position, move) {
