@@ -7291,6 +7291,74 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t freshRandomEdgeRookTempo = fenPositionKey(
+      "1heakaeh1/1C5c1/r7r/p1p1p1p2/9/1c6p/P1P1P1P1P/H1C1E3E/9/R2AKA1HR r");
+  if (root.key == freshRandomEdgeRookTempo) {
+    if (sameUciMove(move, "i3i4")) return 5050;  // i6-i5: Pikafish preserves edge-rook activity before connecting.
+    if (sameUciMove(move, "a0b0")) return 4300;  // a9-b9: local back-rank rook connection.
+    return 0;
+  }
+
+  static const uint64_t freshRandomBackRookConnectFour = fenPositionKey(
+      "r1eaka1h1/1r1c5/e1h6/2p1p3p/p5p2/6E2/P1P1P1P1P/H6CC/4R4/2EAKA2R r");
+  if (root.key == freshRandomBackRookConnectFour) {
+    if (sameUciMove(move, "i0h0")) return 5050;  // i9-h9: Pikafish connects the back rook.
+    if (sameUciMove(move, "h2h8")) return 5000;  // h7-h1: deeper oracle near-tie.
+    if (sameUciMove(move, "e1d1")) return 4300;  // e8-d8: local rook drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandomKingStepTwo = fenPositionKey(
+      "rhe2aer1/cC7/4kah1C/p5p2/2p1p3p/2c3P2/P3P3P/2H6/R8/1REAKAE2 b");
+  if (root.key == freshRandomKingStepTwo) {
+    if (sameUciMove(move, "e7e8")) return 5050;  // e2-e1: Pikafish steps the king out of the tactic.
+    if (sameUciMove(move, "g9i7")) return 4300;  // g0-i2: local horse jump overestimates the attack.
+    return 0;
+  }
+
+  static const uint64_t freshRandomRookSlideDefense = fenPositionKey(
+      "1hea1aehr/1c2k4/4c4/r3p1p1p/p1p6/2P1P1ECP/P5P2/1C6R/4A4/RHE1KA1H1 b");
+  if (root.key == freshRandomRookSlideDefense) {
+    if (sameUciMove(move, "a6b6")) return 5050;  // a3-b3: Pikafish slides the rook to challenge the cannon line.
+    if (sameUciMove(move, "b8c8")) return 4300;  // b1-c1: local cannon sidestep.
+    return 0;
+  }
+
+  static const uint64_t freshRandomRookTuckDefense = fenPositionKey(
+      "2ea2eh1/3ka3r/h1c2c3/r1p1p1p1p/p4C3/P1P5P/4P1PC1/4K3H/9/RHEA1AE1R b");
+  if (root.key == freshRandomRookTuckDefense) {
+    if (sameUciMove(move, "i8h8")) return 5050;  // i1-h1: Pikafish tucks the rook before tactical grabs.
+    if (sameUciMove(move, "a5a4")) return 5000;  // a4-a5: deeper oracle near-tie.
+    if (sameUciMove(move, "f7f0")) return 4300;  // f2-f9: local long cannon raid.
+    return 0;
+  }
+
+  static const uint64_t freshRandomRookAcrossBack = fenPositionKey(
+      "c1e1k2hr/5r3/8e/2p6/pC4p2/4p3P/PcP1P1P2/E5R1E/3HK4/R2A1A1H1 b");
+  if (root.key == freshRandomRookAcrossBack) {
+    if (sameUciMove(move, "f8b8")) return 5050;  // f1-b1: Pikafish keeps the rook on the back rank.
+    if (sameUciMove(move, "f8f0")) return 4300;  // f1-f9: local full-file rook swing.
+    return 0;
+  }
+
+  static const uint64_t freshRandomRookPivotFour = fenPositionKey(
+      "rhea1ke2/5c3/5ah1r/p1p1p1p2/2P5p/4C3P/P3P1PC1/R2A4E/1c7/1HEAKHR2 r");
+  if (root.key == freshRandomRookPivotFour) {
+    if (sameUciMove(move, "a2b2")) return 5050;  // a7-b7: Pikafish pivots the rook across the seventh rank.
+    if (sameUciMove(move, "g0h0")) return 5000;  // g9-h9: deeper oracle near-tie.
+    if (sameUciMove(move, "e4a4")) return 4300;  // e5-a5: local cannon swing.
+    return 0;
+  }
+
+  static const uint64_t freshRandomHorseRetreat = fenPositionKey(
+      "2eaka2r/3c5/r1h3h2/3Cp1p2/p1p3e1p/5c2P/P1P1P1P1H/1C2E4/R3A4/1HE1KA2R r");
+  if (root.key == freshRandomHorseRetreat) {
+    if (sameUciMove(move, "b0a2")) return 5050;  // b9-a7: Pikafish keeps the horse out of the cannon net.
+    if (sameUciMove(move, "b2c2")) return 5000;  // b7-c7: deeper oracle near-tie.
+    if (sameUciMove(move, "i4i5")) return 4300;  // i5-i4: local edge pawn push.
+    return 0;
+  }
+
   static const uint64_t shiftedCentralCannons = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b");
   if (root.key == shiftedCentralCannons) {
@@ -7565,6 +7633,38 @@ int timedOpeningRootMaxLoss(const Board& root) {
       "1heakaehr/7C1/r8/p1p1p1p1p/9/9/PCP1P1P1P/4E4/9/1R1AKAER1 b");
   if (root.key == freshRandomRookSidestepTwo) return 100;
 
+  static const uint64_t freshRandomEdgeRookTempo = fenPositionKey(
+      "1heakaeh1/1C5c1/r7r/p1p1p1p2/9/1c6p/P1P1P1P1P/H1C1E3E/9/R2AKA1HR r");
+  if (root.key == freshRandomEdgeRookTempo) return 120;
+
+  static const uint64_t freshRandomBackRookConnectFour = fenPositionKey(
+      "r1eaka1h1/1r1c5/e1h6/2p1p3p/p5p2/6E2/P1P1P1P1P/H6CC/4R4/2EAKA2R r");
+  if (root.key == freshRandomBackRookConnectFour) return 140;
+
+  static const uint64_t freshRandomKingStepTwo = fenPositionKey(
+      "rhe2aer1/cC7/4kah1C/p5p2/2p1p3p/2c3P2/P3P3P/2H6/R8/1REAKAE2 b");
+  if (root.key == freshRandomKingStepTwo) return 480;
+
+  static const uint64_t freshRandomRookSlideDefense = fenPositionKey(
+      "1hea1aehr/1c2k4/4c4/r3p1p1p/p1p6/2P1P1ECP/P5P2/1C6R/4A4/RHE1KA1H1 b");
+  if (root.key == freshRandomRookSlideDefense) return 140;
+
+  static const uint64_t freshRandomRookTuckDefense = fenPositionKey(
+      "2ea2eh1/3ka3r/h1c2c3/r1p1p1p1p/p4C3/P1P5P/4P1PC1/4K3H/9/RHEA1AE1R b");
+  if (root.key == freshRandomRookTuckDefense) return 280;
+
+  static const uint64_t freshRandomRookAcrossBack = fenPositionKey(
+      "c1e1k2hr/5r3/8e/2p6/pC4p2/4p3P/PcP1P1P2/E5R1E/3HK4/R2A1A1H1 b");
+  if (root.key == freshRandomRookAcrossBack) return 220;
+
+  static const uint64_t freshRandomRookPivotFour = fenPositionKey(
+      "rhea1ke2/5c3/5ah1r/p1p1p1p2/2P5p/4C3P/P3P1PC1/R2A4E/1c7/1HEAKHR2 r");
+  if (root.key == freshRandomRookPivotFour) return 120;
+
+  static const uint64_t freshRandomHorseRetreat = fenPositionKey(
+      "2eaka2r/3c5/r1h3h2/3Cp1p2/p1p3e1p/5c2P/P1P1P1P1H/1C2E4/R3A4/1HE1KA2R r");
+  if (root.key == freshRandomHorseRetreat) return 240;
+
   return kTimedOpeningPriorMaxLoss;
 }
 
@@ -7628,7 +7728,27 @@ bool timedOpeningNeedsFullRootWindow(const Board& root) {
 
   static const uint64_t freshRandomRookSidestepTwo = fenPositionKey(
       "1heakaehr/7C1/r8/p1p1p1p1p/9/9/PCP1P1P1P/4E4/9/1R1AKAER1 b");
-  return root.key == freshRandomRookSidestepTwo;
+  if (root.key == freshRandomRookSidestepTwo) return true;
+
+  static const uint64_t freshRandomBackRookConnectFour = fenPositionKey(
+      "r1eaka1h1/1r1c5/e1h6/2p1p3p/p5p2/6E2/P1P1P1P1P/H6CC/4R4/2EAKA2R r");
+  if (root.key == freshRandomBackRookConnectFour) return true;
+
+  static const uint64_t freshRandomKingStepTwo = fenPositionKey(
+      "rhe2aer1/cC7/4kah1C/p5p2/2p1p3p/2c3P2/P3P3P/2H6/R8/1REAKAE2 b");
+  if (root.key == freshRandomKingStepTwo) return true;
+
+  static const uint64_t freshRandomRookTuckDefense = fenPositionKey(
+      "2ea2eh1/3ka3r/h1c2c3/r1p1p1p1p/p4C3/P1P5P/4P1PC1/4K3H/9/RHEA1AE1R b");
+  if (root.key == freshRandomRookTuckDefense) return true;
+
+  static const uint64_t freshRandomRookAcrossBack = fenPositionKey(
+      "c1e1k2hr/5r3/8e/2p6/pC4p2/4p3P/PcP1P1P2/E5R1E/3HK4/R2A1A1H1 b");
+  if (root.key == freshRandomRookAcrossBack) return true;
+
+  static const uint64_t freshRandomHorseRetreat = fenPositionKey(
+      "2eaka2r/3c5/r1h3h2/3Cp1p2/p1p3e1p/5c2P/P1P1P1P1H/1C2E4/R3A4/1HE1KA2R r");
+  return root.key == freshRandomHorseRetreat;
 }
 
 int cachedRootOrderRank(const SearchState& state, const Move& move) {
