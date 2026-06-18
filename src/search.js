@@ -103,7 +103,9 @@ const ROOT_TACTICAL_VERIFICATION_CAPTURE_VALUE = PIECE_VALUES[PIECES.CANNON];
 const ROOT_HOME_RANK_ROOK_CONNECT_SCORE_BONUS = 150;
 const ROOT_HOME_RANK_ROOK_CONNECT_BONUS = 110;
 const ROOT_EARLY_PAWN_ELEPHANT_RIM_HORSE_TIE_BONUS = 150;
-const ROOT_SHIFTED_CANNON_CENTRAL_PAWN_PUSH_PENALTY = 120;
+const ROOT_OPENING_PRESSURE_CENTRAL_PAWN_PUSH_PENALTY = 120;
+const ROOT_OPENING_PRESSURE_CANNON_INWARD_SHIFT_PENALTY = 120;
+const ROOT_OPENING_PRESSURE_UNDEVELOPED_FLANK_PAWN_PENALTY = 120;
 const ROOT_SHIFTED_CANNON_WING_CANNON_LIFT_PENALTY = 120;
 const DEFAULT_ROOT_TIME_GUARD_MIN_MS = 8;
 const DEFAULT_ROOT_TIME_GUARD_MAX_MS = 250;
@@ -761,8 +763,14 @@ function rootMoveStrategicPriorScore(position, move) {
   ) {
     score += ROOT_HOME_RANK_ROOK_CONNECT_SCORE_BONUS;
   }
-  if (isPrematureCentralPawnPushAgainstShiftedCannons(position, move)) {
-    score -= ROOT_SHIFTED_CANNON_CENTRAL_PAWN_PUSH_PENALTY;
+  if (isPrematureCentralPawnPushAgainstOpeningPressure(position, move)) {
+    score -= ROOT_OPENING_PRESSURE_CENTRAL_PAWN_PUSH_PENALTY;
+  }
+  if (isPrematureCannonInwardShiftAgainstOpeningPressure(position, move)) {
+    score -= ROOT_OPENING_PRESSURE_CANNON_INWARD_SHIFT_PENALTY;
+  }
+  if (isPrematureFlankPawnChallengeBeforeDevelopment(position, move)) {
+    score -= ROOT_OPENING_PRESSURE_UNDEVELOPED_FLANK_PAWN_PENALTY;
   }
   if (isRepeatedWingCannonLiftAgainstShiftedCannons(position, move)) {
     score -= ROOT_SHIFTED_CANNON_WING_CANNON_LIFT_PENALTY;
@@ -798,10 +806,9 @@ function hasHomeRankConnectorRook(position, side) {
   });
 }
 
-function isPrematureCentralPawnPushAgainstShiftedCannons(position, move) {
+function isPrematureCentralPawnPushAgainstOpeningPressure(position, move) {
   const piece = move.piece ?? position.board[move.from];
   if (!piece || piece.type !== PIECES.PAWN) return false;
-  if (!isFacingShiftedCentralCannonsAfterDoubleHorse(position, piece.side)) return false;
 
   const fromFile = fileOf(move.from);
   const fromRank = rankOf(move.from);
@@ -813,7 +820,47 @@ function isPrematureCentralPawnPushAgainstShiftedCannons(position, move) {
   return fromFile === 4
     && toFile === 4
     && fromRank === homeRank
-    && progress === 1;
+    && progress === 1
+    && (
+      isFacingShiftedCentralCannonsAfterDoubleHorse(position, piece.side)
+      || isFacingEarlyPawnCentralCannonPressure(position, piece.side)
+    );
+}
+
+function isPrematureCannonInwardShiftAgainstOpeningPressure(position, move) {
+  const piece = move.piece ?? position.board[move.from];
+  if (!piece || piece.type !== PIECES.CANNON) return false;
+  if (!isFacingEarlyPawnCentralCannonPressure(position, piece.side)) return false;
+
+  const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 3 : 2;
+  const fromFile = fileOf(move.from);
+  const fromRank = rankOf(move.from);
+  const toFile = fileOf(move.to);
+  const toRank = rankOf(move.to);
+  if (fromRank !== homeRank || toRank !== homeRank) return false;
+  if (fromFile !== 1 && fromFile !== BOARD_FILES - 2) return false;
+
+  return (fromFile === 1 && (toFile === 2 || toFile === 3))
+    || (fromFile === BOARD_FILES - 2 && (toFile === BOARD_FILES - 3 || toFile === BOARD_FILES - 4));
+}
+
+function isPrematureFlankPawnChallengeBeforeDevelopment(position, move) {
+  const piece = move.piece ?? position.board[move.from];
+  if (!piece || piece.type !== PIECES.PAWN) return false;
+  if (!isFacingEarlyPawnCentralCannonPressure(position, piece.side)) return false;
+  if (!bothWingHorsesHomeForSearch(position, piece.side)) return false;
+
+  const fromFile = fileOf(move.from);
+  const fromRank = rankOf(move.from);
+  const toFile = fileOf(move.to);
+  const toRank = rankOf(move.to);
+  if (fromFile !== toFile || !isFlankFile(fromFile)) return false;
+
+  const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 4 : 3;
+  const progress = piece.side === SIDES.RED ? fromRank - toRank : toRank - fromRank;
+  if (fromRank !== homeRank || progress !== 1) return false;
+
+  return hasAdvancedEnemyPawnOnFile(position, piece.side, fromFile);
 }
 
 function isRepeatedWingCannonLiftAgainstShiftedCannons(position, move) {
@@ -839,11 +886,24 @@ function isFacingShiftedCentralCannonsAfterDoubleHorse(position, side) {
     && hasEnemyShiftedCentralCannons(position, side);
 }
 
+function isFacingEarlyPawnCentralCannonPressure(position, side) {
+  return hasEnemyCentralCannon(position, side)
+    && hasAdvancedEnemyFlankPawn(position, side);
+}
+
 function bothWingHorsesDevelopedForSearch(position, side) {
   const homeRank = side === SIDES.RED ? BOARD_RANKS - 1 : 0;
   return [1, BOARD_FILES - 2].every((file) => {
     const piece = position.board[indexOf(file, homeRank)];
     return piece?.side !== side || piece.type !== PIECES.HORSE;
+  });
+}
+
+function bothWingHorsesHomeForSearch(position, side) {
+  const homeRank = side === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  return [1, BOARD_FILES - 2].every((file) => {
+    const piece = position.board[indexOf(file, homeRank)];
+    return piece?.side === side && piece.type === PIECES.HORSE;
   });
 }
 
@@ -855,6 +915,43 @@ function hasEnemyShiftedCentralCannons(position, side) {
     return piece?.side === enemy && piece.type === PIECES.CANNON;
   });
   return centralCannonFiles.some((file) => centralCannonFiles.includes(file + 1));
+}
+
+function hasEnemyCentralCannon(position, side) {
+  const enemy = opponent(side);
+  const cannonRank = enemy === SIDES.RED ? BOARD_RANKS - 3 : 2;
+  const piece = position.board[indexOf(4, cannonRank)];
+  return piece?.side === enemy && piece.type === PIECES.CANNON;
+}
+
+function hasAdvancedEnemyFlankPawn(position, side) {
+  const enemy = opponent(side);
+
+  for (const file of [0, 1, 2, BOARD_FILES - 3, BOARD_FILES - 2, BOARD_FILES - 1]) {
+    for (let rank = 0; rank < BOARD_RANKS; rank += 1) {
+      const piece = position.board[indexOf(file, rank)];
+      if (piece?.side !== enemy || piece.type !== PIECES.PAWN) continue;
+      if (enemy === SIDES.RED && rank < BOARD_RANKS - 4) return true;
+      if (enemy === SIDES.BLACK && rank > 3) return true;
+    }
+  }
+
+  return false;
+}
+
+function hasAdvancedEnemyPawnOnFile(position, side, file) {
+  const enemy = opponent(side);
+  for (let rank = 0; rank < BOARD_RANKS; rank += 1) {
+    const piece = position.board[indexOf(file, rank)];
+    if (piece?.side !== enemy || piece.type !== PIECES.PAWN) continue;
+    if (enemy === SIDES.RED && rank < BOARD_RANKS - 4) return true;
+    if (enemy === SIDES.BLACK && rank > 3) return true;
+  }
+  return false;
+}
+
+function isFlankFile(file) {
+  return file <= 2 || file >= BOARD_FILES - 3;
 }
 
 function wingHomeHorseFileForSearch(file) {

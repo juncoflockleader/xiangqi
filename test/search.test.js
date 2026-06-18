@@ -123,6 +123,49 @@ test("search connects the rook in shifted-cannon double-horse openings", () => {
   assert.equal(result.bestMove.notation, "a0-b0");
 });
 
+test("search rejects premature central-pawn pushes under early-pawn cannon pressure", () => {
+  const positions = [
+    parseFen("rheakae1r/9/1c4hc1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b"),
+    parseFen("r1eakaehr/9/1ch4c1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b")
+  ];
+
+  for (const position of positions) {
+    const result = searchBestMove(position, {
+      depth: 6,
+      timeLimitMs: 8000,
+      useBook: false,
+      candidateLimit: 99
+    });
+    const centralPawn = result.candidates.find((candidate) => candidate.move.notation === "e3-e4");
+
+    assert.equal(result.depth, 6);
+    assert.equal(result.timedOut, false);
+    assert.notEqual(result.bestMove.notation, "e3-e4");
+    assert.ok(centralPawn);
+    assert.ok(centralPawn.score < result.score);
+  }
+});
+
+test("search develops before loose cannon and pawn shifts under shifted-cannon pressure", () => {
+  const position = parseFen("rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/4C2C1/9/RHEAKAEHR b");
+  const result = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 8000,
+    useBook: false,
+    candidateLimit: 99
+  });
+
+  assert.equal(result.depth, 6);
+  assert.equal(result.timedOut, false);
+  assert.ok(["c0-e2", "g0-e2", "b0-c2", "b2-e2", "c3-c4"].includes(result.bestMove.notation));
+
+  for (const notation of ["b2-c2", "b2-d2", "g3-g4"]) {
+    const candidate = result.candidates.find((item) => item.move.notation === notation);
+    assert.ok(candidate);
+    assert.ok(candidate.score < result.score);
+  }
+});
+
 test("engine explanations surface tactical-motif ordering diagnostics", () => {
   const position = parseFen("4r4/9/4k4/9/3R5/9/4P4/9/9/4K4 r");
   const engine = createEngine({ depth: 1, timeLimitMs: 1000 });
