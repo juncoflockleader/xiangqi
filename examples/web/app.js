@@ -713,6 +713,7 @@ function renderOptimisticPlayerMove(notation) {
   state.panel = {
     kind: "teachingPair",
     id: state.teachingTurnFocusId,
+    preserveLatestHuman: true,
     playerMove: optimisticMove,
     playerReview: null,
     playerReviewPending: true,
@@ -1048,7 +1049,9 @@ function renderLastMove() {
 }
 
 function renderTeachingPairSummary(pair, node = null) {
-  const teachingPair = pairWithPreservedHumanMove(pair, state.game);
+  const teachingPair = node
+    ? normalizeTeachingPair(pair)
+    : pairWithPreservedHumanMove(pair, state.game);
   const cards = renderTeachingPairCards(teachingPair, {
     compact: true,
     summary: true
@@ -1258,7 +1261,9 @@ function renderAlternativeReasoning(node) {
 }
 
 function renderTeachingPairReasoning(pair) {
-  const teachingPair = pairWithPreservedHumanMove(pair, state.game);
+  const teachingPair = pair.preserveLatestHuman === false
+    ? normalizeTeachingPair(pair)
+    : pairWithPreservedHumanMove(pair, state.game);
   const cards = renderTeachingPairCards(teachingPair);
 
   elements.reasoningPanel.className = "stack teaching-stack";
@@ -2076,7 +2081,7 @@ function panelFromTreeSelection() {
   if (state.treeAnalysis.has(node.id)) return { kind: "treeAnalysis", nodeId: node.id };
   if (node.kind === "main") {
     const pair = teachingPairForMainlineNode(state.game, node);
-    if (pair) return { kind: "teachingPair", ...pair };
+    if (pair) return teachingPairPanel(pair, { preserveLatestHuman: false });
     if (node.id === latestMainlineNodeId()) return null;
   }
   if (node.kind === "analysis") return { kind: "treeBranch", nodeId: node.id };
@@ -2186,7 +2191,7 @@ function renderSelectedMoves() {
 
 function panelFromMove(game) {
   const pair = latestTeachingPair(game);
-  if (pair) return { kind: "teachingPair", ...pair };
+  if (pair) return teachingPairPanel(pair, { preserveLatestHuman: true });
   const last = game?.lastMove;
   if (last?.decision) return { kind: "move", decision: last.decision };
   if (last?.review) return { kind: "move", review: last.review };
@@ -2219,7 +2224,17 @@ function latestTeachingPair(game) {
 
 function panelFromTeachingFocus(game) {
   const pair = focusedTeachingPair(game);
-  return pair ? { kind: "teachingPair", ...pair } : null;
+  return pair ? teachingPairPanel(pair, { preserveLatestHuman: true }) : null;
+}
+
+function teachingPairPanel(pair, options = {}) {
+  const normalized = normalizeTeachingPair(pair);
+  if (!normalized) return null;
+  return {
+    kind: "teachingPair",
+    preserveLatestHuman: options.preserveLatestHuman !== false,
+    ...normalized
+  };
 }
 
 function focusedTeachingPair(game) {
