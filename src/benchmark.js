@@ -209,7 +209,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     id: "oracle-opening-refreshed-pawn-continuation",
     name: "Oracle Opening: Refreshed Pawn Continuation",
     fen: "rheakae1r/9/1c4h1c/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR r",
-    expectedMoves: Object.freeze(["h9-g7", "b9-c7", "b9-a7"]),
+    expectedMoves: Object.freeze(["b7-d7", "h9-g7", "b9-c7"]),
     tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn", "central-cannon"]),
     options: Object.freeze({
       depth: 8,
@@ -217,7 +217,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
       useBook: false,
       lines: 5
     }),
-    lesson: "In the refreshed pawn-push continuation, the native engine should develop a horse before chasing activity with cannons."
+    lesson: "In the refreshed pawn-push continuation, the engine should shift the left cannon into a flexible central file before repeating pawn pushes or drifting into loose cannon play."
   }),
   Object.freeze({
     id: "oracle-opening-shifted-left-pawn",

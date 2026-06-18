@@ -368,7 +368,7 @@ test("search mirrors the rook before shallow lifts in the Hu central-cannon trap
   assert.ok(shallowLift.score < result.score || shallowLift.tieBreak < result.candidates[0].tieBreak);
 });
 
-test("search develops before repeating early flank-pawn pushes", () => {
+test("search shifts the cannon before repeating early flank-pawn pushes", () => {
   const position = parseFen("rheakae1r/9/1c4h1c/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR r");
   const result = searchBestMove(position, {
     depth: 6,
@@ -379,7 +379,11 @@ test("search develops before repeating early flank-pawn pushes", () => {
 
   assert.equal(result.depth, 6);
   assert.equal(result.timedOut, false);
-  assert.ok(["h9-g7", "b9-c7", "b7-d7"].includes(result.bestMove.notation));
+  assert.equal(result.bestMove.notation, "b7-d7");
+
+  const horseDevelopment = result.candidates.find((item) => item.move.notation === "h9-g7");
+  assert.ok(horseDevelopment);
+  assert.ok(horseDevelopment.score < result.score || horseDevelopment.tieBreak < result.candidates[0].tieBreak);
 
   for (const notation of ["g5-g4", "a6-a5", "i6-i5"]) {
     const candidate = result.candidates.find((item) => item.move.notation === notation);

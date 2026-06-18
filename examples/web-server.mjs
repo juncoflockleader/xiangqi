@@ -609,6 +609,8 @@ function summarizeTeachingPair(history, session, status) {
 
   if (!playerMove && !engineMove && !engineThinking) return null;
   return {
+    id: playerMove ? `turn-${playerMove.ply}` : `turn-engine-${engineMove?.ply ?? 0}`,
+    moveNumber: playerMove?.moveNumber ?? engineMove?.moveNumber ?? null,
     playerMove,
     playerReview: playerMove?.review ?? null,
     playerReviewPending: Boolean(playerMove && !playerMove.review),

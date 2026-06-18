@@ -6528,8 +6528,9 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t refreshedPawnPushContinuation = fenPositionKey(
       "rheakae1r/9/1c4h1c/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR r");
   if (root.key == refreshedPawnPushContinuation) {
-    if (sameUciMove(move, "h0g2")) return 5000;  // h9-g7: refreshed 2026 Pikafish top development.
-    if (sameUciMove(move, "b0c2")) return 4900;  // b9-c7: close horse-development alternative.
+    if (sameUciMove(move, "b2d2")) return 5050;  // b7-d7: refreshed Pikafish flexible cannon shift.
+    if (sameUciMove(move, "h0g2")) return 5000;  // h9-g7: close horse-development alternative.
+    if (sameUciMove(move, "b0c2")) return 4900;  // b9-c7: second horse-development fallback.
     if (sameUciMove(move, "b0a2")) return 4400;  // b9-a7: playable horse-shift fallback.
     return 0;
   }

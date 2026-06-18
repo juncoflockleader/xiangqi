@@ -110,6 +110,9 @@ const ROOT_INITIAL_OPENING_TIE_BONUS = 50;
 const ROOT_EARLY_PAWN_DEVELOPMENT_SCORE_BONUS = 60;
 const ROOT_EARLY_PAWN_CANNON_SIDE_STEP_SCORE_BONUS = 80;
 const ROOT_EARLY_PAWN_CANNON_SIDE_STEP_TIE_BONUS = 90;
+const ROOT_REFRESHED_PAWN_CANNON_SHIFT_SCORE_BONUS = 340;
+const ROOT_REFRESHED_PAWN_CANNON_SHIFT_TIE_BONUS = 180;
+const ROOT_REFRESHED_PAWN_HORSE_BEFORE_CANNON_SHIFT_PENALTY = 100;
 const ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_SCORE_BONUS = 100;
 const ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_TIE_BONUS = 120;
 const ROOT_CENTRAL_CANNON_RIGHT_HORSE_SCORE_BONUS = 30;
@@ -804,6 +807,9 @@ function rootTieBreakScore(position, move, next, context, searchScore) {
   if (isEarlyPawnCannonSideStep(position, move)) {
     score += ROOT_EARLY_PAWN_CANNON_SIDE_STEP_TIE_BONUS;
   }
+  if (isRefreshedPawnContinuationCannonShift(position, move)) {
+    score += ROOT_REFRESHED_PAWN_CANNON_SHIFT_TIE_BONUS;
+  }
   if (isEarlyPawnCentralCannonOppositeHorseCounter(position, move)) {
     score += ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_TIE_BONUS;
   }
@@ -847,6 +853,12 @@ function rootMoveStrategicPriorScore(position, move) {
   }
   if (isEarlyPawnCannonSideStep(position, move)) {
     score += ROOT_EARLY_PAWN_CANNON_SIDE_STEP_SCORE_BONUS;
+  }
+  if (isRefreshedPawnContinuationCannonShift(position, move)) {
+    score += ROOT_REFRESHED_PAWN_CANNON_SHIFT_SCORE_BONUS;
+  }
+  if (isRefreshedPawnContinuationHorseBeforeCannonShift(position, move)) {
+    score -= ROOT_REFRESHED_PAWN_HORSE_BEFORE_CANNON_SHIFT_PENALTY;
   }
   if (isEarlyPawnCentralCannonThirdFileCounter(position, move)) {
     score += ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_SCORE_BONUS;
@@ -1063,6 +1075,73 @@ function isWingCannonCentralRegroupMove(position, move) {
 
   return (fromFile === 1 && (toFile === 2 || toFile === 3))
     || (fromFile === BOARD_FILES - 2 && (toFile === BOARD_FILES - 3 || toFile === BOARD_FILES - 4));
+}
+
+function isRefreshedPawnContinuationCannonShift(position, move) {
+  const piece = move.piece ?? position.board[move.from];
+  if (!piece || piece.type !== PIECES.CANNON) return false;
+  if (!hasOwnCentralCannon(position, piece.side)) return false;
+  if (!hasAdvancedOwnFlankPawn(position, piece.side)) return false;
+  if (!bothWingHorsesHomeForSearch(position, piece.side)) return false;
+
+  const screenHorseFile = singleScreenHorseFile(position, opponent(piece.side));
+  if (screenHorseFile === null) return false;
+
+  const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 3 : 2;
+  const fromFile = fileOf(move.from);
+  const fromRank = rankOf(move.from);
+  const toFile = fileOf(move.to);
+  const toRank = rankOf(move.to);
+  if (fromRank !== homeRank || toRank !== homeRank) return false;
+
+  const leftFiles = [0, 1, 2];
+  const rightFiles = [BOARD_FILES - 3, BOARD_FILES - 2, BOARD_FILES - 1];
+  const leftPawn = hasAdvancedPawnOnAnyFile(position, piece.side, leftFiles);
+  const rightPawn = hasAdvancedPawnOnAnyFile(position, piece.side, rightFiles);
+  if (leftPawn === rightPawn) return false;
+
+  if (rightPawn && screenHorseFile === BOARD_FILES - 3) {
+    return fromFile === 1 && toFile === 3;
+  }
+  if (leftPawn && screenHorseFile === 2) {
+    return fromFile === BOARD_FILES - 2 && toFile === BOARD_FILES - 4;
+  }
+  return false;
+}
+
+function isRefreshedPawnContinuationHorseBeforeCannonShift(position, move) {
+  const piece = move.piece ?? position.board[move.from];
+  if (!piece || piece.type !== PIECES.HORSE) return false;
+  if (!hasOwnCentralCannon(position, piece.side)) return false;
+  if (!hasAdvancedOwnFlankPawn(position, piece.side)) return false;
+  if (!bothWingHorsesHomeForSearch(position, piece.side)) return false;
+
+  const screenHorseFile = singleScreenHorseFile(position, opponent(piece.side));
+  if (screenHorseFile === null) return false;
+
+  const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  const fromFile = fileOf(move.from);
+  const fromRank = rankOf(move.from);
+  const toFile = fileOf(move.to);
+  const toRank = rankOf(move.to);
+  if (fromRank !== homeRank) return false;
+
+  const progress = piece.side === SIDES.RED ? homeRank - toRank : toRank - homeRank;
+  if (progress <= 0) return false;
+
+  const leftFiles = [0, 1, 2];
+  const rightFiles = [BOARD_FILES - 3, BOARD_FILES - 2, BOARD_FILES - 1];
+  const leftPawn = hasAdvancedPawnOnAnyFile(position, piece.side, leftFiles);
+  const rightPawn = hasAdvancedPawnOnAnyFile(position, piece.side, rightFiles);
+  if (leftPawn === rightPawn) return false;
+
+  if (rightPawn && screenHorseFile === BOARD_FILES - 3) {
+    return fromFile === BOARD_FILES - 2 && toFile === BOARD_FILES - 3;
+  }
+  if (leftPawn && screenHorseFile === 2) {
+    return fromFile === 1 && toFile === 2;
+  }
+  return false;
 }
 
 function isEarlyPawnCannonSideStep(position, move) {

@@ -554,6 +554,7 @@ const state = {
   pendingSince: null,
   errorMessage: null,
   panel: null,
+  teachingTurnFocusId: null,
   treeCollapsed: new Set(),
   treeSelectedId: null,
   treeAnalysis: new Map(),
@@ -599,6 +600,7 @@ newGame();
 async function newGame() {
   state.selected = null;
   state.panel = null;
+  state.teachingTurnFocusId = null;
   state.treeCollapsed.clear();
   state.treeSelectedId = null;
   state.treeAnalysis.clear();
@@ -614,14 +616,15 @@ async function newGame() {
 
 async function playMove(notation) {
   await runRequest(async () => {
-    renderOptimisticPlayerMove(notation);
+    const optimisticMove = renderOptimisticPlayerMove(notation);
     const result = await api("/api/move", {
       sessionId: state.sessionId,
       move: notation,
       deferEngine: true
     });
+    focusTeachingTurnForMove(result.state, optimisticMove);
     state.treeSelectedId = latestMainlineNodeId(result.state);
-    state.panel = panelFromMove(result.state);
+    state.panel = panelFromTeachingFocus(result.state) ?? panelFromMove(result.state);
     setGame(result.state);
     await holdTeachingReviewBeforeEngineReply(result.state);
     await requestEngineMoveIfNeeded(result.state);
@@ -634,7 +637,7 @@ async function requestEngineMoveIfNeeded(game = state.game) {
     sessionId: state.sessionId
   });
   state.treeSelectedId = latestMainlineNodeId(result.state);
-  state.panel = panelFromMove(result.state);
+  state.panel = panelFromTeachingFocus(result.state) ?? panelFromMove(result.state);
   setGame(result.state);
 }
 
@@ -703,9 +706,11 @@ function renderOptimisticPlayerMove(notation) {
     playerTurn: false
   };
   state.selected = null;
+  state.teachingTurnFocusId = teachingTurnIdForMove(optimisticMove);
   state.treeSelectedId = mainlineNodeId(ply);
   state.panel = {
     kind: "teachingPair",
+    id: state.teachingTurnFocusId,
     playerMove: optimisticMove,
     playerReview: null,
     playerReviewPending: true,
@@ -714,6 +719,7 @@ function renderOptimisticPlayerMove(notation) {
     engineThinking: true
   };
   render();
+  return optimisticMove;
 }
 
 async function undoMove() {
@@ -873,6 +879,10 @@ function setGame(game) {
   state.game = game;
   state.sessionId = game.sessionId;
   syncTreeSelection();
+  syncTeachingFocus();
+  if (state.panel?.kind === "teachingPair") {
+    state.panel = panelFromTeachingFocus(game) ?? panelFromTreeSelection() ?? panelFromMove(game);
+  }
   if (!state.panel) {
     state.panel = panelFromTreeSelection() ?? panelFromMove(game);
   }
@@ -1001,10 +1011,13 @@ function renderLastMove() {
     return;
   }
 
+  const latestMainline = treeNode?.kind === "main" && treeNode.id === latestMainlineNodeId();
   const teachingPair = treeNode?.kind === "main"
-    ? teachingPairForMove(state.game, treeNode.move)
+    ? latestMainline
+      ? focusedTeachingPair(state.game) ?? teachingPairForMove(state.game, treeNode.move)
+      : teachingPairForMove(state.game, treeNode.move)
     : !treeNode
-      ? activeTeachingPair(state.game)
+      ? focusedTeachingPair(state.game) ?? activeTeachingPair(state.game)
       : null;
   if (teachingPair) {
     renderTeachingPairSummary(teachingPair, treeNode?.kind === "main" ? treeNode : null);
@@ -1812,6 +1825,9 @@ async function selectTreeNode(id) {
   if (!node) return;
 
   state.treeSelectedId = id;
+  if (node.kind === "main") {
+    state.teachingTurnFocusId = teachingTurnIdForMove(node.move, state.game);
+  }
   state.panel = panelFromTreeSelection() ?? panelFromMove(state.game);
   state.selected = null;
   render();
@@ -2174,7 +2190,7 @@ function renderSelectedMoves() {
 }
 
 function panelFromMove(game) {
-  const pair = activeTeachingPair(game);
+  const pair = focusedTeachingPair(game) ?? activeTeachingPair(game);
   if (pair) return { kind: "teachingPair", ...pair };
   const last = game?.lastMove;
   if (last?.decision) return { kind: "move", decision: last.decision };
@@ -2185,7 +2201,44 @@ function panelFromMove(game) {
 }
 
 function latestTeachingPair(game) {
-  return activeTeachingPair(game);
+  return focusedTeachingPair(game) ?? activeTeachingPair(game);
+}
+
+function panelFromTeachingFocus(game) {
+  const pair = focusedTeachingPair(game);
+  return pair ? { kind: "teachingPair", ...pair } : null;
+}
+
+function focusedTeachingPair(game) {
+  if (!state.teachingTurnFocusId) return null;
+  return teachingTurnById(game, state.teachingTurnFocusId);
+}
+
+function focusTeachingTurnForMove(game, moveOrPly) {
+  const id = teachingTurnIdForMove(moveOrPly, game);
+  if (id) state.teachingTurnFocusId = id;
+}
+
+function syncTeachingFocus() {
+  if (!state.teachingTurnFocusId) return;
+  if (!teachingTurnById(state.game, state.teachingTurnFocusId)) {
+    state.teachingTurnFocusId = null;
+  }
+}
+
+function teachingTurnById(game, id) {
+  if (!id) return null;
+  return normalizeTeachingTurns(game?.teachingTurns).find((turn) => turn.id === id) ?? null;
+}
+
+function teachingTurnIdForMove(moveOrPly, game = null) {
+  const ply = Number.isFinite(moveOrPly?.ply) ? moveOrPly.ply : Number(moveOrPly);
+  if (!Number.isFinite(ply)) return null;
+  const turn = normalizeTeachingTurns(game?.teachingTurns)
+    .find((item) => item.playerMove?.ply === ply || item.engineMove?.ply === ply);
+  if (turn?.id) return turn.id;
+  const actor = moveOrPly?.actor;
+  return actor === "engine" ? `turn-engine-${ply}` : `turn-${ply}`;
 }
 
 function activeTeachingPair(game, anchorMove = null) {
@@ -2224,6 +2277,8 @@ function teachingPairForMove(game, anchorMove) {
 
   if (!playerMove && !engineMove && !engineThinking) return null;
   return {
+    id: teachingTurnIdForPair(playerMove, engineMove),
+    moveNumber: playerMove?.moveNumber ?? engineMove?.moveNumber ?? null,
     playerMove,
     playerReview: playerMove?.review ?? null,
     playerReviewPending: Boolean(playerMove && !playerMove.review),
@@ -2231,6 +2286,12 @@ function teachingPairForMove(game, anchorMove) {
     engineDecision: engineMove?.decision ?? null,
     engineThinking
   };
+}
+
+function teachingTurnIdForPair(playerMove, engineMove) {
+  if (playerMove?.ply) return `turn-${playerMove.ply}`;
+  if (engineMove?.ply) return `turn-engine-${engineMove.ply}`;
+  return null;
 }
 
 function teachingTurnFromState(game, anchorMove = null) {
@@ -2270,6 +2331,8 @@ function normalizeTeachingPair(pair) {
   const engineThinking = Boolean(pair.engineThinking);
   if (!playerMove && !engineMove && !engineThinking) return null;
   return {
+    id: pair.id ?? teachingTurnIdForPair(playerMove, engineMove),
+    moveNumber: pair.moveNumber ?? playerMove?.moveNumber ?? engineMove?.moveNumber ?? null,
     playerMove,
     playerReview: pair.playerReview ?? playerMove?.review ?? null,
     playerReviewPending: Boolean(pair.playerReviewPending ?? (playerMove && !playerMove.review)),
