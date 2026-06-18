@@ -1,9 +1,12 @@
 import {
+  BOARD_FILES,
+  BOARD_RANKS,
   DRAW_SCORE,
   INFINITY_SCORE,
   MATE_SCORE,
   PIECES,
-  PIECE_VALUES
+  PIECE_VALUES,
+  SIDES
 } from "./constants.js";
 import {
   makeMove,
@@ -97,6 +100,8 @@ const ROOT_TACTICAL_VERIFICATION_MIN_DEPTH = 5;
 const ROOT_TACTICAL_VERIFICATION_SCORE_MARGIN = 220;
 const ROOT_TACTICAL_VERIFICATION_MAX_MOVES = 12;
 const ROOT_TACTICAL_VERIFICATION_CAPTURE_VALUE = PIECE_VALUES[PIECES.CANNON];
+const ROOT_HOME_RANK_ROOK_CONNECT_SCORE_BONUS = 150;
+const ROOT_HOME_RANK_ROOK_CONNECT_BONUS = 110;
 const DEFAULT_ROOT_TIME_GUARD_MIN_MS = 8;
 const DEFAULT_ROOT_TIME_GUARD_MAX_MS = 250;
 const DEFAULT_ROOT_TIME_GUARD_DIVISOR = 3;
@@ -512,6 +517,7 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
       const childBeta = context.exactRootScores ? INFINITY_SCORE : -alpha;
       score = normalizeScore(-negamax(next, depth - 1, childAlpha, childBeta, 1, context, line, context.maxExtensions, true, move));
     }
+    score = applyRootMoveStrategicPrior(position, move, score);
     const annotated = annotateMove(position, move);
     const tieBreak = rootTieBreakScore(position, annotated, next, context, score);
 
@@ -595,14 +601,15 @@ function verifyRootTacticalCandidates(position, depth, root, context, rootMoves)
         move
       ));
       if (context.timedOut) break;
+      const adjustedScore = applyRootMoveStrategicPrior(position, move, score);
 
       const annotated = annotateMove(position, move);
       const key = moveKey(annotated);
       const previous = candidateByKey.get(key);
-      const tieBreak = rootTieBreakScore(position, annotated, next, context, score);
+      const tieBreak = rootTieBreakScore(position, annotated, next, context, adjustedScore);
       const verified = {
         move: annotated,
-        score,
+        score: adjustedScore,
         tieBreak,
         repetition: previous?.repetition ?? rootRepetitionInfo(context, childState?.positionKey ?? positionKey(next)),
         principalVariation: [annotated, ...line],
@@ -725,12 +732,60 @@ function rootTieBreakScore(position, move, next, context, searchScore) {
   let score = evaluateStatic(next, position.turn, context);
   if (move.givesCheck) score += 30;
   if (move.piece?.type !== PIECES.KING) score += 4;
+  if (isHomeRankRookConnectorMove(position, move)) score += ROOT_HOME_RANK_ROOK_CONNECT_BONUS;
   if (move.captured) {
     score += 2;
     const capture = getCaptureAnalysis(position, move, context);
     if (capture?.exchangeScore < 0) score += capture.exchangeScore;
   }
   return score;
+}
+
+function applyRootMoveStrategicPrior(position, move, score) {
+  if (isMateSearchBound(score)) return score;
+  return score + rootMoveStrategicPriorScore(position, move);
+}
+
+function rootMoveStrategicPriorScore(position, move) {
+  if (isMirroringHomeRankRookConnectorMove(position, move)) {
+    return ROOT_HOME_RANK_ROOK_CONNECT_SCORE_BONUS;
+  }
+  return 0;
+}
+
+function isMirroringHomeRankRookConnectorMove(position, move) {
+  const piece = move.piece ?? position.board[move.from];
+  if (!piece) return false;
+  return isHomeRankRookConnectorMove(position, move)
+    && hasHomeRankConnectorRook(position, opponent(piece.side));
+}
+
+function isHomeRankRookConnectorMove(position, move) {
+  const piece = move.piece ?? position.board[move.from];
+  if (!piece || piece.type !== PIECES.ROOK) return false;
+
+  const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  const fromFile = fileOf(move.from);
+  const fromRank = rankOf(move.from);
+  const toFile = fileOf(move.to);
+  const toRank = rankOf(move.to);
+
+  if (fromRank !== homeRank || toRank !== homeRank) return false;
+  if (fromFile === 0 && toFile === 1) return position.board[indexOf(1, homeRank)] === null;
+  if (fromFile === BOARD_FILES - 1 && toFile === BOARD_FILES - 2) {
+    return position.board[indexOf(BOARD_FILES - 2, homeRank)] === null;
+  }
+  return false;
+}
+
+function hasHomeRankConnectorRook(position, side) {
+  const homeRank = side === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  return [1, BOARD_FILES - 2].some((file) => {
+    const piece = position.board[indexOf(file, homeRank)];
+    if (piece?.side !== side || piece.type !== PIECES.ROOK) return false;
+    const cornerFile = file === 1 ? 0 : BOARD_FILES - 1;
+    return position.board[indexOf(cornerFile, homeRank)] === null;
+  });
 }
 
 function legacyRootTieBreakScore(move) {

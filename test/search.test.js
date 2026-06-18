@@ -84,6 +84,19 @@ test("search does not overvalue deep central-cannon checks in the opening", () =
   assert.notEqual(result.bestMove.notation, "b7-e7");
 });
 
+test("search mirrors rook development in the central-cannon red-rook branch", () => {
+  const position = parseFen("rheakae1r/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 b");
+  const result = searchBestMove(position, {
+    depth: 5,
+    timeLimitMs: 3000,
+    useBook: false
+  });
+
+  assert.equal(result.depth, 5);
+  assert.equal(result.timedOut, false);
+  assert.equal(result.bestMove.notation, "i0-h0");
+});
+
 test("engine explanations surface tactical-motif ordering diagnostics", () => {
   const position = parseFen("4r4/9/4k4/9/3R5/9/4P4/9/9/4K4 r");
   const engine = createEngine({ depth: 1, timeLimitMs: 1000 });
