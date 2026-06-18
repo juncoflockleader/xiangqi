@@ -1048,37 +1048,11 @@ function renderLastMove() {
 }
 
 function renderTeachingPairSummary(pair, node = null) {
-  const cards = [];
-  if (pair.playerMove) {
-    cards.push(renderTeachingMoveCard({
-      kind: "player",
-      label: t("yourLastMove"),
-      move: pair.playerMove,
-      compact: true,
-      body: pair.playerReview
-        ? teachingReviewSummaryParts(pair.playerReview)
-        : [escapeHtml(pair.playerReviewPending ? t("reviewPending") : t("moveWaitingReview"))]
-    }));
-  }
-  if (pair.engineMove) {
-    cards.push(renderTeachingMoveCard({
-      kind: "engine",
-      label: t("engineLastMove"),
-      move: pair.engineMove,
-      compact: true,
-      body: pair.engineDecision
-        ? teachingDecisionSummaryParts(pair.engineDecision)
-        : [escapeHtml(t("noDecision"))]
-    }));
-  } else if (pair.engineThinking) {
-    cards.push(renderTeachingMoveCard({
-      kind: "engine",
-      label: t("engineLastMove"),
-      pending: true,
-      compact: true,
-      body: [escapeHtml(t("replyPending"))]
-    }));
-  }
+  const teachingPair = pairWithPreservedHumanMove(pair, state.game);
+  const cards = renderTeachingPairCards(teachingPair, {
+    compact: true,
+    summary: true
+  });
 
   elements.lastMovePanel.className = "stack teaching-stack";
   elements.lastMovePanel.innerHTML = cards.length
@@ -1284,31 +1258,8 @@ function renderAlternativeReasoning(node) {
 }
 
 function renderTeachingPairReasoning(pair) {
-  const cards = [];
-  if (pair.playerMove) {
-    cards.push(renderTeachingMoveCard({
-      kind: "player",
-      label: t("yourLastMove"),
-      move: pair.playerMove,
-      pending: pair.playerReviewPending,
-      body: pair.playerReview ? teachingReviewParts(pair.playerReview) : [escapeHtml(t(pair.playerReviewPending ? "reviewPending" : "moveWaitingReview"))]
-    }));
-  }
-  if (pair.engineMove) {
-    cards.push(renderTeachingMoveCard({
-      kind: "engine",
-      label: t("engineLastMove"),
-      move: pair.engineMove,
-      body: pair.engineDecision ? teachingDecisionParts(pair.engineDecision) : [escapeHtml(t("noDecision"))]
-    }));
-  } else if (pair.engineThinking) {
-    cards.push(renderTeachingMoveCard({
-      kind: "engine",
-      label: t("engineLastMove"),
-      pending: true,
-      body: [escapeHtml(t("replyPending"))]
-    }));
-  }
+  const teachingPair = pairWithPreservedHumanMove(pair, state.game);
+  const cards = renderTeachingPairCards(teachingPair);
 
   elements.reasoningPanel.className = "stack teaching-stack";
   elements.reasoningPanel.innerHTML = cards.length
@@ -1317,6 +1268,48 @@ function renderTeachingPairReasoning(pair) {
       `<div class="teaching-pair-grid teaching-pair-reasoning">${cards.join("")}</div>`
     ].join("")
     : t("noDecision");
+}
+
+function renderTeachingPairCards(pair, options = {}) {
+  const cards = [];
+  const compact = Boolean(options.compact);
+  const summary = Boolean(options.summary);
+  if (pair?.playerMove) {
+    cards.push(renderTeachingMoveCard({
+      kind: "player",
+      label: t("yourLastMove"),
+      move: pair.playerMove,
+      pending: pair.playerReviewPending,
+      compact,
+      body: pair.playerReview
+        ? summary
+          ? teachingReviewSummaryParts(pair.playerReview)
+          : teachingReviewParts(pair.playerReview)
+        : [escapeHtml(t(pair.playerReviewPending ? "reviewPending" : "moveWaitingReview"))]
+    }));
+  }
+  if (pair?.engineMove) {
+    cards.push(renderTeachingMoveCard({
+      kind: "engine",
+      label: t("engineLastMove"),
+      move: pair.engineMove,
+      compact,
+      body: pair.engineDecision
+        ? summary
+          ? teachingDecisionSummaryParts(pair.engineDecision)
+          : teachingDecisionParts(pair.engineDecision)
+        : [escapeHtml(t("noDecision"))]
+    }));
+  } else if (pair?.engineThinking) {
+    cards.push(renderTeachingMoveCard({
+      kind: "engine",
+      label: t("engineLastMove"),
+      pending: true,
+      compact,
+      body: [escapeHtml(t("replyPending"))]
+    }));
+  }
+  return cards;
 }
 
 function renderTeachingMoveCard({ kind, label, move = null, body = [], pending = false, compact = false }) {
@@ -2218,7 +2211,10 @@ function teachingPairForMainlineNode(game, node) {
 }
 
 function latestTeachingPair(game) {
-  return focusedTeachingPair(game) ?? latestPlayerTeachingPair(game) ?? activeTeachingPair(game);
+  const focused = focusedTeachingPair(game);
+  const latestPlayer = latestPlayerTeachingPair(game);
+  if (focused && hasHumanTeachingMove(focused)) return focused;
+  return latestPlayer ?? focused ?? activeTeachingPair(game);
 }
 
 function panelFromTeachingFocus(game) {
@@ -2283,6 +2279,18 @@ function latestPlayerTeachingPair(game) {
     .reverse()
     .find((turn) => turn.playerMove || turn.playerReview)
     ?? null;
+}
+
+function pairWithPreservedHumanMove(pair, game = state.game) {
+  const current = normalizeTeachingPair(pair);
+  const latestPlayer = latestPlayerTeachingPair(game);
+  if (!current) return latestPlayer ?? activeTeachingPair(game);
+  if (hasHumanTeachingMove(current) || !latestPlayer) return current;
+  return latestPlayer;
+}
+
+function hasHumanTeachingMove(pair) {
+  return Boolean(pair?.playerMove || pair?.playerReview);
 }
 
 function teachingPairForMove(game, anchorMove) {

@@ -945,7 +945,25 @@ test("local C++ engine follows fresh random oracle priors", async (t) => {
       ["r3kaehr/3ha4/4e4/pcp1p1p1p/5c3/4P4/P1P3P1P/1C1C5/4K4/RHEA1AEHR r", "h9-g7"],
       ["rhe1kaeh1/1C7/c4a2r/p1p1p1p1p/9/2P6/P3P1PCP/4E4/9/1R1AKAEHR r", "h9-g7"],
       ["rh2kaehr/4a4/e4c3/2p1p1pc1/p7p/5C3/P1P1P1P1P/9/7C1/RHEAKAEHR b", "h0-i2"],
-      ["rCeaka1hr/7c1/4e4/2p1p1Cc1/p7p/4P4/P1P3P1P/4E3H/9/RHEAKA2R r", "b0-b5"]
+      ["rCeaka1hr/7c1/4e4/2p1p1Cc1/p7p/4P4/P1P3P1P/4E3H/9/RHEAKA2R r", "b0-b5"],
+      ["2eakaeh1/7r1/1chc4r/p1p1p1p1p/9/6P2/P1P1P3P/H1C5C/9/R1EAKAEHR r", "h9-g7"],
+      ["rh2ka1hr/4a4/e4c2e/p1p1p1p1p/9/6Pc1/P1P1P3P/2CA4C/9/RHEAK1EHR b", "h0-g2"],
+      ["r3kaehr/9/h2cea2c/p1p1p1p1p/2P6/9/P3P1P1P/1C7/1C2K4/RHEA1AEHR r", "c4-b4"],
+      ["2eakaehr/r8/h3c4/p1p1p1C1p/9/9/P1P3P1P/2C1c4/R8/1HEAKAEHR b", "e7-e4"],
+      ["1r1a1ae1r/4k4/4c3h/p3p1pcp/2p3e2/4P1P2/P1P5P/H1C6/9/R1EAKAEHR b", "e2-e5"],
+      ["rheakaeh1/2r6/4c4/pcp1p1C1p/3C5/9/P1P1P1P1P/4E3H/R3A3R/1HE1KA3 r", "d4-g4"],
+      ["rheakaehr/9/5c2c/p1p1p1p1p/9/9/P1P1P1P1P/EC4HC1/3HA4/1R2KAE1R r", "h7-h3"],
+      ["1he1kaehr/rc2a4/8c/p1p3p1p/4pC3/8P/P1P1P1P2/R4CH2/4K4/1HEA1AE1R b", "b1-d1"],
+      ["1h1a1aehr/r2k5/e3c2c1/p1p1C1p1p/9/6P2/P1P1P3P/9/H3A4/RCEAK1EHR b", "b0-c2"],
+      ["2rakaeh1/cr7/e6c1/C3p3p/3h5/9/P1P1P1P1P/E4R1C1/9/1HEAKA1HR b", "a1-a3"],
+      ["rh1aka1hr/9/1c2e3c/p1p1p1p1p/6e2/2P6/P3P1P1P/8C/1C1R5/RHEAKAEH1 b", "h0-f1"],
+      ["1heakaehr/1C7/6r2/p5p2/2p1p2cp/2P2R3/P3P1P1P/C3K4/3R5/1HEA1AE2 r", "b1-b4"],
+      ["rheakaehr/4c4/c8/4p1p1p/p1p6/P8/2P1P1P1P/3C5/R4C3/1HEAKAEHR b", "e1-e6"],
+      ["1heak3r/4a4/rc2c1h2/p1p3p1p/4p1e2/P1P5P/2C1P1P2/E1HA4C/9/2RAK1EHR b", "e2-e6"],
+      ["rh1ak2hr/4a4/2c1e3e/p1p3p2/4p2Cp/P8/2P3PcP/5C2R/R3K4/1HEA1AEH1 b", "h0-g2"],
+      ["r2akaehr/3h5/3ce2c1/p3p3p/2p3p2/2P6/P3P1P1P/2C1C3R/9/RHEAKAEH1 b", "c4-c5"],
+      ["rheaka1hr/9/3c3ce/p1p3p1p/9/4p1P2/P1P1P3P/C7E/1C2A4/RHEAK2HR b", "b0-a2"],
+      ["rCea1aeh1/r3k4/5c1c1/p1p1p3p/6p2/P5P2/2P1P2CP/H1R5E/5H3/2EAKA2R b", "a0-b0"]
     ];
 
     for (const [fen, expected] of cases) {

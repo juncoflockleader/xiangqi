@@ -617,7 +617,7 @@ h2 {
 }
 
 .command-panel .stack.teaching-stack {
-  max-height: 96px;
+  max-height: 108px;
 }
 
 .command-panel .meta-list {
@@ -783,7 +783,7 @@ h2 {
 
 .teaching-pair-summary .teaching-card-body {
   color: var(--muted);
-  max-height: 1.25em;
+  max-height: 2.4em;
   overflow: hidden;
   gap: 0;
   font-size: 10.5px;
@@ -797,6 +797,12 @@ h2 {
 .teaching-card.compact .teaching-card-head {
   gap: 3px;
   font-size: 10px;
+}
+
+.teaching-card.compact .teaching-card-body > div {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .teaching-pair-summary .teaching-card-move {
@@ -1142,7 +1148,7 @@ h2 {
   }
 
   .command-panel .stack.teaching-stack {
-    max-height: 86px;
+    max-height: 96px;
   }
 
   .command-panel .meta-list {
