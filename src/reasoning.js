@@ -464,6 +464,15 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.rootChildStateReuses ?? 0) > 0) {
     orderingParts.push(formatCount(stats.rootChildStateReuses, "root child-state reuse"));
   }
+  if ((stats.rootReductions ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.rootReductions, "root late-move reduction"));
+  }
+  if ((stats.rootBadCaptureReductions ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.rootBadCaptureReductions, "root bad-capture reduction"));
+  }
+  if ((stats.rootReductionResearches ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.rootReductionResearches, "root reduction re-search"));
+  }
   if ((stats.rootTtHits ?? 0) > 0) {
     orderingParts.push(formatCount(stats.rootTtHits, "root transposition-table ordering hint"));
   }
@@ -554,6 +563,8 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   if ((stats.rootPvsSearches ?? 0) > 0) supports.push("root PVS scout searches");
   if ((stats.aspirationWidenedSearches ?? 0) > 0) supports.push("widened aspiration-window searches");
   if ((stats.rootChildStateReuses ?? 0) > 0) supports.push("root child-state reuse");
+  if ((stats.rootReductions ?? 0) > 0) supports.push("root late-move reductions");
+  if ((stats.rootBadCaptureReductions ?? 0) > 0) supports.push("root bad-capture reductions");
   if ((stats.rootTtHits ?? 0) > 0) supports.push("root transposition-table ordering");
   if ((stats.historyGravityUpdates ?? 0) > 0) supports.push("history-gravity learning");
   if ((stats.captureHistoryHits ?? 0) > 0) supports.push("capture-history ordering");

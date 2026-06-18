@@ -74,6 +74,9 @@ test("UCCI session searches a FEN position", () => {
   assert.ok(output.some((line) => /\bimplmp \d+/.test(line)));
   assert.ok(output.some((line) => /\bnimlmp \d+/.test(line)));
   assert.ok(output.some((line) => /\brootstate \d+/.test(line)));
+  assert.ok(output.some((line) => /\brootred \d+\/\d+/.test(line)));
+  assert.ok(output.some((line) => /\brootredply \d+/.test(line)));
+  assert.ok(output.some((line) => /\brootsee \d+/.test(line)));
   assert.ok(output.includes("bestmove e9e2"));
   assert.ok(output.some((line) => line.includes("reason: Wins a rook")));
   assert.ok(output.some((line) => line.includes("go plan: Start with e9e2") || line.includes("go plan: Start with e9-e2")));

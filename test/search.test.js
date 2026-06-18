@@ -481,6 +481,43 @@ test("search uses root principal variation scouts for ordered root moves", () =>
   assert.ok(explained.explanation.confidence.factors.some((factor) => factor.text.includes("root PVS scout searches")));
 });
 
+test("search reduces late root moves with full-depth repair", () => {
+  const position = parseFen("4k4/9/9/9/9/4P4/9/9/2C6/4K4 r");
+  const commonOptions = {
+    depth: 6,
+    timeLimitMs: 10000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  };
+  const result = searchBestMove(position, commonOptions);
+  const disabled = searchBestMove(position, {
+    ...commonOptions,
+    useRootReductions: false
+  });
+  const exactRoot = searchBestMove(position, {
+    ...commonOptions,
+    exactRootScores: true
+  });
+
+  assert.equal(result.depth, 6);
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.equal(Math.round(result.score), Math.round(disabled.score));
+  assert.ok(result.stats.rootReductions > 0);
+  assert.ok(result.stats.rootReductionPlies >= result.stats.rootReductions);
+  assert.equal(disabled.stats.rootReductions, 0);
+  assert.equal(disabled.stats.rootReductionPlies, 0);
+  assert.equal(exactRoot.stats.rootReductions, 0);
+  assert.equal(exactRoot.stats.rootReductionPlies, 0);
+  assert.ok(result.nodes < disabled.nodes);
+
+  const engine = createEngine({ depth: 6, timeLimitMs: 10000 });
+  const explained = engine.chooseMove(position, {
+    ...commonOptions,
+    useBook: false
+  });
+  assert.ok(explained.explanation.confidence.factors.some((factor) => factor.text.includes("root late-move reductions")));
+});
+
 test("search uses internal iterative deepening when hash move ordering is unavailable", () => {
   const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
   const result = searchBestMove(position, {

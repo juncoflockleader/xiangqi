@@ -84,6 +84,13 @@ const HISTORY_GRAVITY_LIMIT = 200_000;
 const IMPROVING_EVAL_MARGIN = 12;
 const HISTORY_PRUNING_MAX_DEPTH = 3;
 const HISTORY_PRUNING_BASE_INDEX = 3;
+const ROOT_REDUCTION_MIN_DEPTH = 6;
+const ROOT_REDUCTION_MOVE_INDEX = 5;
+const ROOT_DEEP_REDUCTION_MIN_DEPTH = 8;
+const ROOT_DEEP_REDUCTION_MOVE_INDEX = 12;
+const ROOT_HISTORY_REDUCTION_BOOST_MIN_DEPTH = 7;
+const ROOT_HISTORY_REDUCTION_BOOST_MOVE_INDEX = 8;
+const ROOT_BAD_CAPTURE_REDUCTION_LOSS_MARGIN = 120;
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -198,6 +205,7 @@ export function searchBestMove(position, options = {}) {
       useNullMoveVerification: options.useNullMoveVerification !== false,
       usePvs: options.usePvs !== false,
       useRootPvs: options.useRootPvs !== false,
+      useRootReductions: options.useRootReductions !== false,
       useKillerMoves: options.useKillerMoves !== false,
       useCountermoves: options.useCountermoves !== false,
       useContinuationHistory: options.useContinuationHistory !== false,
@@ -429,12 +437,42 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
     const next = childState?.next ?? makeMove(position, move);
     const repetition = rootRepetitionInfo(context, childState?.positionKey ?? positionKey(next));
     const line = [];
+    const givesCheck = moveGivesCheck(position, move, context, next);
+    const useRootPvs = shouldUseRootPvs(index, depth, alpha, beta, context);
+    const reduction = useRootPvs ? rootMoveReduction({
+      position,
+      move,
+      depth,
+      index,
+      alpha,
+      beta,
+      inCheck: Boolean(checkInfo),
+      givesCheck,
+      context
+    }) : 0;
     context.stats.rootMovesSearched += 1;
     let score;
 
-    if (shouldUseRootPvs(index, depth, alpha, beta, context)) {
+    if (useRootPvs) {
       context.stats.rootPvsSearches += 1;
-      score = normalizeScore(-negamax(next, depth - 1, -alpha - 1, -alpha, 1, context, line, context.maxExtensions, true, move));
+      if (reduction > 0) recordRootReduction(context, reduction);
+      score = normalizeScore(-negamax(
+        next,
+        Math.max(0, depth - 1 - reduction),
+        -alpha - 1,
+        -alpha,
+        1,
+        context,
+        line,
+        context.maxExtensions,
+        true,
+        move
+      ));
+      if (reduction > 0 && score > alpha && !context.timedOut) {
+        context.stats.rootReductionResearches += 1;
+        line.length = 0;
+        score = normalizeScore(-negamax(next, depth - 1, -alpha - 1, -alpha, 1, context, line, context.maxExtensions, true, move));
+      }
       if (score >= alpha && score < beta && !context.timedOut) {
         context.stats.rootPvsResearches += 1;
         line.length = 0;
@@ -496,6 +534,62 @@ function rootTieBreakScore(move) {
   if (move.piece?.type !== PIECES.KING) score += 100;
   if (move.captured) score += 10;
   return score;
+}
+
+function rootMoveReduction({ position, move, depth, index, alpha, beta, inCheck, givesCheck, context }) {
+  if (!context.useRootReductions) return 0;
+  if (!context.useRootPvs || context.exactRootScores) return 0;
+  if (depth < ROOT_REDUCTION_MIN_DEPTH || index < ROOT_REDUCTION_MOVE_INDEX) return 0;
+  if (inCheck || givesCheck) return 0;
+  if (isMateSearchBound(alpha) || isMateSearchBound(beta)) return 0;
+  if (context.priorityMoveKeys?.has(moveKey(move))) return 0;
+
+  if (move.captured) {
+    if (!isRootReducibleBadCapture(position, move, context)) return 0;
+    context.stats.rootBadCaptureReductions += 1;
+    return 1;
+  }
+
+  let reduction = 1;
+  const historyScore = context.history.get(moveKey(move)) ?? 0;
+  const historyScale = depth * depth;
+  if (historyScore > historyScale) {
+    context.stats.rootHistoryReductionGuards += 1;
+    return 0;
+  }
+  if (depth >= ROOT_DEEP_REDUCTION_MIN_DEPTH && index >= ROOT_DEEP_REDUCTION_MOVE_INDEX) {
+    reduction += 1;
+  }
+  if (
+    depth >= ROOT_HISTORY_REDUCTION_BOOST_MIN_DEPTH
+    && index >= ROOT_HISTORY_REDUCTION_BOOST_MOVE_INDEX
+    && historyScore < -historyScale * 16
+  ) {
+    reduction += 1;
+    context.stats.rootHistoryReductionBoosts += 1;
+  }
+
+  return Math.max(0, Math.min(depth - 2, reduction));
+}
+
+function isRootReducibleBadCapture(position, move, context) {
+  if (!move.captured || move.captured.type === PIECES.KING) return false;
+
+  const movingValue = PIECE_VALUES[move.piece.type] ?? 0;
+  const capturedValue = PIECE_VALUES[move.captured.type] ?? 0;
+  if (movingValue <= capturedValue + ROOT_BAD_CAPTURE_REDUCTION_LOSS_MARGIN) return false;
+
+  const capture = getCaptureAnalysis(position, move, context);
+  return capture.exchangeScore < -ROOT_BAD_CAPTURE_REDUCTION_LOSS_MARGIN;
+}
+
+function recordRootReduction(context, reduction) {
+  context.stats.rootReductions += 1;
+  context.stats.rootReductionPlies += reduction;
+}
+
+function isMateSearchBound(score) {
+  return Math.abs(score) >= MATE_SCORE - 1000 && Math.abs(score) < INFINITY_SCORE;
 }
 
 function shouldUseAspiration(depth, previousScore, context) {
@@ -2531,6 +2625,12 @@ function createSearchStats() {
     rootScoreOrderHits: 0,
     rootRankOrderHits: 0,
     rootChildStateReuses: 0,
+    rootReductions: 0,
+    rootBadCaptureReductions: 0,
+    rootReductionPlies: 0,
+    rootReductionResearches: 0,
+    rootHistoryReductionGuards: 0,
+    rootHistoryReductionBoosts: 0,
     rootPvsSearches: 0,
     rootPvsResearches: 0,
     iidSearches: 0,
@@ -2634,6 +2734,12 @@ function mergeSearchStats(total, next) {
     rootScoreOrderHits: total.rootScoreOrderHits + next.rootScoreOrderHits,
     rootRankOrderHits: total.rootRankOrderHits + next.rootRankOrderHits,
     rootChildStateReuses: total.rootChildStateReuses + next.rootChildStateReuses,
+    rootReductions: total.rootReductions + next.rootReductions,
+    rootBadCaptureReductions: total.rootBadCaptureReductions + next.rootBadCaptureReductions,
+    rootReductionPlies: total.rootReductionPlies + next.rootReductionPlies,
+    rootReductionResearches: total.rootReductionResearches + next.rootReductionResearches,
+    rootHistoryReductionGuards: total.rootHistoryReductionGuards + next.rootHistoryReductionGuards,
+    rootHistoryReductionBoosts: total.rootHistoryReductionBoosts + next.rootHistoryReductionBoosts,
     rootPvsSearches: total.rootPvsSearches + next.rootPvsSearches,
     rootPvsResearches: total.rootPvsResearches + next.rootPvsResearches,
     iidSearches: total.iidSearches + next.iidSearches,
