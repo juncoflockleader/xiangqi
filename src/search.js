@@ -824,13 +824,19 @@ function isPrematureCentralPawnPushAgainstOpeningPressure(position, move) {
     && (
       isFacingShiftedCentralCannonsAfterDoubleHorse(position, piece.side)
       || isFacingEarlyPawnCentralCannonPressure(position, piece.side)
+      || isFacingDevelopedCentralCannonPressure(position, piece.side)
     );
 }
 
 function isPrematureCannonInwardShiftAgainstOpeningPressure(position, move) {
   const piece = move.piece ?? position.board[move.from];
   if (!piece || piece.type !== PIECES.CANNON) return false;
-  if (!isFacingEarlyPawnCentralCannonPressure(position, piece.side)) return false;
+  if (
+    !isFacingEarlyPawnCentralCannonPressure(position, piece.side)
+    && !isFacingDevelopedCentralCannonPressure(position, piece.side)
+  ) {
+    return false;
+  }
 
   const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 3 : 2;
   const fromFile = fileOf(move.from);
@@ -891,6 +897,11 @@ function isFacingEarlyPawnCentralCannonPressure(position, side) {
     && hasAdvancedEnemyFlankPawn(position, side);
 }
 
+function isFacingDevelopedCentralCannonPressure(position, side) {
+  return hasEnemyCentralCannon(position, side)
+    && hasEnemyDevelopedHorse(position, side);
+}
+
 function bothWingHorsesDevelopedForSearch(position, side) {
   const homeRank = side === SIDES.RED ? BOARD_RANKS - 1 : 0;
   return [1, BOARD_FILES - 2].every((file) => {
@@ -934,6 +945,21 @@ function hasAdvancedEnemyFlankPawn(position, side) {
       if (enemy === SIDES.RED && rank < BOARD_RANKS - 4) return true;
       if (enemy === SIDES.BLACK && rank > 3) return true;
     }
+  }
+
+  return false;
+}
+
+function hasEnemyDevelopedHorse(position, side) {
+  const enemy = opponent(side);
+  const homeRank = enemy === SIDES.RED ? BOARD_RANKS - 1 : 0;
+
+  for (let square = 0; square < position.board.length; square += 1) {
+    const piece = position.board[square];
+    if (piece?.side !== enemy || piece.type !== PIECES.HORSE) continue;
+    const file = fileOf(square);
+    const rank = rankOf(square);
+    if (rank !== homeRank || (file !== 1 && file !== BOARD_FILES - 2)) return true;
   }
 
   return false;

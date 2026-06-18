@@ -166,6 +166,26 @@ test("search develops before loose cannon and pawn shifts under shifted-cannon p
   }
 });
 
+test("search avoids central-pawn and half-cannon drifts against developed central cannon pressure", () => {
+  const position = parseFen("rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R b");
+  const result = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 8000,
+    useBook: false,
+    candidateLimit: 99
+  });
+
+  assert.equal(result.depth, 6);
+  assert.equal(result.timedOut, false);
+  assert.notEqual(result.bestMove.notation, "e3-e4");
+
+  for (const notation of ["e3-e4", "b2-c2", "b2-d2"]) {
+    const candidate = result.candidates.find((item) => item.move.notation === notation);
+    assert.ok(candidate);
+    assert.ok(candidate.score < result.score);
+  }
+});
+
 test("engine explanations surface tactical-motif ordering diagnostics", () => {
   const position = parseFen("4r4/9/4k4/9/3R5/9/4P4/9/9/4K4 r");
   const engine = createEngine({ depth: 1, timeLimitMs: 1000 });
