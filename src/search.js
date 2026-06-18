@@ -114,6 +114,8 @@ export function searchBestMove(position, options = {}) {
   const captureHistory = new Map();
   const checkHistory = new Map();
   const checkCache = options.checkCache ?? new Map();
+  const rootChildStateCache = options.rootChildStateCache ?? new Map();
+  const rootPositionHash = hashPosition(position);
   const tacticalCache = options.tacticalCache ?? new Map();
   const candidateLimit = options.candidateLimit ?? 8;
   const exactRootScores = options.exactRootScores === true || !Number.isFinite(candidateLimit);
@@ -167,6 +169,8 @@ export function searchBestMove(position, options = {}) {
       captureHistory,
       checkHistory,
       checkCache,
+      rootChildStateCache,
+      rootPositionHash,
       staticEvalStack: [],
       candidateLimit,
       priorityMoveKeys,
@@ -199,6 +203,7 @@ export function searchBestMove(position, options = {}) {
       useContinuationHistory: options.useContinuationHistory !== false,
       useCheckHistory: options.useCheckHistory !== false,
       useCheckCache: options.useCheckCache !== false,
+      useRootChildStateCache: options.useRootChildStateCache !== false,
       useCheckEvasionOrdering: options.useCheckEvasionOrdering !== false,
       useRootScoreOrdering: options.useRootScoreOrdering !== false,
       useMateDistancePruning: options.useMateDistancePruning !== false,
@@ -420,8 +425,9 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
       break;
     }
 
-    const next = makeMove(position, move);
-    const repetition = rootRepetitionInfo(context, positionKey(next));
+    const childState = rootChildState(position, move, context);
+    const next = childState?.next ?? makeMove(position, move);
+    const repetition = rootRepetitionInfo(context, childState?.positionKey ?? positionKey(next));
     const line = [];
     context.stats.rootMovesSearched += 1;
     let score;
@@ -1189,9 +1195,12 @@ function quietCheckingMoves(position, context, qChecksRemaining) {
   return checks;
 }
 
-function moveGivesCheck(position, move, context = null, nextPosition = null) {
+function moveGivesCheck(position, move, context = null, nextPosition = null, options = {}) {
+  const childState = options.useRootChildState ? rootChildState(position, move, context) : null;
+  const reusableNext = nextPosition ?? childState?.next;
+
   if (!context?.useCheckCache) {
-    const next = nextPosition ?? makeMove(position, move);
+    const next = reusableNext ?? makeMove(position, move);
     return isInCheck(next, next.turn);
   }
 
@@ -1201,11 +1210,31 @@ function moveGivesCheck(position, move, context = null, nextPosition = null) {
     return context.checkCache.get(key);
   }
 
-  const next = nextPosition ?? makeMove(position, move);
+  const next = reusableNext ?? makeMove(position, move);
   const result = isInCheck(next, next.turn);
   context.checkCache.set(key, result);
   context.stats.checkCacheStores += 1;
   return result;
+}
+
+function rootChildState(position, move, context) {
+  if (!context?.useRootChildStateCache) return null;
+  if (context.rootPositionHash === undefined) return null;
+
+  const key = `${context.rootPositionHash}:${moveKey(move)}`;
+  const cached = context.rootChildStateCache.get(key);
+  if (cached) {
+    context.stats.rootChildStateReuses += 1;
+    return cached;
+  }
+
+  const next = makeMove(position, move);
+  const state = {
+    next,
+    positionKey: positionKey(next)
+  };
+  context.rootChildStateCache.set(key, state);
+  return state;
 }
 
 function orderMoves(position, moves, principalMove, context, ply, previousMove = null, checkInfo = null) {
@@ -1243,7 +1272,7 @@ function moveOrderingScore(position, move, principalMove, context, ply, previous
     score += captureHistoryScore(context, move);
   }
 
-  if (moveGivesCheck(position, move, context)) {
+  if (moveGivesCheck(position, move, context, null, { useRootChildState: ply === 0 })) {
     score += 40_000;
     score += checkHistoryScore(context, move);
   }
@@ -2501,6 +2530,7 @@ function createSearchStats() {
     historyGravityUpdates: 0,
     rootScoreOrderHits: 0,
     rootRankOrderHits: 0,
+    rootChildStateReuses: 0,
     rootPvsSearches: 0,
     rootPvsResearches: 0,
     iidSearches: 0,
@@ -2603,6 +2633,7 @@ function mergeSearchStats(total, next) {
     historyGravityUpdates: total.historyGravityUpdates + next.historyGravityUpdates,
     rootScoreOrderHits: total.rootScoreOrderHits + next.rootScoreOrderHits,
     rootRankOrderHits: total.rootRankOrderHits + next.rootRankOrderHits,
+    rootChildStateReuses: total.rootChildStateReuses + next.rootChildStateReuses,
     rootPvsSearches: total.rootPvsSearches + next.rootPvsSearches,
     rootPvsResearches: total.rootPvsResearches + next.rootPvsResearches,
     iidSearches: total.iidSearches + next.iidSearches,

@@ -406,6 +406,7 @@ function maybeBookResult(position, options, tableSize) {
       historyGravityUpdates: 0,
       rootScoreOrderHits: 0,
       rootRankOrderHits: 0,
+      rootChildStateReuses: 0,
       iidSearches: 0,
       iidMoveHits: 0,
       rootMovesSearched: 0,

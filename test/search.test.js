@@ -321,6 +321,33 @@ test("search reuses cached checking-move results", () => {
   assert.ok(explained.explanation.confidence.factors.some((factor) => factor.text.includes("check-cache reuse")));
 });
 
+test("search reuses root child positions across iterative root searches", () => {
+  const position = parseFen("2bakab2/9/4c4/4p4/9/4P4/4C4/9/9/2BAKAB2 r");
+  const commonOptions = {
+    depth: 4,
+    timeLimitMs: 5000,
+    useAspiration: false,
+    useSoftTimeManagement: false
+  };
+  const result = searchBestMove(position, commonOptions);
+  const disabled = searchBestMove(position, {
+    ...commonOptions,
+    useRootChildStateCache: false
+  });
+
+  assert.equal(result.bestMove.notation, disabled.bestMove.notation);
+  assert.equal(Math.round(result.score), Math.round(disabled.score));
+  assert.ok(result.stats.rootChildStateReuses > 0);
+  assert.equal(disabled.stats.rootChildStateReuses, 0);
+
+  const engine = createEngine({ depth: 4, timeLimitMs: 5000 });
+  const explained = engine.chooseMove(position, {
+    ...commonOptions,
+    useBook: false
+  });
+  assert.ok(explained.explanation.confidence.factors.some((factor) => factor.text.includes("root child-state reuse")));
+});
+
 test("search records a per-depth iterative deepening trace", () => {
   const position = parseFen("4k4/9/4r4/9/9/9/9/9/9/3KR4 r");
   const result = searchBestMove(position, {
