@@ -617,7 +617,7 @@ h2 {
 }
 
 .command-panel .last-move-panel .stack {
-  max-height: 104px;
+  max-height: 124px;
 }
 
 .command-panel .reasoning-panel .stack {
@@ -625,11 +625,11 @@ h2 {
 }
 
 .command-panel .stack.teaching-stack {
-  max-height: 136px;
+  max-height: 148px;
 }
 
 .command-panel .reasoning-panel .stack.teaching-stack {
-  max-height: 152px;
+  max-height: 166px;
 }
 
 .command-panel .meta-list {
@@ -748,6 +748,10 @@ h2 {
   border-radius: 7px;
   background: rgba(248, 250, 247, 0.84);
   padding: 5px 6px;
+}
+
+.teaching-card.player {
+  border-left-color: var(--red);
 }
 
 .teaching-card.engine {
@@ -1168,7 +1172,7 @@ h2 {
   }
 
   .command-panel .last-move-panel .stack {
-    max-height: 86px;
+    max-height: 96px;
   }
 
   .command-panel .reasoning-panel .stack {
@@ -1176,11 +1180,11 @@ h2 {
   }
 
   .command-panel .stack.teaching-stack {
-    max-height: 112px;
+    max-height: 122px;
   }
 
   .command-panel .reasoning-panel .stack.teaching-stack {
-    max-height: 124px;
+    max-height: 136px;
   }
 
   .command-panel .meta-list {

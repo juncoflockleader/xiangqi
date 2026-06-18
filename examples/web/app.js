@@ -630,6 +630,7 @@ async function playMove(notation) {
   await runRequest(async () => {
     state.pendingStage = "player-review";
     const optimisticMove = renderOptimisticPlayerMove(notation);
+    await waitForNextPaint();
     const result = await api("/api/move", {
       sessionId: state.sessionId,
       move: notation,
@@ -667,7 +668,7 @@ async function requestEngineMoveIfNeeded(game = state.game) {
 function focusLatestMainlineTeachingView(game) {
   focusLatestPlayerTeachingTurn(game);
   state.treeSelectedId = latestMainlineNodeId(game);
-  state.panel = panelFromLatestPlayerTeaching(game) ?? panelFromTeachingFocus(game) ?? panelFromMove(game);
+  state.panel = panelFromVisibleTeachingPair(game) ?? panelFromTeachingFocus(game) ?? panelFromMove(game);
 }
 
 function shouldRequestEngineMove(game) {
@@ -688,6 +689,14 @@ function shouldHoldTeachingReview(game) {
 function delay(ms) {
   return new Promise((resolveDelay) => {
     window.setTimeout(resolveDelay, ms);
+  });
+}
+
+function waitForNextPaint() {
+  return new Promise((resolvePaint) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(resolvePaint);
+    });
   });
 }
 
@@ -917,10 +926,10 @@ function setGame(game) {
   if (state.panel?.kind === "teachingPair") {
     state.panel = state.panel.preserveLatestHuman === false
       ? panelFromTeachingFocus(game) ?? panelFromTreeSelection() ?? panelFromMove(game)
-      : panelFromLatestPlayerTeaching(game) ?? panelFromTeachingFocus(game) ?? panelFromTreeSelection() ?? panelFromMove(game);
+      : panelFromVisibleTeachingPair(game) ?? panelFromTeachingFocus(game) ?? panelFromTreeSelection() ?? panelFromMove(game);
   }
   if (!state.panel) {
-    state.panel = panelFromTreeSelection() ?? panelFromMove(game);
+    state.panel = panelFromTreeSelection() ?? panelFromVisibleTeachingPair(game) ?? panelFromMove(game);
   }
   render();
 }
@@ -2276,6 +2285,11 @@ function panelFromLatestPlayerTeaching(game) {
   return pair ? teachingPairPanel(pair, { preserveLatestHuman: true }) : null;
 }
 
+function panelFromVisibleTeachingPair(game) {
+  const pair = visibleTeachingPair(game);
+  return pair ? teachingPairPanel(pair, { preserveLatestHuman: true }) : null;
+}
+
 function teachingPairForSelectedTreeNode(node = selectedTreeNode()) {
   if (node?.kind === "main") {
     return teachingPairForMainlineNode(state.game, node);
@@ -2296,6 +2310,10 @@ function latestTeachingPair(game) {
   const latestPlayer = latestPlayerTeachingPair(game);
   if (focused && hasHumanTeachingMove(focused)) return focused;
   return latestPlayer ?? focused ?? activeTeachingPair(game);
+}
+
+function visibleTeachingPair(game) {
+  return latestPlayerTeachingPair(game) ?? focusedTeachingPair(game) ?? activeTeachingPair(game);
 }
 
 function panelFromTeachingFocus(game) {
