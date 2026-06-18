@@ -110,6 +110,9 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function normalizeTeachingPair/);
     assert.match(script, /function renderTeachingMoveCard/);
     assert.match(script, /function renderTeachingPairReasoning/);
+    assert.match(script, /TEACHING_REVIEW_HOLD_MS = 900/);
+    assert.match(script, /function holdTeachingReviewBeforeEngineReply/);
+    assert.match(script, /function shouldHoldTeachingReview/);
     assert.match(script, /reviewPending: "正在复盘你的上一手\.\.\."/);
     assert.match(script, /replyPending: "引擎正在思考应手\.\.\."/);
     assert.match(script, /function fitTreeView/);

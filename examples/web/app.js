@@ -6,6 +6,7 @@ const DEFAULT_CLIENT_REQUEST_TIMEOUT_MS = 15 * 60 * 1000;
 const CLIENT_REQUEST_TIMEOUT_BUFFER_MS = 5000;
 const CLIENT_STATE_REFRESH_TIMEOUT_MS = 15000;
 const PENDING_STATUS_INTERVAL_MS = 1000;
+const TEACHING_REVIEW_HOLD_MS = 900;
 const TREE_NODE_WIDTH = 188;
 const TREE_NODE_HEIGHT = 96;
 const TREE_LEVEL_GAP = 96;
@@ -619,6 +620,7 @@ async function playMove(notation) {
     state.treeSelectedId = latestMainlineNodeId(result.state);
     state.panel = panelFromMove(result.state);
     setGame(result.state);
+    await holdTeachingReviewBeforeEngineReply(result.state);
     await requestEngineMoveIfNeeded(result.state);
   });
 }
@@ -635,6 +637,23 @@ async function requestEngineMoveIfNeeded(game = state.game) {
 
 function shouldRequestEngineMove(game) {
   return game?.status?.state === "playing" && game.turn === game.engineSide;
+}
+
+async function holdTeachingReviewBeforeEngineReply(game) {
+  if (!shouldHoldTeachingReview(game)) return;
+  await delay(TEACHING_REVIEW_HOLD_MS);
+}
+
+function shouldHoldTeachingReview(game) {
+  if (!shouldRequestEngineMove(game)) return false;
+  const pair = latestTeachingPair(game);
+  return Boolean(pair?.playerMove && pair.playerReview && !pair.engineMove && pair.engineThinking);
+}
+
+function delay(ms) {
+  return new Promise((resolveDelay) => {
+    window.setTimeout(resolveDelay, ms);
+  });
 }
 
 function renderOptimisticPlayerMove(notation) {
