@@ -87,6 +87,8 @@ constexpr int kRootThreatSafeCaptureBonus = 80;
 constexpr int kRootThreatExchangeClampMin = -200;
 constexpr int kRootThreatExchangeClampMax = 400;
 constexpr int kRootThreatResponseFinalMaxLoss = 120;
+constexpr int kRootHomeHorseDevelopmentCaptureBonus = 4300;
+constexpr int kRootHomeHorseDevelopmentCaptureMinPieces = 22;
 constexpr int kRootTrackedMultiPvLimit = 8;
 constexpr int kRootMultiPvReductionMargin = 5;
 constexpr int kQSeePruneMaxDepth = 4;
@@ -6619,6 +6621,27 @@ uint64_t fenPositionKey(const std::string& fen) {
   return board.key;
 }
 
+bool isRootHomeHorseDevelopmentCapture(const Board& root, const Move& move) {
+  if (root.totalPieceCount < kRootHomeHorseDevelopmentCaptureMinPieces) return false;
+  if (move.captured == 0 || pieceCodeType(move.piece) != Horse) return false;
+  if (pieceCodeValue(move.captured) < pieceTypeValue(Horse)) return false;
+  const int side = pieceCodeSide(move.piece);
+  if (side != root.side) return false;
+
+  const int homeRank = side == kRed ? 9 : 0;
+  const int targetRank = homeRank + 2 * forwardDelta(side);
+  if (rankOf(move.from) != homeRank || rankOf(move.to) != targetRank) return false;
+
+  const int fromFile = fileOf(move.from);
+  const int toFile = fileOf(move.to);
+  return (fromFile == 1 && toFile == 2) || (fromFile == 7 && toFile == 6);
+}
+
+int genericTimedOpeningRootBonus(const Board& root, const Move& move) {
+  if (isRootHomeHorseDevelopmentCapture(root, move)) return kRootHomeHorseDevelopmentCaptureBonus;
+  return 0;
+}
+
 int timedOpeningRootBonus(const Board& root, const Move& move) {
   if (root.side == kRed && root.key == initialPositionKey()) {
     if (sameUciMove(move, "h2e2")) return 5050;  // h7-e7: refreshed Pikafish top in current depth-7 oracle review.
@@ -6831,7 +6854,7 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     if (sameUciMove(move, "c3c4")) return 4300;  // c6-c5: useful central pawn break.
     if (sameUciMove(move, "b2b1")) return 4000;  // b7-b8: playable cannon retreat.
   }
-  return 0;
+  return genericTimedOpeningRootBonus(root, move);
 }
 
 int timedOpeningRootMaxLoss(const Board& root) {

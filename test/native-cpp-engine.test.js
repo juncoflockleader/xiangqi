@@ -739,6 +739,37 @@ test("local C++ engine follows oracle early-midgame development priors", async (
   }
 });
 
+test("local C++ engine promotes near-tied home-horse captures in early middlegames", async (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const backend = createUcciEngineBackend({
+    command: build.output,
+    protocol: "uci",
+    depth: 6,
+    timeLimitMs: 1000,
+    startupTimeoutMs: 3000,
+    commandTimeoutMs: 5000
+  });
+
+  try {
+    const position = parseFen("rhea1ae2/8r/2C1k4/p5p1p/2p1p4/2P4C1/c3P1P1P/R8/2c1K4/1HEA1AEHR b");
+    const result = await backend.chooseMove(position, {
+      useBook: false,
+      depth: 6,
+      timeLimitMs: 1000
+    });
+
+    assert.equal(moveToNotation(result.bestMove), "b0-c2");
+    assert.ok(result.nodes > 0);
+  } finally {
+    await backend.close();
+  }
+});
+
 test("local C++ engine preserves mate-range TT scores across repeated searches", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {
