@@ -102,6 +102,7 @@ const ROOT_TACTICAL_VERIFICATION_MAX_MOVES = 12;
 const ROOT_TACTICAL_VERIFICATION_CAPTURE_VALUE = PIECE_VALUES[PIECES.CANNON];
 const ROOT_HOME_RANK_ROOK_CONNECT_SCORE_BONUS = 150;
 const ROOT_HOME_RANK_ROOK_CONNECT_BONUS = 110;
+const ROOT_EARLY_PAWN_ELEPHANT_RIM_HORSE_TIE_BONUS = 150;
 const DEFAULT_ROOT_TIME_GUARD_MIN_MS = 8;
 const DEFAULT_ROOT_TIME_GUARD_MAX_MS = 250;
 const DEFAULT_ROOT_TIME_GUARD_DIVISOR = 3;
@@ -733,6 +734,7 @@ function rootTieBreakScore(position, move, next, context, searchScore) {
   if (move.givesCheck) score += 30;
   if (move.piece?.type !== PIECES.KING) score += 4;
   if (isHomeRankRookConnectorMove(position, move)) score += ROOT_HOME_RANK_ROOK_CONNECT_BONUS;
+  if (isEarlyPawnElephantRimHorseResponse(position, move)) score += ROOT_EARLY_PAWN_ELEPHANT_RIM_HORSE_TIE_BONUS;
   if (move.captured) {
     score += 2;
     const capture = getCaptureAnalysis(position, move, context);
@@ -786,6 +788,53 @@ function hasHomeRankConnectorRook(position, side) {
     const cornerFile = file === 1 ? 0 : BOARD_FILES - 1;
     return position.board[indexOf(cornerFile, homeRank)] === null;
   });
+}
+
+function isEarlyPawnElephantRimHorseResponse(position, move) {
+  const piece = move.piece ?? position.board[move.from];
+  if (!piece || piece.type !== PIECES.HORSE) return false;
+
+  const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  const fromFile = fileOf(move.from);
+  const fromRank = rankOf(move.from);
+  const toFile = fileOf(move.to);
+  const toRank = rankOf(move.to);
+  if (fromRank !== homeRank) return false;
+
+  const ownRightWing = fromFile === BOARD_FILES - 2 && toFile === BOARD_FILES - 1;
+  const ownLeftWing = fromFile === 1 && toFile === 0;
+  if (!ownRightWing && !ownLeftWing) return false;
+
+  const progress = piece.side === SIDES.RED ? homeRank - toRank : toRank - homeRank;
+  if (progress !== 2) return false;
+
+  const wing = ownRightWing ? "right" : "left";
+  const enemy = opponent(piece.side);
+  return hasCentralElephantDeveloped(position, enemy)
+    && hasAdvancedEnemyPawnOnWing(position, piece.side, wing);
+}
+
+function hasCentralElephantDeveloped(position, side) {
+  const rank = side === SIDES.RED ? BOARD_RANKS - 3 : 2;
+  const piece = position.board[indexOf(4, rank)];
+  return piece?.side === side && piece.type === PIECES.ELEPHANT;
+}
+
+function hasAdvancedEnemyPawnOnWing(position, side, wing) {
+  const enemy = opponent(side);
+  const minFile = wing === "right" ? 6 : 0;
+  const maxFile = wing === "right" ? BOARD_FILES - 1 : 2;
+
+  for (let file = minFile; file <= maxFile; file += 1) {
+    for (let rank = 0; rank < BOARD_RANKS; rank += 1) {
+      const piece = position.board[indexOf(file, rank)];
+      if (piece?.side !== enemy || piece.type !== PIECES.PAWN) continue;
+      if (enemy === SIDES.RED && rank < BOARD_RANKS - 4) return true;
+      if (enemy === SIDES.BLACK && rank > 3) return true;
+    }
+  }
+
+  return false;
 }
 
 function legacyRootTieBreakScore(move) {
