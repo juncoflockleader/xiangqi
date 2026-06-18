@@ -555,6 +555,7 @@ const state = {
   errorMessage: null,
   panel: null,
   teachingTurnFocusId: null,
+  preservedTeachingPair: null,
   treeCollapsed: new Set(),
   treeSelectedId: null,
   treeAnalysis: new Map(),
@@ -601,6 +602,7 @@ async function newGame() {
   state.selected = null;
   state.panel = null;
   state.teachingTurnFocusId = null;
+  state.preservedTeachingPair = null;
   state.treeCollapsed.clear();
   state.treeSelectedId = null;
   state.treeAnalysis.clear();
@@ -721,6 +723,7 @@ function renderOptimisticPlayerMove(notation) {
     engineDecision: null,
     engineThinking: true
   };
+  state.preservedTeachingPair = normalizeTeachingPair(state.panel);
   render();
   return optimisticMove;
 }
@@ -881,6 +884,7 @@ function stopPendingTicker() {
 function setGame(game) {
   state.game = game;
   state.sessionId = game.sessionId;
+  updatePreservedTeachingPair(game);
   syncTreeSelection();
   syncTeachingFocus();
   if (state.panel?.kind === "teachingPair") {
@@ -2288,12 +2292,28 @@ function activeTeachingPair(game, anchorMove = null) {
 }
 
 function latestPlayerTeachingPair(game) {
+  return latestPlayerTeachingPairFromGame(game) ?? state.preservedTeachingPair ?? null;
+}
+
+function latestPlayerTeachingPairFromGame(game) {
   const latestPlayerTurn = normalizeTeachingPair(game?.latestPlayerTeachingTurn);
   if (latestPlayerTurn) return latestPlayerTurn;
   return [...normalizeTeachingTurns(game?.teachingTurns)]
     .reverse()
     .find((turn) => turn.playerMove || turn.playerReview)
     ?? null;
+}
+
+function updatePreservedTeachingPair(game) {
+  if (!game?.history?.length) {
+    state.preservedTeachingPair = null;
+    return;
+  }
+
+  const latestPlayer = latestPlayerTeachingPairFromGame(game);
+  if (latestPlayer?.playerMove || latestPlayer?.playerReview) {
+    state.preservedTeachingPair = latestPlayer;
+  }
 }
 
 function pairWithPreservedHumanMove(pair, game = state.game) {

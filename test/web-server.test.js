@@ -87,6 +87,8 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(page, /id="selectedMoves"/);
     assert.match(page, />九</);
     assert.match(page, /id="localeSelect"/);
+    assert.match(page, /class="panel-block last-move-panel"/);
+    assert.match(page, /class="panel-block reasoning-panel"/);
     assert.match(page, /data-i18n="moveTree"/);
     assert.match(page, /class="tree-toolbar"/);
     assert.match(page, /role="tree"/);
@@ -105,6 +107,9 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /kind: "teachingPair"/);
     assert.match(script, /function latestTeachingPair/);
     assert.match(script, /function latestPlayerTeachingPair/);
+    assert.match(script, /preservedTeachingPair/);
+    assert.match(script, /function latestPlayerTeachingPairFromGame/);
+    assert.match(script, /function updatePreservedTeachingPair/);
     assert.match(script, /function focusLatestPlayerTeachingTurn/);
     assert.match(script, /focusLatestPlayerTeachingTurn\(result\.state\)/);
     assert.match(script, /function teachingPairForSelectedTreeNode/);
@@ -187,6 +192,8 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(stylesheet, /\.selected-moves/);
     assert.match(stylesheet, /\.play-section/);
     assert.match(stylesheet, /\.command-panel/);
+    assert.match(stylesheet, /\.last-move-panel/);
+    assert.match(stylesheet, /\.reasoning-panel/);
     assert.match(stylesheet, /\.tree-viewport/);
     assert.match(stylesheet, /\.move-tree-canvas/);
     assert.match(stylesheet, /\.move-tree-edges/);

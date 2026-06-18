@@ -609,15 +609,27 @@ h2 {
 }
 
 .command-panel .stack {
-  max-height: 58px;
+  max-height: 76px;
   overflow: auto;
   font-size: 12px;
   line-height: 1.25;
   scrollbar-width: thin;
 }
 
+.command-panel .last-move-panel .stack {
+  max-height: 104px;
+}
+
+.command-panel .reasoning-panel .stack {
+  max-height: 128px;
+}
+
 .command-panel .stack.teaching-stack {
-  max-height: 108px;
+  max-height: 136px;
+}
+
+.command-panel .reasoning-panel .stack.teaching-stack {
+  max-height: 152px;
 }
 
 .command-panel .meta-list {
@@ -783,11 +795,13 @@ h2 {
 
 .teaching-pair-summary .teaching-card-body {
   color: var(--muted);
-  max-height: 2.4em;
-  overflow: hidden;
   gap: 0;
   font-size: 10.5px;
   line-height: 1.2;
+}
+
+.teaching-pair-summary {
+  grid-template-columns: repeat(auto-fit, minmax(min(138px, 100%), 1fr));
 }
 
 .teaching-pair-summary .teaching-card {
@@ -801,16 +815,13 @@ h2 {
 
 .teaching-card.compact .teaching-card-body > div {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .teaching-pair-summary .teaching-card-move {
   margin-top: 2px;
-  overflow: hidden;
   font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .teaching-reason-list {
@@ -1144,11 +1155,23 @@ h2 {
   }
 
   .command-panel .stack {
-    max-height: 42px;
+    max-height: 58px;
+  }
+
+  .command-panel .last-move-panel .stack {
+    max-height: 86px;
+  }
+
+  .command-panel .reasoning-panel .stack {
+    max-height: 104px;
   }
 
   .command-panel .stack.teaching-stack {
-    max-height: 96px;
+    max-height: 112px;
+  }
+
+  .command-panel .reasoning-panel .stack.teaching-stack {
+    max-height: 124px;
   }
 
   .command-panel .meta-list {
