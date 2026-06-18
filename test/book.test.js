@@ -259,7 +259,7 @@ test("opening heuristics cover early positions outside exact book when requested
 
 test("opening heuristic validation rejects losses above the configured threshold", () => {
   const engine = createEngine({ depth: 2, timeLimitMs: 2000 });
-  const position = engine.play(createInitialPosition(), "a9-a8");
+  const position = engine.play(createInitialPosition(), "c6-c5");
   const raw = engine.chooseMove(position, { validateOpeningHeuristics: false });
   const result = engine.chooseMove(position, {
     openingHeuristicValidationDepth: 2,

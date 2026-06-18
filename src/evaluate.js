@@ -76,6 +76,12 @@ const OPENING_ROOK_EXPOSURE_PENALTY = 720;
 const OPENING_REPEATED_WING_CANNON_LIFT_PENALTY = 130;
 const OPENING_HORSE_PALACE_CONGESTION_PENALTY = 130;
 const OPENING_ROOK_FILE_PENALTY = 220;
+const OPENING_EDGE_ROOK_SHALLOW_PENALTY = 100;
+const OPENING_DOUBLE_HORSE_ELEPHANT_PENALTY = 32;
+const OPENING_ADVISOR_BEFORE_DEVELOPMENT_PENALTY = 70;
+const OPENING_EDGE_PAWN_DRIFT_PENALTY = 70;
+const OPENING_WING_CANNON_STEP_PENALTY = 70;
+const OPENING_CANNON_WING_CROWDING_PENALTY = 50;
 
 export function evaluatePosition(position, perspective = position.turn, options = {}) {
   const openingPhase = openingPhaseValue(position);
@@ -873,6 +879,9 @@ function openingDisciplineValue(position, piece, square, openingPhase) {
   if (openingPhase <= 0) return 0;
   if (piece.type === PIECES.ROOK) return openingRookDisciplineValue(position, piece, square, openingPhase);
   if (piece.type === PIECES.HORSE) return openingHorseDisciplineValue(position, piece, square, openingPhase);
+  if (piece.type === PIECES.ELEPHANT) return openingElephantDisciplineValue(position, piece, square, openingPhase);
+  if (piece.type === PIECES.ADVISOR) return openingAdvisorDisciplineValue(position, piece, square, openingPhase);
+  if (piece.type === PIECES.PAWN) return openingPawnDisciplineValue(piece, square, openingPhase);
   if (piece.type !== PIECES.CANNON) return 0;
 
   const file = fileOf(square);
@@ -882,15 +891,20 @@ function openingDisciplineValue(position, piece, square, openingPhase) {
   const rank = rankOf(square);
   const homeCannonRank = piece.side === SIDES.RED ? 7 : 2;
   const progress = piece.side === SIDES.RED ? homeCannonRank - rank : rank - homeCannonRank;
-  if (progress <= 0) return 0;
+  let penalty = openingCannonWingCrowdingPenalty(position, piece, square, homeCannonRank);
+  if (progress <= 0) {
+    return penalty > 0 ? -Math.round(penalty * openingPhase) : 0;
+  }
 
-  let penalty = openingCannonFarCampPenalty(piece, rank, progress);
+  penalty += openingCannonFarCampPenalty(piece, rank, progress);
   if (progress >= 5 && isExposedToEnemyRook(position, piece.side, square)) {
     penalty += OPENING_ROOK_EXPOSURE_PENALTY;
   }
   const sameWingHorseHome = sameWingHorseIsHome(position, piece.side, homeHorseFile);
-  if (progress >= 3 && file === homeHorseFile && !sameWingHorseHome) {
-    penalty += (progress - 2) * OPENING_REPEATED_WING_CANNON_LIFT_PENALTY;
+  if (file === homeHorseFile && !sameWingHorseHome) {
+    penalty += progress >= 3
+      ? (progress - 2) * OPENING_REPEATED_WING_CANNON_LIFT_PENALTY
+      : progress * OPENING_WING_CANNON_STEP_PENALTY;
   }
 
   if (sameWingHorseHome) {
@@ -922,6 +936,51 @@ function openingHorseDisciplineValue(position, piece, square, openingPhase) {
   if (penalty <= 0) return 0;
 
   return -Math.round(penalty * openingPhase);
+}
+
+function openingElephantDisciplineValue(position, piece, square, openingPhase) {
+  const file = fileOf(square);
+  if (file !== 4) return 0;
+  if (!bothWingHorsesDeveloped(position, piece.side)) return 0;
+
+  return -Math.round(OPENING_DOUBLE_HORSE_ELEPHANT_PENALTY * openingPhase);
+}
+
+function openingAdvisorDisciplineValue(position, piece, square, openingPhase) {
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  const centerRank = piece.side === SIDES.RED ? BOARD_RANKS - 2 : 1;
+  if (file !== 4 || rank !== centerRank) return 0;
+  if (!hasHomeWingHorse(position, piece.side)) return 0;
+
+  return -Math.round(OPENING_ADVISOR_BEFORE_DEVELOPMENT_PENALTY * openingPhase);
+}
+
+function openingPawnDisciplineValue(piece, square, openingPhase) {
+  const file = fileOf(square);
+  if (file !== 0 && file !== BOARD_FILES - 1) return 0;
+
+  const rank = rankOf(square);
+  const homeRank = piece.side === SIDES.RED ? 6 : 3;
+  const progress = piece.side === SIDES.RED ? homeRank - rank : rank - homeRank;
+  if (progress <= 0) return 0;
+
+  return -Math.round(progress * OPENING_EDGE_PAWN_DRIFT_PENALTY * openingPhase);
+}
+
+function openingCannonWingCrowdingPenalty(position, piece, square, homeCannonRank) {
+  const file = fileOf(square);
+  if (rankOf(square) !== homeCannonRank) return 0;
+  if (file !== 3 && file !== 5) return 0;
+
+  const sameWingCannon = pieceSquares(position, piece.side, PIECES.CANNON)
+    .some((candidateSquare) => {
+      if (candidateSquare === square) return false;
+      const candidateFile = fileOf(candidateSquare);
+      return file < 4 ? candidateFile < 4 : candidateFile > 4;
+    });
+
+  return sameWingCannon ? OPENING_CANNON_WING_CROWDING_PENALTY : 0;
 }
 
 function openingCannonFarCampPenalty(piece, rank, progress) {
@@ -967,7 +1026,13 @@ function openingRookDisciplineValue(position, piece, square, openingPhase) {
   const progress = piece.side === SIDES.RED ? homeRank - rank : rank - homeRank;
   if (progress <= 0) return 0;
 
-  if (!sameWingHorseIsHome(position, piece.side, homeHorseFile)) return 0;
+  const sameWingHorseHome = sameWingHorseIsHome(position, piece.side, homeHorseFile);
+  if (!sameWingHorseHome) {
+    if ((file === 0 || file === BOARD_FILES - 1) && progress <= 2) {
+      return -Math.round(OPENING_EDGE_ROOK_SHALLOW_PENALTY * openingPhase);
+    }
+    return 0;
+  }
 
   return -Math.round(progress * OPENING_ROOK_FILE_PENALTY * openingPhase);
 }
@@ -982,6 +1047,14 @@ function sameWingHorseIsHome(position, side, file) {
   const homeRank = side === SIDES.RED ? BOARD_RANKS - 1 : 0;
   const piece = position.board[indexOf(file, homeRank)];
   return piece?.side === side && piece.type === PIECES.HORSE;
+}
+
+function bothWingHorsesDeveloped(position, side) {
+  return !sameWingHorseIsHome(position, side, 1) && !sameWingHorseIsHome(position, side, 7);
+}
+
+function hasHomeWingHorse(position, side) {
+  return sameWingHorseIsHome(position, side, 1) || sameWingHorseIsHome(position, side, 7);
 }
 
 function enemyBackRank(side) {
