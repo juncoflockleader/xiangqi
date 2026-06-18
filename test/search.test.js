@@ -184,6 +184,24 @@ test("search develops before loose cannon and pawn shifts under shifted-cannon p
   }
 });
 
+test("search centralizes the far elephant in shifted left-screen pawn lines", () => {
+  const position = parseFen("r1eakaehr/9/1ch4c1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b");
+  const result = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 8000,
+    useBook: false,
+    candidateLimit: 99
+  });
+
+  assert.equal(result.depth, 6);
+  assert.equal(result.timedOut, false);
+  assert.ok(["g0-e2", "g3-g4", "c3-c4"].includes(result.bestMove.notation));
+
+  const nearElephant = result.candidates.find((item) => item.move.notation === "c0-e2");
+  assert.ok(nearElephant);
+  assert.ok(nearElephant.score < result.score || nearElephant.tieBreak < result.candidates[0].tieBreak);
+});
+
 test("search avoids central-pawn and half-cannon drifts against developed central cannon pressure", () => {
   const position = parseFen("rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R b");
   const result = searchBestMove(position, {
