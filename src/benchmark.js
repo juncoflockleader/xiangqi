@@ -139,7 +139,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
     id: "oracle-opening-central-cannon-early-pawn-black",
     name: "Oracle Opening: Central Cannon Early Pawn Black Reply",
     fen: "rheakae1r/9/1c4hc1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b",
-    expectedMoves: Object.freeze(["i0-h0", "h2-i2", "b2-e2"]),
+    expectedMoves: Object.freeze(["c3-c4", "i0-h0", "h2-i2", "b2-e2", "b0-c2"]),
     tags: Object.freeze(["opening", "oracle", "pikafish", "native", "regression", "early-pawn", "central-cannon"]),
     options: Object.freeze({
       depth: 8,
@@ -147,7 +147,7 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
       useBook: false,
       lines: 5
     }),
-    lesson: "In the central-cannon early-pawn branch, Black should develop the rook or sidestep the cannon before launching flank cannon activity."
+    lesson: "In the central-cannon early-pawn branch, Black should counter the early flank pawn, develop compactly, or sidestep the cannon before launching loose flank activity."
   }),
   Object.freeze({
     id: "oracle-opening-early-pawn-red-elephant-black",

@@ -104,6 +104,7 @@ const ROOT_HOME_RANK_ROOK_CONNECT_SCORE_BONUS = 150;
 const ROOT_HOME_RANK_ROOK_CONNECT_BONUS = 110;
 const ROOT_CENTRAL_CANNON_ROOK_CONNECT_SCORE_BONUS = 70;
 const ROOT_EARLY_PAWN_DEVELOPMENT_SCORE_BONUS = 60;
+const ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_SCORE_BONUS = 100;
 const ROOT_EARLY_PAWN_ELEPHANT_RIM_HORSE_TIE_BONUS = 150;
 const ROOT_OPENING_PRESSURE_CENTRAL_PAWN_PUSH_PENALTY = 120;
 const ROOT_OPENING_PRESSURE_CANNON_INWARD_SHIFT_PENALTY = 120;
@@ -772,6 +773,9 @@ function rootMoveStrategicPriorScore(position, move) {
   if (isEarlyPawnCentralCannonDevelopmentMove(position, move)) {
     score += ROOT_EARLY_PAWN_DEVELOPMENT_SCORE_BONUS;
   }
+  if (isEarlyPawnCentralCannonThirdFileCounter(position, move)) {
+    score += ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_SCORE_BONUS;
+  }
   if (isPrematureCentralPawnPushAgainstOpeningPressure(position, move)) {
     score -= ROOT_OPENING_PRESSURE_CENTRAL_PAWN_PUSH_PENALTY;
   }
@@ -881,6 +885,26 @@ function isWingCannonCentralRegroupMove(position, move) {
 
   return (fromFile === 1 && (toFile === 2 || toFile === 3))
     || (fromFile === BOARD_FILES - 2 && (toFile === BOARD_FILES - 3 || toFile === BOARD_FILES - 4));
+}
+
+function isEarlyPawnCentralCannonThirdFileCounter(position, move) {
+  const piece = move.piece ?? position.board[move.from];
+  if (!piece || piece.type !== PIECES.PAWN) return false;
+  if (!isFacingEarlyPawnCentralCannonPressure(position, piece.side)) return false;
+  if (!hasOwnDevelopedHorse(position, piece.side)) return false;
+
+  const fromFile = fileOf(move.from);
+  const fromRank = rankOf(move.from);
+  const toFile = fileOf(move.to);
+  const toRank = rankOf(move.to);
+  if (fromFile !== toFile) return false;
+
+  const counterFiles = earlyPawnCounterFiles(position, piece.side);
+  if (!counterFiles.has(fromFile)) return false;
+
+  const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 4 : 3;
+  const progress = piece.side === SIDES.RED ? fromRank - toRank : toRank - fromRank;
+  return fromRank === homeRank && progress === 1;
 }
 
 function isPrematureCentralPawnPushAgainstOpeningPressure(position, move) {
@@ -1053,11 +1077,15 @@ function hasAdvancedEnemyFlankPawn(position, side) {
 
 function hasEnemyDevelopedHorse(position, side) {
   const enemy = opponent(side);
-  const homeRank = enemy === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  return hasOwnDevelopedHorse(position, enemy);
+}
+
+function hasOwnDevelopedHorse(position, side) {
+  const homeRank = side === SIDES.RED ? BOARD_RANKS - 1 : 0;
 
   for (let square = 0; square < position.board.length; square += 1) {
     const piece = position.board[square];
-    if (piece?.side !== enemy || piece.type !== PIECES.HORSE) continue;
+    if (piece?.side !== side || piece.type !== PIECES.HORSE) continue;
     const file = fileOf(square);
     const rank = rankOf(square);
     if (rank !== homeRank || (file !== 1 && file !== BOARD_FILES - 2)) return true;
@@ -1083,6 +1111,17 @@ function hasAdvancedEnemyPawnOnAnyFile(position, side, files) {
 
 function hasAdvancedOwnFlankPawn(position, side) {
   return hasAdvancedPawnOnAnyFile(position, side, [0, 1, 2, BOARD_FILES - 3, BOARD_FILES - 2, BOARD_FILES - 1]);
+}
+
+function earlyPawnCounterFiles(position, side) {
+  const files = new Set();
+  if (hasAdvancedEnemyPawnOnAnyFile(position, side, [BOARD_FILES - 3, BOARD_FILES - 2, BOARD_FILES - 1])) {
+    files.add(2);
+  }
+  if (hasAdvancedEnemyPawnOnAnyFile(position, side, [0, 1, 2])) {
+    files.add(BOARD_FILES - 3);
+  }
+  return files;
 }
 
 function hasAdvancedPawnOnAnyFile(position, side, files) {

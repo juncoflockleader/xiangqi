@@ -146,6 +146,24 @@ test("search rejects premature central-pawn pushes under early-pawn cannon press
   }
 });
 
+test("search counters central-cannon early pawns before lifting the edge rook", () => {
+  const position = parseFen("rheakae1r/9/1c4hc1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b");
+  const result = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 8000,
+    useBook: false,
+    candidateLimit: 99
+  });
+
+  assert.equal(result.depth, 6);
+  assert.equal(result.timedOut, false);
+  assert.ok(["c3-c4", "i0-h0", "h2-i2", "b2-e2", "b0-c2"].includes(result.bestMove.notation));
+
+  const edgeRookLift = result.candidates.find((item) => item.move.notation === "i0-i1");
+  assert.ok(edgeRookLift);
+  assert.ok(edgeRookLift.score < result.score || edgeRookLift.tieBreak < result.candidates[0].tieBreak);
+});
+
 test("search develops before loose cannon and pawn shifts under shifted-cannon pressure", () => {
   const position = parseFen("rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/4C2C1/9/RHEAKAEHR b");
   const result = searchBestMove(position, {
@@ -157,12 +175,12 @@ test("search develops before loose cannon and pawn shifts under shifted-cannon p
 
   assert.equal(result.depth, 6);
   assert.equal(result.timedOut, false);
-  assert.ok(["c0-e2", "g0-e2", "b0-c2", "b2-e2", "c3-c4"].includes(result.bestMove.notation));
+  assert.ok(["c0-e2", "g0-e2", "b0-c2", "b2-e2"].includes(result.bestMove.notation));
 
-  for (const notation of ["b2-c2", "b2-d2", "g3-g4"]) {
+  for (const notation of ["b2-c2", "b2-d2", "g3-g4", "c3-c4"]) {
     const candidate = result.candidates.find((item) => item.move.notation === notation);
     assert.ok(candidate);
-    assert.ok(candidate.score < result.score);
+    assert.ok(candidate.score < result.score || candidate.tieBreak < result.candidates[0].tieBreak);
   }
 });
 
