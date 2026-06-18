@@ -2411,7 +2411,13 @@ function pairWithPreservedHumanMove(pair, game = state.game) {
   const latestPlayer = latestPlayerTeachingPair(game);
   if (!current) return latestPlayer ?? activeTeachingPair(game);
   if (hasHumanTeachingMove(current) || !latestPlayer) return current;
-  return latestPlayer;
+  return normalizeTeachingPair({
+    ...current,
+    moveNumber: current.moveNumber ?? latestPlayer.moveNumber,
+    playerMove: latestPlayer.playerMove,
+    playerReview: latestPlayer.playerReview,
+    playerReviewPending: latestPlayer.playerReviewPending
+  });
 }
 
 function hasHumanTeachingMove(pair) {

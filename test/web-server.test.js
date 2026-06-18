@@ -528,6 +528,46 @@ test("web server defers engine replies and can continue from tree nodes", async 
   }
 });
 
+test("web server keeps earlier human reviews after later engine replies", async () => {
+  const app = await startWebServer({
+    port: 0,
+    native: false,
+    depth: 1,
+    timeLimitMs: 50,
+    lines: 2,
+    useBook: false
+  });
+
+  try {
+    const created = await postJson(`${app.url}/api/new`, { side: "red" });
+    const sessionId = created.state.sessionId;
+    const first = await postJson(`${app.url}/api/move`, { sessionId, move: "h7-e7" });
+    const secondMove = first.state.legalMoves[0].notation;
+    const second = await postJson(`${app.url}/api/move`, { sessionId, move: secondMove });
+
+    assert.equal(first.state.history.length, 2);
+    assert.equal(first.state.teachingTurns.length, 1);
+    assert.equal(first.state.teachingTurns[0].playerMove.notation, "h7-e7");
+    assert.equal(first.state.teachingTurns[0].playerReview.move, "h7-e7");
+    assert.equal(first.state.teachingTurns[0].engineMove.notation, first.state.history[1].notation);
+
+    assert.equal(second.state.history.length, 4);
+    assert.equal(second.state.teachingTurns.length, 2);
+    assert.equal(second.state.teachingTurns[0].playerMove.notation, "h7-e7");
+    assert.equal(second.state.teachingTurns[0].playerReview.move, "h7-e7");
+    assert.equal(second.state.teachingTurns[0].engineMove.notation, first.state.history[1].notation);
+    assert.equal(second.state.teachingTurns[1].playerMove.notation, secondMove);
+    assert.equal(second.state.teachingTurns[1].playerReview.move, secondMove);
+    assert.equal(second.state.teachingTurns[1].engineMove.notation, second.state.history[3].notation);
+    assert.equal(second.state.latestPlayerTeachingTurn.id, second.state.teachingTurns[1].id);
+    assert.equal(second.state.latestPlayerTeachingTurn.playerReview.move, secondMove);
+    assert.equal(second.state.teachingPair.id, second.state.teachingTurns[1].id);
+    assert.equal(second.state.teachingPair.playerReview.move, secondMove);
+  } finally {
+    await app.close();
+  }
+});
+
 test("web server preserves teaching turns when the engine opens first", async () => {
   const app = await startWebServer({
     port: 0,
