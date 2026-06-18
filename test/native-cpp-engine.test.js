@@ -810,6 +810,46 @@ test("local C++ engine follows oracle cannon-pressure priors in random middlegam
   }
 });
 
+test("local C++ engine follows fresh random oracle priors", async (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const backend = createUcciEngineBackend({
+    command: build.output,
+    protocol: "uci",
+    depth: 6,
+    timeLimitMs: 1000,
+    startupTimeoutMs: 3000,
+    commandTimeoutMs: 5000
+  });
+
+  try {
+    const cases = [
+      ["r1eakhe1r/4a4/7c1/p5p2/2h5p/9/P3P1P1P/4E1C1H/9/R2K1AE1R r", "i9-h9"],
+      ["C4a2r/3k5/C3e1h2/p1p5p/4p1p2/9/PcP1P1P1P/H1RAE4/9/1RE1KA3 b", "f0-e1"],
+      ["1heaka1hr/8r/1C2e4/4p1p1p/p1p6/9/P1P1P1P1P/E3EC3/8R/1R2KA3 r", "i8-d8"],
+      ["r1eaka3/3c5/h3e4/p5p1r/4p4/4C3P/P1P1P1P2/4EA3/1R7/3AK2HR r", "i5-i4"],
+      ["rhea1ae2/4k3r/9/p1C1p3p/9/8P/2P3c2/5A1CR/9/RHEAK1EH1 r", "c3-c5"],
+      ["1R1a1a1hr/2Ck5/6c2/p1p1p1p1p/6e2/P1P5P/4P1P2/4E4/4C4/2EAK3R b", "g2-e2"]
+    ];
+
+    for (const [fen, expected] of cases) {
+      const result = await backend.chooseMove(parseFen(fen), {
+        useBook: false,
+        depth: 6,
+        timeLimitMs: 1000
+      });
+      assert.equal(moveToNotation(result.bestMove), expected);
+      assert.ok(result.nodes > 0);
+    }
+  } finally {
+    await backend.close();
+  }
+});
+
 test("local C++ engine preserves mate-range TT scores across repeated searches", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {

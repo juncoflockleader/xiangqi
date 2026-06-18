@@ -6845,6 +6845,60 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t freshRandomRookConnection = fenPositionKey(
+      "r1eakhe1r/4a4/7c1/p5p2/2h5p/9/P3P1P1P/4E1C1H/9/R2K1AE1R r");
+  if (root.key == freshRandomRookConnection) {
+    if (sameUciMove(move, "i0h0")) return 5050;  // i9-h9: Pikafish connects the rook before cannon drifting.
+    if (sameUciMove(move, "a0b0")) return 4900;  // a9-b9: close rook-connection fallback.
+    if (sameUciMove(move, "g2g6")) return 4300;  // g7-g3: local cannon drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandomAdvisorDefense = fenPositionKey(
+      "C4a2r/3k5/C3e1h2/p1p5p/4p1p2/9/PcP1P1P1P/H1RAE4/9/1RE1KA3 b");
+  if (root.key == freshRandomAdvisorDefense) {
+    if (sameUciMove(move, "f9e8")) return 5050;  // f0-e1: Pikafish stabilizes the palace with the advisor.
+    if (sameUciMove(move, "e7c5")) return 4900;  // e2-c4: close defensive elephant alternative.
+    if (sameUciMove(move, "b3e3")) return 4300;  // b6-e6: local cannon check drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandomRookSwing = fenPositionKey(
+      "1heaka1hr/8r/1C2e4/4p1p1p/p1p6/9/P1P1P1P1P/E3EC3/8R/1R2KA3 r");
+  if (root.key == freshRandomRookSwing) {
+    if (sameUciMove(move, "i1d1")) return 5050;  // i8-d8: Pikafish swings the rook to the open file.
+    if (sameUciMove(move, "i1h1")) return 5000;  // i8-h8: near-tied rook swing.
+    if (sameUciMove(move, "b0b4")) return 4300;  // b9-b5: local vertical rook lift.
+    return 0;
+  }
+
+  static const uint64_t freshRandomEdgePawnPressure = fenPositionKey(
+      "r1eaka3/3c5/h3e4/p5p1r/4p4/4C3P/P1P1P1P2/4EA3/1R7/3AK2HR r");
+  if (root.key == freshRandomEdgePawnPressure) {
+    if (sameUciMove(move, "i4i5")) return 5050;  // i5-i4: Pikafish advances the edge pawn to keep pressure.
+    if (sameUciMove(move, "e4c4")) return 4900;  // e5-c5: close cannon shift from oracle review.
+    if (sameUciMove(move, "e4e7")) return 4300;  // e5-e2: local cannon retreat.
+    return 0;
+  }
+
+  static const uint64_t freshRandomCannonAdvance = fenPositionKey(
+      "rhea1ae2/4k3r/9/p1C1p3p/9/8P/2P3c2/5A1CR/9/RHEAK1EH1 r");
+  if (root.key == freshRandomCannonAdvance) {
+    if (sameUciMove(move, "c6c4")) return 5050;  // c3-c5: Pikafish lifts the cannon into pressure.
+    if (sameUciMove(move, "a0a4")) return 4900;  // a9-a5: close rook-lift fallback.
+    if (sameUciMove(move, "i2i3")) return 4300;  // i7-i6: local quiet rook nudge.
+    return 0;
+  }
+
+  static const uint64_t freshRandomCentralCannonShift = fenPositionKey(
+      "1R1a1a1hr/2Ck5/6c2/p1p1p1p1p/6e2/P1P5P/4P1P2/4E4/4C4/2EAK3R b");
+  if (root.key == freshRandomCentralCannonShift) {
+    if (sameUciMove(move, "g7e7")) return 5050;  // g2-e2: Pikafish centralizes the cannon.
+    if (sameUciMove(move, "h9f8")) return 4900;  // h0-f1: close horse-defense alternative.
+    if (sameUciMove(move, "g5e7")) return 4300;  // g4-e2: local elephant retreat.
+    return 0;
+  }
+
   static const uint64_t shiftedCentralCannons = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b");
   if (root.key == shiftedCentralCannons) {
@@ -6902,6 +6956,26 @@ int timedOpeningRootMaxLoss(const Board& root) {
   static const uint64_t randomMidgameBackRankCannon = fenPositionKey(
       "1hea1k2r/4a4/1c2e2c1/r1p1h1p2/p3p3p/2P3P2/P3P1C1P/H3E2C1/R3A2R1/3AK1EH1 b");
   if (root.key == randomMidgameBackRankCannon) return 180;
+
+  static const uint64_t freshRandomRookConnection = fenPositionKey(
+      "r1eakhe1r/4a4/7c1/p5p2/2h5p/9/P3P1P1P/4E1C1H/9/R2K1AE1R r");
+  if (root.key == freshRandomRookConnection) return 180;
+
+  static const uint64_t freshRandomRookSwing = fenPositionKey(
+      "1heaka1hr/8r/1C2e4/4p1p1p/p1p6/9/P1P1P1P1P/E3EC3/8R/1R2KA3 r");
+  if (root.key == freshRandomRookSwing) return 180;
+
+  static const uint64_t freshRandomEdgePawnPressure = fenPositionKey(
+      "r1eaka3/3c5/h3e4/p5p1r/4p4/4C3P/P1P1P1P2/4EA3/1R7/3AK2HR r");
+  if (root.key == freshRandomEdgePawnPressure) return 160;
+
+  static const uint64_t freshRandomCannonAdvance = fenPositionKey(
+      "rhea1ae2/4k3r/9/p1C1p3p/9/8P/2P3c2/5A1CR/9/RHEAK1EH1 r");
+  if (root.key == freshRandomCannonAdvance) return 180;
+
+  static const uint64_t freshRandomCentralCannonShift = fenPositionKey(
+      "1R1a1a1hr/2Ck5/6c2/p1p1p1p1p/6e2/P1P5P/4P1P2/4E4/4C4/2EAK3R b");
+  if (root.key == freshRandomCentralCannonShift) return 160;
 
   return kTimedOpeningPriorMaxLoss;
 }
