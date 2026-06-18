@@ -932,7 +932,20 @@ test("local C++ engine follows fresh random oracle priors", async (t) => {
       ["rheaka1hr/9/2c5e/p1c3p1p/2p1p3P/CRP1P4/P5P2/H4CH2/9/2EAKAE1R b", "b0-a2"],
       ["rhea1aehr/4kC1c1/9/pCc1p1p1p/9/9/P1p1P1P1P/8E/4A3R/RHE1KA1H1 r", "f1-f5"],
       ["rheaka1hr/6c2/3c4e/2p3p1p/p2C5/4p1P2/P1P1P3P/H2AE1HC1/9/R1EAK3R b", "d2-e2"],
-      ["rh1a1ae1r/3c1k1c1/6h2/p1p1p1p1p/2e6/P7P/2P1P1P2/H2C3C1/R3A4/2E1KAEHR r", "h7-e7"]
+      ["rh1a1ae1r/3c1k1c1/6h2/p1p1p1p1p/2e6/P7P/2P1P1P2/H2C3C1/R3A4/2E1KAEHR r", "h7-e7"],
+      ["rheakachr/9/7ce/pCp1p1p1P/9/9/P1P1P1P2/7CH/4K4/RHEA1AE1R r", "b3-e3"],
+      ["r1e1kaehr/4a4/2h6/p1pcp1pCp/9/9/PcP1PHP1P/5C3/4A4/R1E1KAEHR r", "h9-g7"],
+      ["C1eakaeh1/6r1r/1c7/p1p1p3p/9/2P3pcP/P3P1P2/CR6H/4K4/1HEA1AE1R b", "g1-b1"],
+      ["1heaka1h1/r8/2c1e3r/p1p3pC1/4p3p/8P/P1P1c1P2/4C3R/R3H4/2EAKAEH1 r", "h9-g7"],
+      ["1hcak1eh1/r3a4/e8/p1p1p1pcr/8p/P8/2P1P1P1P/EC7/2C1A3R/RH1AK1EH1 r", "a7-c9"],
+      ["rhe1kae1r/4a4/6h2/2p1p1c1p/p8/6p2/PcP1P1P1P/2H3HCE/2C6/R1EAKA2R r", "a9-b9"],
+      ["rheaka1hr/9/8e/pcp1p1p1p/7c1/8P/P1P1P1P2/6C1E/C8/RHEAKA1HR r", "b9-c7"],
+      ["rhea1aehr/2c6/2c1k4/p1p5p/4p1p2/9/P1P1P1P1P/ECC6/9/RH1AKAEHR r", "c7-e7"],
+      ["rheakaehr/4c4/9/p1p1p1p1p/9/2P5P/P3P1Pc1/4C1HC1/9/RHEAKAE1R b", "h0-g2"],
+      ["r3kaehr/3ha4/4e4/pcp1p1p1p/5c3/4P4/P1P3P1P/1C1C5/4K4/RHEA1AEHR r", "h9-g7"],
+      ["rhe1kaeh1/1C7/c4a2r/p1p1p1p1p/9/2P6/P3P1PCP/4E4/9/1R1AKAEHR r", "h9-g7"],
+      ["rh2kaehr/4a4/e4c3/2p1p1pc1/p7p/5C3/P1P1P1P1P/9/7C1/RHEAKAEHR b", "h0-i2"],
+      ["rCeaka1hr/7c1/4e4/2p1p1Cc1/p7p/4P4/P1P3P1P/4E3H/9/RHEAKA2R r", "b0-b5"]
     ];
 
     for (const [fen, expected] of cases) {
