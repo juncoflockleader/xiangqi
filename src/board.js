@@ -59,7 +59,7 @@ export function clonePiece(piece) {
 }
 
 export function cloneBoard(board) {
-  return board.map(clonePiece);
+  return board.slice();
 }
 
 export function createInitialPosition() {

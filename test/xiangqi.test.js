@@ -13,6 +13,7 @@ import {
   generateQuietMoves,
   indexOf,
   isInCheck,
+  makeMove,
   parseFen,
   toFen
 } from "../src/index.js";
@@ -136,6 +137,22 @@ test("applying a legal move updates the board and turn", () => {
   assert.equal(next.turn, SIDES.BLACK);
   assert.equal(next.board[coordToIndex("a8")].type, PIECES.ROOK);
   assert.equal(next.board[coordToIndex("a9")], null);
+});
+
+test("makeMove isolates board arrays while reusing immutable pieces", () => {
+  const position = createInitialPosition();
+  const from = coordToIndex("a9");
+  const to = coordToIndex("a8");
+  const moving = position.board[from];
+  const neighbor = position.board[coordToIndex("b9")];
+  const next = makeMove(position, { from, to });
+
+  assert.notEqual(next.board, position.board);
+  assert.equal(position.board[from], moving);
+  assert.equal(position.board[to], null);
+  assert.equal(next.board[from], null);
+  assert.equal(next.board[to], moving);
+  assert.equal(next.board[coordToIndex("b9")], neighbor);
 });
 
 test("engine returns a legal move and explanation", () => {
