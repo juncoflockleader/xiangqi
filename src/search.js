@@ -725,7 +725,11 @@ function rootTieBreakScore(position, move, next, context, searchScore) {
   let score = evaluateStatic(next, position.turn, context);
   if (move.givesCheck) score += 30;
   if (move.piece?.type !== PIECES.KING) score += 4;
-  if (move.captured) score += 2;
+  if (move.captured) {
+    score += 2;
+    const capture = getCaptureAnalysis(position, move, context);
+    if (capture?.exchangeScore < 0) score += capture.exchangeScore;
+  }
   return score;
 }
 

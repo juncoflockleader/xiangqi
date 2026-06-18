@@ -263,6 +263,18 @@ test("evaluation keeps pseudo king-capture threats finite", () => {
   assert.ok(stableDelta.deltaScore > greedyDelta.deltaScore);
 });
 
+test("evaluation fades opening discipline in developed full-piece middlegames", () => {
+  const position = parseFen("rheakae2/8r/4c1hc1/2p1p1p1p/p8/3C2P2/P1P1P2CP/4E4/8R/RHEAKA1H1 r");
+  const slowHorse = makeMove(position, parseMoveNotation("b9-c7"));
+  const activeHorse = makeMove(position, parseMoveNotation("h9-g7"));
+  const slowEval = evaluatePosition(slowHorse, SIDES.RED, { detailed: true });
+  const activeEval = evaluatePosition(activeHorse, SIDES.RED, { detailed: true });
+
+  assert.equal(slowEval.terms.red.openingDiscipline, 0);
+  assert.equal(activeEval.terms.red.openingDiscipline, 0);
+  assert.ok(activeEval.score > slowEval.score);
+});
+
 test("evaluation discourages repeated wing-cannon lifts after the wing horse develops", () => {
   const position = parseFen("r1eakae1r/9/1ch3hc1/p1p1p1p1p/9/9/P1P1P1P1P/2HCC4/9/R1EAKAEHR b");
   const shortLift = makeMove(position, parseMoveNotation("b2-b3"));

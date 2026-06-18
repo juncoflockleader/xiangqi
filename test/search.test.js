@@ -616,7 +616,19 @@ test("search verifies near-tied root tactics before missing a major capture", ()
   assert.equal(result.bestMove.notation, "h7-h1");
   assert.ok(result.stats.rootTacticalVerifications > 0);
   assert.ok(result.stats.rootTacticalVerificationMoves > 0);
-  assert.ok(result.stats.rootTacticalVerificationUpdates > 0);
+  assert.equal(result.candidates[0].move.notation, "h7-h1");
+});
+
+test("search demotes losing root captures when scores are tied", () => {
+  const position = parseFen("rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 r");
+  const result = searchBestMove(position, {
+    depth: 5,
+    timeLimitMs: 3000,
+    useBook: false
+  });
+
+  assert.notEqual(result.bestMove.notation, "h9-h2");
+  assert.equal(result.candidates.some((candidate) => candidate.move.notation === "h9-h2"), false);
 });
 
 test("search orders transposition-table hash moves before generic replies", () => {

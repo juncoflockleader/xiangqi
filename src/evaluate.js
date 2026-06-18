@@ -82,6 +82,8 @@ const OPENING_ADVISOR_BEFORE_DEVELOPMENT_PENALTY = 70;
 const OPENING_EDGE_PAWN_DRIFT_PENALTY = 70;
 const OPENING_WING_CANNON_STEP_PENALTY = 70;
 const OPENING_CANNON_WING_CROWDING_PENALTY = 50;
+const OPENING_STRUCTURE_ACTIVE_MAJOR_THRESHOLD = 5;
+const OPENING_STRUCTURE_DRIFT_FULL = 4;
 const OPENING_MAJOR_MATERIAL_LEAD_THRESHOLD = PIECE_VALUES[PIECES.ROOK] - PIECE_VALUES[PIECES.PAWN];
 const OPENING_CANNON_MAJOR_WIN_PENALTY_CAP = PIECE_VALUES[PIECES.CANNON];
 const THREAT_KING_PRESSURE_VALUE = PIECE_VALUES[PIECES.ROOK];
@@ -873,9 +875,74 @@ function openingPhaseValue(position) {
     if (piece) pieceCount += 1;
   }
 
-  if (pieceCount >= OPENING_FULL_PIECE_COUNT) return 1;
-  if (pieceCount <= OPENING_MIN_PIECE_COUNT) return 0;
-  return (pieceCount - OPENING_MIN_PIECE_COUNT) / (OPENING_FULL_PIECE_COUNT - OPENING_MIN_PIECE_COUNT);
+  let piecePhase;
+  if (pieceCount >= OPENING_FULL_PIECE_COUNT) piecePhase = 1;
+  else if (pieceCount <= OPENING_MIN_PIECE_COUNT) piecePhase = 0;
+  else piecePhase = (pieceCount - OPENING_MIN_PIECE_COUNT) / (OPENING_FULL_PIECE_COUNT - OPENING_MIN_PIECE_COUNT);
+
+  if (pieceCount < OPENING_FULL_PIECE_COUNT) return piecePhase;
+  return piecePhase * openingStructurePhaseValue(position);
+}
+
+function openingStructurePhaseValue(position) {
+  let displacedMajorPieces = 0;
+  let activeLinePieces = 0;
+  let deepLinePieces = 0;
+
+  for (let square = 0; square < position.board.length; square += 1) {
+    const piece = position.board[square];
+    if (!piece) continue;
+
+    if (isOpeningMajorPiece(piece) && !isOpeningHomeSquare(piece, square)) {
+      displacedMajorPieces += 1;
+    }
+
+    if (isOpeningLinePiece(piece) && !isOpeningHomeSquare(piece, square) && !isOpeningDeploymentBand(piece, square)) {
+      activeLinePieces += 1;
+      if (isDeepEnemyCamp(piece, square)) deepLinePieces += 1;
+    }
+  }
+
+  if (displacedMajorPieces < OPENING_STRUCTURE_ACTIVE_MAJOR_THRESHOLD || activeLinePieces < 2) {
+    return 1;
+  }
+
+  const drift = activeLinePieces * 2
+    + deepLinePieces
+    + Math.max(0, displacedMajorPieces - OPENING_STRUCTURE_ACTIVE_MAJOR_THRESHOLD);
+  return Math.max(0, (OPENING_STRUCTURE_DRIFT_FULL - drift) / OPENING_STRUCTURE_DRIFT_FULL);
+}
+
+function isOpeningMajorPiece(piece) {
+  return piece.type === PIECES.ROOK || piece.type === PIECES.CANNON || piece.type === PIECES.HORSE;
+}
+
+function isOpeningLinePiece(piece) {
+  return piece.type === PIECES.ROOK || piece.type === PIECES.CANNON;
+}
+
+function isOpeningHomeSquare(piece, square) {
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 1 : 0;
+
+  if (piece.type === PIECES.ROOK) return rank === homeRank && (file === 0 || file === BOARD_FILES - 1);
+  if (piece.type === PIECES.HORSE) return rank === homeRank && (file === 1 || file === BOARD_FILES - 2);
+  if (piece.type === PIECES.CANNON) {
+    const homeCannonRank = piece.side === SIDES.RED ? BOARD_RANKS - 3 : 2;
+    return rank === homeCannonRank && (file === 1 || file === BOARD_FILES - 2);
+  }
+  return false;
+}
+
+function isOpeningDeploymentBand(piece, square) {
+  const rank = rankOf(square);
+  return piece.side === SIDES.RED ? rank >= BOARD_RANKS - 3 : rank <= 2;
+}
+
+function isDeepEnemyCamp(piece, square) {
+  const rank = rankOf(square);
+  return piece.side === SIDES.RED ? rank <= 2 : rank >= BOARD_RANKS - 3;
 }
 
 function openingDisciplineValue(position, piece, square, openingPhase) {
