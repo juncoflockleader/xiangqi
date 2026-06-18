@@ -1049,7 +1049,9 @@ function renderLastMove() {
 
   const teachingPair = teachingPairForSelectedTreeNode(treeNode);
   if (teachingPair) {
-    renderTeachingPairSummary(teachingPair, treeNode?.kind === "main" ? treeNode : null);
+    renderTeachingPairSummary(teachingPair, treeNode?.kind === "main" ? treeNode : null, {
+      preserveLatestHuman: shouldPreserveHumanTeachingForNode(treeNode)
+    });
     return;
   }
 
@@ -1081,10 +1083,12 @@ function renderLastMove() {
   bindTreeRecomputeActions(elements.lastMovePanel);
 }
 
-function renderTeachingPairSummary(pair, node = null) {
-  const teachingPair = node
-    ? normalizeTeachingPair(pair)
-    : pairWithPreservedHumanMove(pair, state.game);
+function renderTeachingPairSummary(pair, node = null, options = {}) {
+  const teachingPair = options.preserveLatestHuman
+    ? pairWithPreservedHumanMove(pair, state.game)
+    : node
+      ? normalizeTeachingPair(pair)
+      : pairWithPreservedHumanMove(pair, state.game);
   const cards = renderTeachingPairCards(teachingPair, {
     compact: true,
     summary: true,
@@ -2141,7 +2145,9 @@ function panelFromTreeSelection() {
   if (state.treeAnalysis.has(node.id)) return { kind: "treeAnalysis", nodeId: node.id };
   if (node.kind === "main") {
     const pair = teachingPairForMainlineNode(state.game, node);
-    if (pair) return teachingPairPanel(pair, { preserveLatestHuman: false });
+    if (pair) return teachingPairPanel(pair, {
+      preserveLatestHuman: shouldPreserveHumanTeachingForNode(node)
+    });
     if (node.id === latestMainlineNodeId()) return null;
   }
   if (node.kind === "analysis") return { kind: "treeBranch", nodeId: node.id };
@@ -2149,6 +2155,11 @@ function panelFromTreeSelection() {
   if (node.move?.decision) return { kind: "move", decision: node.move.decision };
   if (node.move?.review) return { kind: "move", review: node.move.review };
   return null;
+}
+
+function shouldPreserveHumanTeachingForNode(node = selectedTreeNode()) {
+  if (!node) return true;
+  return node.kind === "main" && node.id === latestMainlineNodeId(state.game);
 }
 
 function boardCellsForTreeSelection() {

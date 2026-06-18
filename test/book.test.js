@@ -216,6 +216,10 @@ test("opening book follows refreshed Pikafish priors in shifted branches", () =>
     {
       fen: "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r",
       move: "i9-h9"
+    },
+    {
+      fen: "rheakaehr/7c1/2c6/pCp1p1p1p/8P/9/P1P1P1P2/3C4H/9/RHEAKAE1R b",
+      move: "c3-c4"
     }
   ];
 

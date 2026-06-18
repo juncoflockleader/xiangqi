@@ -140,9 +140,11 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function renderTeachingMoveCard/);
     assert.match(script, /function renderTeachingPairCards/);
     assert.match(script, /function pairWithPreservedHumanMove/);
+    assert.match(script, /function shouldPreserveHumanTeachingForNode/);
     assert.match(script, /function teachingPairPanel/);
     assert.match(script, /preserveLatestHuman: true/);
-    assert.match(script, /preserveLatestHuman: false/);
+    assert.match(script, /preserveLatestHuman: shouldPreserveHumanTeachingForNode\(node\)/);
+    assert.match(script, /preserveLatestHuman: shouldPreserveHumanTeachingForNode\(treeNode\)/);
     assert.match(script, /pair\.preserveLatestHuman === false/);
     assert.match(script, /function hasHumanTeachingMove/);
     assert.match(script, /function teachingReviewScoreText/);
