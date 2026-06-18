@@ -110,6 +110,19 @@ test("search follows the rim-horse response to early-pawn elephant development",
   assert.equal(result.bestMove.notation, "h0-i2");
 });
 
+test("search connects the rook in shifted-cannon double-horse openings", () => {
+  const position = parseFen("r1eakae1r/9/1ch3hc1/p1p1p1p1p/9/9/P1P1P1P1P/2HCC4/9/R1EAKAEHR b");
+  const result = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 8000,
+    useBook: false
+  });
+
+  assert.equal(result.depth, 6);
+  assert.equal(result.timedOut, false);
+  assert.equal(result.bestMove.notation, "a0-b0");
+});
+
 test("engine explanations surface tactical-motif ordering diagnostics", () => {
   const position = parseFen("4r4/9/4k4/9/3R5/9/4P4/9/9/4K4 r");
   const engine = createEngine({ depth: 1, timeLimitMs: 1000 });

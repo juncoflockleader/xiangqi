@@ -103,6 +103,8 @@ const ROOT_TACTICAL_VERIFICATION_CAPTURE_VALUE = PIECE_VALUES[PIECES.CANNON];
 const ROOT_HOME_RANK_ROOK_CONNECT_SCORE_BONUS = 150;
 const ROOT_HOME_RANK_ROOK_CONNECT_BONUS = 110;
 const ROOT_EARLY_PAWN_ELEPHANT_RIM_HORSE_TIE_BONUS = 150;
+const ROOT_SHIFTED_CANNON_CENTRAL_PAWN_PUSH_PENALTY = 120;
+const ROOT_SHIFTED_CANNON_WING_CANNON_LIFT_PENALTY = 120;
 const DEFAULT_ROOT_TIME_GUARD_MIN_MS = 8;
 const DEFAULT_ROOT_TIME_GUARD_MAX_MS = 250;
 const DEFAULT_ROOT_TIME_GUARD_DIVISOR = 3;
@@ -749,17 +751,23 @@ function applyRootMoveStrategicPrior(position, move, score) {
 }
 
 function rootMoveStrategicPriorScore(position, move) {
-  if (isMirroringHomeRankRookConnectorMove(position, move)) {
-    return ROOT_HOME_RANK_ROOK_CONNECT_SCORE_BONUS;
-  }
-  return 0;
-}
-
-function isMirroringHomeRankRookConnectorMove(position, move) {
   const piece = move.piece ?? position.board[move.from];
-  if (!piece) return false;
-  return isHomeRankRookConnectorMove(position, move)
-    && hasHomeRankConnectorRook(position, opponent(piece.side));
+  if (!piece) return 0;
+
+  let score = 0;
+  if (
+    isHomeRankRookConnectorMove(position, move)
+    && hasHomeRankConnectorRook(position, opponent(piece.side))
+  ) {
+    score += ROOT_HOME_RANK_ROOK_CONNECT_SCORE_BONUS;
+  }
+  if (isPrematureCentralPawnPushAgainstShiftedCannons(position, move)) {
+    score -= ROOT_SHIFTED_CANNON_CENTRAL_PAWN_PUSH_PENALTY;
+  }
+  if (isRepeatedWingCannonLiftAgainstShiftedCannons(position, move)) {
+    score -= ROOT_SHIFTED_CANNON_WING_CANNON_LIFT_PENALTY;
+  }
+  return score;
 }
 
 function isHomeRankRookConnectorMove(position, move) {
@@ -788,6 +796,71 @@ function hasHomeRankConnectorRook(position, side) {
     const cornerFile = file === 1 ? 0 : BOARD_FILES - 1;
     return position.board[indexOf(cornerFile, homeRank)] === null;
   });
+}
+
+function isPrematureCentralPawnPushAgainstShiftedCannons(position, move) {
+  const piece = move.piece ?? position.board[move.from];
+  if (!piece || piece.type !== PIECES.PAWN) return false;
+  if (!isFacingShiftedCentralCannonsAfterDoubleHorse(position, piece.side)) return false;
+
+  const fromFile = fileOf(move.from);
+  const fromRank = rankOf(move.from);
+  const toFile = fileOf(move.to);
+  const toRank = rankOf(move.to);
+  const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 4 : 3;
+  const progress = piece.side === SIDES.RED ? fromRank - toRank : toRank - fromRank;
+
+  return fromFile === 4
+    && toFile === 4
+    && fromRank === homeRank
+    && progress === 1;
+}
+
+function isRepeatedWingCannonLiftAgainstShiftedCannons(position, move) {
+  const piece = move.piece ?? position.board[move.from];
+  if (!piece || piece.type !== PIECES.CANNON) return false;
+  if (!isFacingShiftedCentralCannonsAfterDoubleHorse(position, piece.side)) return false;
+
+  const fromFile = fileOf(move.from);
+  const toFile = fileOf(move.to);
+  if (fromFile !== toFile) return false;
+
+  const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 3 : 2;
+  const fromRank = rankOf(move.from);
+  const toRank = rankOf(move.to);
+  if (fromRank !== homeRank) return false;
+
+  const progress = piece.side === SIDES.RED ? homeRank - toRank : toRank - homeRank;
+  return progress >= 2 && wingHomeHorseFileForSearch(fromFile) !== null;
+}
+
+function isFacingShiftedCentralCannonsAfterDoubleHorse(position, side) {
+  return bothWingHorsesDevelopedForSearch(position, side)
+    && hasEnemyShiftedCentralCannons(position, side);
+}
+
+function bothWingHorsesDevelopedForSearch(position, side) {
+  const homeRank = side === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  return [1, BOARD_FILES - 2].every((file) => {
+    const piece = position.board[indexOf(file, homeRank)];
+    return piece?.side !== side || piece.type !== PIECES.HORSE;
+  });
+}
+
+function hasEnemyShiftedCentralCannons(position, side) {
+  const enemy = opponent(side);
+  const cannonRank = enemy === SIDES.RED ? BOARD_RANKS - 3 : 2;
+  const centralCannonFiles = [3, 4, 5].filter((file) => {
+    const piece = position.board[indexOf(file, cannonRank)];
+    return piece?.side === enemy && piece.type === PIECES.CANNON;
+  });
+  return centralCannonFiles.some((file) => centralCannonFiles.includes(file + 1));
+}
+
+function wingHomeHorseFileForSearch(file) {
+  if (file >= 0 && file <= 3) return 1;
+  if (file >= 5 && file <= BOARD_FILES - 1) return BOARD_FILES - 2;
+  return null;
 }
 
 function isEarlyPawnElephantRimHorseResponse(position, move) {
