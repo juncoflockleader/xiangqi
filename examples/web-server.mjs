@@ -522,7 +522,8 @@ function serializeState(session, engine, config = {}) {
   const lastPlayerPosition = positionBeforeEntry(lastPlayerMove);
   const lastEnginePosition = positionBeforeEntry(lastEngineMove);
   const history = session.game.moves.map(summarizeHistoryMove);
-  const teachingTurn = summarizeTeachingPair(history, session, status);
+  const teachingTurns = summarizeTeachingTurns(history, session, status);
+  const teachingTurn = teachingTurns.at(-1) ?? summarizeTeachingPair(history, session, status);
 
   return {
     sessionId: session.id,
@@ -540,6 +541,7 @@ function serializeState(session, engine, config = {}) {
     lastMove: lastMove ? summarizeHistoryMove(lastMove) : null,
     lastPlayerReview: lastPlayerMove?.review ? summarizeReview(lastPlayerMove.review, lastPlayerPosition) : null,
     lastEngineDecision: lastEngineMove?.decision ? summarizeDecision(lastEngineMove.decision, lastEnginePosition) : null,
+    teachingTurns,
     teachingPair: teachingTurn,
     teachingTurn,
     backend: describeEngineBackend(engine),
@@ -547,6 +549,42 @@ function serializeState(session, engine, config = {}) {
       commandTimeoutMs: config.commandTimeoutMs ?? null,
       requestTimeoutMs: config.requestTimeoutMs ?? null
     }
+  };
+}
+
+function summarizeTeachingTurns(history, session, status) {
+  if (!history.length) return [];
+
+  const turns = history
+    .filter((move) => move.actor === "player")
+    .map((playerMove) => {
+      const engineMove = history.find((move) => move.actor === "engine" && move.ply > playerMove.ply) ?? null;
+      return summarizeTeachingTurn(playerMove, engineMove, session, status);
+    });
+
+  if (turns.length) return turns;
+
+  const engineMove = history.find((move) => move.actor === "engine") ?? null;
+  return engineMove ? [summarizeTeachingTurn(null, engineMove, session, status)] : [];
+}
+
+function summarizeTeachingTurn(playerMove, engineMove, session, status) {
+  const engineThinking = Boolean(
+    playerMove
+    && !engineMove
+    && status.state === "playing"
+    && session.game.position.turn === session.engineSide
+  );
+
+  return {
+    id: playerMove ? `turn-${playerMove.ply}` : `turn-engine-${engineMove?.ply ?? 0}`,
+    moveNumber: playerMove?.moveNumber ?? engineMove?.moveNumber ?? null,
+    playerMove,
+    playerReview: playerMove?.review ?? null,
+    playerReviewPending: Boolean(playerMove && !playerMove.review),
+    engineMove,
+    engineDecision: engineMove?.decision ?? null,
+    engineThinking
   };
 }
 

@@ -1007,7 +1007,7 @@ function renderLastMove() {
       ? activeTeachingPair(state.game)
       : null;
   if (teachingPair) {
-    renderTeachingPairSummary(teachingPair);
+    renderTeachingPairSummary(teachingPair, treeNode?.kind === "main" ? treeNode : null);
     return;
   }
 
@@ -1039,7 +1039,7 @@ function renderLastMove() {
   bindTreeRecomputeActions(elements.lastMovePanel);
 }
 
-function renderTeachingPairSummary(pair) {
+function renderTeachingPairSummary(pair, node = null) {
   const cards = [];
   if (pair.playerMove) {
     cards.push(renderTeachingMoveCard({
@@ -1076,9 +1076,12 @@ function renderTeachingPairSummary(pair) {
   elements.lastMovePanel.innerHTML = cards.length
     ? [
       `<div class="teaching-turn-title">${escapeHtml(t("teachingTurn"))}</div>`,
-      `<div class="teaching-pair-grid teaching-pair-summary">${cards.join("")}</div>`
+      `<div class="teaching-pair-grid teaching-pair-summary">${cards.join("")}</div>`,
+      node ? renderSelectedNodeActions(node) : ""
     ].join("")
     : t("noMoves");
+  bindTreeRestoreAction();
+  bindTreeRecomputeActions(elements.lastMovePanel);
 }
 
 function renderTreeAnalysisSummary(node) {
@@ -1145,10 +1148,16 @@ function renderSelectedNodeActions(node) {
   const actions = [
     `<button class="tree-restore-button" type="button" data-tree-recompute="${escapeHtml(node.id)}">${escapeHtml(t("recomputeNode"))}</button>`
   ];
-  if (node.kind === "main" && node.id !== latestMainlineNodeId()) {
+  if (canRestoreTreeNode(node)) {
     actions.unshift(`<button class="tree-restore-button" type="button" data-tree-restore="${escapeHtml(node.id)}">${escapeHtml(t("restorePoint"))}</button>`);
   }
   return `<div class="tree-action-row">${actions.join("")}</div>`;
+}
+
+function canRestoreTreeNode(node) {
+  if (!node) return false;
+  if (node.kind === "main") return node.id !== latestMainlineNodeId();
+  return Boolean(analysisRequestForTreeNode(node));
 }
 
 function renderReasoning() {
@@ -1800,21 +1809,12 @@ function analysisBranchSummaryText(branch) {
 async function selectTreeNode(id) {
   if (!id) return;
   const node = findTreeNode(id);
-  const requestNode = analysisRequestForTreeNode(node);
-  if (!requestNode) return;
+  if (!node) return;
 
-  await runRequest(async () => {
-    const result = await api("/api/select-node", {
-      sessionId: state.sessionId,
-      node: requestNode
-    });
-    state.treeSelectedId = latestMainlineNodeId(result.state);
-    state.panel = panelFromMove(result.state);
-    state.selected = null;
-    setGame(result.state);
-    await holdTeachingReviewBeforeEngineReply(result.state);
-    await requestEngineMoveIfNeeded(result.state);
-  });
+  state.treeSelectedId = id;
+  state.panel = panelFromTreeSelection() ?? panelFromMove(state.game);
+  state.selected = null;
+  render();
 }
 
 async function recomputeTreeNode(id) {
@@ -1867,13 +1867,20 @@ function analysisRequestForTreeNode(node) {
 
 async function restoreTreeNode(id) {
   const node = findTreeNode(id);
-  if (node?.kind !== "main") return;
+  const requestNode = analysisRequestForTreeNode(node);
+  if (!requestNode) return;
+
   await runRequest(async () => {
-    const result = await api("/api/jump", {
-      sessionId: state.sessionId,
-      ply: node.move.ply,
-      deferEngine: true
-    });
+    const result = node.kind === "main"
+      ? await api("/api/jump", {
+        sessionId: state.sessionId,
+        ply: node.move.ply,
+        deferEngine: true
+      })
+      : await api("/api/select-node", {
+        sessionId: state.sessionId,
+        node: requestNode
+      });
     state.treeSelectedId = latestMainlineNodeId(result.state);
     state.panel = panelFromMove(result.state);
     state.selected = null;
@@ -2182,9 +2189,7 @@ function latestTeachingPair(game) {
 }
 
 function activeTeachingPair(game, anchorMove = null) {
-  const serializedPair = !anchorMove
-    ? normalizeTeachingPair(game?.teachingTurn ?? game?.teachingPair)
-    : null;
+  const serializedPair = teachingTurnFromState(game, anchorMove);
   if (serializedPair) return serializedPair;
 
   const history = game?.history ?? [];
@@ -2197,6 +2202,9 @@ function activeTeachingPair(game, anchorMove = null) {
 }
 
 function teachingPairForMove(game, anchorMove) {
+  const serializedPair = teachingTurnFromState(game, anchorMove);
+  if (serializedPair) return serializedPair;
+
   const history = game?.history ?? [];
   if (!anchorMove || !history.length) return null;
 
@@ -2223,6 +2231,28 @@ function teachingPairForMove(game, anchorMove) {
     engineDecision: engineMove?.decision ?? null,
     engineThinking
   };
+}
+
+function teachingTurnFromState(game, anchorMove = null) {
+  if (!game) return null;
+  if (!anchorMove) {
+    return normalizeTeachingPair(game.teachingTurn ?? game.teachingPair)
+      ?? normalizeTeachingTurns(game.teachingTurns).at(-1)
+      ?? null;
+  }
+
+  const anchorPly = anchorMove.ply;
+  if (!Number.isFinite(anchorPly)) return null;
+  return normalizeTeachingTurns(game.teachingTurns)
+    .find((turn) => turn.playerMove?.ply === anchorPly || turn.engineMove?.ply === anchorPly)
+    ?? null;
+}
+
+function normalizeTeachingTurns(turns) {
+  if (!Array.isArray(turns)) return [];
+  return turns
+    .map(normalizeTeachingPair)
+    .filter(Boolean);
 }
 
 function latestActorMove(history, actor) {
