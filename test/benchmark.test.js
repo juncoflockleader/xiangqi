@@ -246,6 +246,34 @@ test("oracle comparison surfaces review-needed disagreements", async () => {
   assert.ok(text.includes("Focus: Decision quality"));
 });
 
+test("oracle comparison resets backend state between independent benchmarks", async () => {
+  const base = createJavaScriptEngineBackend({ depth: 1, timeLimitMs: 100 });
+  const candidate = createScriptedBenchmarkBackend(base, "a9-a8");
+  const oracle = createScriptedOracleBackend(base, "h7-e7", {
+    classification: "good",
+    centipawnLoss: 20
+  });
+  let candidateNewGames = 0;
+  let oracleNewGames = 0;
+  candidate.newGame = () => {
+    candidateNewGames += 1;
+  };
+  oracle.newGame = async () => {
+    oracleNewGames += 1;
+  };
+  const benchmark = ENGINE_BENCHMARKS[0];
+
+  await compareEngineToOracle(candidate, oracle, {
+    benchmarks: [
+      { ...benchmark, id: "reset-one" },
+      { ...benchmark, id: "reset-two" }
+    ]
+  });
+
+  assert.equal(candidateNewGames, 2);
+  assert.equal(oracleNewGames, 2);
+});
+
 test("engine comparison rejects entries without chooseMove", async () => {
   await assert.rejects(
     () => compareEngineBackends([{ id: "bad-engine" }]),

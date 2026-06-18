@@ -590,6 +590,8 @@ async function compareBenchmarkToOracle(candidateEntry, oracleEntry, benchmark, 
     ...(options.oracleReviewOptions ?? {})
   };
   const startedAt = performanceNow();
+  await resetBenchmarkEngine(candidateEntry.engine);
+  await resetBenchmarkEngine(oracleEntry.engine);
   const candidateDecision = await candidateEntry.engine.chooseMove(position, candidateOptions);
   const oracleDecision = await oracleEntry.engine.chooseMove(position, oracleOptions);
   const candidateMove = notationFor(candidateDecision.bestMove);
@@ -626,6 +628,15 @@ async function compareBenchmarkToOracle(candidateEntry, oracleEntry, benchmark, 
     oracleReasons: [...(oracleDecision.explanation?.reasons ?? [])],
     oracleReview: oracleReview ? summarizeOracleReview(oracleReview) : null
   };
+}
+
+async function resetBenchmarkEngine(engine) {
+  if (typeof engine?.newGame === "function") {
+    await engine.newGame();
+    return;
+  }
+
+  engine?.resetCache?.();
 }
 
 function normalizeExactOracleReview(review, candidateMove) {
