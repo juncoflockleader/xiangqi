@@ -330,6 +330,8 @@ const zhTwTranslations = {
   replyPending: "引擎正在思考應手...",
   reviewHoldReady: "已保留你的上一手評價。",
   moveWaitingReview: "已落子，等待評價。",
+  noPlayerMove: "你尚未走棋。",
+  noEngineMove: "引擎尚未落子。",
   yourLastMove: "你的上一手",
   engineLastMove: "引擎上一手",
   teachingTurn: "本回合覆盤",
@@ -412,6 +414,8 @@ const zhCnTranslations = {
   replyPending: "引擎正在思考应手...",
   reviewHoldReady: "已保留你的上一手评价。",
   moveWaitingReview: "已落子，等待评价。",
+  noPlayerMove: "你尚未走棋。",
+  noEngineMove: "引擎尚未落子。",
   teachingTurn: "本回合复盘",
   thinking: "引擎思考中...",
   thinkingShort: "思考中",
@@ -501,6 +505,8 @@ const translations = {
     replyPending: "Engine is thinking about the reply...",
     reviewHoldReady: "Your last-move review is preserved.",
     moveWaitingReview: "Move played; waiting for review.",
+    noPlayerMove: "You have not moved yet.",
+    noEngineMove: "The engine has not moved yet.",
     thinking: "Engine thinking...",
     thinkingShort: "Thinking",
     requestTimedOut: "The request waited too long. Please try again.",
@@ -1073,7 +1079,8 @@ function renderTeachingPairSummary(pair, node = null) {
     : pairWithPreservedHumanMove(pair, state.game);
   const cards = renderTeachingPairCards(teachingPair, {
     compact: true,
-    summary: true
+    summary: true,
+    stableLanes: true
   });
 
   elements.lastMovePanel.className = "stack teaching-stack";
@@ -1283,7 +1290,9 @@ function renderTeachingPairReasoning(pair) {
   const teachingPair = pair.preserveLatestHuman === false
     ? normalizeTeachingPair(pair)
     : pairWithPreservedHumanMove(pair, state.game);
-  const cards = renderTeachingPairCards(teachingPair);
+  const cards = renderTeachingPairCards(teachingPair, {
+    stableLanes: true
+  });
 
   elements.reasoningPanel.className = "stack teaching-stack";
   elements.reasoningPanel.innerHTML = cards.length
@@ -1298,6 +1307,14 @@ function renderTeachingPairCards(pair, options = {}) {
   const cards = [];
   const compact = Boolean(options.compact);
   const summary = Boolean(options.summary);
+  const stableLanes = Boolean(options.stableLanes);
+  const hasTeachingContent = Boolean(
+    pair?.playerMove
+    || pair?.playerReview
+    || pair?.engineMove
+    || pair?.engineDecision
+    || pair?.engineThinking
+  );
   if (pair?.playerMove) {
     cards.push(renderTeachingMoveCard({
       kind: "player",
@@ -1310,6 +1327,14 @@ function renderTeachingPairCards(pair, options = {}) {
           ? teachingReviewSummaryParts(pair.playerReview)
           : teachingReviewParts(pair.playerReview)
         : [escapeHtml(t(pair.playerReviewPending ? "reviewPending" : "moveWaitingReview"))]
+    }));
+  } else if (stableLanes && hasTeachingContent) {
+    cards.push(renderTeachingMoveCard({
+      kind: "player placeholder",
+      label: t("yourLastMove"),
+      metaText: actorName("player"),
+      compact,
+      body: [escapeHtml(t("noPlayerMove"))]
     }));
   }
   if (pair?.engineMove) {
@@ -1332,12 +1357,20 @@ function renderTeachingPairCards(pair, options = {}) {
       compact,
       body: [escapeHtml(t("replyPending"))]
     }));
+  } else if (stableLanes && hasTeachingContent) {
+    cards.push(renderTeachingMoveCard({
+      kind: "engine placeholder",
+      label: t("engineLastMove"),
+      metaText: actorName("engine"),
+      compact,
+      body: [escapeHtml(t("noEngineMove"))]
+    }));
   }
   return cards;
 }
 
-function renderTeachingMoveCard({ kind, label, move = null, body = [], pending = false, compact = false }) {
-  const meta = move ? `${sideName(move.side)} · ${actorName(move.actor)}` : t("thinkingShort");
+function renderTeachingMoveCard({ kind, label, move = null, body = [], pending = false, compact = false, metaText = null }) {
+  const meta = metaText ?? (move ? `${sideName(move.side)} · ${actorName(move.actor)}` : pending ? t("thinkingShort") : "");
   const content = body.filter(Boolean);
   const moveHtml = move
     ? compact
@@ -1348,7 +1381,7 @@ function renderTeachingMoveCard({ kind, label, move = null, body = [], pending =
     `<section class="teaching-card ${escapeHtml(kind)}${pending ? " pending" : ""}${compact ? " compact" : ""}">`,
     `<div class="teaching-card-head">`,
     `<strong>${escapeHtml(label)}</strong>`,
-    `<span class="score">${escapeHtml(meta)}</span>`,
+    meta ? `<span class="score">${escapeHtml(meta)}</span>` : "",
     `</div>`,
     moveHtml ? `<div class="teaching-card-move">${moveHtml}</div>` : "",
     content.length ? `<div class="teaching-card-body">${content.map((part) => `<div>${part}</div>`).join("")}</div>` : "",

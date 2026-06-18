@@ -162,6 +162,13 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function actorMoveAtPly/);
     assert.match(script, /reviewPending: "正在复盘你的上一手\.\.\."/);
     assert.match(script, /replyPending: "引擎正在思考应手\.\.\."/);
+    assert.match(script, /noPlayerMove: "你尚未走棋。"/);
+    assert.match(script, /noEngineMove: "引擎尚未落子。"/);
+    assert.match(script, /stableLanes: true/);
+    assert.match(script, /kind: "player placeholder"/);
+    assert.match(script, /kind: "engine placeholder"/);
+    assert.match(script, /metaText: actorName\("player"\)/);
+    assert.match(script, /metaText: actorName\("engine"\)/);
     assert.match(script, /function fitTreeView/);
     assert.match(script, /function zoomTreeView/);
     assert.match(script, /function handleTreeWheel/);
@@ -219,6 +226,7 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(stylesheet, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
     assert.match(stylesheet, /\.teaching-pair-reasoning/);
     assert.match(stylesheet, /\.teaching-card\.pending/);
+    assert.match(stylesheet, /\.teaching-card\.placeholder/);
     assert.match(stylesheet, /\.teaching-card\.compact/);
     assert.match(stylesheet, /\.teaching-card/);
     assert.match(stylesheet, /\.board-wrap\.tree-preview/);

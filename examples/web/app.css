@@ -758,6 +758,15 @@ h2 {
   border-style: dashed;
 }
 
+.teaching-card.placeholder {
+  border-style: dashed;
+  background: rgba(248, 250, 247, 0.54);
+}
+
+.teaching-card.placeholder .teaching-card-body {
+  color: var(--muted);
+}
+
 .teaching-card-head {
   display: flex;
   min-width: 0;
