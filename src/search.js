@@ -105,6 +105,8 @@ const ROOT_HOME_RANK_ROOK_CONNECT_BONUS = 110;
 const ROOT_CENTRAL_CANNON_ROOK_CONNECT_SCORE_BONUS = 70;
 const ROOT_MIRRORED_HOME_RANK_ROOK_CONNECT_SCORE_BONUS = 170;
 const ROOT_EARLY_PAWN_DEVELOPMENT_SCORE_BONUS = 60;
+const ROOT_EARLY_PAWN_CANNON_SIDE_STEP_SCORE_BONUS = 80;
+const ROOT_EARLY_PAWN_CANNON_SIDE_STEP_TIE_BONUS = 90;
 const ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_SCORE_BONUS = 100;
 const ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_TIE_BONUS = 120;
 const ROOT_CENTRAL_CANNON_RIGHT_HORSE_SCORE_BONUS = 30;
@@ -759,6 +761,9 @@ function rootTieBreakScore(position, move, next, context, searchScore) {
   if (isCentralCannonRightHorseDevelopment(position, move)) {
     score += ROOT_CENTRAL_CANNON_RIGHT_HORSE_TIE_BONUS;
   }
+  if (isEarlyPawnCannonSideStep(position, move)) {
+    score += ROOT_EARLY_PAWN_CANNON_SIDE_STEP_TIE_BONUS;
+  }
   if (isEarlyPawnCentralCannonOppositeHorseCounter(position, move)) {
     score += ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_TIE_BONUS;
   }
@@ -798,6 +803,9 @@ function rootMoveStrategicPriorScore(position, move) {
   }
   if (isEarlyPawnCentralCannonDevelopmentMove(position, move)) {
     score += ROOT_EARLY_PAWN_DEVELOPMENT_SCORE_BONUS;
+  }
+  if (isEarlyPawnCannonSideStep(position, move)) {
+    score += ROOT_EARLY_PAWN_CANNON_SIDE_STEP_SCORE_BONUS;
   }
   if (isEarlyPawnCentralCannonThirdFileCounter(position, move)) {
     score += ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_SCORE_BONUS;
@@ -979,6 +987,32 @@ function isWingCannonCentralRegroupMove(position, move) {
 
   return (fromFile === 1 && (toFile === 2 || toFile === 3))
     || (fromFile === BOARD_FILES - 2 && (toFile === BOARD_FILES - 3 || toFile === BOARD_FILES - 4));
+}
+
+function isEarlyPawnCannonSideStep(position, move) {
+  const piece = move.piece ?? position.board[move.from];
+  if (!piece || piece.type !== PIECES.CANNON) return false;
+  if (!bothWingHorsesHomeForSearch(position, piece.side)) return false;
+  if (hasEnemyCentralCannon(position, piece.side)) return false;
+  if (hasCentralElephantDeveloped(position, opponent(piece.side))) return false;
+
+  const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 3 : 2;
+  const fromFile = fileOf(move.from);
+  const fromRank = rankOf(move.from);
+  const toFile = fileOf(move.to);
+  const toRank = rankOf(move.to);
+  if (fromRank !== homeRank || toRank !== homeRank) return false;
+
+  const leftFiles = [0, 1, 2];
+  const rightFiles = [BOARD_FILES - 3, BOARD_FILES - 2, BOARD_FILES - 1];
+  const leftPressure = hasAdvancedEnemyPawnOnAnyFile(position, piece.side, leftFiles)
+    && hasEnemyCannonOnAnyFile(position, piece.side, leftFiles);
+  const rightPressure = hasAdvancedEnemyPawnOnAnyFile(position, piece.side, rightFiles)
+    && hasEnemyCannonOnAnyFile(position, piece.side, rightFiles);
+  if (leftPressure === rightPressure) return false;
+
+  if (leftPressure) return fromFile === 1 && toFile === 2;
+  return fromFile === BOARD_FILES - 2 && toFile === BOARD_FILES - 3;
 }
 
 function isEarlyPawnCentralCannonThirdFileCounter(position, move) {

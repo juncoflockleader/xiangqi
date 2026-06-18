@@ -134,6 +134,24 @@ test("search follows the rim-horse response to early-pawn elephant development",
   assert.equal(result.bestMove.notation, "h0-i2");
 });
 
+test("search sidesteps the pressure-side cannon against early flank-pawn pressure", () => {
+  const position = parseFen("rheakaehr/9/1c5c1/p1p1p1p1p/9/6P2/P1P1P3P/1C5C1/9/RHEAKAEHR b");
+  const result = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 8000,
+    useBook: false,
+    candidateLimit: 99
+  });
+
+  assert.equal(result.depth, 6);
+  assert.equal(result.timedOut, false);
+  assert.equal(result.bestMove.notation, "h2-g2");
+
+  const leftHorse = result.candidates.find((item) => item.move.notation === "b0-c2");
+  assert.ok(leftHorse);
+  assert.ok(leftHorse.score < result.score || leftHorse.tieBreak < result.candidates[0].tieBreak);
+});
+
 test("search connects the rook in shifted-cannon double-horse openings", () => {
   const position = parseFen("r1eakae1r/9/1ch3hc1/p1p1p1p1p/9/9/P1P1P1P1P/2HCC4/9/R1EAKAEHR b");
   const result = searchBestMove(position, {
