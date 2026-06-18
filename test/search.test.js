@@ -240,6 +240,24 @@ test("search avoids central-pawn and half-cannon drifts against developed centra
   }
 });
 
+test("search keeps the same-flank pawn challenge in central-cannon double-horse lines", () => {
+  const position = parseFen("rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R b");
+  const result = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 8000,
+    useBook: false,
+    candidateLimit: 99
+  });
+
+  assert.equal(result.depth, 6);
+  assert.equal(result.timedOut, false);
+  assert.equal(result.bestMove.notation, "g3-g4");
+
+  const cannonLift = result.candidates.find((item) => item.move.notation === "b2-a2");
+  assert.ok(cannonLift);
+  assert.ok(cannonLift.score < result.score || cannonLift.tieBreak < result.candidates[0].tieBreak);
+});
+
 test("search connects the far rook against central-cannon pawn challenges", () => {
   const position = parseFen("r1eakae1r/9/1ch3hc1/p3p1p1p/2p6/9/P1P1P1P1P/HC2C1H2/9/R1EAKAE1R r");
   const result = searchBestMove(position, {
