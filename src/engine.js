@@ -390,6 +390,8 @@ function maybeBookResult(position, options, tableSize) {
       checkHistoryStores: 0,
       checkHistoryHits: 0,
       checkHistoryMaluses: 0,
+      checkCacheStores: 0,
+      checkCacheHits: 0,
       countermoveStores: 0,
       countermoveHits: 0,
       continuationHistoryStores: 0,

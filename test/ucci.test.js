@@ -55,6 +55,7 @@ test("UCCI session searches a FEN position", () => {
   assert.ok(output.some((line) => /\bcaphist \d+/.test(line)));
   assert.ok(output.some((line) => /\bcheckhist \d+/.test(line)));
   assert.ok(output.some((line) => /\bcheckhm \d+/.test(line)));
+  assert.ok(output.some((line) => /\bcheckcache \d+\/\d+/.test(line)));
   assert.ok(output.some((line) => /\bch \d+/.test(line)));
   assert.ok(output.some((line) => /\bchred \d+/.test(line)));
   assert.ok(output.some((line) => /\bchredm \d+/.test(line)));

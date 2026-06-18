@@ -113,6 +113,7 @@ export function searchBestMove(position, options = {}) {
   const continuationHistory = new Map();
   const captureHistory = new Map();
   const checkHistory = new Map();
+  const checkCache = options.checkCache ?? new Map();
   const tacticalCache = options.tacticalCache ?? new Map();
   const candidateLimit = options.candidateLimit ?? 8;
   const exactRootScores = options.exactRootScores === true || !Number.isFinite(candidateLimit);
@@ -165,6 +166,7 @@ export function searchBestMove(position, options = {}) {
       continuationHistory,
       captureHistory,
       checkHistory,
+      checkCache,
       staticEvalStack: [],
       candidateLimit,
       priorityMoveKeys,
@@ -196,6 +198,7 @@ export function searchBestMove(position, options = {}) {
       useCountermoves: options.useCountermoves !== false,
       useContinuationHistory: options.useContinuationHistory !== false,
       useCheckHistory: options.useCheckHistory !== false,
+      useCheckCache: options.useCheckCache !== false,
       useCheckEvasionOrdering: options.useCheckEvasionOrdering !== false,
       useRootScoreOrdering: options.useRootScoreOrdering !== false,
       useMateDistancePruning: options.useMateDistancePruning !== false,
@@ -782,7 +785,7 @@ function negamax(position, depth, alpha, beta, ply, context, lineOut, extensions
     const move = ordered[index];
     const next = makeMove(position, move);
     let childLine = [];
-    const givesCheck = isInCheck(next, next.turn);
+    const givesCheck = moveGivesCheck(position, move, context, next);
     const singularReason = singularExtensionReasonFor({
       position,
       orderedMoves: ordered,
@@ -1180,15 +1183,29 @@ function quietCheckingMoves(position, context, qChecksRemaining) {
   if (!context.useQuiescenceChecks || qChecksRemaining <= 0) return [];
 
   const checks = generateLegalMoves(position, position.turn)
-    .filter((move) => !move.captured && givesCheck(position, move));
+    .filter((move) => !move.captured && moveGivesCheck(position, move, context));
 
   context.stats.qchecks += checks.length;
   return checks;
 }
 
-function givesCheck(position, move) {
-  const next = makeMove(position, move);
-  return isInCheck(next, next.turn);
+function moveGivesCheck(position, move, context = null, nextPosition = null) {
+  if (!context?.useCheckCache) {
+    const next = nextPosition ?? makeMove(position, move);
+    return isInCheck(next, next.turn);
+  }
+
+  const key = `${hashPosition(position)}:${moveKey(move)}:check`;
+  if (context.checkCache.has(key)) {
+    context.stats.checkCacheHits += 1;
+    return context.checkCache.get(key);
+  }
+
+  const next = nextPosition ?? makeMove(position, move);
+  const result = isInCheck(next, next.turn);
+  context.checkCache.set(key, result);
+  context.stats.checkCacheStores += 1;
+  return result;
 }
 
 function orderMoves(position, moves, principalMove, context, ply, previousMove = null, checkInfo = null) {
@@ -1226,8 +1243,7 @@ function moveOrderingScore(position, move, principalMove, context, ply, previous
     score += captureHistoryScore(context, move);
   }
 
-  const next = makeMove(position, move);
-  if (isInCheck(next, opponent(position.turn))) {
+  if (moveGivesCheck(position, move, context)) {
     score += 40_000;
     score += checkHistoryScore(context, move);
   }
@@ -1939,7 +1955,7 @@ function shouldPruneDelta({ position, move, standPat, alpha, context }) {
   if (move.captured.type === PIECES.KING) return false;
   if (alpha >= MATE_SCORE - 1000) return false;
   if (standPat + PIECE_VALUES[move.captured.type] + context.deltaMargin > alpha) return false;
-  return !givesCheck(position, move);
+  return !moveGivesCheck(position, move, context);
 }
 
 function tryProbCut({
@@ -2469,6 +2485,8 @@ function createSearchStats() {
     checkHistoryStores: 0,
     checkHistoryHits: 0,
     checkHistoryMaluses: 0,
+    checkCacheStores: 0,
+    checkCacheHits: 0,
     countermoveStores: 0,
     countermoveHits: 0,
     continuationHistoryStores: 0,
@@ -2569,6 +2587,8 @@ function mergeSearchStats(total, next) {
     checkHistoryStores: total.checkHistoryStores + next.checkHistoryStores,
     checkHistoryHits: total.checkHistoryHits + next.checkHistoryHits,
     checkHistoryMaluses: total.checkHistoryMaluses + next.checkHistoryMaluses,
+    checkCacheStores: total.checkCacheStores + next.checkCacheStores,
+    checkCacheHits: total.checkCacheHits + next.checkCacheHits,
     countermoveStores: total.countermoveStores + next.countermoveStores,
     countermoveHits: total.countermoveHits + next.countermoveHits,
     continuationHistoryStores: total.continuationHistoryStores + next.continuationHistoryStores,
