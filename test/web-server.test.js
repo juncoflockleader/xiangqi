@@ -122,8 +122,7 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function holdTeachingReviewBeforeEngineReply/);
     assert.match(script, /function shouldHoldTeachingReview/);
     assert.match(script, /function teachingPairForMove/);
-    assert.match(script, /function previousActorMoveBefore/);
-    assert.match(script, /function nextActorMoveAfter/);
+    assert.match(script, /function actorMoveAtPly/);
     assert.match(script, /reviewPending: "正在复盘你的上一手\.\.\."/);
     assert.match(script, /replyPending: "引擎正在思考应手\.\.\."/);
     assert.match(script, /function fitTreeView/);
@@ -426,6 +425,62 @@ test("web server defers engine replies and can continue from tree nodes", async 
     assert.equal(continued.state.teachingPair.engineMove.notation, continued.state.history[1].notation);
     assert.equal(continued.state.teachingTurn.engineMove.notation, continued.state.history[1].notation);
     assert.equal(continued.state.playerTurn, true);
+  } finally {
+    await app.close();
+  }
+});
+
+test("web server preserves teaching turns when the engine opens first", async () => {
+  const app = await startWebServer({
+    port: 0,
+    native: false,
+    depth: 1,
+    timeLimitMs: 50,
+    lines: 2,
+    useBook: false
+  });
+
+  try {
+    const created = await postJson(`${app.url}/api/new`, { side: "black" });
+    const sessionId = created.state.sessionId;
+
+    assert.equal(created.state.playerSide, "black");
+    assert.equal(created.state.history.length, 1);
+    assert.equal(created.state.history[0].actor, "engine");
+    assert.equal(created.state.teachingTurns.length, 1);
+    assert.equal(created.state.teachingTurns[0].playerMove, null);
+    assert.equal(created.state.teachingTurns[0].engineMove.notation, created.state.history[0].notation);
+    assert.equal(created.state.teachingPair.engineMove.notation, created.state.history[0].notation);
+    assert.equal(created.state.playerTurn, true);
+
+    const playerMove = created.state.legalMoves[0].notation;
+    const deferred = await postJson(`${app.url}/api/move`, {
+      sessionId,
+      move: playerMove,
+      deferEngine: true
+    });
+
+    assert.equal(deferred.state.history.length, 2);
+    assert.equal(deferred.state.history[1].actor, "player");
+    assert.equal(deferred.state.teachingTurns.length, 2);
+    assert.equal(deferred.state.teachingTurns[0].engineMove.notation, created.state.history[0].notation);
+    assert.equal(deferred.state.teachingTurns[1].playerMove.notation, playerMove);
+    assert.equal(deferred.state.teachingTurns[1].playerReview.move, playerMove);
+    assert.equal(deferred.state.teachingTurns[1].engineMove, null);
+    assert.equal(deferred.state.teachingTurns[1].engineThinking, true);
+    assert.equal(deferred.state.teachingPair.playerMove.notation, playerMove);
+    assert.equal(deferred.state.teachingPair.playerReview.move, playerMove);
+
+    const replied = await postJson(`${app.url}/api/engine-move`, { sessionId });
+    assert.equal(replied.state.history.length, 3);
+    assert.equal(replied.state.history[2].actor, "engine");
+    assert.equal(replied.state.teachingTurns.length, 2);
+    assert.equal(replied.state.teachingTurns[0].engineMove.notation, created.state.history[0].notation);
+    assert.equal(replied.state.teachingTurns[1].playerMove.notation, playerMove);
+    assert.equal(replied.state.teachingTurns[1].engineMove.notation, replied.state.history[2].notation);
+    assert.equal(replied.state.teachingTurns[1].engineMove.ply, replied.state.teachingTurns[1].playerMove.ply + 1);
+    assert.equal(replied.state.teachingPair.playerReview.move, playerMove);
+    assert.equal(replied.state.teachingPair.engineMove.notation, replied.state.history[2].notation);
   } finally {
     await app.close();
   }

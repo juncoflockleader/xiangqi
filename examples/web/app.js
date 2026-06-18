@@ -2211,10 +2211,10 @@ function teachingPairForMove(game, anchorMove) {
   const anchor = history.find((move) => move.ply === anchorMove.ply) ?? anchorMove;
   const playerMove = anchor.actor === "player"
     ? anchor
-    : previousActorMoveBefore(history, "player", anchor.ply);
+    : actorMoveAtPly(history, "player", anchor.ply - 1);
   const engineMove = anchor.actor === "engine"
     ? anchor
-    : nextActorMoveAfter(history, "engine", anchor.ply);
+    : actorMoveAtPly(history, "engine", anchor.ply + 1);
   const engineThinking = Boolean(
     playerMove
     && !engineMove
@@ -2259,12 +2259,8 @@ function latestActorMove(history, actor) {
   return [...history].reverse().find((move) => move.actor === actor) ?? null;
 }
 
-function previousActorMoveBefore(history, actor, ply) {
-  return [...history].reverse().find((move) => move.actor === actor && move.ply < ply) ?? null;
-}
-
-function nextActorMoveAfter(history, actor, ply) {
-  return history.find((move) => move.actor === actor && move.ply > ply) ?? null;
+function actorMoveAtPly(history, actor, ply) {
+  return history.find((move) => move.actor === actor && move.ply === ply) ?? null;
 }
 
 function normalizeTeachingPair(pair) {

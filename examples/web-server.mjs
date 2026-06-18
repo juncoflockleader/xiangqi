@@ -555,17 +555,17 @@ function serializeState(session, engine, config = {}) {
 function summarizeTeachingTurns(history, session, status) {
   if (!history.length) return [];
 
-  const turns = history
-    .filter((move) => move.actor === "player")
-    .map((playerMove) => {
-      const engineMove = history.find((move) => move.actor === "engine" && move.ply > playerMove.ply) ?? null;
-      return summarizeTeachingTurn(playerMove, engineMove, session, status);
-    });
-
-  if (turns.length) return turns;
-
-  const engineMove = history.find((move) => move.actor === "engine") ?? null;
-  return engineMove ? [summarizeTeachingTurn(null, engineMove, session, status)] : [];
+  return history
+    .map((move) => {
+      if (move.actor === "player") {
+        return summarizeTeachingTurn(move, nextEngineReply(history, move), session, status);
+      }
+      if (move.actor === "engine" && !previousPlayerMove(history, move)) {
+        return summarizeTeachingTurn(null, move, session, status);
+      }
+      return null;
+    })
+    .filter(Boolean);
 }
 
 function summarizeTeachingTurn(playerMove, engineMove, session, status) {
@@ -594,11 +594,11 @@ function summarizeTeachingPair(history, session, status) {
   const last = history.at(-1);
   const playerMove = last?.actor === "player"
     ? last
-    : [...history].reverse().find((move) => move.actor === "player" && move.ply < last.ply) ?? null;
+    : previousPlayerMove(history, last);
   const engineMove = last?.actor === "engine"
     ? last
     : playerMove
-      ? history.find((move) => move.actor === "engine" && move.ply > playerMove.ply) ?? null
+      ? nextEngineReply(history, playerMove)
       : [...history].reverse().find((move) => move.actor === "engine") ?? null;
   const engineThinking = Boolean(
     playerMove
@@ -616,6 +616,16 @@ function summarizeTeachingPair(history, session, status) {
     engineDecision: engineMove?.decision ?? null,
     engineThinking
   };
+}
+
+function nextEngineReply(history, playerMove) {
+  if (!playerMove) return null;
+  return history.find((move) => move.actor === "engine" && move.ply === playerMove.ply + 1) ?? null;
+}
+
+function previousPlayerMove(history, engineMove) {
+  if (!engineMove) return null;
+  return history.find((move) => move.actor === "player" && move.ply === engineMove.ply - 1) ?? null;
 }
 
 function serializeBoard(position) {
