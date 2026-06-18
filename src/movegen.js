@@ -44,21 +44,15 @@ const MOVE_FILTER_CAPTURES = 1;
 const MOVE_FILTER_QUIETS = 2;
 
 export function generateLegalMoves(position, side = position.turn) {
-  return generatePseudoMoves(position, side).filter((move) => {
-    return isLegalGeneratedMove(position, move, side);
-  });
+  return retainLegalGeneratedMoves(position, generatePseudoMoves(position, side), side);
 }
 
 export function generateCaptures(position, side = position.turn) {
-  return generatePseudoCaptures(position, side).filter((move) => {
-    return isLegalGeneratedMove(position, move, side);
-  });
+  return retainLegalGeneratedMoves(position, generatePseudoCaptures(position, side), side);
 }
 
 export function generateQuietMoves(position, side = position.turn) {
-  return generatePseudoMovesByFilter(position, side, MOVE_FILTER_QUIETS).filter((move) => {
-    return isLegalGeneratedMove(position, move, side);
-  });
+  return retainLegalGeneratedMoves(position, generatePseudoMovesByFilter(position, side, MOVE_FILTER_QUIETS), side);
 }
 
 export function generatePseudoMoves(position, side = position.turn) {
@@ -114,7 +108,12 @@ export function isInCheck(position, side = position.turn) {
 }
 
 export function findKing(position, side) {
-  return position.board.findIndex((piece) => piece?.side === side && piece.type === PIECES.KING);
+  for (let square = 0; square < position.board.length; square += 1) {
+    const piece = position.board[square];
+    if (piece?.side === side && piece.type === PIECES.KING) return square;
+  }
+
+  return -1;
 }
 
 export function generalsFace(position) {
@@ -243,6 +242,20 @@ function isLegalGeneratedMove(position, move, side) {
   return !isInCheck(next, side);
 }
 
+function retainLegalGeneratedMoves(position, moves, side) {
+  let write = 0;
+
+  for (let read = 0; read < moves.length; read += 1) {
+    const move = moves[read];
+    if (!isLegalGeneratedMove(position, move, side)) continue;
+    moves[write] = move;
+    write += 1;
+  }
+
+  moves.length = write;
+  return moves;
+}
+
 export function applyLegalMove(position, move, side = position.turn) {
   const legalMove = generateLegalMoves(position, side).find(
     (candidate) => candidate.from === move.from && candidate.to === move.to
@@ -275,6 +288,10 @@ export function legalMovesWithNotation(position, side = position.turn) {
 }
 
 function makeMoveWithTurn(position, move, side) {
+  if (side === position.turn) {
+    return makeMove(position, move);
+  }
+
   const originalTurn = position.turn;
   const next = makeMove({ ...position, turn: side }, move);
   return { ...next, turn: opponent(side), fullmove: originalTurn === SIDES.BLACK ? (position.fullmove ?? 1) + 1 : position.fullmove ?? 1 };
