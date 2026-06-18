@@ -59,7 +59,7 @@ test("search move ordering does not leak private score metadata", () => {
   assert.ok(moves.every((move) => Object.getOwnPropertySymbols(move).length === 0));
 });
 
-test("search keeps opening cannon development aligned without book help", () => {
+test("search keeps opening development aligned without book help", () => {
   const result = searchBestMove(createInitialPosition(), {
     depth: 5,
     timeLimitMs: 10000,
@@ -67,7 +67,7 @@ test("search keeps opening cannon development aligned without book help", () => 
     useSoftTimeManagement: false
   });
 
-  assert.ok(["b7-e7", "h7-e7"].includes(result.bestMove.notation));
+  assert.ok(["b7-e7", "h7-e7", "b9-c7", "h9-g7"].includes(result.bestMove.notation));
 });
 
 test("engine explanations surface tactical-motif ordering diagnostics", () => {

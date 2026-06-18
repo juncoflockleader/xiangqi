@@ -147,6 +147,102 @@ test("evaluation discourages early cannon lifts before horse development", () =>
   assert.ok(notes.some((note) => note.term === "openingDiscipline" && note.text.includes("opening piece discipline")));
 });
 
+test("evaluation discourages shifted wing-cannon pawn grabs before horse development", () => {
+  const position = parseFen("rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/4C2C1/9/RHEAKAEHR b");
+  const centralize = makeMove(position, parseMoveNotation("b2-e2"));
+  const pawnGrab = makeMove(position, parseMoveNotation("g2-g5"));
+  const centralizeEval = evaluatePosition(centralize, SIDES.BLACK, { detailed: true });
+  const pawnGrabEval = evaluatePosition(pawnGrab, SIDES.BLACK, { detailed: true });
+  const delta = evaluateMoveDelta(position, pawnGrab, SIDES.BLACK);
+
+  assert.equal(centralizeEval.terms.black.openingDiscipline, 0);
+  assert.ok(pawnGrabEval.terms.black.openingDiscipline <= -100);
+  assert.ok(centralizeEval.score > pawnGrabEval.score);
+  assert.ok(delta.delta.openingDiscipline <= -100);
+});
+
+test("evaluation discourages early rook lifts before wing horse development", () => {
+  const position = createInitialPosition();
+  const rookLift = makeMove(position, parseMoveNotation("a9-a8"));
+  const centralCannon = makeMove(position, parseMoveNotation("b7-e7"));
+  const liftedEval = evaluatePosition(rookLift, SIDES.RED, { detailed: true });
+  const centralEval = evaluatePosition(centralCannon, SIDES.RED, { detailed: true });
+
+  assert.ok(liftedEval.terms.red.openingDiscipline <= -120);
+  assert.equal(centralEval.terms.red.openingDiscipline, 0);
+  assert.ok(centralEval.score > liftedEval.score);
+});
+
+test("evaluation discourages deep cannon raids even after horse development", () => {
+  const position = parseFen("rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R b");
+  const pawnBreak = makeMove(position, parseMoveNotation("c3-c4"));
+  const nearBackRank = makeMove(position, parseMoveNotation("h2-h8"));
+  const backRank = makeMove(position, parseMoveNotation("h2-h9"));
+  const pawnBreakEval = evaluatePosition(pawnBreak, SIDES.BLACK, { detailed: true });
+  const nearBackRankEval = evaluatePosition(nearBackRank, SIDES.BLACK, { detailed: true });
+  const backRankEval = evaluatePosition(backRank, SIDES.BLACK, { detailed: true });
+
+  assert.equal(pawnBreakEval.terms.black.openingDiscipline, 0);
+  assert.ok(nearBackRankEval.terms.black.openingDiscipline <= -250);
+  assert.ok(backRankEval.terms.black.openingDiscipline <= -650);
+  assert.ok(pawnBreakEval.score > nearBackRankEval.score);
+  assert.ok(pawnBreakEval.score > backRankEval.score);
+});
+
+test("evaluation discourages opening cannon raids into an enemy rook file", () => {
+  const position = parseFen("rheakae1r/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 b");
+  const exposedCannon = makeMove(position, parseMoveNotation("h2-h7"));
+  const compactCannon = makeMove(position, parseMoveNotation("h2-h4"));
+  const exposedEval = evaluatePosition(exposedCannon, SIDES.BLACK, { detailed: true });
+  const compactEval = evaluatePosition(compactCannon, SIDES.BLACK, { detailed: true });
+  const delta = evaluateMoveDelta(position, exposedCannon, SIDES.BLACK);
+
+  assert.ok(exposedEval.terms.black.openingDiscipline <= -300);
+  assert.equal(compactEval.terms.black.openingDiscipline, 0);
+  assert.ok(compactEval.score > exposedEval.score);
+  assert.ok(delta.delta.openingDiscipline <= -300);
+});
+
+test("evaluation discourages repeated wing-cannon lifts after the wing horse develops", () => {
+  const position = parseFen("r1eakae1r/9/1ch3hc1/p1p1p1p1p/9/9/P1P1P1P1P/2HCC4/9/R1EAKAEHR b");
+  const cannonLift = makeMove(position, parseMoveNotation("b2-b5"));
+  const pawnBreak = makeMove(position, parseMoveNotation("c3-c4"));
+  const rookConnect = makeMove(position, parseMoveNotation("a0-b0"));
+  const liftedEval = evaluatePosition(cannonLift, SIDES.BLACK, { detailed: true });
+  const pawnEval = evaluatePosition(pawnBreak, SIDES.BLACK, { detailed: true });
+  const rookEval = evaluatePosition(rookConnect, SIDES.BLACK, { detailed: true });
+
+  assert.ok(liftedEval.terms.black.openingDiscipline <= -120);
+  assert.equal(pawnEval.terms.black.openingDiscipline, 0);
+  assert.equal(rookEval.terms.black.openingDiscipline, 0);
+  assert.ok(pawnEval.score > liftedEval.score);
+  assert.ok(rookEval.score > liftedEval.score);
+});
+
+test("evaluation discourages horses from jumping into an enemy rook file", () => {
+  const position = parseFen("rheakae1r/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1C2C1H2/9/RHEAKAER1 b");
+  const exposedHorse = makeMove(position, parseMoveNotation("g2-h4"));
+  const rookConnect = makeMove(position, parseMoveNotation("i0-h0"));
+  const exposedEval = evaluatePosition(exposedHorse, SIDES.BLACK, { detailed: true });
+  const rookEval = evaluatePosition(rookConnect, SIDES.BLACK, { detailed: true });
+
+  assert.ok(exposedEval.terms.black.openingDiscipline <= -300);
+  assert.equal(rookEval.terms.black.openingDiscipline, 0);
+  assert.ok(rookEval.score > exposedEval.score);
+});
+
+test("evaluation discourages opening horses from retreating into the palace", () => {
+  const position = parseFen("r1eakae1r/9/1ch3hc1/p1p1p1p1p/9/9/P1P1P1P1P/2HCC4/9/R1EAKAEHR b");
+  const palaceRetreat = makeMove(position, parseMoveNotation("c2-e1"));
+  const pawnBreak = makeMove(position, parseMoveNotation("c3-c4"));
+  const retreatEval = evaluatePosition(palaceRetreat, SIDES.BLACK, { detailed: true });
+  const pawnEval = evaluatePosition(pawnBreak, SIDES.BLACK, { detailed: true });
+
+  assert.ok(retreatEval.terms.black.openingDiscipline <= -120);
+  assert.equal(pawnEval.terms.black.openingDiscipline, 0);
+  assert.ok(pawnEval.score > retreatEval.score);
+});
+
 test("evaluation rewards direct rook pins to the general", () => {
   const pinned = parseFen("4k4/9/9/4h4/9/4R4/9/9/9/4K4 r");
   const unpinned = parseFen("4k4/9/9/4h4/9/R8/9/9/9/4K4 r");

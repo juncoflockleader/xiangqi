@@ -77,7 +77,7 @@ export function explainMove(position, searchResult) {
 
   return {
     summary,
-    reasons: unique(reasons).slice(0, 7),
+    reasons: unique(reasons).slice(0, 8),
     alternatives: explainAlternatives(position, searchResult.candidates ?? []),
     principalVariation: bestLine.map((candidate) => candidate.notation ?? moveToNotation(candidate)),
     principalVariationText: formatPrincipalVariation(bestLine),

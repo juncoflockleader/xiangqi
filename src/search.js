@@ -503,7 +503,7 @@ function searchRoot(position, depth, previousBest, context, rootMoves, alpha, be
       score = normalizeScore(-negamax(next, depth - 1, childAlpha, childBeta, 1, context, line, context.maxExtensions, true, move));
     }
     const annotated = annotateMove(position, move);
-    const tieBreak = rootTieBreakScore(annotated);
+    const tieBreak = rootTieBreakScore(position, annotated, next, context, score);
 
     candidates.push({
       move: annotated,
@@ -547,7 +547,19 @@ function shouldUseRootPvs(index, depth, alpha, beta, context) {
   return true;
 }
 
-function rootTieBreakScore(move) {
+function rootTieBreakScore(position, move, next, context, searchScore) {
+  if (isMateSearchBound(searchScore)) {
+    return legacyRootTieBreakScore(move);
+  }
+
+  let score = evaluateStatic(next, position.turn, context);
+  if (move.givesCheck) score += 30;
+  if (move.piece?.type !== PIECES.KING) score += 4;
+  if (move.captured) score += 2;
+  return score;
+}
+
+function legacyRootTieBreakScore(move) {
   let score = 0;
   if (move.givesCheck) score += 1000;
   if (move.piece?.type !== PIECES.KING) score += 100;
