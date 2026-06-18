@@ -258,6 +258,40 @@ test("search uses aspiration windows after the first completed depth", () => {
   assert.equal(withoutAspiration.stats.aspirationSearches, 0);
 });
 
+test("search widens failed aspiration windows before full-width search", () => {
+  const position = parseFen("4k4/9/4h4/4c4/4P4/9/4C4/9/9/4K4 r");
+  const commonOptions = {
+    depth: 4,
+    timeLimitMs: 5000,
+    aspirationWindow: 30,
+    useSoftTimeManagement: false
+  };
+  const result = searchBestMove(position, commonOptions);
+  const withoutAspiration = searchBestMove(position, {
+    ...commonOptions,
+    useAspiration: false
+  });
+  const disabled = searchBestMove(position, {
+    ...commonOptions,
+    useAspirationWidening: false
+  });
+
+  assert.equal(result.depth, 4);
+  assert.equal(result.bestMove.notation, withoutAspiration.bestMove.notation);
+  assert.equal(Math.round(result.score), Math.round(withoutAspiration.score));
+  assert.ok(result.stats.aspirationWidenedSearches > 0);
+  assert.ok(result.stats.aspirationFailHigh > 0);
+  assert.equal(disabled.stats.aspirationWidenedSearches, 0);
+  assert.ok(result.nodes < withoutAspiration.nodes);
+
+  const engine = createEngine({ depth: 4, timeLimitMs: 5000 });
+  const explained = engine.chooseMove(position, {
+    ...commonOptions,
+    useBook: false
+  });
+  assert.ok(explained.explanation.confidence.factors.some((factor) => factor.text.includes("widened aspiration-window searches")));
+});
+
 test("search records a per-depth iterative deepening trace", () => {
   const position = parseFen("4k4/9/4r4/9/9/9/9/9/9/3KR4 r");
   const result = searchBestMove(position, {

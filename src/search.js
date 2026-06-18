@@ -44,6 +44,8 @@ const UPPER = "upper";
 const DEFAULT_MAX_EXTENSIONS = 4;
 const DEFAULT_MAX_PLY = 80;
 const DEFAULT_ASPIRATION_WINDOW = 45;
+const DEFAULT_ASPIRATION_WIDENING_LIMIT = 3;
+const DEFAULT_ASPIRATION_WIDENING_FACTOR = 2;
 const DEFAULT_QCHECK_DEPTH = 1;
 const DEFAULT_DELTA_MARGIN = 160;
 const DEFAULT_QUIESCENCE_TABLE_ENTRIES = 16_384;
@@ -173,6 +175,16 @@ export function searchBestMove(position, options = {}) {
       exactRootScores,
       rootMoveScores: previousRootScores,
       aspirationWindow: options.aspirationWindow ?? DEFAULT_ASPIRATION_WINDOW,
+      useAspirationWidening: options.useAspirationWidening !== false,
+      aspirationWideningLimit: Math.max(0, Math.floor(numberOption(
+        options.aspirationWideningLimit,
+        options.aspirationMaxWidenings,
+        DEFAULT_ASPIRATION_WIDENING_LIMIT
+      ))),
+      aspirationWideningFactor: Math.max(1.25, numberOption(
+        options.aspirationWideningFactor,
+        DEFAULT_ASPIRATION_WIDENING_FACTOR
+      )),
       qCheckDepth: options.qCheckDepth ?? DEFAULT_QCHECK_DEPTH,
       deltaMargin: options.deltaMargin ?? DEFAULT_DELTA_MARGIN,
       useAspiration: options.useAspiration !== false && !exactRootScores,
@@ -315,22 +327,78 @@ function searchDepthRoot(position, depth, previousBest, previousScore, context, 
     return searchRoot(position, depth, previousBest, context, rootMoves, -INFINITY_SCORE, INFINITY_SCORE);
   }
 
+  if (!context.useAspirationWidening || context.aspirationWideningLimit <= 0) {
+    return searchDepthRootWithSingleAspiration(position, depth, previousBest, previousScore, context, rootMoves);
+  }
+
+  return searchDepthRootWithWidening(position, depth, previousBest, previousScore, context, rootMoves);
+}
+
+function searchDepthRootWithSingleAspiration(position, depth, previousBest, previousScore, context, rootMoves) {
   const window = context.aspirationWindow;
-  let alpha = Math.max(-INFINITY_SCORE, previousScore - window);
-  let beta = Math.min(INFINITY_SCORE, previousScore + window);
+  const alpha = Math.max(-INFINITY_SCORE, previousScore - window);
+  const beta = Math.min(INFINITY_SCORE, previousScore + window);
   context.stats.aspirationSearches += 1;
 
-  let root = searchRoot(position, depth, previousBest, context, rootMoves, alpha, beta);
+  const root = searchRoot(position, depth, previousBest, context, rootMoves, alpha, beta);
+  if (context.timedOut) return root;
 
-  if (!context.timedOut && root.score <= alpha) {
+  if (root.score <= alpha) {
     context.stats.aspirationFailLow += 1;
-    root = searchRoot(position, depth, previousBest, context, rootMoves, -INFINITY_SCORE, INFINITY_SCORE);
-  } else if (!context.timedOut && root.score >= beta) {
+    return searchRoot(position, depth, previousBest, context, rootMoves, -INFINITY_SCORE, INFINITY_SCORE);
+  }
+  if (root.score >= beta) {
     context.stats.aspirationFailHigh += 1;
-    root = searchRoot(position, depth, previousBest, context, rootMoves, -INFINITY_SCORE, INFINITY_SCORE);
+    return searchRoot(position, depth, previousBest, context, rootMoves, -INFINITY_SCORE, INFINITY_SCORE);
   }
 
   return root;
+}
+
+function searchDepthRootWithWidening(position, depth, previousBest, previousScore, context, rootMoves) {
+  const baseWindow = context.aspirationWindow;
+  let window = baseWindow;
+  let widenings = 0;
+  let alpha = Math.max(-INFINITY_SCORE, previousScore - window);
+  let beta = Math.min(INFINITY_SCORE, previousScore + window);
+
+  for (;;) {
+    context.stats.aspirationSearches += 1;
+    const root = searchRoot(position, depth, previousBest, context, rootMoves, alpha, beta);
+    if (context.timedOut) return root;
+
+    if (root.score <= alpha) {
+      context.stats.aspirationFailLow += 1;
+      if (widenings >= context.aspirationWideningLimit) {
+        return searchRoot(position, depth, previousBest, context, rootMoves, -INFINITY_SCORE, INFINITY_SCORE);
+      }
+      widenings += 1;
+      context.stats.aspirationWidenedSearches += 1;
+      window = widenedAspirationWindow(window, context);
+      alpha = Math.max(-INFINITY_SCORE, previousScore - window);
+      beta = Math.min(INFINITY_SCORE, previousScore + baseWindow);
+      continue;
+    }
+
+    if (root.score >= beta) {
+      context.stats.aspirationFailHigh += 1;
+      if (widenings >= context.aspirationWideningLimit) {
+        return searchRoot(position, depth, previousBest, context, rootMoves, -INFINITY_SCORE, INFINITY_SCORE);
+      }
+      widenings += 1;
+      context.stats.aspirationWidenedSearches += 1;
+      window = widenedAspirationWindow(window, context);
+      alpha = Math.max(-INFINITY_SCORE, previousScore - baseWindow);
+      beta = Math.min(INFINITY_SCORE, previousScore + window);
+      continue;
+    }
+
+    return root;
+  }
+}
+
+function widenedAspirationWindow(window, context) {
+  return Math.max(window + 1, Math.ceil(window * context.aspirationWideningFactor));
 }
 
 function searchRoot(position, depth, previousBest, context, rootMoves, alpha, beta) {
@@ -2350,6 +2418,7 @@ function createSearchStats() {
     ttMoveHits: 0,
     cutoffs: 0,
     aspirationSearches: 0,
+    aspirationWidenedSearches: 0,
     aspirationFailHigh: 0,
     aspirationFailLow: 0,
     extensions: 0,
@@ -2449,6 +2518,7 @@ function mergeSearchStats(total, next) {
     ttMoveHits: total.ttMoveHits + next.ttMoveHits,
     cutoffs: total.cutoffs + next.cutoffs,
     aspirationSearches: total.aspirationSearches + next.aspirationSearches,
+    aspirationWidenedSearches: total.aspirationWidenedSearches + next.aspirationWidenedSearches,
     aspirationFailHigh: total.aspirationFailHigh + next.aspirationFailHigh,
     aspirationFailLow: total.aspirationFailLow + next.aspirationFailLow,
     extensions: total.extensions + next.extensions,

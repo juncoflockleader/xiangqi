@@ -339,6 +339,7 @@ function maybeBookResult(position, options, tableSize) {
       ttMoveHits: 0,
       cutoffs: 0,
       aspirationSearches: 0,
+      aspirationWidenedSearches: 0,
       aspirationFailHigh: 0,
       aspirationFailLow: 0,
       extensions: 0,

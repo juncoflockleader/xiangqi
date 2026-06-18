@@ -458,6 +458,9 @@ function searchTechniqueReasons(stats = {}) {
   if ((stats.rootPvsSearches ?? 0) > 0) {
     orderingParts.push(formatCount(stats.rootPvsSearches, "root PVS scout search"));
   }
+  if ((stats.aspirationWidenedSearches ?? 0) > 0) {
+    orderingParts.push(formatCount(stats.aspirationWidenedSearches, "widened aspiration-window re-search"));
+  }
   if ((stats.rootChildStateReuses ?? 0) > 0) {
     orderingParts.push(formatCount(stats.rootChildStateReuses, "root child-state reuse"));
   }
@@ -549,6 +552,7 @@ function searchSelectivityConfidenceFactor(stats = {}) {
   if ((stats.tacticalMoveOrderHits ?? 0) > 0) supports.push("tactical-motif ordering");
   if ((stats.rootRankOrderHits ?? 0) > 0) supports.push("previous-root-rank ordering");
   if ((stats.rootPvsSearches ?? 0) > 0) supports.push("root PVS scout searches");
+  if ((stats.aspirationWidenedSearches ?? 0) > 0) supports.push("widened aspiration-window searches");
   if ((stats.rootChildStateReuses ?? 0) > 0) supports.push("root child-state reuse");
   if ((stats.rootTtHits ?? 0) > 0) supports.push("root transposition-table ordering");
   if ((stats.historyGravityUpdates ?? 0) > 0) supports.push("history-gravity learning");

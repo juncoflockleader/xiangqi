@@ -40,6 +40,7 @@ test("UCCI session searches a FEN position", () => {
   assert.ok(output.some((line) => /\btactord \d+/.test(line)));
   assert.ok(output.some((line) => line.includes("ttstores")));
   assert.ok(output.some((line) => /\bttmove \d+/.test(line)));
+  assert.ok(output.some((line) => /\baspwide \d+/.test(line)));
   assert.ok(output.some((line) => line.includes("mdp")));
   assert.ok(output.some((line) => line.includes("razor")));
   assert.ok(output.some((line) => line.includes("singext")));
