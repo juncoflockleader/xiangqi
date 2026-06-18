@@ -77,6 +77,9 @@ const OPENING_REPEATED_WING_CANNON_LIFT_PENALTY = 130;
 const OPENING_HORSE_PALACE_CONGESTION_PENALTY = 130;
 const OPENING_ROOK_FILE_PENALTY = 220;
 const OPENING_EDGE_ROOK_SHALLOW_PENALTY = 100;
+const OPENING_EDGE_ROOK_BLOCKED_SHALLOW_PENALTY = 140;
+const OPENING_EDGE_ROOK_BLOCKED_PATROL_PENALTY = 80;
+const OPENING_CENTRAL_CANNON_DEEP_CAMP_PENALTY = 360;
 const OPENING_DOUBLE_HORSE_ELEPHANT_PENALTY = 32;
 const OPENING_ADVISOR_BEFORE_DEVELOPMENT_PENALTY = 70;
 const OPENING_EDGE_PAWN_DRIFT_PENALTY = 70;
@@ -955,12 +958,13 @@ function openingDisciplineValue(position, piece, square, openingPhase) {
   if (piece.type !== PIECES.CANNON) return 0;
 
   const file = fileOf(square);
-  const homeHorseFile = wingHomeHorseFile(file);
-  if (homeHorseFile === null) return 0;
-
   const rank = rankOf(square);
   const homeCannonRank = piece.side === SIDES.RED ? 7 : 2;
   const progress = piece.side === SIDES.RED ? homeCannonRank - rank : rank - homeCannonRank;
+  const homeHorseFile = wingHomeHorseFile(file);
+  if (homeHorseFile === null) {
+    return openingCentralCannonDisciplineValue(piece, rank, progress, openingPhase);
+  }
   let penalty = openingCannonWingCrowdingPenalty(position, piece, square, homeCannonRank);
   if (progress <= 0) {
     return penalty > 0 ? -Math.round(penalty * openingPhase) : 0;
@@ -988,6 +992,19 @@ function openingDisciplineValue(position, piece, square, openingPhase) {
   penalty = capOpeningCannonPenaltyForMaterialLead(position, piece.side, progress, penalty);
 
   return -Math.round(penalty * openingPhase);
+}
+
+function openingCentralCannonDisciplineValue(piece, rank, progress, openingPhase) {
+  if (progress <= 0) return 0;
+
+  let penalty = openingCannonFarCampPenalty(piece, rank, progress);
+  if (progress >= 5) {
+    penalty += progress * OPENING_CANNON_FILE_PENALTY;
+    penalty += OPENING_CANNON_DEEP_CAMP_PENALTY;
+    penalty += OPENING_CENTRAL_CANNON_DEEP_CAMP_PENALTY;
+  }
+
+  return penalty > 0 ? -Math.round(penalty * openingPhase) : 0;
 }
 
 function openingHorseDisciplineValue(position, piece, square, openingPhase) {
@@ -1105,6 +1122,13 @@ function openingRookDisciplineValue(position, piece, square, openingPhase) {
   if (progress <= 0) return 0;
 
   const sameWingHorseHome = sameWingHorseIsHome(position, piece.side, homeHorseFile);
+  if (sameWingHorseHome && (file === 0 || file === BOARD_FILES - 1) && progress <= 2) {
+    const penalty = progress === 1
+      ? OPENING_EDGE_ROOK_BLOCKED_SHALLOW_PENALTY
+      : OPENING_EDGE_ROOK_BLOCKED_PATROL_PENALTY;
+    return -Math.round(penalty * openingPhase);
+  }
+
   if (!sameWingHorseHome) {
     if ((file === 0 || file === BOARD_FILES - 1) && progress <= 2) {
       return -Math.round(OPENING_EDGE_ROOK_SHALLOW_PENALTY * openingPhase);

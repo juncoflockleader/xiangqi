@@ -240,6 +240,18 @@ test("evaluation discourages opening cannon raids into an enemy rook file", () =
   assert.ok(delta.delta.openingDiscipline <= -300);
 });
 
+test("evaluation keeps deep central-cannon checks under opening discipline", () => {
+  const position = parseFen("rheakaehr/7c1/9/p3p1p1p/2p6/9/P1P1P1P1P/1c7/4A1C1C/RHE1KAEHR b");
+  const centralCheck = makeMove(position, parseMoveNotation("b7-e7"));
+  const rookPatrol = makeMove(position, parseMoveNotation("a0-a2"));
+  const centralEval = evaluatePosition(centralCheck, SIDES.BLACK, { detailed: true });
+  const patrolEval = evaluatePosition(rookPatrol, SIDES.BLACK, { detailed: true });
+
+  assert.ok(centralEval.terms.black.openingDiscipline <= -900);
+  assert.ok(patrolEval.terms.black.openingDiscipline > -800);
+  assert.ok(patrolEval.score > centralEval.score);
+});
+
 test("evaluation caps opening cannon discipline after a major material win", () => {
   const position = parseFen("rc1akaeh1/7r1/2h1e4/p1p1p1p1p/9/8P/P1P1P1PcR/E5CC1/4K4/RH1A1AEH1 r");
   const rookCapture = makeMove(position, parseMoveNotation("h7-h1"));

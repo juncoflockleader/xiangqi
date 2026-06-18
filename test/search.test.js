@@ -70,6 +70,20 @@ test("search keeps opening development aligned without book help", () => {
   assert.ok(["b7-e7", "h7-e7", "b9-c7", "h9-g7"].includes(result.bestMove.notation));
 });
 
+test("search does not overvalue deep central-cannon checks in the opening", () => {
+  const position = parseFen("rheakaehr/7c1/9/p3p1p1p/2p6/9/P1P1P1P1P/1c7/4A1C1C/RHE1KAEHR b");
+  const result = searchBestMove(position, {
+    depth: 5,
+    timeLimitMs: 3000,
+    useBook: false
+  });
+
+  assert.equal(result.depth, 5);
+  assert.equal(result.timedOut, false);
+  assert.equal(result.bestMove.notation, "b7-b2");
+  assert.notEqual(result.bestMove.notation, "b7-e7");
+});
+
 test("engine explanations surface tactical-motif ordering diagnostics", () => {
   const position = parseFen("4r4/9/4k4/9/3R5/9/4P4/9/9/4K4 r");
   const engine = createEngine({ depth: 1, timeLimitMs: 1000 });
