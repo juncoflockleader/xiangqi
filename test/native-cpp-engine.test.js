@@ -699,6 +699,46 @@ test("local C++ engine balances root threat response against invaded-piece captu
   }
 });
 
+test("local C++ engine follows oracle early-midgame development priors", async (t) => {
+  const build = buildNativeEngine();
+  if (build.skip) {
+    t.skip(build.skip);
+    return;
+  }
+
+  const backend = createUcciEngineBackend({
+    command: build.output,
+    protocol: "uci",
+    depth: 6,
+    timeLimitMs: 1000,
+    startupTimeoutMs: 3000,
+    commandTimeoutMs: 5000
+  });
+
+  try {
+    const development = parseFen("rheakaehr/9/c6c1/2pC2p1p/p3p4/9/P1P1P1P1P/5A1C1/9/RHEAK1EHR r");
+    const pawnRelief = parseFen("1heak1ehr/4a4/7c1/2p3p1p/p3p4/r8/c1P1P1P1P/R2C3C1/4AK3/1HEA2EHR r");
+
+    const developmentResult = await backend.chooseMove(development, {
+      useBook: false,
+      depth: 6,
+      timeLimitMs: 1000
+    });
+    const pawnReliefResult = await backend.chooseMove(pawnRelief, {
+      useBook: false,
+      depth: 6,
+      timeLimitMs: 1000
+    });
+
+    assert.equal(moveToNotation(developmentResult.bestMove), "b9-c7");
+    assert.equal(moveToNotation(pawnReliefResult.bestMove), "c6-c5");
+    assert.ok(developmentResult.nodes > 0);
+    assert.ok(pawnReliefResult.nodes > 0);
+  } finally {
+    await backend.close();
+  }
+});
+
 test("local C++ engine preserves mate-range TT scores across repeated searches", (t) => {
   const build = buildNativeEngine();
   if (build.skip) {

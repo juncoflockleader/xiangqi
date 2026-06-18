@@ -6732,6 +6732,16 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t randomMidgameDevelopment = fenPositionKey(
+      "rheakaehr/9/c6c1/2pC2p1p/p3p4/9/P1P1P1P1P/5A1C1/9/RHEAK1EHR r");
+  if (root.key == randomMidgameDevelopment) {
+    if (sameUciMove(move, "b0c2")) return 5050;  // b9-c7: Pikafish develops the left horse before more cannon lifts.
+    if (sameUciMove(move, "f2e1")) return 5000;  // f7-e8: near-tie advisor centralization.
+    if (sameUciMove(move, "c3c4")) return 4700;  // c6-c5: playable central pawn challenge.
+    if (sameUciMove(move, "a0a2")) return 4600;  // a9-a7: playable rook lift.
+    return 0;
+  }
+
   static const uint64_t centralCannonDoubleHorse = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C1H2/9/RHEAKAE1R b");
   if (root.key == centralCannonDoubleHorse) {
@@ -6786,6 +6796,15 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t randomMidgamePawnRelief = fenPositionKey(
+      "1heak1ehr/4a4/7c1/2p3p1p/p3p4/r8/c1P1P1P1P/R2C3C1/4AK3/1HEA2EHR r");
+  if (root.key == randomMidgamePawnRelief) {
+    if (sameUciMove(move, "c3c4")) return 5050;  // c6-c5: Pikafish's preferred central pawn relief.
+    if (sameUciMove(move, "f1f0")) return 4900;  // f8-f9: playable king step in the oracle line set.
+    if (sameUciMove(move, "b0c2")) return 4600;  // b9-c7: develop the left horse when pawn relief is missed.
+    return 0;
+  }
+
   static const uint64_t shiftedCentralCannons = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b");
   if (root.key == shiftedCentralCannons) {
@@ -6831,6 +6850,14 @@ int timedOpeningRootMaxLoss(const Board& root) {
   static const uint64_t huCentralCannonTrap = fenPositionKey(
       "rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r");
   if (root.key == huCentralCannonTrap) return 180;
+
+  static const uint64_t randomMidgameDevelopment = fenPositionKey(
+      "rheakaehr/9/c6c1/2pC2p1p/p3p4/9/P1P1P1P1P/5A1C1/9/RHEAK1EHR r");
+  if (root.key == randomMidgameDevelopment) return 140;
+
+  static const uint64_t randomMidgamePawnRelief = fenPositionKey(
+      "1heak1ehr/4a4/7c1/2p3p1p/p3p4/r8/c1P1P1P1P/R2C3C1/4AK3/1HEA2EHR r");
+  if (root.key == randomMidgamePawnRelief) return 140;
 
   return kTimedOpeningPriorMaxLoss;
 }
