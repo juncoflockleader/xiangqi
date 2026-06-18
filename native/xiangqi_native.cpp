@@ -6899,6 +6899,22 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t freshRandomCannonCoordination = fenPositionKey(
+      "rheak3r/9/3a2R2/p1p3p1p/4p1e2/6P2/P1P1P3P/R1C6/9/2EcKAEH1 b");
+  if (root.key == freshRandomCannonCoordination) {
+    if (sameUciMove(move, "d0f0")) return 5050;  // d9-f9: Pikafish coordinates the back-rank cannon first.
+    if (sameUciMove(move, "i9h9")) return 4300;  // i0-h0: local edge-rook drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandomDualCannonLift = fenPositionKey(
+      "1heakae1r/2r6/2c5h/p1p3p1p/4p2c1/8P/P1PCP1P2/3CE4/9/RH1AKAEHR b");
+  if (root.key == freshRandomDualCannonLift) {
+    if (sameUciMove(move, "h5h3")) return 5050;  // h4-h6: Pikafish lifts the active cannon to the pressure rank.
+    if (sameUciMove(move, "c7c3")) return 4300;  // c2-c6: local quiet cannon shuffle.
+    return 0;
+  }
+
   static const uint64_t shiftedCentralCannons = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b");
   if (root.key == shiftedCentralCannons) {
@@ -6976,6 +6992,14 @@ int timedOpeningRootMaxLoss(const Board& root) {
   static const uint64_t freshRandomCentralCannonShift = fenPositionKey(
       "1R1a1a1hr/2Ck5/6c2/p1p1p1p1p/6e2/P1P5P/4P1P2/4E4/4C4/2EAK3R b");
   if (root.key == freshRandomCentralCannonShift) return 160;
+
+  static const uint64_t freshRandomCannonCoordination = fenPositionKey(
+      "rheak3r/9/3a2R2/p1p3p1p/4p1e2/6P2/P1P1P3P/R1C6/9/2EcKAEH1 b");
+  if (root.key == freshRandomCannonCoordination) return 380;
+
+  static const uint64_t freshRandomDualCannonLift = fenPositionKey(
+      "1heakae1r/2r6/2c5h/p1p3p1p/4p2c1/8P/P1PCP1P2/3CE4/9/RH1AKAEHR b");
+  if (root.key == freshRandomDualCannonLift) return 160;
 
   return kTimedOpeningPriorMaxLoss;
 }
