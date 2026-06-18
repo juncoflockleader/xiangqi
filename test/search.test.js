@@ -200,6 +200,26 @@ test("search connects the far rook against central-cannon pawn challenges", () =
   assert.equal(result.bestMove.notation, "i9-h9");
 });
 
+test("search develops before repeating early flank-pawn pushes", () => {
+  const position = parseFen("rheakae1r/9/1c4h1c/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR r");
+  const result = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 8000,
+    useBook: false,
+    candidateLimit: 99
+  });
+
+  assert.equal(result.depth, 6);
+  assert.equal(result.timedOut, false);
+  assert.ok(["h9-g7", "b9-c7", "b7-d7"].includes(result.bestMove.notation));
+
+  for (const notation of ["g5-g4", "a6-a5", "i6-i5"]) {
+    const candidate = result.candidates.find((item) => item.move.notation === notation);
+    assert.ok(candidate);
+    assert.ok(candidate.score < result.score || candidate.tieBreak < result.candidates[0].tieBreak);
+  }
+});
+
 test("engine explanations surface tactical-motif ordering diagnostics", () => {
   const position = parseFen("4r4/9/4k4/9/3R5/9/4P4/9/9/4K4 r");
   const engine = createEngine({ depth: 1, timeLimitMs: 1000 });
