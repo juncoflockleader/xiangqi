@@ -6482,7 +6482,8 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t centralCannonEarlyPawnBlack = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b");
   if (root.key == centralCannonEarlyPawnBlack) {
-    if (sameUciMove(move, "i9h9")) return 5000;  // i0-h0: refreshed 2026 Pikafish quiet rook development.
+    if (sameUciMove(move, "c6c5")) return 5050;  // c3-c4: refreshed Pikafish central pawn challenge.
+    if (sameUciMove(move, "i9h9")) return 5000;  // i0-h0: close quiet rook development.
     if (sameUciMove(move, "h7i7")) return 4900;  // h2-i2: near-tie rook-file cannon sidestep.
     if (sameUciMove(move, "b7e7")) return 4400;  // b2-e2: central cannon alternative.
     return 0;
@@ -6500,8 +6501,8 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
   static const uint64_t earlyPawnShiftedCannonBlack = fenPositionKey(
       "rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/4C2C1/9/RHEAKAEHR b");
   if (root.key == earlyPawnShiftedCannonBlack) {
-    if (sameUciMove(move, "b7e7")) return 5050;  // b2-e2: refreshed Pikafish central cannon response.
-    if (sameUciMove(move, "c9e7")) return 5000;  // c0-e2: elephant development remains playable.
+    if (sameUciMove(move, "c9e7")) return 5050;  // c0-e2: refreshed Pikafish elephant development.
+    if (sameUciMove(move, "b7e7")) return 5000;  // b2-e2: close central cannon alternative.
     if (sameUciMove(move, "b9c7")) return 4700;  // b0-c2: close horse-development alternative.
     return 0;
   }

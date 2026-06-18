@@ -560,9 +560,9 @@ test("local C++ timed opening priors guide pure native central cannon branches",
     assert.equal(moveToNotation(refreshedPawnPushContinuationResult.bestMove), "b7-d7");
     assert.equal(moveToNotation(shiftedLeftPawnResult.bestMove), "g0-e2");
     assert.equal(moveToNotation(earlyPawnBlackCannonSideResult.bestMove), "h2-g2");
-    assert.equal(moveToNotation(centralCannonEarlyPawnBlackResult.bestMove), "i0-h0");
+    assert.equal(moveToNotation(centralCannonEarlyPawnBlackResult.bestMove), "c3-c4");
     assert.equal(moveToNotation(earlyPawnRedElephantBlackResult.bestMove), "h0-i2");
-    assert.equal(moveToNotation(earlyPawnShiftedCannonBlackResult.bestMove), "b2-e2");
+    assert.equal(moveToNotation(earlyPawnShiftedCannonBlackResult.bestMove), "c0-e2");
     assert.ok(huResult.nodes > 0);
     assert.ok(centralHorseReplyResult.nodes > 0);
     assert.ok(centralResult.nodes > 0);
@@ -644,7 +644,7 @@ test("local C++ engine keeps the refreshed Pikafish shifted-cannon central respo
       lines: 5
     });
 
-    assert.equal(moveToNotation(result.bestMove), "b2-e2");
+    assert.equal(moveToNotation(result.bestMove), "c0-e2");
     assert.ok(result.nodes > 0);
   } finally {
     await backend.close();
