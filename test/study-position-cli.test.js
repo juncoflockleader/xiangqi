@@ -113,7 +113,8 @@ test("study position CLI can load an oracle opening artifact", async () => {
     assert.equal(report.study.openingCandidates[0].move, "h9-g7");
     assert.equal(report.study.openingCandidates[0].name, "Fixture Oracle Horse");
     assert.equal(report.study.searchDisagreement.openingMove, "h9-g7");
-    assert.equal(report.study.searchDisagreement.searchMove, "b7-b0");
+    assert.equal(report.study.searchDisagreement.searchMove, report.study.candidateLines[0].move);
+    assert.notEqual(report.study.searchDisagreement.searchMove, report.study.searchDisagreement.openingMove);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

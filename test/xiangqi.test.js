@@ -41,6 +41,17 @@ test("flying general check is detected and legal moves must resolve it", () => {
   );
 });
 
+test("check detection covers direct Xiangqi attackers", () => {
+  assert.equal(isInCheck(parseFen("4k4/9/9/9/4r4/9/9/9/9/4K4 r"), SIDES.RED), true);
+  assert.equal(isInCheck(parseFen("4k4/9/9/9/4c4/9/9/4P4/9/4K4 r"), SIDES.RED), true);
+  assert.equal(isInCheck(parseFen("4k4/9/9/9/4c4/9/9/9/9/4K4 r"), SIDES.RED), false);
+  assert.equal(isInCheck(parseFen("4k4/9/9/9/9/4P4/9/3h5/9/4K4 r"), SIDES.RED), true);
+  assert.equal(isInCheck(parseFen("4k4/9/9/9/9/4P4/9/3h5/3P5/4K4 r"), SIDES.RED), false);
+  assert.equal(isInCheck(parseFen("4k4/9/9/9/9/9/9/9/4p4/4K4 r"), SIDES.RED), true);
+  assert.equal(isInCheck(parseFen("4k4/9/9/9/9/4P4/9/9/9/3pK4 r"), SIDES.RED), true);
+  assert.equal(isInCheck(parseFen("2eakae2/9/4c4/4C4/9/4P4/9/9/9/2EAKAE2 b"), SIDES.BLACK), true);
+});
+
 test("legal moves do not include literal king captures", () => {
   const position = parseFen("4k4/9/9/9/9/9/9/9/9/3KR4 r");
   const moves = generateLegalMoves(position).map((move) => move.notation);

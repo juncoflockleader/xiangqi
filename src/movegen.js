@@ -92,10 +92,7 @@ export function isInCheck(position, side = position.turn) {
   const kingSquare = findKing(position, side);
   if (kingSquare === -1) return true;
 
-  if (generalsFace(position)) return true;
-
-  const enemy = opponent(side);
-  return generatePseudoMoves(position, enemy).some((move) => move.to === kingSquare);
+  return isSquareAttackedBy(position, kingSquare, opponent(side));
 }
 
 export function findKing(position, side) {
@@ -118,6 +115,102 @@ export function generalsFace(position) {
   }
 
   return true;
+}
+
+function isSquareAttackedBy(position, square, attackerSide) {
+  return isAttackedBySlidingPiece(position, square, attackerSide)
+    || isAttackedByHorse(position, square, attackerSide)
+    || isAttackedByPawn(position, square, attackerSide);
+}
+
+function isAttackedBySlidingPiece(position, square, attackerSide) {
+  const targetFile = fileOf(square);
+  const targetRank = rankOf(square);
+
+  for (const [dx, dy] of ORTHOGONAL) {
+    let file = targetFile + dx;
+    let rank = targetRank + dy;
+    let screenSeen = false;
+    let distance = 1;
+
+    while (isInside(file, rank)) {
+      const source = indexOf(file, rank);
+      const piece = position.board[source];
+
+      if (!piece) {
+        file += dx;
+        rank += dy;
+        distance += 1;
+        continue;
+      }
+
+      if (!screenSeen) {
+        if (piece.side === attackerSide) {
+          if (piece.type === PIECES.ROOK) return true;
+          if (piece.type === PIECES.KING && kingAttacksAlongLine(source, square, attackerSide, distance)) {
+            return true;
+          }
+        }
+        screenSeen = true;
+        file += dx;
+        rank += dy;
+        distance += 1;
+        continue;
+      }
+
+      if (piece.side === attackerSide && piece.type === PIECES.CANNON) return true;
+      break;
+    }
+  }
+
+  return false;
+}
+
+function kingAttacksAlongLine(source, target, attackerSide, distance) {
+  if (fileOf(source) === fileOf(target)) return true;
+  return distance === 1 && palaceContains(attackerSide, fileOf(target), rankOf(target));
+}
+
+function isAttackedByHorse(position, square, attackerSide) {
+  const targetFile = fileOf(square);
+  const targetRank = rankOf(square);
+
+  for (const [dx, dy] of HORSE_DELTAS) {
+    const sourceFile = targetFile - dx;
+    const sourceRank = targetRank - dy;
+    if (!isInside(sourceFile, sourceRank)) continue;
+
+    const source = indexOf(sourceFile, sourceRank);
+    const piece = position.board[source];
+    if (piece?.side !== attackerSide || piece.type !== PIECES.HORSE) continue;
+
+    const legFile = Math.abs(dx) === 2 ? sourceFile + Math.sign(dx) : sourceFile;
+    const legRank = Math.abs(dy) === 2 ? sourceRank + Math.sign(dy) : sourceRank;
+    if (!position.board[indexOf(legFile, legRank)]) return true;
+  }
+
+  return false;
+}
+
+function isAttackedByPawn(position, square, attackerSide) {
+  const targetFile = fileOf(square);
+  const targetRank = rankOf(square);
+  const forwardSourceRank = targetRank - forwardDelta(attackerSide);
+
+  if (isEnemyPawnAt(position, targetFile, forwardSourceRank, attackerSide)) return true;
+
+  for (const sourceFile of [targetFile - 1, targetFile + 1]) {
+    if (!isEnemyPawnAt(position, sourceFile, targetRank, attackerSide)) continue;
+    if (hasCrossedRiver(attackerSide, targetRank)) return true;
+  }
+
+  return false;
+}
+
+function isEnemyPawnAt(position, file, rank, attackerSide) {
+  if (!isInside(file, rank)) return false;
+  const piece = position.board[indexOf(file, rank)];
+  return piece?.side === attackerSide && piece.type === PIECES.PAWN;
 }
 
 export function isLegalMove(position, move, side = position.turn) {

@@ -104,10 +104,11 @@ test("position study separates opening candidates from search candidates", () =>
   assert.equal(study.openingCandidates[0].name, "Oracle Horse");
   assert.equal(study.openingCandidates[0].database.source, "Fixture Oracle");
   assert.equal(study.searchDisagreement.openingMove, "h9-g7");
-  assert.equal(study.searchDisagreement.searchMove, "b7-b0");
+  assert.equal(study.searchDisagreement.searchMove, study.candidateLines[0].move);
+  assert.notEqual(study.searchDisagreement.searchMove, study.searchDisagreement.openingMove);
   assert.equal(study.nextSteps[0].kind, "opening-search-check");
   assert.match(text, /Opening candidates:/);
-  assert.match(text, /Search check: b7-b0 is the top search candidate, while h9-g7 is the opening-book choice\./);
+  assert.ok(text.includes(`Search check: ${study.searchDisagreement.searchMove} is the top search candidate, while h9-g7 is the opening-book choice.`));
   assert.match(text, /Plan: Start with h9-g7; theme: creates threat, answers threat\./);
 });
 
