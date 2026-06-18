@@ -70,6 +70,24 @@ test("search keeps opening development aligned without book help", () => {
   assert.ok(["b7-e7", "h7-e7", "b9-c7", "h9-g7"].includes(result.bestMove.notation));
 });
 
+test("search follows the refreshed central-cannon prior from the initial position", () => {
+  const result = searchBestMove(createInitialPosition(), {
+    depth: 6,
+    timeLimitMs: 8000,
+    useBook: false,
+    useSoftTimeManagement: false,
+    candidateLimit: 99
+  });
+
+  assert.equal(result.depth, 6);
+  assert.equal(result.timedOut, false);
+  assert.equal(result.bestMove.notation, "h7-e7");
+
+  const leftHorse = result.candidates.find((item) => item.move.notation === "b9-c7");
+  assert.ok(leftHorse);
+  assert.ok(leftHorse.score < result.score || leftHorse.tieBreak < result.candidates[0].tieBreak);
+});
+
 test("search prefers right-horse development against single-screen central cannon replies", () => {
   const positions = [
     parseFen("rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/1C2C4/9/RHEAKAEHR r"),

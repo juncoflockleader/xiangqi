@@ -104,6 +104,9 @@ const ROOT_HOME_RANK_ROOK_CONNECT_SCORE_BONUS = 150;
 const ROOT_HOME_RANK_ROOK_CONNECT_BONUS = 110;
 const ROOT_CENTRAL_CANNON_ROOK_CONNECT_SCORE_BONUS = 70;
 const ROOT_MIRRORED_HOME_RANK_ROOK_CONNECT_SCORE_BONUS = 170;
+const ROOT_INITIAL_PRIMARY_CANNON_SCORE_BONUS = 36;
+const ROOT_INITIAL_SECONDARY_CANNON_SCORE_BONUS = 14;
+const ROOT_INITIAL_OPENING_TIE_BONUS = 50;
 const ROOT_EARLY_PAWN_DEVELOPMENT_SCORE_BONUS = 60;
 const ROOT_EARLY_PAWN_CANNON_SIDE_STEP_SCORE_BONUS = 80;
 const ROOT_EARLY_PAWN_CANNON_SIDE_STEP_TIE_BONUS = 90;
@@ -125,6 +128,40 @@ const DEFAULT_ROOT_TIME_GUARD_MIN_MS = 8;
 const DEFAULT_ROOT_TIME_GUARD_MAX_MS = 250;
 const DEFAULT_ROOT_TIME_GUARD_DIVISOR = 3;
 const ORDERING_SCORE = Symbol("orderingScore");
+const INITIAL_OPENING_PIECES = Object.freeze([
+  [0, 0, SIDES.BLACK, PIECES.ROOK],
+  [1, 0, SIDES.BLACK, PIECES.HORSE],
+  [2, 0, SIDES.BLACK, PIECES.ELEPHANT],
+  [3, 0, SIDES.BLACK, PIECES.ADVISOR],
+  [4, 0, SIDES.BLACK, PIECES.KING],
+  [5, 0, SIDES.BLACK, PIECES.ADVISOR],
+  [6, 0, SIDES.BLACK, PIECES.ELEPHANT],
+  [7, 0, SIDES.BLACK, PIECES.HORSE],
+  [8, 0, SIDES.BLACK, PIECES.ROOK],
+  [1, 2, SIDES.BLACK, PIECES.CANNON],
+  [7, 2, SIDES.BLACK, PIECES.CANNON],
+  [0, 3, SIDES.BLACK, PIECES.PAWN],
+  [2, 3, SIDES.BLACK, PIECES.PAWN],
+  [4, 3, SIDES.BLACK, PIECES.PAWN],
+  [6, 3, SIDES.BLACK, PIECES.PAWN],
+  [8, 3, SIDES.BLACK, PIECES.PAWN],
+  [0, 6, SIDES.RED, PIECES.PAWN],
+  [2, 6, SIDES.RED, PIECES.PAWN],
+  [4, 6, SIDES.RED, PIECES.PAWN],
+  [6, 6, SIDES.RED, PIECES.PAWN],
+  [8, 6, SIDES.RED, PIECES.PAWN],
+  [1, 7, SIDES.RED, PIECES.CANNON],
+  [7, 7, SIDES.RED, PIECES.CANNON],
+  [0, 9, SIDES.RED, PIECES.ROOK],
+  [1, 9, SIDES.RED, PIECES.HORSE],
+  [2, 9, SIDES.RED, PIECES.ELEPHANT],
+  [3, 9, SIDES.RED, PIECES.ADVISOR],
+  [4, 9, SIDES.RED, PIECES.KING],
+  [5, 9, SIDES.RED, PIECES.ADVISOR],
+  [6, 9, SIDES.RED, PIECES.ELEPHANT],
+  [7, 9, SIDES.RED, PIECES.HORSE],
+  [8, 9, SIDES.RED, PIECES.ROOK]
+]);
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -752,6 +789,9 @@ function rootTieBreakScore(position, move, next, context, searchScore) {
   if (move.givesCheck) score += 30;
   if (move.piece?.type !== PIECES.KING) score += 4;
   if (isHomeRankRookConnectorMove(position, move)) score += ROOT_HOME_RANK_ROOK_CONNECT_BONUS;
+  if (isInitialOpeningPriorMove(position, move)) {
+    score += ROOT_INITIAL_OPENING_TIE_BONUS;
+  }
   if (isSingleScreenHorseFarElephantCentralization(position, move)) {
     score += ROOT_SINGLE_SCREEN_HORSE_FAR_ELEPHANT_TIE_BONUS;
   }
@@ -789,6 +829,7 @@ function rootMoveStrategicPriorScore(position, move) {
   if (!piece) return 0;
 
   let score = 0;
+  score += initialOpeningPriorScore(position, move);
   if (
     isHomeRankRookConnectorMove(position, move)
     && hasHomeRankConnectorRook(position, opponent(piece.side))
@@ -832,6 +873,41 @@ function rootMoveStrategicPriorScore(position, move) {
     score -= ROOT_SHIFTED_CANNON_WING_CANNON_LIFT_PENALTY;
   }
   return score;
+}
+
+function initialOpeningPriorScore(position, move) {
+  if (!isInitialOpeningPosition(position)) return 0;
+
+  const piece = move.piece ?? position.board[move.from];
+  if (piece?.side !== SIDES.RED) return 0;
+
+  const fromFile = fileOf(move.from);
+  const fromRank = rankOf(move.from);
+  const toFile = fileOf(move.to);
+  const toRank = rankOf(move.to);
+
+  if (piece.type === PIECES.CANNON && fromRank === 7 && toRank === 7 && toFile === 4) {
+    if (fromFile === BOARD_FILES - 2) return ROOT_INITIAL_PRIMARY_CANNON_SCORE_BONUS;
+    if (fromFile === 1) return ROOT_INITIAL_SECONDARY_CANNON_SCORE_BONUS;
+  }
+
+  return 0;
+}
+
+function isInitialOpeningPriorMove(position, move) {
+  return initialOpeningPriorScore(position, move) > 0;
+}
+
+function isInitialOpeningPosition(position) {
+  if (position.turn !== SIDES.RED) return false;
+  if (INITIAL_OPENING_PIECES.some(([file, rank, side, type]) => {
+    const piece = position.board[indexOf(file, rank)];
+    return piece?.side !== side || piece.type !== type;
+  })) {
+    return false;
+  }
+
+  return position.board.reduce((count, piece) => count + (piece ? 1 : 0), 0) === INITIAL_OPENING_PIECES.length;
 }
 
 function isHomeRankRookConnectorMove(position, move) {
