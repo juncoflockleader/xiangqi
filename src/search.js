@@ -95,6 +95,7 @@ const ROOT_BAD_CAPTURE_REDUCTION_LOSS_MARGIN = 120;
 const DEFAULT_ROOT_TIME_GUARD_MIN_MS = 8;
 const DEFAULT_ROOT_TIME_GUARD_MAX_MS = 250;
 const DEFAULT_ROOT_TIME_GUARD_DIVISOR = 3;
+const ORDERING_SCORE = Symbol("orderingScore");
 
 export function searchBestMove(position, options = {}) {
   const depthLimit = options.depth ?? 4;
@@ -1368,13 +1369,19 @@ function rootChildState(position, move, context) {
 }
 
 function orderMoves(position, moves, principalMove, context, ply, previousMove = null, checkInfo = null) {
-  return moves
-    .map((move) => ({
-      move,
-      score: moveOrderingScore(position, move, principalMove, context, ply, previousMove, checkInfo)
-    }))
-    .sort((a, b) => b.score - a.score)
-    .map((entry) => entry.move);
+  const ordered = moves.slice();
+  for (const move of ordered) {
+    move[ORDERING_SCORE] = moveOrderingScore(position, move, principalMove, context, ply, previousMove, checkInfo);
+  }
+  ordered.sort(compareOrderedMoves);
+  for (const move of ordered) {
+    delete move[ORDERING_SCORE];
+  }
+  return ordered;
+}
+
+function compareOrderedMoves(left, right) {
+  return (right[ORDERING_SCORE] ?? 0) - (left[ORDERING_SCORE] ?? 0);
 }
 
 function orderQuiescenceMoves(position, moves, hashMove, context, ply, previousMove = null, checkInfo = null) {

@@ -44,6 +44,21 @@ test("search orders quiet tactical motifs before generic quiet moves", () => {
   assert.equal(disabled.stats.tacticalMoveOrderCacheStores, 0);
 });
 
+test("search move ordering does not leak private score metadata", () => {
+  const result = searchBestMove(createInitialPosition(), {
+    depth: 2,
+    timeLimitMs: 1000,
+    candidateLimit: 4
+  });
+  const moves = [
+    result.bestMove,
+    ...result.candidates.map((candidate) => candidate.move)
+  ].filter(Boolean);
+
+  assert.ok(moves.length > 0);
+  assert.ok(moves.every((move) => Object.getOwnPropertySymbols(move).length === 0));
+});
+
 test("engine explanations surface tactical-motif ordering diagnostics", () => {
   const position = parseFen("4r4/9/4k4/9/3R5/9/4P4/9/9/4K4 r");
   const engine = createEngine({ depth: 1, timeLimitMs: 1000 });
