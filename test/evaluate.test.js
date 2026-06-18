@@ -449,3 +449,42 @@ test("evaluation descriptions surface soldier palace invasion", () => {
   assert.ok(delta.delta.pawnStructure >= 30);
   assert.ok(notes.some((note) => note.term === "pawnStructure" && note.text.includes("palace invasion")));
 });
+
+test("evaluation preserves representative control-map scores", () => {
+  const cases = [{
+    fen: "rheakaehr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RHEAKAEHR r",
+    score: 0,
+    sideScores: { red: 25377, black: 25377 },
+    terms: { pieceSafety: 0, guardPressure: 0, kingSafety: 0, pawnStructure: 0 }
+  }, {
+    fen: "4k4/9/9/4r4/9/4R4/P8/9/9/4K4 r",
+    score: 201,
+    sideScores: { red: 21264, black: 21063 },
+    terms: { pieceSafety: 0, guardPressure: 0, kingSafety: 0, pawnStructure: 0 }
+  }, {
+    fen: "4k4/4a4/9/9/9/4R4/9/9/9/4K4 r",
+    score: 1233,
+    sideScores: { red: 21350, black: 20117 },
+    terms: { pieceSafety: 7, guardPressure: 96, kingSafety: -19, pawnStructure: 0 }
+  }, {
+    fen: "4k4/9/9/9/2PP5/4P4/9/9/9/4K4 r",
+    score: 906,
+    sideScores: { red: 20876, black: 19970 },
+    terms: { pieceSafety: 0, guardPressure: 0, kingSafety: 0, pawnStructure: 154 }
+  }];
+
+  for (const expected of cases) {
+    const evaluation = evaluatePosition(parseFen(expected.fen), SIDES.RED, { detailed: true });
+    assert.equal(Math.round(evaluation.score), expected.score);
+    assert.deepEqual({
+      red: Math.round(evaluation.sideScores.red),
+      black: Math.round(evaluation.sideScores.black)
+    }, expected.sideScores);
+    assert.deepEqual({
+      pieceSafety: Math.round(evaluation.difference.pieceSafety),
+      guardPressure: Math.round(evaluation.difference.guardPressure),
+      kingSafety: Math.round(evaluation.difference.kingSafety),
+      pawnStructure: Math.round(evaluation.difference.pawnStructure)
+    }, expected.terms);
+  }
+});

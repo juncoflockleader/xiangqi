@@ -19,6 +19,31 @@ import {
 } from "./board.js";
 import { generatePseudoMoves, isInCheck } from "./movegen.js";
 
+const ORTHOGONAL_DELTAS = Object.freeze([
+  [0, -1],
+  [1, 0],
+  [0, 1],
+  [-1, 0]
+]);
+
+const DIAGONAL_DELTAS = Object.freeze([
+  [1, 1],
+  [1, -1],
+  [-1, 1],
+  [-1, -1]
+]);
+
+const HORSE_DELTAS = Object.freeze([
+  [1, 2],
+  [2, 1],
+  [2, -1],
+  [1, -2],
+  [-1, -2],
+  [-2, -1],
+  [-2, 1],
+  [-1, 2]
+]);
+
 const MOBILITY_WEIGHTS = Object.freeze({
   [PIECES.KING]: 1,
   [PIECES.ADVISOR]: 1,
@@ -229,10 +254,8 @@ function pawnSupportValue(position, piece, file, rank) {
   let score = 0;
 
   if (hasCrossedRiver(piece.side, rank)) {
-    for (const neighborFile of [file - 1, file + 1]) {
-      if (!isFriendlyPawn(position, piece.side, neighborFile, rank)) continue;
-      score += 18;
-    }
+    if (isFriendlyPawn(position, piece.side, file - 1, rank)) score += 18;
+    if (isFriendlyPawn(position, piece.side, file + 1, rank)) score += 18;
   }
 
   const supportRank = rank - forwardDelta(piece.side);
@@ -275,7 +298,7 @@ function pawnInvasionValue(position, piece, square, file, rank) {
     score += Math.max(0, 32 - rankDistance * 5);
   }
 
-  if (pawnControls(square, piece).includes(enemyKingSquare)) {
+  if (pawnControlsSquare(square, piece, enemyKingSquare)) {
     score += 70;
   }
 
@@ -347,7 +370,7 @@ function enemyPawnCanContest(position, enemy, square) {
   for (let candidate = 0; candidate < position.board.length; candidate += 1) {
     const piece = position.board[candidate];
     if (piece?.side !== enemy || piece.type !== PIECES.PAWN) continue;
-    if (pawnControls(candidate, piece).includes(square)) return true;
+    if (pawnControlsSquare(candidate, piece, square)) return true;
   }
 
   return false;
@@ -404,16 +427,12 @@ function coordinationValue(position, piece, square) {
 function horseLegCoordination(position, piece, square) {
   const file = fileOf(square);
   const rank = rankOf(square);
-  const legSquares = [
-    [file, rank - 1],
-    [file + 1, rank],
-    [file, rank + 1],
-    [file - 1, rank]
-  ];
   let blockedLegs = 0;
   let score = 0;
 
-  for (const [legFile, legRank] of legSquares) {
+  for (const [dx, dy] of ORTHOGONAL_DELTAS) {
+    const legFile = file + dx;
+    const legRank = rank + dy;
     if (!isInside(legFile, legRank)) continue;
     const blocker = position.board[indexOf(legFile, legRank)];
     if (!blocker) continue;
@@ -430,14 +449,13 @@ function linkedHorseValue(position, piece, square) {
 
   const file = fileOf(square);
   const rank = rankOf(square);
-  const controls = horseControls(position, square);
   let score = 0;
 
-  for (const target of controls) {
-    if (target <= square) continue;
+  forEachHorseControl(position, square, (target) => {
+    if (target <= square) return;
     const partner = position.board[target];
-    if (partner?.side !== piece.side || partner.type !== PIECES.HORSE) continue;
-    if (!horseControls(position, target).includes(square)) continue;
+    if (partner?.side !== piece.side || partner.type !== PIECES.HORSE) return;
+    if (!horseControlsSquare(position, target, square)) return;
 
     const partnerFile = fileOf(target);
     const partnerRank = rankOf(target);
@@ -447,7 +465,7 @@ function linkedHorseValue(position, piece, square) {
     score += 26;
     score += centrality * 3;
     if (advanced) score += 8;
-  }
+  });
 
   return score;
 }
@@ -512,7 +530,7 @@ function cannonPlatformValue(position, piece, square) {
   if (piece.type !== PIECES.CANNON) return 0;
 
   let score = 0;
-  for (const [fileStep, rankStep] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+  for (const [fileStep, rankStep] of ORTHOGONAL_DELTAS) {
     const platform = cannonPlatformRay(position, square, fileStep, rankStep);
     if (!platform.screen) continue;
 
@@ -666,7 +684,7 @@ function raysFromSquare(position, square) {
   const file = fileOf(square);
   const rank = rankOf(square);
 
-  for (const [fileStep, rankStep] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+  for (const [fileStep, rankStep] of ORTHOGONAL_DELTAS) {
     const ray = [];
     let targetFile = file + fileStep;
     let targetRank = rank + rankStep;
@@ -793,15 +811,22 @@ function horsePressureValue(position, piece, square) {
   const rank = rankOf(square);
   const kingFile = fileOf(enemyKingSquare);
   const kingRank = rankOf(enemyKingSquare);
-  const controls = horseControls(position, square);
-  const palaceControls = controls.filter((target) => palaceContains(enemy, fileOf(target), rankOf(target)));
   const escapeControls = new Set(kingEscapeSquares(position, enemy, enemyKingSquare));
+  let palaceControlCount = 0;
+  let escapeControlCount = 0;
+  let controlsKing = false;
   let score = 0;
 
-  score += palaceControls.length * 16;
-  score += controls.filter((target) => escapeControls.has(target)).length * 14;
+  forEachHorseControl(position, square, (target) => {
+    if (palaceContains(enemy, fileOf(target), rankOf(target))) palaceControlCount += 1;
+    if (escapeControls.has(target)) escapeControlCount += 1;
+    if (target === enemyKingSquare) controlsKing = true;
+  });
 
-  if (controls.includes(enemyKingSquare)) score += 62;
+  score += palaceControlCount * 16;
+  score += escapeControlCount * 14;
+
+  if (controlsKing) score += 62;
   if (hasCrossedRiver(piece.side, rank)) score += 10;
 
   const kingDistance = Math.abs(file - kingFile) + Math.abs(rank - kingRank);
@@ -979,9 +1004,7 @@ function createControlMap(position, side) {
     const piece = position.board[square];
     if (!piece || piece.side !== side) continue;
 
-    for (const target of controlledSquares(position, square, piece)) {
-      addControl(control, target, piece);
-    }
+    addPieceControls(control, position, square, piece);
   }
 
   return control;
@@ -997,48 +1020,51 @@ function addControl(control, square, piece) {
   control.set(square, current);
 }
 
-function controlledSquares(position, square, piece) {
+function addPieceControls(control, position, square, piece) {
   switch (piece.type) {
     case PIECES.KING:
-      return shortRangeControls(square, piece, [[0, -1], [1, 0], [0, 1], [-1, 0]], palaceContains);
+      addShortRangeControls(control, square, piece, ORTHOGONAL_DELTAS, palaceContains);
+      break;
     case PIECES.ADVISOR:
-      return shortRangeControls(square, piece, [[1, 1], [1, -1], [-1, 1], [-1, -1]], palaceContains);
+      addShortRangeControls(control, square, piece, DIAGONAL_DELTAS, palaceContains);
+      break;
     case PIECES.ELEPHANT:
-      return elephantControls(position, square, piece);
+      addElephantControls(control, position, square, piece);
+      break;
     case PIECES.HORSE:
-      return horseControls(position, square);
+      addHorseControls(control, position, square, piece);
+      break;
     case PIECES.ROOK:
-      return rookControls(position, square);
+      addRookControls(control, position, square, piece);
+      break;
     case PIECES.CANNON:
-      return cannonControls(position, square);
+      addCannonControls(control, position, square, piece);
+      break;
     case PIECES.PAWN:
-      return pawnControls(square, piece);
+      addPawnControls(control, square, piece);
+      break;
     default:
-      return [];
+      break;
   }
 }
 
-function shortRangeControls(square, piece, deltas, contains) {
+function addShortRangeControls(control, square, piece, deltas, contains) {
   const file = fileOf(square);
   const rank = rankOf(square);
-  const controls = [];
 
   for (const [dx, dy] of deltas) {
     const targetFile = file + dx;
     const targetRank = rank + dy;
     if (!contains(piece.side, targetFile, targetRank)) continue;
-    controls.push(indexOf(targetFile, targetRank));
+    addControl(control, indexOf(targetFile, targetRank), piece);
   }
-
-  return controls;
 }
 
-function elephantControls(position, square, piece) {
+function addElephantControls(control, position, square, piece) {
   const file = fileOf(square);
   const rank = rankOf(square);
-  const controls = [];
 
-  for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+  for (const [dx, dy] of DIAGONAL_DELTAS) {
     const targetFile = file + dx * 2;
     const targetRank = rank + dy * 2;
     const eyeFile = file + dx;
@@ -1046,18 +1072,21 @@ function elephantControls(position, square, piece) {
     if (!isInside(targetFile, targetRank)) continue;
     if (!ownRiverSide(piece.side, targetRank)) continue;
     if (position.board[indexOf(eyeFile, eyeRank)]) continue;
-    controls.push(indexOf(targetFile, targetRank));
+    addControl(control, indexOf(targetFile, targetRank), piece);
   }
-
-  return controls;
 }
 
-function horseControls(position, square) {
+function addHorseControls(control, position, square, piece) {
+  forEachHorseControl(position, square, (target) => {
+    addControl(control, target, piece);
+  });
+}
+
+function forEachHorseControl(position, square, visit) {
   const file = fileOf(square);
   const rank = rankOf(square);
-  const controls = [];
 
-  for (const [dx, dy] of [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]]) {
+  for (const [dx, dy] of HORSE_DELTAS) {
     const targetFile = file + dx;
     const targetRank = rank + dy;
     if (!isInside(targetFile, targetRank)) continue;
@@ -1065,27 +1094,38 @@ function horseControls(position, square) {
     const legFile = Math.abs(dx) === 2 ? file + Math.sign(dx) : file;
     const legRank = Math.abs(dy) === 2 ? rank + Math.sign(dy) : rank;
     if (position.board[indexOf(legFile, legRank)]) continue;
-    controls.push(indexOf(targetFile, targetRank));
+    visit(indexOf(targetFile, targetRank));
   }
-
-  return controls;
 }
 
-function rookControls(position, square) {
-  const controls = [];
+function horseControlsSquare(position, square, target) {
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  const targetFile = fileOf(target);
+  const targetRank = rankOf(target);
+  const dx = targetFile - file;
+  const dy = targetRank - rank;
+  const longStep = Math.abs(dx) === 2 && Math.abs(dy) === 1;
+  const tallStep = Math.abs(dx) === 1 && Math.abs(dy) === 2;
+  if (!longStep && !tallStep) return false;
+
+  const legFile = longStep ? file + Math.sign(dx) : file;
+  const legRank = tallStep ? rank + Math.sign(dy) : rank;
+  return !position.board[indexOf(legFile, legRank)];
+}
+
+function addRookControls(control, position, square, piece) {
   forEachRay(square, (target) => {
-    controls.push(target);
+    addControl(control, target, piece);
     return !position.board[target];
   });
-  return controls;
 }
 
-function cannonControls(position, square) {
-  const controls = [];
+function addCannonControls(control, position, square, piece) {
   const file = fileOf(square);
   const rank = rankOf(square);
 
-  for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+  for (const [dx, dy] of ORTHOGONAL_DELTAS) {
     let targetFile = file + dx;
     let targetRank = rank + dy;
     let screenFound = false;
@@ -1096,7 +1136,7 @@ function cannonControls(position, square) {
       if (!screenFound) {
         if (occupant) screenFound = true;
       } else if (occupant) {
-        controls.push(target);
+        addControl(control, target, piece);
         break;
       }
 
@@ -1104,31 +1144,42 @@ function cannonControls(position, square) {
       targetRank += dy;
     }
   }
-
-  return controls;
 }
 
-function pawnControls(square, piece) {
+function addPawnControls(control, square, piece) {
+  forEachPawnControl(square, piece, (target) => {
+    addControl(control, target, piece);
+  });
+}
+
+function forEachPawnControl(square, piece, visit) {
   const file = fileOf(square);
   const rank = rankOf(square);
-  const controls = [];
   const forwardRank = rank + forwardDelta(piece.side);
-  if (isInside(file, forwardRank)) controls.push(indexOf(file, forwardRank));
+  if (isInside(file, forwardRank)) visit(indexOf(file, forwardRank));
 
   if (hasCrossedRiver(piece.side, rank)) {
-    for (const sideFile of [file - 1, file + 1]) {
-      if (isInside(sideFile, rank)) controls.push(indexOf(sideFile, rank));
-    }
+    const leftFile = file - 1;
+    const rightFile = file + 1;
+    if (isInside(leftFile, rank)) visit(indexOf(leftFile, rank));
+    if (isInside(rightFile, rank)) visit(indexOf(rightFile, rank));
   }
+}
 
-  return controls;
+function pawnControlsSquare(square, piece, target) {
+  const file = fileOf(square);
+  const rank = rankOf(square);
+  const targetFile = fileOf(target);
+  const targetRank = rankOf(target);
+  if (targetFile === file && targetRank === rank + forwardDelta(piece.side)) return true;
+  return hasCrossedRiver(piece.side, rank) && targetRank === rank && Math.abs(targetFile - file) === 1;
 }
 
 function forEachRay(square, visit) {
   const file = fileOf(square);
   const rank = rankOf(square);
 
-  for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+  for (const [dx, dy] of ORTHOGONAL_DELTAS) {
     let targetFile = file + dx;
     let targetRank = rank + dy;
 
@@ -1329,7 +1380,7 @@ function kingEscapeSquares(position, side, kingSquare) {
   const rank = rankOf(kingSquare);
   const squares = [];
 
-  for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+  for (const [dx, dy] of ORTHOGONAL_DELTAS) {
     const targetFile = file + dx;
     const targetRank = rank + dy;
     if (!palaceContains(side, targetFile, targetRank)) continue;
