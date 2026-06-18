@@ -107,6 +107,7 @@ const ROOT_MIRRORED_HOME_RANK_ROOK_CONNECT_SCORE_BONUS = 170;
 const ROOT_EARLY_PAWN_DEVELOPMENT_SCORE_BONUS = 60;
 const ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_SCORE_BONUS = 100;
 const ROOT_SINGLE_SCREEN_HORSE_FAR_ELEPHANT_TIE_BONUS = 40;
+const ROOT_EARLY_PAWN_SHIFTED_CANNON_ANCHOR_ELEPHANT_TIE_BONUS = 40;
 const ROOT_EARLY_PAWN_ELEPHANT_RIM_HORSE_TIE_BONUS = 150;
 const ROOT_OPENING_PRESSURE_CENTRAL_PAWN_PUSH_PENALTY = 120;
 const ROOT_OPENING_PRESSURE_CANNON_INWARD_SHIFT_PENALTY = 120;
@@ -747,6 +748,9 @@ function rootTieBreakScore(position, move, next, context, searchScore) {
   if (isSingleScreenHorseFarElephantCentralization(position, move)) {
     score += ROOT_SINGLE_SCREEN_HORSE_FAR_ELEPHANT_TIE_BONUS;
   }
+  if (isEarlyPawnShiftedCannonAnchorElephant(position, move)) {
+    score += ROOT_EARLY_PAWN_SHIFTED_CANNON_ANCHOR_ELEPHANT_TIE_BONUS;
+  }
   if (isEarlyPawnElephantRimHorseResponse(position, move)) score += ROOT_EARLY_PAWN_ELEPHANT_RIM_HORSE_TIE_BONUS;
   if (move.captured) {
     score += 2;
@@ -880,6 +884,27 @@ function isSingleScreenHorseFarElephantCentralization(position, move) {
 
   const farElephantFile = screenHorseFile <= 2 ? BOARD_FILES - 3 : 2;
   return fromFile === farElephantFile;
+}
+
+function isEarlyPawnShiftedCannonAnchorElephant(position, move) {
+  const piece = move.piece ?? position.board[move.from];
+  if (!piece || piece.type !== PIECES.ELEPHANT) return false;
+  if (!bothWingHorsesHomeForSearch(position, piece.side)) return false;
+  if (!hasEnemyCentralCannon(position, piece.side)) return false;
+
+  const pressureFlank = shiftedCannonEarlyPawnPressureFlank(position, piece.side);
+  if (pressureFlank === null) return false;
+
+  const homeRank = piece.side === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  const targetRank = piece.side === SIDES.RED ? BOARD_RANKS - 3 : 2;
+  const fromFile = fileOf(move.from);
+  const fromRank = rankOf(move.from);
+  const toFile = fileOf(move.to);
+  const toRank = rankOf(move.to);
+  if (fromRank !== homeRank || toFile !== 4 || toRank !== targetRank) return false;
+
+  const anchorElephantFile = pressureFlank === "right" ? 2 : BOARD_FILES - 3;
+  return fromFile === anchorElephantFile;
 }
 
 function isOppositeFlankRookConnectorAgainstEnemyPawn(position, side, rookFromFile) {
@@ -1093,6 +1118,27 @@ function singleScreenHorseFile(position, side) {
     return piece?.side === side && piece.type === PIECES.HORSE;
   });
   return screenFiles.length === 1 ? screenFiles[0] : null;
+}
+
+function shiftedCannonEarlyPawnPressureFlank(position, side) {
+  const leftFiles = [0, 1, 2];
+  const rightFiles = [BOARD_FILES - 3, BOARD_FILES - 2, BOARD_FILES - 1];
+  const left = hasAdvancedEnemyPawnOnAnyFile(position, side, leftFiles)
+    && hasEnemyCannonOnAnyFile(position, side, leftFiles);
+  const right = hasAdvancedEnemyPawnOnAnyFile(position, side, rightFiles)
+    && hasEnemyCannonOnAnyFile(position, side, rightFiles);
+
+  if (left === right) return null;
+  return right ? "right" : "left";
+}
+
+function hasEnemyCannonOnAnyFile(position, side, files) {
+  const enemy = opponent(side);
+  const cannonRank = enemy === SIDES.RED ? BOARD_RANKS - 3 : 2;
+  return files.some((file) => {
+    const piece = position.board[indexOf(file, cannonRank)];
+    return piece?.side === enemy && piece.type === PIECES.CANNON;
+  });
 }
 
 function hasEnemyShiftedCentralCannons(position, side) {

@@ -184,6 +184,24 @@ test("search develops before loose cannon and pawn shifts under shifted-cannon p
   }
 });
 
+test("search keeps the pressure-side elephant home in shifted-cannon early-pawn lines", () => {
+  const position = parseFen("rheakaehr/9/1c4c2/p1p1p1p1p/9/6P2/P1P1P3P/4C2C1/9/RHEAKAEHR b");
+  const result = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 8000,
+    useBook: false,
+    candidateLimit: 99
+  });
+
+  assert.equal(result.depth, 6);
+  assert.equal(result.timedOut, false);
+  assert.equal(result.bestMove.notation, "c0-e2");
+
+  const nearPressureElephant = result.candidates.find((item) => item.move.notation === "g0-e2");
+  assert.ok(nearPressureElephant);
+  assert.ok(nearPressureElephant.score < result.score || nearPressureElephant.tieBreak < result.candidates[0].tieBreak);
+});
+
 test("search centralizes the far elephant in shifted left-screen pawn lines", () => {
   const position = parseFen("r1eakaehr/9/1ch4c1/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR b");
   const result = searchBestMove(position, {
