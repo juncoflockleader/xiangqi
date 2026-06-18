@@ -218,6 +218,24 @@ test("search connects the far rook against central-cannon pawn challenges", () =
   assert.equal(result.bestMove.notation, "i9-h9");
 });
 
+test("search mirrors the rook before shallow lifts in the Hu central-cannon trap", () => {
+  const position = parseFen("rheakaer1/9/1c4hc1/p1p1p3p/6p2/9/P1P1P1P1P/1CH1C1H2/9/R1EAKAE1R r");
+  const result = searchBestMove(position, {
+    depth: 6,
+    timeLimitMs: 8000,
+    useBook: false,
+    candidateLimit: 99
+  });
+
+  assert.equal(result.depth, 6);
+  assert.equal(result.timedOut, false);
+  assert.ok(["i9-h9", "b7-a7", "c6-c5"].includes(result.bestMove.notation));
+
+  const shallowLift = result.candidates.find((item) => item.move.notation === "i9-i8");
+  assert.ok(shallowLift);
+  assert.ok(shallowLift.score < result.score || shallowLift.tieBreak < result.candidates[0].tieBreak);
+});
+
 test("search develops before repeating early flank-pawn pushes", () => {
   const position = parseFen("rheakae1r/9/1c4h1c/p1p1p1p1p/9/6P2/P1P1P3P/1C2C4/9/RHEAKAEHR r");
   const result = searchBestMove(position, {

@@ -103,6 +103,7 @@ const ROOT_TACTICAL_VERIFICATION_CAPTURE_VALUE = PIECE_VALUES[PIECES.CANNON];
 const ROOT_HOME_RANK_ROOK_CONNECT_SCORE_BONUS = 150;
 const ROOT_HOME_RANK_ROOK_CONNECT_BONUS = 110;
 const ROOT_CENTRAL_CANNON_ROOK_CONNECT_SCORE_BONUS = 70;
+const ROOT_MIRRORED_HOME_RANK_ROOK_CONNECT_SCORE_BONUS = 170;
 const ROOT_EARLY_PAWN_DEVELOPMENT_SCORE_BONUS = 60;
 const ROOT_EARLY_PAWN_THIRD_FILE_COUNTER_SCORE_BONUS = 100;
 const ROOT_EARLY_PAWN_ELEPHANT_RIM_HORSE_TIE_BONUS = 150;
@@ -770,6 +771,9 @@ function rootMoveStrategicPriorScore(position, move) {
   if (isCentralCannonRookConnectorAgainstPawnChallenge(position, move)) {
     score += ROOT_CENTRAL_CANNON_ROOK_CONNECT_SCORE_BONUS;
   }
+  if (isMirroredCentralCannonRookConnector(position, move)) {
+    score += ROOT_MIRRORED_HOME_RANK_ROOK_CONNECT_SCORE_BONUS;
+  }
   if (isEarlyPawnCentralCannonDevelopmentMove(position, move)) {
     score += ROOT_EARLY_PAWN_DEVELOPMENT_SCORE_BONUS;
   }
@@ -831,6 +835,27 @@ function isCentralCannonRookConnectorAgainstPawnChallenge(position, move) {
     && bothWingHorsesDevelopedForSearch(position, opponent(piece.side))
     && isOppositeFlankRookConnectorAgainstEnemyPawn(position, piece.side, fileOf(move.from))
   );
+}
+
+function isMirroredCentralCannonRookConnector(position, move) {
+  const piece = move.piece ?? position.board[move.from];
+  return Boolean(
+    piece
+    && isHomeRankRookConnectorMove(position, move)
+    && hasOwnCentralCannon(position, piece.side)
+    && bothWingHorsesDevelopedForSearch(position, piece.side)
+    && hasMirroredEnemyConnectorRook(position, piece.side, fileOf(move.to))
+  );
+}
+
+function hasMirroredEnemyConnectorRook(position, side, connectorFile) {
+  const enemy = opponent(side);
+  const enemyHomeRank = enemy === SIDES.RED ? BOARD_RANKS - 1 : 0;
+  const enemyPiece = position.board[indexOf(connectorFile, enemyHomeRank)];
+  if (enemyPiece?.side !== enemy || enemyPiece.type !== PIECES.ROOK) return false;
+
+  const cornerFile = connectorFile <= 1 ? 0 : BOARD_FILES - 1;
+  return position.board[indexOf(cornerFile, enemyHomeRank)] === null;
 }
 
 function isOppositeFlankRookConnectorAgainstEnemyPawn(position, side, rookFromFile) {
