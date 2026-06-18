@@ -44,6 +44,32 @@ test("search orders quiet tactical motifs before generic quiet moves", () => {
   assert.equal(disabled.stats.tacticalMoveOrderCacheStores, 0);
 });
 
+test("search answers root opponent threats before speculative checking captures", () => {
+  const position = parseFen("1heak1ehr/3ra4/7c1/2p3p1p/p3p4/9/c1P1P1P1P/R2C3C1/4A4/1HEA1KEHR b");
+  const result = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 1500,
+    useBook: false,
+    candidateLimit: 12
+  });
+  const disabled = searchBestMove(position, {
+    depth: 4,
+    timeLimitMs: 1500,
+    useBook: false,
+    candidateLimit: 12,
+    useRootThreatResponse: false
+  });
+
+  assert.equal(result.depth, 4);
+  assert.equal(result.timedOut, false);
+  assert.equal(result.bestMove.notation, "a6-a5");
+  assert.equal(disabled.bestMove.notation, "h2-h9");
+  assert.ok(result.stats.rootThreatResponseOrderHits > 0);
+  assert.ok(result.stats.rootThreatResponseTieHits > 0);
+  assert.equal(disabled.stats.rootThreatResponseOrderHits, 0);
+  assert.equal(disabled.stats.rootThreatResponseTieHits, 0);
+});
+
 test("search move ordering does not leak private score metadata", () => {
   const result = searchBestMove(createInitialPosition(), {
     depth: 2,

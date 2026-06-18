@@ -33,6 +33,7 @@ import {
   isInCheck
 } from "./movegen.js";
 import { evaluatePosition } from "./evaluate.js";
+import { analyzeThreats } from "./pressure.js";
 import {
   analyzeCapture,
   analyzeDiscoveredCheck,
@@ -127,6 +128,12 @@ const ROOT_OPENING_PRESSURE_CANNON_INWARD_SHIFT_PENALTY = 120;
 const ROOT_OPENING_PRESSURE_UNDEVELOPED_FLANK_PAWN_PENALTY = 120;
 const ROOT_REPEATED_EARLY_FLANK_PAWN_PUSH_PENALTY = 80;
 const ROOT_SHIFTED_CANNON_WING_CANNON_LIFT_PENALTY = 120;
+const ROOT_THREAT_RESPONSE_MIN_BASELINE = PIECE_VALUES[PIECES.HORSE];
+const ROOT_THREAT_RESPONSE_MAX_PIECES = 31;
+const ROOT_THREAT_RESPONSE_ORDERING_WEIGHT = 250;
+const ROOT_THREAT_RESPONSE_RESIDUAL_ORDERING_WEIGHT = 100;
+const ROOT_THREAT_RESPONSE_TIE_WEIGHT = 3;
+const ROOT_THREAT_RESPONSE_RESIDUAL_TIE_WEIGHT = 1;
 const DEFAULT_ROOT_TIME_GUARD_MIN_MS = 8;
 const DEFAULT_ROOT_TIME_GUARD_MAX_MS = 250;
 const DEFAULT_ROOT_TIME_GUARD_DIVISOR = 3;
@@ -222,6 +229,14 @@ export function searchBestMove(position, options = {}) {
     };
   }
 
+  const rootThreatResponseMaxPieces = Math.max(0, Math.floor(numberOption(
+    options.rootThreatResponseMaxPieces,
+    ROOT_THREAT_RESPONSE_MAX_PIECES
+  )));
+  const rootPieceCountValue = position.board.reduce((count, piece) => count + (piece ? 1 : 0), 0);
+  const rootThreatResponseEnabled = options.useRootThreatResponse !== false
+    && rootPieceCountValue <= rootThreatResponseMaxPieces;
+  const rootHasSafeMajorCapture = rootThreatResponseEnabled && hasSafeMajorCapture(position, rootMoves);
   let bestMove = rootMoves[0];
   let bestScore = evaluatePosition(position, position.turn).score;
   let bestLine = [];
@@ -330,10 +345,35 @@ export function searchBestMove(position, options = {}) {
       useInternalIterativeDeepening: options.useInternalIterativeDeepening !== false,
       useSingularExtensions: options.useSingularExtensions !== false,
       useTacticalMoveOrdering: options.useTacticalMoveOrdering !== false,
+      useRootThreatResponse: rootThreatResponseEnabled && !rootHasSafeMajorCapture,
       tacticalMoveOrderingMaxPly: Math.max(0, Math.floor(numberOption(
         options.tacticalMoveOrderingMaxPly,
         DEFAULT_TACTICAL_MOVE_ORDERING_MAX_PLY
       ))),
+      rootThreatResponseMinBaseline: Math.max(0, numberOption(
+        options.rootThreatResponseMinBaseline,
+        ROOT_THREAT_RESPONSE_MIN_BASELINE
+      )),
+      rootThreatResponseMaxPieces,
+      rootThreatResponseOrderingWeight: Math.max(0, numberOption(
+        options.rootThreatResponseOrderingWeight,
+        ROOT_THREAT_RESPONSE_ORDERING_WEIGHT
+      )),
+      rootThreatResponseResidualOrderingWeight: Math.max(0, numberOption(
+        options.rootThreatResponseResidualOrderingWeight,
+        ROOT_THREAT_RESPONSE_RESIDUAL_ORDERING_WEIGHT
+      )),
+      rootThreatResponseTieWeight: Math.max(0, numberOption(
+        options.rootThreatResponseTieWeight,
+        ROOT_THREAT_RESPONSE_TIE_WEIGHT
+      )),
+      rootThreatResponseResidualTieWeight: Math.max(0, numberOption(
+        options.rootThreatResponseResidualTieWeight,
+        ROOT_THREAT_RESPONSE_RESIDUAL_TIE_WEIGHT
+      )),
+      rootThreatResponseCache: new Map(),
+      rootOpponentThreatBaseline: null,
+      rootPieceCount: rootPieceCountValue,
       nullMoveVerificationMinDepth: Math.max(3, Math.floor(numberOption(options.nullMoveVerificationMinDepth, NULL_MOVE_VERIFICATION_MIN_DEPTH))),
       seePruneMargin: Math.max(0, numberOption(options.seePruneMargin, DEFAULT_SEE_PRUNE_MARGIN)),
       probCutMargin: Math.max(0, numberOption(options.probCutMargin, DEFAULT_PROBCUT_MARGIN)),
@@ -817,9 +857,16 @@ function rootTieBreakScore(position, move, next, context, searchScore) {
     score += ROOT_DEVELOPED_CENTRAL_CANNON_FLANK_PAWN_TIE_BONUS;
   }
   if (isEarlyPawnElephantRimHorseResponse(position, move)) score += ROOT_EARLY_PAWN_ELEPHANT_RIM_HORSE_TIE_BONUS;
+  const threatResponse = rootThreatResponse(position, move, next, context);
+  const threatTieAdjustment = rootThreatResponseTieAdjustment(threatResponse, context);
+  if (threatTieAdjustment !== 0) {
+    score += threatTieAdjustment;
+    context.stats.rootThreatResponseTieHits += 1;
+  }
   if (move.captured) {
     score += 2;
     const capture = getCaptureAnalysis(position, move, context);
+    score += safeRootCaptureTieBonus(move, capture);
     if (capture?.exchangeScore < 0) score += capture.exchangeScore;
   }
   return score;
@@ -2430,6 +2477,7 @@ function moveOrderingScore(position, move, principalMove, context, ply, previous
   if (sameMove(move, principalMove)) score += 1_000_000;
   score += checkEvasionOrderingScore(move, checkInfo, context);
   score += rootMoveOrderingScore(context, move, ply);
+  score += rootThreatResponseOrderingScore(position, move, context, ply);
   if (isCountermove(context, previousMove, move)) score += 30_000;
   score += continuationHistoryScore(context, previousMove, move);
   if (move.captured) {
@@ -2716,6 +2764,100 @@ function rootMoveOrderingScore(context, move, ply) {
 
 function rootRankOrderingBonus(rank) {
   return Math.max(0, 160_000 - rank * 20_000);
+}
+
+function rootThreatResponseOrderingScore(position, move, context, ply) {
+  if (ply !== 0) return 0;
+  const response = rootThreatResponse(position, move, null, context);
+  const score = rootThreatResponseOrderingAdjustment(response, context);
+  if (score <= 0) return 0;
+
+  context.stats.rootThreatResponseOrderHits += 1;
+  return Math.round(score);
+}
+
+function rootThreatResponse(position, move, next, context) {
+  if (!context?.useRootThreatResponse) return emptyRootThreatResponse();
+  if (rootPieceCount(position, context) > context.rootThreatResponseMaxPieces) {
+    return emptyRootThreatResponse();
+  }
+
+  const baseline = rootOpponentThreatBaseline(position, context);
+  if (baseline.top < context.rootThreatResponseMinBaseline) {
+    return { ...emptyRootThreatResponse(), baseline };
+  }
+
+  const key = moveKey(move);
+  if (context.rootThreatResponseCache.has(key)) {
+    return context.rootThreatResponseCache.get(key);
+  }
+
+  const child = next ?? makeMove(position, move);
+  const after = threatProfile(child, child.turn);
+  const relief = Math.max(0, baseline.top - after.top);
+  const residual = Math.max(0, after.burden - after.top);
+  const response = { relief, residual, after, baseline };
+  context.rootThreatResponseCache.set(key, response);
+  return response;
+}
+
+function rootOpponentThreatBaseline(position, context) {
+  if (context.rootOpponentThreatBaseline !== null) {
+    return context.rootOpponentThreatBaseline;
+  }
+
+  context.rootOpponentThreatBaseline = threatProfile(position, opponent(position.turn));
+  return context.rootOpponentThreatBaseline;
+}
+
+function threatProfile(position, side) {
+  const threats = analyzeThreats(position, side, { limit: 4 });
+  return {
+    top: threats[0]?.score ?? 0,
+    burden: threats.reduce((sum, threat) => sum + threat.score, 0)
+  };
+}
+
+function rootPieceCount(position, context) {
+  if (context.rootPieceCount !== null) return context.rootPieceCount;
+
+  context.rootPieceCount = position.board.reduce((count, piece) => count + (piece ? 1 : 0), 0);
+  return context.rootPieceCount;
+}
+
+function safeRootCaptureTieBonus(move, capture) {
+  if (!move.captured || !capture || capture.exchangeScore <= 0) return 0;
+
+  const capturedValue = PIECE_VALUES[move.captured.type] ?? 0;
+  return Math.min(capturedValue, capture.exchangeScore);
+}
+
+function hasSafeMajorCapture(position, moves) {
+  return moves.some((move) => {
+    if (!move.captured || move.captured.type === PIECES.KING) return false;
+    if ((PIECE_VALUES[move.captured.type] ?? 0) < PIECE_VALUES[PIECES.HORSE]) return false;
+    const capture = analyzeCapture(position, move);
+    return Boolean(capture?.isSafe && capture.exchangeScore >= PIECE_VALUES[PIECES.HORSE]);
+  });
+}
+
+function rootThreatResponseOrderingAdjustment(response, context) {
+  return (response.relief * context.rootThreatResponseOrderingWeight)
+    - (response.residual * context.rootThreatResponseResidualOrderingWeight);
+}
+
+function rootThreatResponseTieAdjustment(response, context) {
+  return (response.relief * context.rootThreatResponseTieWeight)
+    - (response.residual * context.rootThreatResponseResidualTieWeight);
+}
+
+function emptyRootThreatResponse() {
+  return {
+    relief: 0,
+    residual: 0,
+    after: { top: 0, burden: 0 },
+    baseline: { top: 0, burden: 0 }
+  };
 }
 
 function extensionReasonFor({ inCheck, givesCheck, move, previousMove, extensionsRemaining, context }) {
@@ -3698,6 +3840,8 @@ function createSearchStats() {
     historyGravityUpdates: 0,
     rootScoreOrderHits: 0,
     rootRankOrderHits: 0,
+    rootThreatResponseOrderHits: 0,
+    rootThreatResponseTieHits: 0,
     rootChildStateReuses: 0,
     rootReductions: 0,
     rootBadCaptureReductions: 0,
@@ -3811,6 +3955,8 @@ function mergeSearchStats(total, next) {
     historyGravityUpdates: total.historyGravityUpdates + next.historyGravityUpdates,
     rootScoreOrderHits: total.rootScoreOrderHits + next.rootScoreOrderHits,
     rootRankOrderHits: total.rootRankOrderHits + next.rootRankOrderHits,
+    rootThreatResponseOrderHits: total.rootThreatResponseOrderHits + next.rootThreatResponseOrderHits,
+    rootThreatResponseTieHits: total.rootThreatResponseTieHits + next.rootThreatResponseTieHits,
     rootChildStateReuses: total.rootChildStateReuses + next.rootChildStateReuses,
     rootReductions: total.rootReductions + next.rootReductions,
     rootBadCaptureReductions: total.rootBadCaptureReductions + next.rootBadCaptureReductions,
