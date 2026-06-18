@@ -321,6 +321,30 @@ const PIKAFISH_OPENING_POSITIONS = Object.freeze([
       pikafishEntry("h9-h5", 3, 92, 29, "h9-h5 b0-c2 b9-c7 h2-i2 h5-h0"),
       pikafishEntry("b9-c7", 4, 88, 22, "b9-c7 h2-i2 h9-h5 b0-c2")
     ])
+  }),
+  Object.freeze({
+    fen: "rhe1kaeh1/4a4/1c6r/p1pc2p2/4p3p/2P6/P3P1P1P/R1C3H1C/9/1HEAKAE1R b",
+    entries: Object.freeze([
+      pikafishEntry("i2-f2", 1, 100, -52, "i2-f2 c7-e7 b0-a2 i9-h9 h0-i2 a7-d7 f2-f3 h9-h5 a0-b0"),
+      pikafishEntry("i2-d2", 2, 97, -57, "i2-d2 c7-d7 d3-e3 f9-e8 d2-d6 i9-h9 h0-i2 h9-h5 b2-e2"),
+      pikafishEntry("i2-h2", 3, 90, -70, "i2-h2 c7-e7 d3-d0 a7-b7 h2-d2 f9-e8 b0-a2")
+    ])
+  }),
+  Object.freeze({
+    fen: "1heakaeh1/8r/rc7/p1p6/4p1pCp/6P2/P1P1P3P/c1CA2H2/8R/RHE1KAE2 r",
+    entries: Object.freeze([
+      pikafishEntry("h4-e4", 1, 100, 419, "h4-e4 i1-d1 b9-a7 g4-g5 a9-b9 d1-d4 e6-e5 h0-i2 c7-c3"),
+      pikafishEntry("g5-g4", 2, 82, 337, "g5-g4 a7-d7 h4-e4 i1-g1 g4-f4 g1-g3 g7-f5 b2-g2 g9-e7"),
+      pikafishEntry("i8-f8", 3, 70, 280, "i8-f8 g4-g5 b9-a7 h0-i2 h4-h8 g5-g6 g7-i8 b2-e2 a9-b9 a2-d2")
+    ])
+  }),
+  Object.freeze({
+    fen: "rhea1aeh1/4k4/1c4c1r/p1p1p1p1p/6P2/2P6/P2CP3P/8C/4A4/RHEAK1EHR b",
+    entries: Object.freeze([
+      pikafishEntry("g3-g4", 1, 100, -57, "g3-g4 b9-c7 b0-c2 d6-d7 a0-b0 g9-e7"),
+      pikafishEntry("e1-e0", 2, 87, -122, "e1-e0 i7-e7 g2-g4 b9-c7 i2-d2 d6-d7 b0-c2"),
+      pikafishEntry("i2-h2", 3, 70, -163, "i2-h2 g4-g3 g2-g9 h9-g7 g9-g3 g7-f5")
+    ])
   })
 ]);
 
@@ -554,7 +578,7 @@ function pikafishEntry(move, rank, weight, engineScore, pv) {
     move,
     name: `Pikafish ${label}: ${move}`,
     weight,
-    idea: `Pikafish ranks ${move} as ${label} in this central-cannon branch at depth 8, score ${scoreText} cp. Principal variation: ${pv}.`,
+    idea: `Pikafish ranks ${move} as ${label} in this position at depth 8, score ${scoreText} cp. Principal variation: ${pv}.`,
     tags: ["oracle", "pikafish", "generated", "opening", rank === 1 ? "best" : "alternative"],
     database: {
       source: "Pikafish",
