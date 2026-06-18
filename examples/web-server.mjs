@@ -524,6 +524,7 @@ function serializeState(session, engine, config = {}) {
   const history = session.game.moves.map(summarizeHistoryMove);
   const teachingTurns = summarizeTeachingTurns(history, session, status);
   const teachingTurn = teachingTurns.at(-1) ?? summarizeTeachingPair(history, session, status);
+  const latestPlayerTeachingTurn = latestPlayerTeachingPair(teachingTurns);
 
   return {
     sessionId: session.id,
@@ -542,6 +543,7 @@ function serializeState(session, engine, config = {}) {
     lastPlayerReview: lastPlayerMove?.review ? summarizeReview(lastPlayerMove.review, lastPlayerPosition) : null,
     lastEngineDecision: lastEngineMove?.decision ? summarizeDecision(lastEngineMove.decision, lastEnginePosition) : null,
     teachingTurns,
+    latestPlayerTeachingTurn,
     teachingPair: teachingTurn,
     teachingTurn,
     backend: describeEngineBackend(engine),
@@ -566,6 +568,13 @@ function summarizeTeachingTurns(history, session, status) {
       return null;
     })
     .filter(Boolean);
+}
+
+function latestPlayerTeachingPair(teachingTurns) {
+  return [...(teachingTurns ?? [])]
+    .reverse()
+    .find((turn) => turn.playerMove || turn.playerReview)
+    ?? null;
 }
 
 function summarizeTeachingTurn(playerMove, engineMove, session, status) {

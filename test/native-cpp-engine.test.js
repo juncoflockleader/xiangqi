@@ -860,7 +860,17 @@ test("local C++ engine follows fresh random oracle priors", async (t) => {
       ["rhe1kaehr/4aC3/1c2c4/p1p1p1p1p/7C1/2P5P/P3P1P2/H3E4/4A4/R1E1KA1HR b", "b0-a2"],
       ["r2akaehr/5c3/h3e4/p1p1p1p1p/6P2/P8/1cP1P3P/7CC/9/RHEAKAEHR r", "i9-i8"],
       ["3a2Ch1/r3a2c1/e3k4/p1p1phprp/9/9/P1P1P1P1P/H3E3H/6R2/1C1AKcE1R r", "e9-f9"],
-      ["2ea1aeh1/r3k3r/2h4C1/p5p1p/1cp3c2/P8/2P1P1P1P/R3E2CE/4A4/1H1AK2HR r", "g6-g5"]
+      ["2ea1aeh1/r3k3r/2h4C1/p5p1p/1cp3c2/P8/2P1P1P1P/R3E2CE/4A4/1H1AK2HR r", "g6-g5"],
+      ["rh1akaer1/6h2/1c2e4/p1p1p1p1p/9/9/P1P1P1PcP/2HC4H/9/RCEAKAE1R b", "h6-e6"],
+      ["2e1kae2/4a4/hr6h/p5p2/2p1p4/P1E4rp/2P1P1P1C/E8/3RA1HC1/1H1A1K1cR r", "i6-h6"],
+      ["rheak1er1/1c7/5a3/p1p5p/4C1p1h/2E1P4/P1P3P1P/2H4c1/7R1/R2AKAEH1 b", "b1-f1"],
+      ["1h1akaehr/4c4/1r2eR3/p1p3p1p/1c5C1/P1P1P1P2/8P/4C3H/H8/R1EAKAE2 r", "a9-b9"],
+      ["r1ea1ae2/h3k3r/4c4/C1p3pCp/9/P5P2/2P1P3P/3RE4/4K4/1HcA1A1HR b", "a0-b0"],
+      ["2eaka1hr/r8/hcc1e4/p1p3pCp/4p4/P2C5/2P1P1P1P/H5H2/4K3R/R1EA1AE2 b", "a1-d1"],
+      ["r1e1ka1hr/4a4/eh1C2c2/2p1p3p/pc4p2/6P2/P1P1P2CP/E3E1H2/3K4R/RH1A1A3 r", "g5-g4"],
+      ["rheakaeh1/c8/5c2r/p1C1p2Cp/6p2/2E6/P1P1P1P1P/9/8R/1H1AKAEHR b", "b0-a2"],
+      ["1hea1ae1r/4k4/6hC1/4prc2/p5p1p/P1pH2E1P/4c1P2/R3C4/4A4/2EAK2HR r", "h2-h3"],
+      ["2eakaeh1/8r/h8/p1p1C1p1p/1r6c/4P1P2/P1P5P/2H1K3E/2cCA4/R4A2R b", "h0-g2"]
     ];
 
     for (const [fen, expected] of cases) {

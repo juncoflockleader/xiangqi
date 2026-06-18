@@ -2269,6 +2269,8 @@ function activeTeachingPair(game, anchorMove = null) {
 }
 
 function latestPlayerTeachingPair(game) {
+  const latestPlayerTurn = normalizeTeachingPair(game?.latestPlayerTeachingTurn);
+  if (latestPlayerTurn) return latestPlayerTurn;
   return [...normalizeTeachingTurns(game?.teachingTurns)]
     .reverse()
     .find((turn) => turn.playerMove || turn.playerReview)

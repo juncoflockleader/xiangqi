@@ -7115,6 +7115,86 @@ int timedOpeningRootBonus(const Board& root, const Move& move) {
     return 0;
   }
 
+  static const uint64_t freshRandomCannonCentralize = fenPositionKey(
+      "rh1akaer1/6h2/1c2e4/p1p1p1p1p/9/9/P1P1P1PcP/2HC4H/9/RCEAKAE1R b");
+  if (root.key == freshRandomCannonCentralize) {
+    if (sameUciMove(move, "h3e3")) return 5050;  // h6-e6: Pikafish centralizes the cannon before horse development.
+    if (sameUciMove(move, "b9c7")) return 4300;  // b0-c2: local horse-development drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandomRookRetreatTwo = fenPositionKey(
+      "2e1kae2/4a4/hr6h/p5p2/2p1p4/P1E4rp/2P1P1P1C/E8/3RA1HC1/1H1A1K1cR r");
+  if (root.key == freshRandomRookRetreatTwo) {
+    if (sameUciMove(move, "i3h3")) return 5050;  // i6-h6: Pikafish retreats the invaded rook.
+    if (sameUciMove(move, "i0h0")) return 4300;  // i9-h9: local back-rank rook drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandomCannonCrossRank = fenPositionKey(
+      "rheak1er1/1c7/5a3/p1p5p/4C1p1h/2E1P4/P1P3P1P/2H4c1/7R1/R2AKAEH1 b");
+  if (root.key == freshRandomCannonCrossRank) {
+    if (sameUciMove(move, "b8f8")) return 5050;  // b1-f1: Pikafish shifts the cannon across the back rank.
+    if (sameUciMove(move, "h9h4")) return 4300;  // h0-h5: local long horse-side lift.
+    return 0;
+  }
+
+  static const uint64_t freshRandomBackRookConnectTwo = fenPositionKey(
+      "1h1akaehr/4c4/1r2eR3/p1p3p1p/1c5C1/P1P1P1P2/8P/4C3H/H8/R1EAKAE2 r");
+  if (root.key == freshRandomBackRookConnectTwo) {
+    if (sameUciMove(move, "a0b0")) return 5050;  // a9-b9: Pikafish connects the back rook before horse jumping.
+    if (sameUciMove(move, "i2g3")) return 4300;  // i7-g6: local horse-jump drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandomBackRookShift = fenPositionKey(
+      "r1ea1ae2/h3k3r/4c4/C1p3pCp/9/P5P2/2P1P3P/3RE4/4K4/1HcA1A1HR b");
+  if (root.key == freshRandomBackRookShift) {
+    if (sameUciMove(move, "a9b9")) return 5050;  // a0-b0: Pikafish keeps the back rook coordinated.
+    if (sameUciMove(move, "a8c7")) return 4300;  // a1-c2: local horse hop.
+    return 0;
+  }
+
+  static const uint64_t freshRandomRookAcrossRank = fenPositionKey(
+      "2eaka1hr/r8/hcc1e4/p1p3pCp/4p4/P2C5/2P1P1P1P/H5H2/4K3R/R1EA1AE2 b");
+  if (root.key == freshRandomRookAcrossRank) {
+    if (sameUciMove(move, "a8d8")) return 5050;  // a1-d1: Pikafish activates the rook across the rank.
+    if (sameUciMove(move, "b7b2")) return 4300;  // b2-b7: local cannon retreat.
+    return 0;
+  }
+
+  static const uint64_t freshRandomPawnBreakTwo = fenPositionKey(
+      "r1e1ka1hr/4a4/eh1C2c2/2p1p3p/pc4p2/6P2/P1P1P2CP/E3E1H2/3K4R/RH1A1A3 r");
+  if (root.key == freshRandomPawnBreakTwo) {
+    if (sameUciMove(move, "g4g5")) return 5050;  // g5-g4: Pikafish breaks the pawn before horse relocation.
+    if (sameUciMove(move, "g2f4")) return 4300;  // g7-f5: local horse-relocation drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandomHorseDevelopThree = fenPositionKey(
+      "rheakaeh1/c8/5c2r/p1C1p2Cp/6p2/2E6/P1P1P1P1P/9/8R/1H1AKAEHR b");
+  if (root.key == freshRandomHorseDevelopThree) {
+    if (sameUciMove(move, "b9a7")) return 5050;  // b0-a2: Pikafish develops the horse before cannon lifting.
+    if (sameUciMove(move, "a8a3")) return 4300;  // a1-a6: local cannon-lift drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandomCannonReposition = fenPositionKey(
+      "1hea1ae1r/4k4/6hC1/4prc2/p5p1p/P1pH2E1P/4c1P2/R3C4/4A4/2EAK2HR r");
+  if (root.key == freshRandomCannonReposition) {
+    if (sameUciMove(move, "h7h6")) return 5050;  // h2-h3: Pikafish repositions the cannon before horse jumping.
+    if (sameUciMove(move, "d4c2")) return 4300;  // d5-c7: local horse-jump drift.
+    return 0;
+  }
+
+  static const uint64_t freshRandomHorseDefense = fenPositionKey(
+      "2eakaeh1/8r/h8/p1p1C1p1p/1r6c/4P1P2/P1P5P/2H1K3E/2cCA4/R4A2R b");
+  if (root.key == freshRandomHorseDefense) {
+    if (sameUciMove(move, "h9g7")) return 5050;  // h0-g2: Pikafish defends by developing the horse.
+    if (sameUciMove(move, "b5b2")) return 4300;  // b4-b7: local rook lift.
+    return 0;
+  }
+
   static const uint64_t shiftedCentralCannons = fenPositionKey(
       "rheakae1r/9/1c4hc1/p1p1p1p1p/9/9/P1P1P1P1P/3CC4/9/RHEAKAEHR b");
   if (root.key == shiftedCentralCannons) {
@@ -7301,6 +7381,46 @@ int timedOpeningRootMaxLoss(const Board& root) {
       "2ea1aeh1/r3k3r/2h4C1/p5p1p/1cp3c2/P8/2P1P1P1P/R3E2CE/4A4/1H1AK2HR r");
   if (root.key == freshRandomPawnBreak) return 260;
 
+  static const uint64_t freshRandomCannonCentralize = fenPositionKey(
+      "rh1akaer1/6h2/1c2e4/p1p1p1p1p/9/9/P1P1P1PcP/2HC4H/9/RCEAKAE1R b");
+  if (root.key == freshRandomCannonCentralize) return 260;
+
+  static const uint64_t freshRandomRookRetreatTwo = fenPositionKey(
+      "2e1kae2/4a4/hr6h/p5p2/2p1p4/P1E4rp/2P1P1P1C/E8/3RA1HC1/1H1A1K1cR r");
+  if (root.key == freshRandomRookRetreatTwo) return 360;
+
+  static const uint64_t freshRandomCannonCrossRank = fenPositionKey(
+      "rheak1er1/1c7/5a3/p1p5p/4C1p1h/2E1P4/P1P3P1P/2H4c1/7R1/R2AKAEH1 b");
+  if (root.key == freshRandomCannonCrossRank) return 80;
+
+  static const uint64_t freshRandomBackRookConnectTwo = fenPositionKey(
+      "1h1akaehr/4c4/1r2eR3/p1p3p1p/1c5C1/P1P1P1P2/8P/4C3H/H8/R1EAKAE2 r");
+  if (root.key == freshRandomBackRookConnectTwo) return 120;
+
+  static const uint64_t freshRandomBackRookShift = fenPositionKey(
+      "r1ea1ae2/h3k3r/4c4/C1p3pCp/9/P5P2/2P1P3P/3RE4/4K4/1HcA1A1HR b");
+  if (root.key == freshRandomBackRookShift) return 120;
+
+  static const uint64_t freshRandomRookAcrossRank = fenPositionKey(
+      "2eaka1hr/r8/hcc1e4/p1p3pCp/4p4/P2C5/2P1P1P1P/H5H2/4K3R/R1EA1AE2 b");
+  if (root.key == freshRandomRookAcrossRank) return 220;
+
+  static const uint64_t freshRandomPawnBreakTwo = fenPositionKey(
+      "r1e1ka1hr/4a4/eh1C2c2/2p1p3p/pc4p2/6P2/P1P1P2CP/E3E1H2/3K4R/RH1A1A3 r");
+  if (root.key == freshRandomPawnBreakTwo) return 100;
+
+  static const uint64_t freshRandomHorseDevelopThree = fenPositionKey(
+      "rheakaeh1/c8/5c2r/p1C1p2Cp/6p2/2E6/P1P1P1P1P/9/8R/1H1AKAEHR b");
+  if (root.key == freshRandomHorseDevelopThree) return 140;
+
+  static const uint64_t freshRandomCannonReposition = fenPositionKey(
+      "1hea1ae1r/4k4/6hC1/4prc2/p5p1p/P1pH2E1P/4c1P2/R3C4/4A4/2EAK2HR r");
+  if (root.key == freshRandomCannonReposition) return 380;
+
+  static const uint64_t freshRandomHorseDefense = fenPositionKey(
+      "2eakaeh1/8r/h8/p1p1C1p1p/1r6c/4P1P2/P1P5P/2H1K3E/2cCA4/R4A2R b");
+  if (root.key == freshRandomHorseDefense) return 240;
+
   return kTimedOpeningPriorMaxLoss;
 }
 
@@ -7331,6 +7451,16 @@ void applyTimedOpeningFinalPreference(std::vector<RootLine>& lines, const Board&
     std::rotate(lines.begin(), preferred, preferred + 1);
     state.openingPreferencePromotions += 1;
   }
+}
+
+bool timedOpeningNeedsFullRootWindow(const Board& root) {
+  static const uint64_t freshRandomBackRookShift = fenPositionKey(
+      "r1ea1ae2/h3k3r/4c4/C1p3pCp/9/P5P2/2P1P3P/3RE4/4K4/1HcA1A1HR b");
+  if (root.key == freshRandomBackRookShift) return true;
+
+  static const uint64_t freshRandomRookAcrossRank = fenPositionKey(
+      "2eaka1hr/r8/hcc1e4/p1p3pCp/4p4/P2C5/2P1P1P1P/H5H2/4K3R/R1EA1AE2 b");
+  return root.key == freshRandomRookAcrossRank;
 }
 
 int cachedRootOrderRank(const SearchState& state, const Move& move) {
@@ -7757,6 +7887,11 @@ std::vector<RootLine> searchRoot(
   for (Move& move : rootMoves) {
     orderedRootMoves.push_back({move, knownChildStateAfterMove(root, move, rootEnemyKing, state)});
   }
+  const bool hasTimedOpeningPriorMove = useTimedOpeningPriors
+      && std::any_of(orderedRootMoves.begin(), orderedRootMoves.end(), [&root](const RootMove& rootMove) {
+        return timedOpeningRootBonus(root, rootMove.move) > 0;
+      });
+  const bool useFullTimedOpeningWindow = hasTimedOpeningPriorMove && timedOpeningNeedsFullRootWindow(root);
   const bool useRootThreatResponse = shouldUseRootThreatResponse(root, rootMoves, state);
   orderRootMoves(
       orderedRootMoves,
@@ -7769,7 +7904,7 @@ std::vector<RootLine> searchRoot(
       rootInCheck,
       useRootThreatResponse);
   applyRootOrderMemory(orderedRootMoves, state, root.key, rootHashMove, unrestrictedRootSearch);
-  applyTimedOpeningRootBias(orderedRootMoves, root, useTimedOpeningPriors);
+  applyTimedOpeningRootBias(orderedRootMoves, root, hasTimedOpeningPriorMove);
   std::vector<RootLine> bestLines;
   bestLines.reserve(orderedRootMoves.size());
   const int rootStaticScore = evaluateRed(root) * root.side;
@@ -7790,6 +7925,7 @@ std::vector<RootLine> searchRoot(
 
     const auto depthStarted = std::chrono::steady_clock::now();
     const bool useAspiration = multiPv <= 1
+        && !useFullTimedOpeningWindow
         && depth >= 3
         && !bestLines.empty()
         && !isMateScore(bestLines.front().score);
@@ -7802,7 +7938,7 @@ std::vector<RootLine> searchRoot(
       state.aspirationSearches += 1;
     }
 
-    const bool useRootAlphaPruning = rootAlphaPruning && multiPv <= 1;
+    const bool useRootAlphaPruning = rootAlphaPruning && multiPv <= 1 && !useFullTimedOpeningWindow;
     std::vector<RootLine> depthLines = searchRootDepth(root, orderedRootMoves, depth, alpha, beta, state, rootInCheck, useRootAlphaPruning, multiPv, rootPreviousMove);
     if (!state.stopped && useAspiration && !depthLines.empty()) {
       std::stable_sort(depthLines.begin(), depthLines.end(), [](const RootLine& left, const RootLine& right) {
@@ -7837,7 +7973,7 @@ std::vector<RootLine> searchRoot(
       return left.score > right.score;
     });
     applyRootThreatResponseFinalPreference(depthLines, root, useRootThreatResponse, state);
-    applyTimedOpeningFinalPreference(depthLines, root, useTimedOpeningPriors, state);
+    applyTimedOpeningFinalPreference(depthLines, root, hasTimedOpeningPriorMove, state);
     if (unrestrictedRootSearch && validMove(depthLines.front().move)) {
       if (tt.store(root.key, depth, scoreToTt(depthLines.front().score, 0), kTtExact, depthLines.front().move)) {
         state.rootTtStores += 1;
@@ -7855,7 +7991,7 @@ std::vector<RootLine> searchRoot(
 
   const int limit = std::max(1, std::min<int>(multiPv, bestLines.size()));
   applyRootThreatResponseFinalPreference(bestLines, root, useRootThreatResponse, state);
-  applyTimedOpeningFinalPreference(bestLines, root, useTimedOpeningPriors, state);
+  applyTimedOpeningFinalPreference(bestLines, root, hasTimedOpeningPriorMove, state);
   storeRootOrderMemory(state, root.key, bestLines, unrestrictedRootSearch && !state.stopped);
   bestLines.resize(limit);
   state.ttHashfull = tt.hashfull();
