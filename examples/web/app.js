@@ -6,7 +6,7 @@ const DEFAULT_CLIENT_REQUEST_TIMEOUT_MS = 15 * 60 * 1000;
 const CLIENT_REQUEST_TIMEOUT_BUFFER_MS = 5000;
 const CLIENT_STATE_REFRESH_TIMEOUT_MS = 15000;
 const PENDING_STATUS_INTERVAL_MS = 1000;
-const TEACHING_REVIEW_HOLD_MS = 900;
+const TEACHING_REVIEW_HOLD_MS = 2400;
 const TREE_NODE_WIDTH = 188;
 const TREE_NODE_HEIGHT = 96;
 const TREE_LEVEL_GAP = 96;
@@ -998,8 +998,11 @@ function renderLastMove() {
     return;
   }
 
-  const showDefaultTeachingPair = !treeNode || treeNode.id === latestMainlineNodeId();
-  const teachingPair = showDefaultTeachingPair ? latestTeachingPair(state.game) : null;
+  const teachingPair = treeNode?.kind === "main"
+    ? teachingPairForMove(state.game, treeNode.move)
+    : !treeNode
+      ? latestTeachingPair(state.game)
+      : null;
   if (teachingPair) {
     renderTeachingPairSummary(teachingPair);
     return;
@@ -1751,6 +1754,7 @@ async function selectTreeNode(id) {
     state.panel = panelFromMove(result.state);
     state.selected = null;
     setGame(result.state);
+    await holdTeachingReviewBeforeEngineReply(result.state);
     await requestEngineMoveIfNeeded(result.state);
   });
 }
@@ -1809,12 +1813,15 @@ async function restoreTreeNode(id) {
   await runRequest(async () => {
     const result = await api("/api/jump", {
       sessionId: state.sessionId,
-      ply: node.move.ply
+      ply: node.move.ply,
+      deferEngine: true
     });
     state.treeSelectedId = latestMainlineNodeId(result.state);
     state.panel = panelFromMove(result.state);
     state.selected = null;
     setGame(result.state);
+    await holdTeachingReviewBeforeEngineReply(result.state);
+    await requestEngineMoveIfNeeded(result.state);
   });
 }
 
@@ -1992,6 +1999,10 @@ function panelFromTreeSelection() {
   if (!node) return null;
   if (node.kind === "main" && node.id === latestMainlineNodeId()) return null;
   if (state.treeAnalysis.has(node.id)) return { kind: "treeAnalysis", nodeId: node.id };
+  if (node.kind === "main") {
+    const pair = teachingPairForMove(state.game, node.move);
+    if (pair) return { kind: "teachingPair", ...pair };
+  }
   if (node.kind === "analysis") return { kind: "treeBranch", nodeId: node.id };
   if (node.kind === "alternative") return { kind: "treeAlternative", node };
   if (node.move?.decision) return { kind: "move", decision: node.move.decision };
@@ -2115,14 +2126,23 @@ function latestTeachingPair(game) {
   const history = game?.history ?? [];
   if (!history.length) return null;
 
-  const playerMove = latestActorMove(history, "player");
-  const latestEngineMove = [...history].reverse().find((move) => move.actor === "engine" && move.decision) ?? null;
-  const engineMove = latestEngineMove && (!playerMove || latestEngineMove.ply > playerMove.ply)
-    ? latestEngineMove
-    : null;
+  return teachingPairForMove(game, history.at(-1));
+}
+
+function teachingPairForMove(game, anchorMove) {
+  const history = game?.history ?? [];
+  if (!anchorMove || !history.length) return null;
+
+  const anchor = history.find((move) => move.ply === anchorMove.ply) ?? anchorMove;
+  const playerMove = anchor.actor === "player"
+    ? anchor
+    : previousActorMoveBefore(history, "player", anchor.ply);
+  const engineMove = anchor.actor === "engine"
+    ? anchor
+    : nextActorMoveAfter(history, "engine", anchor.ply);
   const engineThinking = Boolean(
     playerMove
-    && (!latestEngineMove || latestEngineMove.ply < playerMove.ply)
+    && !engineMove
     && game?.status?.state === "playing"
     && game.turn === game.engineSide
   );
@@ -2140,6 +2160,14 @@ function latestTeachingPair(game) {
 
 function latestActorMove(history, actor) {
   return [...history].reverse().find((move) => move.actor === actor) ?? null;
+}
+
+function previousActorMoveBefore(history, actor, ply) {
+  return [...history].reverse().find((move) => move.actor === actor && move.ply < ply) ?? null;
+}
+
+function nextActorMoveAfter(history, actor, ply) {
+  return history.find((move) => move.actor === actor && move.ply > ply) ?? null;
 }
 
 function normalizeTeachingPair(pair) {

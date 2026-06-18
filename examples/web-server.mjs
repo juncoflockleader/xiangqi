@@ -333,7 +333,9 @@ async function handleApiPost(context, url) {
       const before = session.game;
       session.game = truncateGameAtPly(session.game, ply);
       session.undoStack.push(before);
-      await maybePlayEngineTurn(session, context.engine);
+      if (body.deferEngine !== true) {
+        await maybePlayEngineTurn(session, context.engine);
+      }
     });
     return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine, context.config) });
   }

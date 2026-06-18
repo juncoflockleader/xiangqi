@@ -110,9 +110,12 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function normalizeTeachingPair/);
     assert.match(script, /function renderTeachingMoveCard/);
     assert.match(script, /function renderTeachingPairReasoning/);
-    assert.match(script, /TEACHING_REVIEW_HOLD_MS = 900/);
+    assert.match(script, /TEACHING_REVIEW_HOLD_MS = 2400/);
     assert.match(script, /function holdTeachingReviewBeforeEngineReply/);
     assert.match(script, /function shouldHoldTeachingReview/);
+    assert.match(script, /function teachingPairForMove/);
+    assert.match(script, /function previousActorMoveBefore/);
+    assert.match(script, /function nextActorMoveAfter/);
     assert.match(script, /reviewPending: "正在复盘你的上一手\.\.\."/);
     assert.match(script, /replyPending: "引擎正在思考应手\.\.\."/);
     assert.match(script, /function fitTreeView/);
@@ -358,6 +361,26 @@ test("web server defers engine replies and can continue from tree nodes", async 
     assert.equal(selected.state.lastMove.notation, alternative.move);
     assert.equal(selected.state.playerTurn, true);
     assert.equal(selected.state.legalMoves.length > 0, true);
+
+    const deferredJump = await postJson(`${app.url}/api/jump`, {
+      sessionId,
+      ply: 1,
+      deferEngine: true
+    });
+    assert.equal(deferredJump.ok, true);
+    assert.equal(deferredJump.state.history.length, 1);
+    assert.equal(deferredJump.state.history[0].notation, "h7-e7");
+    assert.equal(deferredJump.state.teachingPair.playerReview.move, "h7-e7");
+    assert.equal(deferredJump.state.teachingPair.engineMove, null);
+    assert.equal(deferredJump.state.teachingPair.engineThinking, true);
+    assert.equal(deferredJump.state.playerTurn, false);
+
+    const continued = await postJson(`${app.url}/api/engine-move`, { sessionId });
+    assert.equal(continued.ok, true);
+    assert.equal(continued.state.history.length, 2);
+    assert.equal(continued.state.teachingPair.playerReview.move, "h7-e7");
+    assert.equal(continued.state.teachingPair.engineMove.notation, continued.state.history[1].notation);
+    assert.equal(continued.state.playerTurn, true);
   } finally {
     await app.close();
   }
