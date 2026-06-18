@@ -84,6 +84,7 @@ const OPENING_WING_CANNON_STEP_PENALTY = 70;
 const OPENING_CANNON_WING_CROWDING_PENALTY = 50;
 const OPENING_MAJOR_MATERIAL_LEAD_THRESHOLD = PIECE_VALUES[PIECES.ROOK] - PIECE_VALUES[PIECES.PAWN];
 const OPENING_CANNON_MAJOR_WIN_PENALTY_CAP = PIECE_VALUES[PIECES.CANNON];
+const THREAT_KING_PRESSURE_VALUE = PIECE_VALUES[PIECES.ROOK];
 
 export function evaluatePosition(position, perspective = position.turn, options = {}) {
   const openingPhase = openingPhaseValue(position);
@@ -1153,12 +1154,17 @@ function threatValue(moves) {
 
   for (const move of moves) {
     if (!move.captured) continue;
-    const victim = PIECE_VALUES[move.captured.type];
+    const victim = threatVictimValue(move.captured);
     const attacker = PIECE_VALUES[move.piece.type];
     score += Math.max(4, victim * 0.08 - attacker * 0.01);
   }
 
   return score;
+}
+
+function threatVictimValue(piece) {
+  if (piece.type === PIECES.KING) return THREAT_KING_PRESSURE_VALUE;
+  return PIECE_VALUES[piece.type];
 }
 
 function pieceSafetyValue(position, side, ownControl, enemyControl) {

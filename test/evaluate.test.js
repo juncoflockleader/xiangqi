@@ -252,6 +252,17 @@ test("evaluation caps opening cannon discipline after a major material win", () 
   assert.ok(afterEval.score > 0);
 });
 
+test("evaluation keeps pseudo king-capture threats finite", () => {
+  const position = parseFen("r2akaeh1/8r/4e1cC1/p1C1h1p2/4p3p/9/P1P1P1P1P/E4R3/9/1H1AKAER1 r");
+  const greedyAttack = makeMove(position, parseMoveNotation("f7-f0"));
+  const stableRook = makeMove(position, parseMoveNotation("f7-f3"));
+  const greedyDelta = evaluateMoveDelta(position, greedyAttack, SIDES.RED);
+  const stableDelta = evaluateMoveDelta(position, stableRook, SIDES.RED);
+
+  assert.ok(greedyDelta.delta.threats < 150);
+  assert.ok(stableDelta.deltaScore > greedyDelta.deltaScore);
+});
+
 test("evaluation discourages repeated wing-cannon lifts after the wing horse develops", () => {
   const position = parseFen("r1eakae1r/9/1ch3hc1/p1p1p1p1p/9/9/P1P1P1P1P/2HCC4/9/R1EAKAEHR b");
   const shortLift = makeMove(position, parseMoveNotation("b2-b3"));
