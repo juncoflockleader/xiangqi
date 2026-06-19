@@ -319,6 +319,34 @@ test("opening book follows fresh random 1842 oracle priors", () => {
   }
 });
 
+test("opening book follows fresh random 1843 oracle priors", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  const cases = [
+    ["r1eakaehr/9/c1h6/p3p3p/2pc2p2/PC7/2P1P1P1P/4C3H/R8/1HEAKAE1R r", "b5-i5"],
+    ["1Ceakaehr/5r3/4c4/p3p3p/2p3p2/P3P4/2P3PCP/H8/1c1K5/R1EA1AEHR b", "i0-i1"],
+    ["r1eakaehr/9/hc7/p1p1p1p1p/4P2c1/9/P1P3P1P/4E2CR/1C7/RH1AKAEH1 b", "h4-i4"],
+    ["1heakaehr/rC7/3c5/2p1p1p1p/p8/9/c1P1P1P1P/4E2CH/9/RH1AKAE1R r", "a9-a6"],
+    ["rheakaehr/9/4c4/p1p1p1p1p/9/2P1P4/Pc4P1P/1C5C1/9/RHEAKAEHR r", "d9-e8"],
+    ["r1eakaehr/9/4c2c1/2ph2p1p/p3p4/9/P1P1P1P1P/R2C4R/1C7/1HEAKAEH1 b", "e2-e6"],
+    ["rheakaehr/9/1c3c3/pCp3p1p/4p4/9/P1P1P1P1P/4E1C2/9/RH1AKAEHR r", "h9-i7"],
+    ["rheakaehr/9/3c5/pCp1p1p1p/9/9/P1P1P1P1P/1c7/5C2H/RHEAKAE1R b", "h0-g2"],
+    ["r1eakaeh1/9/1ch3c1r/p1p1p1p1p/7C1/6P2/P1P1P3P/1C7/4A4/RHE1KAEHR r", "h9-i7"],
+    ["1heakaehr/r8/c6c1/p1p1p1p1p/9/9/P1P1P1P1P/4C4/7C1/RHEAKAEHR r", "e7-e3"],
+    ["r1eaka1h1/9/2h3r1e/pCp1p1p1p/9/6P1P/P1P1c4/9/2H5C/R1EAKAER1 b", "g2-f2"],
+    ["1heakaeh1/9/r3c3r/p1p1p1p1p/4c2C1/8P/P1P1P1P2/4C3E/3R5/RHEAKA1H1 r", "d8-d5"],
+    ["2eak1eh1/1C2a4/r7r/p1p3p1p/4p4/9/P1P1c1P1P/4E2C1/4A4/RHEAK2R1 b", "i2-b2"],
+    ["rh1akaehr/9/9/p1p1p3p/2e3pc1/9/PcP1P1P1P/2H1C4/1C7/R1EAKAEHR r", "e7-e3"]
+  ];
+
+  for (const [fen, move] of cases) {
+    const result = engine.chooseMove(parseFen(fen), { openingHeuristics: false });
+
+    assert.equal(result.source, "opening-book");
+    assert.equal(result.bestMove.notation, move);
+    assert.equal(result.book.name, `Pikafish best: ${move}`);
+  }
+});
+
 test("opening book follows Pikafish principal-variation continuations past exact oracle nodes", () => {
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });
   let position = createInitialPosition();
