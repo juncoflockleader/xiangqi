@@ -282,8 +282,8 @@ const zhTwTranslations = {
   hint: "提示",
   best: "最佳著法",
   engine: "引擎",
-  lastMove: "上一手",
-  reasoning: "思路",
+  lastMove: "上回合",
+  reasoning: "双方思路",
   history: "棋譜",
   moveTree: "變化樹",
   starting: "啟動中...",
@@ -457,8 +457,8 @@ const translations = {
     hint: "Hint",
     best: "Best",
     engine: "Engine",
-    lastMove: "Last Move",
-    reasoning: "Reasoning",
+    lastMove: "Last Turn",
+    reasoning: "Both Sides",
     history: "History",
     moveTree: "Move Tree",
     starting: "Starting...",
@@ -2467,7 +2467,7 @@ function teachingTurnIdForPair(playerMove, engineMove) {
 function teachingTurnFromState(game, anchorMove = null) {
   if (!game) return null;
   if (!anchorMove) {
-    return normalizeTeachingPair(game.teachingTurn ?? game.teachingPair)
+    return normalizeTeachingPair(game.currentTeachingTurn ?? game.teachingTurn ?? game.teachingPair)
       ?? normalizeTeachingTurns(game.teachingTurns).at(-1)
       ?? null;
   }

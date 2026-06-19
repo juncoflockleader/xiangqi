@@ -89,6 +89,8 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(page, /id="localeSelect"/);
     assert.match(page, /class="panel-block last-move-panel"/);
     assert.match(page, /class="panel-block reasoning-panel"/);
+    assert.match(page, />上回合</);
+    assert.match(page, />双方思路</);
     assert.match(page, /data-i18n="moveTree"/);
     assert.match(page, /class="tree-toolbar"/);
     assert.match(page, /role="tree"/);
@@ -133,6 +135,7 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function teachingTurnById/);
     assert.match(script, /function teachingTurnIdForMove/);
     assert.match(script, /game\.teachingPair/);
+    assert.match(script, /game\.currentTeachingTurn/);
     assert.match(script, /game\.teachingTurn/);
     assert.match(script, /game\.teachingTurns/);
     assert.match(script, /game\?\.latestPlayerTeachingTurn/);
@@ -155,6 +158,8 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /function renderReasoningPrompt/);
     assert.match(script, /if \(!panel\) {\n    renderReasoningPrompt\(\);/);
     assert.match(script, /teachingTurn: "本回合复盘"/);
+    assert.match(script, /lastMove: "上回合"/);
+    assert.match(script, /reasoning: "双方思路"/);
     assert.match(script, /compact: true/);
     assert.match(script, /function renderTeachingPairReasoning/);
     assert.match(script, /TEACHING_REVIEW_HOLD_MS = 8000/);
@@ -354,6 +359,10 @@ test("web server plays a player move, engine reply, hints, best move, and undo",
     assert.equal(moved.state.latestPlayerTeachingTurn.playerMove.notation, "h7-e7");
     assert.equal(moved.state.latestPlayerTeachingTurn.playerReview.move, "h7-e7");
     assert.equal(moved.state.latestPlayerTeachingTurn.engineMove.notation, moved.state.history[1].notation);
+    assert.equal(moved.state.currentTeachingTurn.playerMove.notation, "h7-e7");
+    assert.equal(moved.state.currentTeachingTurn.playerReview.move, "h7-e7");
+    assert.equal(moved.state.currentTeachingTurn.engineMove.notation, moved.state.history[1].notation);
+    assert.equal(moved.state.currentTeachingTurn.engineDecision.bestMove, moved.state.history[1].notation);
     assert.equal(moved.state.teachingTurn.playerMove.notation, "h7-e7");
     assert.equal(moved.state.teachingTurn.playerReview.move, "h7-e7");
     assert.equal(moved.state.teachingTurn.engineMove.notation, moved.state.history[1].notation);
@@ -426,6 +435,13 @@ test("web server defers engine replies and can continue from tree nodes", async 
     assert.equal(deferred.state.latestPlayerTeachingTurn.playerReviewPending, true);
     assert.equal(deferred.state.latestPlayerTeachingTurn.engineMove, null);
     assert.equal(deferred.state.latestPlayerTeachingTurn.engineThinking, true);
+    assert.equal(deferred.state.currentTeachingTurn.playerMove.notation, "h7-e7");
+    assert.equal(deferred.state.currentTeachingTurn.id, "turn-1");
+    assert.equal(deferred.state.currentTeachingTurn.playerReview, null);
+    assert.equal(deferred.state.currentTeachingTurn.playerReviewPending, true);
+    assert.equal(deferred.state.currentTeachingTurn.engineMove, null);
+    assert.equal(deferred.state.currentTeachingTurn.engineDecision, null);
+    assert.equal(deferred.state.currentTeachingTurn.engineThinking, true);
     assert.equal(deferred.state.teachingTurn.playerMove.notation, "h7-e7");
     assert.equal(deferred.state.teachingTurn.id, "turn-1");
     assert.equal(deferred.state.teachingTurn.playerReview, null);
@@ -447,6 +463,8 @@ test("web server defers engine replies and can continue from tree nodes", async 
     assert.equal(reviewed.state.teachingPair.engineMove, null);
     assert.equal(reviewed.state.teachingPair.engineThinking, true);
     assert.equal(reviewed.state.latestPlayerTeachingTurn.playerReview.move, "h7-e7");
+    assert.equal(reviewed.state.currentTeachingTurn.playerReview.move, "h7-e7");
+    assert.equal(reviewed.state.currentTeachingTurn.engineThinking, true);
     assert.equal(reviewed.state.teachingTurn.playerReview.move, "h7-e7");
     assert.equal(reviewed.state.playerTurn, false);
 
@@ -470,6 +488,12 @@ test("web server defers engine replies and can continue from tree nodes", async 
     assert.equal(engineReply.state.latestPlayerTeachingTurn.playerReview.move, "h7-e7");
     assert.equal(engineReply.state.latestPlayerTeachingTurn.engineMove.notation, engineReply.state.history[1].notation);
     assert.equal(engineReply.state.latestPlayerTeachingTurn.engineThinking, false);
+    assert.equal(engineReply.state.currentTeachingTurn.playerMove.notation, "h7-e7");
+    assert.equal(engineReply.state.currentTeachingTurn.id, "turn-1");
+    assert.equal(engineReply.state.currentTeachingTurn.playerReview.move, "h7-e7");
+    assert.equal(engineReply.state.currentTeachingTurn.engineMove.notation, engineReply.state.history[1].notation);
+    assert.equal(engineReply.state.currentTeachingTurn.engineDecision.bestMove, engineReply.state.history[1].notation);
+    assert.equal(engineReply.state.currentTeachingTurn.engineThinking, false);
     assert.equal(engineReply.state.teachingTurn.playerMove.notation, "h7-e7");
     assert.equal(engineReply.state.teachingTurn.id, "turn-1");
     assert.equal(engineReply.state.teachingTurn.playerReview.move, "h7-e7");
@@ -590,6 +614,9 @@ test("web server preserves teaching turns when the engine opens first", async ()
     assert.equal(created.state.teachingTurns[0].playerMove, null);
     assert.equal(created.state.teachingTurns[0].engineMove.notation, created.state.history[0].notation);
     assert.equal(created.state.latestPlayerTeachingTurn, null);
+    assert.equal(created.state.currentTeachingTurn.id, "turn-engine-1");
+    assert.equal(created.state.currentTeachingTurn.playerMove, null);
+    assert.equal(created.state.currentTeachingTurn.engineMove.notation, created.state.history[0].notation);
     assert.equal(created.state.teachingPair.id, "turn-engine-1");
     assert.equal(created.state.teachingPair.engineMove.notation, created.state.history[0].notation);
     assert.equal(created.state.playerTurn, true);
@@ -641,6 +668,10 @@ test("web server preserves teaching turns when the engine opens first", async ()
     assert.equal(replied.state.latestPlayerTeachingTurn.id, "turn-2");
     assert.equal(replied.state.latestPlayerTeachingTurn.playerMove.notation, playerMove);
     assert.equal(replied.state.latestPlayerTeachingTurn.engineMove.notation, replied.state.history[2].notation);
+    assert.equal(replied.state.currentTeachingTurn.id, "turn-2");
+    assert.equal(replied.state.currentTeachingTurn.playerMove.notation, playerMove);
+    assert.equal(replied.state.currentTeachingTurn.playerReview.move, playerMove);
+    assert.equal(replied.state.currentTeachingTurn.engineMove.notation, replied.state.history[2].notation);
     assert.equal(replied.state.teachingPair.id, "turn-2");
     assert.equal(replied.state.teachingPair.playerReview.move, playerMove);
     assert.equal(replied.state.teachingPair.engineMove.notation, replied.state.history[2].notation);
