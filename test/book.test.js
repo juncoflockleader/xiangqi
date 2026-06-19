@@ -297,6 +297,28 @@ test("opening book follows fresh random 1841 oracle priors", () => {
   }
 });
 
+test("opening book follows fresh random 1842 oracle priors", () => {
+  const engine = createEngine({ depth: 1, timeLimitMs: 500 });
+  const cases = [
+    ["rh1akaehr/6c2/e5c2/p1p1p3p/6p2/3C5/P1P1P1P1P/8R/C8/RHEAKAEH1 r", "a8-a3"],
+    ["rh1akaehr/9/ec1c5/p1p1p1p1p/9/1C7/P1P1P1P1P/6HC1/8R/RHEAKAE2 b", "g3-g4"],
+    ["rheaka1hr/1C6c/8e/6p1P/p1p1p4/6P2/PcP1P4/4E2C1/4A4/R3KAEHR r", "i9-i4"],
+    ["r1eakaehr/9/hc7/p5p1p/2p1p4/6PcP/P1P1P4/4C4/1C7/RHEAKAEHR b", "c0-e2"],
+    ["rCeakaeh1/1c7/2c5r/p1p1p1p1p/9/2P4CP/P3P1P2/9/9/RHEAKAEHR r", "b0-d0"],
+    ["rheak1ehr/1c2a4/7c1/p1p3p1p/4p4/2P6/P3P1P1P/1C5CH/9/RHEAKAE1R b", "b1-c1"],
+    ["1h2kaehr/r3a4/e6c1/p1p1p1p1p/9/P1P3P2/4c3P/2C5C/9/RHEAKAEHR b", "h2-h6"],
+    ["r1eaka2r/5h3/hc3c3/p1p3p1p/6e2/PCP1p1PCP/4P4/4E4/9/RH1AKAEHR r", "b5-e5"]
+  ];
+
+  for (const [fen, move] of cases) {
+    const result = engine.chooseMove(parseFen(fen), { openingHeuristics: false });
+
+    assert.equal(result.source, "opening-book");
+    assert.equal(result.bestMove.notation, move);
+    assert.equal(result.book.name, `Pikafish best: ${move}`);
+  }
+});
+
 test("opening book follows Pikafish principal-variation continuations past exact oracle nodes", () => {
   const engine = createEngine({ depth: 1, timeLimitMs: 500 });
   let position = createInitialPosition();
