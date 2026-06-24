@@ -65,14 +65,17 @@ const I18N = {
   }
 };
 
-// Difficulty is time-based, never a fixed depth cap: a hard shallow depth makes
-// the engine pick odd openings (depth 4 → b2g2), whereas even a short movetime
-// lets iterative deepening converge to sound play (h2e2). Shorter time = weaker.
+// Difficulty is time-based. We pass a high `depth` deliberately: the server's
+// play-level config defaults depth to as low as 4 (profiles.js), and a hard
+// shallow depth makes the engine pick unsound moves (depth 4 → b2g2) for BOTH
+// colors. Sending a non-binding depth overrides that so the movetime governs and
+// iterative deepening converges to sound play (h2e2). Shorter time = weaker.
+const UNCAPPED_DEPTH = 64;
 const LEVELS = {
-  beginner: { timeLimitMs: 250, lines: 2 },
-  casual: { timeLimitMs: 800, lines: 2 },
-  club: { timeLimitMs: 2000, lines: 2 },
-  expert: { timeLimitMs: 5000, lines: 2 }
+  beginner: { depth: UNCAPPED_DEPTH, timeLimitMs: 250, lines: 2 },
+  casual: { depth: UNCAPPED_DEPTH, timeLimitMs: 800, lines: 2 },
+  club: { depth: UNCAPPED_DEPTH, timeLimitMs: 2000, lines: 2 },
+  expert: { depth: UNCAPPED_DEPTH, timeLimitMs: 5000, lines: 2 }
 };
 
 const FILE_DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
