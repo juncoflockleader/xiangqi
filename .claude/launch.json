@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "xiangqi-web",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["examples/web-server.mjs", "--engine-preset", "local-cpp", "--side", "red", "--level", "club", "--time", "2000"],
+      "port": 5175
+    }
+  ]
+}

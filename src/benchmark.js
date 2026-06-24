@@ -361,15 +361,69 @@ export const ENGINE_OPENING_ORACLE_BENCHMARKS = Object.freeze([
   })
 ]);
 
+// Sharp, unique-solution tactical positions used as a regression gate: each has
+// a single best move with a decisive score gap, verified solvable from shallow
+// depth by the JS engine. Any eval/search regression that breaks a tactic flips
+// the corresponding result to failing. Solutions are objective (clean material
+// wins / forced mate), not "whatever the engine currently plays".
+export const ENGINE_TACTICS_BENCHMARKS = Object.freeze([
+  Object.freeze({
+    id: "tactic-cannon-wins-rook",
+    name: "Tactic: Cannon Captures Over a Screen",
+    fen: "3ka4/9/9/r8/9/9/P8/9/9/C2AK4 r",
+    expectedMoves: Object.freeze(["a9-a3"]),
+    tags: Object.freeze(["tactic", "cannon", "capture", "search"]),
+    options: Object.freeze({ depth: 4, timeLimitMs: 1500, useBook: false }),
+    lesson: "Only the cannon jump over the pawn screen wins the rook; every other move leaves it on the board."
+  }),
+  Object.freeze({
+    id: "tactic-rook-takes-cannon",
+    name: "Tactic: Rook Wins the Loose Cannon",
+    fen: "4ak3/9/9/9/9/c8/9/9/9/R2KA4 r",
+    expectedMoves: Object.freeze(["a9-a5"]),
+    tags: Object.freeze(["tactic", "rook", "capture", "search"]),
+    options: Object.freeze({ depth: 4, timeLimitMs: 1500, useBook: false }),
+    lesson: "The rook captures the undefended cannon down the open file for a clean material gain."
+  }),
+  Object.freeze({
+    id: "tactic-cannon-screen-rook-i",
+    name: "Tactic: Edge Cannon Screen Capture",
+    fen: "3ka4/9/9/8r/9/9/8P/9/9/3AK3C r",
+    expectedMoves: Object.freeze(["i9-i3"]),
+    tags: Object.freeze(["tactic", "cannon", "capture", "search"]),
+    options: Object.freeze({ depth: 4, timeLimitMs: 1500, useBook: false }),
+    lesson: "The edge cannon uses the pawn as a screen to win the rook; no other move keeps the material."
+  }),
+  Object.freeze({
+    id: "tactic-rook-wins-central-rook",
+    name: "Tactic: Win the Central Rook",
+    fen: "4k4/9/4r4/9/9/9/9/9/9/3KR4 r",
+    expectedMoves: Object.freeze(["e9-e2"]),
+    tags: Object.freeze(["tactic", "rook", "capture", "search"]),
+    options: Object.freeze({ depth: 3, timeLimitMs: 1500, useBook: false }),
+    lesson: "The search should find the direct rook capture and explain the material win."
+  }),
+  Object.freeze({
+    id: "tactic-rook-forces-mate",
+    name: "Tactic: Force the Exposed General",
+    fen: "4k4/9/9/9/9/9/9/9/9/3KR4 r",
+    expectedMoves: Object.freeze(["e9-e8", "e9-e7", "e9-e6", "e9-e5", "e9-e4", "e9-e3", "e9-e2", "e9-e1"]),
+    tags: Object.freeze(["tactic", "mate", "forcing", "search"]),
+    options: Object.freeze({ depth: 3, timeLimitMs: 1500, useBook: false }),
+    lesson: "The engine should force mate against the exposed general without relying on a literal king capture."
+  })
+]);
+
 export const ENGINE_BENCHMARK_SUITES = Object.freeze({
   starter: ENGINE_BENCHMARKS,
   default: ENGINE_BENCHMARKS,
   "opening-oracle": ENGINE_OPENING_ORACLE_BENCHMARKS,
-  opening: ENGINE_OPENING_ORACLE_BENCHMARKS
+  opening: ENGINE_OPENING_ORACLE_BENCHMARKS,
+  tactics: ENGINE_TACTICS_BENCHMARKS
 });
 
 export function listBenchmarkSuiteNames() {
-  return Object.freeze(["starter", "opening-oracle"]);
+  return Object.freeze(["starter", "opening-oracle", "tactics"]);
 }
 
 export function resolveBenchmarkSuite(name = "starter") {

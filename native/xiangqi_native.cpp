@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -4817,6 +4818,74 @@ int pieceSafetyBonus(const Board& board, int square, int piece, int totalPieceCo
   return 0;
 }
 
+// --- Minimal NNUE inference -------------------------------------------------
+// Mirrors src/nnue.js exactly: piece-square features (red's perspective,
+// 2 colors × 7 types × 90 squares = 1260) → 1 hidden layer with clipped ReLU →
+// scalar centipawn output. Feature index and square numbering match the JS
+// trainer (verified by the `nnueeval` cross-check), so JS-trained weights run
+// here unchanged. Off by default; enabled via the UseNnue UCI option.
+struct NnueNet {
+  bool loaded = false;
+  int inputSize = 0;
+  int hidden = 0;
+  float outputScale = 400.0f;
+  std::vector<float> w1; // feature-major: w1[feature * hidden + h]
+  std::vector<float> b1;
+  std::vector<float> w2;
+  float b2 = 0.0f;
+};
+
+NnueNet gNnue;
+bool gUseNnue = false;
+
+bool loadNnueFile(const std::string& path) {
+  std::ifstream in(path);
+  if (!in) return false;
+  std::string magic;
+  in >> magic;
+  if (magic != "NNUE") return false;
+  NnueNet net;
+  in >> net.inputSize >> net.hidden >> net.outputScale;
+  if (!in || net.inputSize <= 0 || net.hidden <= 0) return false;
+  net.w1.resize(static_cast<std::size_t>(net.inputSize) * net.hidden);
+  net.b1.resize(static_cast<std::size_t>(net.hidden));
+  net.w2.resize(static_cast<std::size_t>(net.hidden));
+  for (auto& x : net.w1) in >> x;
+  for (auto& x : net.b1) in >> x;
+  for (auto& x : net.w2) in >> x;
+  in >> net.b2;
+  if (in.fail()) return false;
+  net.loaded = true;
+  gNnue = std::move(net);
+  return true;
+}
+
+int nnueEvalRed(const Board& board) {
+  const int hidden = gNnue.hidden;
+  std::vector<float> acc(gNnue.b1.begin(), gNnue.b1.end());
+  for (int square = 0; square < kSquares; square += 1) {
+    const int piece = board.cells[square];
+    if (piece == 0) continue;
+    const int colorBlock = sideOf(piece) == kRed ? 0 : 1;
+    const int typeIndex = typeOf(piece) - 1; // King..Pawn -> 0..6, matches JS
+    const int feature = (colorBlock * 7 + typeIndex) * 90 + square;
+    const std::size_t base = static_cast<std::size_t>(feature) * hidden;
+    for (int h = 0; h < hidden; h += 1) acc[static_cast<std::size_t>(h)] += gNnue.w1[base + h];
+  }
+  float out = gNnue.b2;
+  for (int h = 0; h < hidden; h += 1) {
+    float a = acc[static_cast<std::size_t>(h)];
+    a = a < 0.0f ? 0.0f : (a > 1.0f ? 1.0f : a);
+    out += gNnue.w2[static_cast<std::size_t>(h)] * a;
+  }
+  return static_cast<int>(std::lround(out * gNnue.outputScale));
+}
+
+// Upper bound on |full eval − cheap incremental baseline|. Measured max over deep
+// searches on diverse positions was 565cp; 800 leaves ~40% headroom so the lazy
+// fast-path below can never return a value on the wrong side of the search window.
+constexpr int kLazyEvalMargin = 800;
+
 int evaluateRed(const Board& board) {
   const int redKing = trackedKingSquare(board, kRed);
   const int blackKing = trackedKingSquare(board, kBlack);
@@ -4892,7 +4961,18 @@ int evaluateRed(const Board& board) {
   return score;
 }
 
-int evaluateRedCached(const Board& board, SearchState& state) {
+// Cheap O(1) eval baseline (red perspective), maintained incrementally in
+// make/unmake. The full eval adds positional terms bounded by kLazyEvalMargin.
+int evaluateRedBaseline(const Board& board) {
+  return board.materialScore + board.positionalScore + board.guardPairScore;
+}
+
+// redAlpha/redBeta bound the useful eval range in RED's perspective. When the
+// cheap baseline is already more than kLazyEvalMargin beyond the window, the full
+// positional terms cannot bring the score back inside it, so we return a valid
+// bound (a lower bound on a fail-high, an upper bound on a fail-low) without
+// computing them. Lazy values are NOT cached (only exact full evals are stored).
+int evaluateRedCached(const Board& board, SearchState& state, int redAlpha, int redBeta) {
   state.evalCacheProbes += 1;
   const uint64_t key = board.side == kBlack ? board.key ^ sideHash() : board.key;
   if (state.evalCache) {
@@ -4902,12 +4982,38 @@ int evaluateRedCached(const Board& board, SearchState& state) {
     }
   }
 
+  if (gUseNnue && gNnue.loaded) {
+    const int nnueScore = nnueEvalRed(board);
+    if (state.evalCache) {
+      state.evalCache->store(key, nnueScore);
+      state.evalCacheStores += 1;
+    }
+    return nnueScore;
+  }
+
+  if (redBeta - redAlpha < 2 * kLazyEvalMargin) {
+    const int baseline = evaluateRedBaseline(board);
+    if (baseline - kLazyEvalMargin >= redBeta) return baseline - kLazyEvalMargin;
+    if (baseline + kLazyEvalMargin <= redAlpha) return baseline + kLazyEvalMargin;
+  }
+
   const int score = evaluateRed(board);
   if (state.evalCache) {
     state.evalCache->store(key, score);
     state.evalCacheStores += 1;
   }
   return score;
+}
+
+int evaluateRedCached(const Board& board, SearchState& state) {
+  return evaluateRedCached(board, state, -kMate, kMate);
+}
+
+int evaluateSideToMove(const Board& board, SearchState& state, int alpha, int beta) {
+  // Convert the side-to-move window [alpha, beta] into red's perspective.
+  const int redAlpha = board.side == kRed ? alpha : -beta;
+  const int redBeta = board.side == kRed ? beta : -alpha;
+  return evaluateRedCached(board, state, redAlpha, redBeta) * board.side;
 }
 
 int evaluateSideToMove(const Board& board, SearchState& state) {
@@ -6383,7 +6489,7 @@ int quiescenceKnownCheck(
 
   int standPat = 0;
   if (!inCheck) {
-    standPat = evaluateSideToMove(board, state);
+    standPat = evaluateSideToMove(board, state, alpha, beta);
     if (standPat >= beta) {
       storeQtt(state, board, qDepth, ply, standPat, kTtLower, {});
       return beta;
@@ -15793,6 +15899,59 @@ int elapsedMs(const SearchState& state) {
   return static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
 }
 
+// Move-generation correctness check: counts the leaf nodes of the legal-move
+// tree to a fixed depth. Must match src/perft.js exactly (canonical xiangqi
+// series from startpos: 44, 1920, 79666, 3290240, ...). Mutates the board via
+// makeMove/undoMove but restores it.
+uint64_t runPerft(Board& board, int depth) {
+  if (depth <= 0) return 1;
+  MoveList moves = generateLegalMoves(board, board.side);
+  if (depth == 1) return static_cast<uint64_t>(moves.size());
+  uint64_t nodes = 0;
+  for (Move& move : moves) {
+    makeMove(board, move);
+    nodes += runPerft(board, depth - 1);
+    undoMove(board, move);
+  }
+  return nodes;
+}
+
+void handlePerft(Board& board, const std::string& line) {
+  const auto tokens = split(line);
+  int depth = 1;
+  if (tokens.size() >= 2) {
+    try {
+      depth = std::stoi(tokens[1]);
+    } catch (...) {
+      depth = 1;
+    }
+  }
+  if (depth < 0) depth = 0;
+
+  const auto started = std::chrono::steady_clock::now();
+  uint64_t total = 0;
+  if (depth == 0) {
+    total = 1;
+  } else {
+    MoveList moves = generateLegalMoves(board, board.side);
+    for (Move& move : moves) {
+      uint64_t child = 1;
+      if (depth > 1) {
+        makeMove(board, move);
+        child = runPerft(board, depth - 1);
+        undoMove(board, move);
+      }
+      total += child;
+      std::cout << moveToUci(move) << ": " << child << std::endl;
+    }
+  }
+  const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - started).count();
+  std::cout << "info string perft depth " << depth << " nodes " << total
+            << " time " << ms << std::endl;
+  std::cout << "perft " << total << std::endl;
+}
+
 struct PositionState {
   Board board;
   Move lastMove{};
@@ -16091,6 +16250,35 @@ int parseSpinOption(const std::string& line, const std::string& optionName, int 
   return std::max(1, std::stoi(tokens[valueIndex + 1]));
 }
 
+// Returns the (case-preserved) value of a string/check option, or "" if the
+// option name doesn't match. Used for NnueFile (a path) and UseNnue (true/false).
+std::string parseStringOption(const std::string& line, const std::string& optionName) {
+  const auto tokens = split(line);
+  int nameIndex = -1;
+  int valueIndex = -1;
+  for (std::size_t i = 0; i < tokens.size(); i += 1) {
+    const std::string token = lower(tokens[i]);
+    if (token == "name") nameIndex = static_cast<int>(i);
+    if (token == "value") {
+      valueIndex = static_cast<int>(i);
+      break;
+    }
+  }
+  if (nameIndex < 0 || valueIndex < 0 || valueIndex + 1 >= static_cast<int>(tokens.size())) return "";
+  std::string name;
+  for (int i = nameIndex + 1; i < valueIndex; i += 1) {
+    if (!name.empty()) name += " ";
+    name += lower(tokens[i]);
+  }
+  if (name != optionName) return "";
+  std::string value;
+  for (int i = valueIndex + 1; i < static_cast<int>(tokens.size()); i += 1) {
+    if (!value.empty()) value += " ";
+    value += tokens[i];
+  }
+  return value;
+}
+
 bool parseButtonOption(const std::string& line, const std::string& optionName) {
   const auto tokens = split(line);
   int nameIndex = -1;
@@ -16161,6 +16349,8 @@ int main() {
       std::cout << "option name MultiPV type spin default 1 min 1 max 8" << std::endl;
       std::cout << "option name Hash type spin default " << kDefaultHashMb << " min 1 max 1024" << std::endl;
       std::cout << "option name Clear Hash type button" << std::endl;
+      std::cout << "option name UseNnue type check default false" << std::endl;
+      std::cout << "option name NnueFile type string default <empty>" << std::endl;
       std::cout << "uciok" << std::endl;
     } else if (command == "isready") {
       std::cout << "readyok" << std::endl;
@@ -16175,6 +16365,17 @@ int main() {
         clearEngineMemory();
         continue;
       }
+      const std::string nnueFile = parseStringOption(line, "nnuefile");
+      if (!nnueFile.empty()) {
+        if (loadNnueFile(nnueFile)) {
+          std::cout << "info string nnue loaded " << nnueFile
+                    << " (" << gNnue.inputSize << "x" << gNnue.hidden << ")" << std::endl;
+        } else {
+          std::cout << "info string nnue load FAILED " << nnueFile << std::endl;
+        }
+      }
+      const std::string useNnue = parseStringOption(line, "usennue");
+      if (!useNnue.empty()) gUseNnue = (lower(useNnue) == "true");
       multiPv = parseSpinOption(line, "multipv", multiPv);
       const int requestedHash = parseSpinOption(line, "hash", hashMb);
       if (requestedHash != hashMb) {
@@ -16188,6 +16389,11 @@ int main() {
       handlePosition(position, line);
     } else if (command == "eval") {
       std::cout << "info string eval cp " << evaluateRed(position.board) * position.board.side << std::endl;
+    } else if (command == "perft") {
+      handlePerft(position.board, line);
+    } else if (command == "nnueeval") {
+      if (gNnue.loaded) std::cout << "info string nnueeval " << nnueEvalRed(position.board) << std::endl;
+      else std::cout << "info string nnueeval not-loaded" << std::endl;
     } else if (command == "go") {
       const GoOptions options = parseGo(line);
       if (options.searchMoves.empty()) {

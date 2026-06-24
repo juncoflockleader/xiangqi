@@ -1,141 +1,149 @@
 <!doctype html>
 <html lang="zh-CN">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>中国象棋</title>
-    <link rel="stylesheet" href="/app.css">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>中国象棋 · Xiangqi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="/app.css" />
   </head>
   <body>
-    <main class="app-shell" id="app">
-      <section class="play-section" aria-label="象棋棋盘" data-i18n-aria-label="boardAria">
-        <div class="board-zone">
-          <div class="board-wrap" id="boardWrap">
-            <div class="board-art">
-              <div class="board-lines" aria-hidden="true">
-                <svg class="board-grid" viewBox="0 0 8 9" preserveAspectRatio="none" focusable="false" aria-hidden="true">
-                  <path class="board-grid-major" d="M0 0H8V9H0Z"></path>
-                  <path class="board-grid-line" d="M0 1H8 M0 2H8 M0 3H8 M0 6H8 M0 7H8 M0 8H8"></path>
-                  <path class="board-grid-major" d="M0 4H8 M0 5H8"></path>
-                  <path class="board-grid-line" d="M1 0V4 M1 5V9 M2 0V4 M2 5V9 M3 0V4 M3 5V9 M4 0V4 M4 5V9 M5 0V4 M5 5V9 M6 0V4 M6 5V9 M7 0V4 M7 5V9"></path>
-                  <path class="board-palace-line" d="M3 0L5 2 M5 0L3 2 M3 7L5 9 M5 7L3 9"></path>
-                </svg>
-                <div class="file-labels file-labels-north" aria-hidden="true">
-                  <span class="file-label" style="--file: 0">1</span>
-                  <span class="file-label" style="--file: 1">2</span>
-                  <span class="file-label" style="--file: 2">3</span>
-                  <span class="file-label" style="--file: 3">4</span>
-                  <span class="file-label" style="--file: 4">5</span>
-                  <span class="file-label" style="--file: 5">6</span>
-                  <span class="file-label" style="--file: 6">7</span>
-                  <span class="file-label" style="--file: 7">8</span>
-                  <span class="file-label" style="--file: 8">9</span>
-                </div>
-                <span class="river-label river-left">楚河</span>
-                <span class="river-label river-right">汉界</span>
-                <span class="point-mark" style="--file: 1; --rank: 2"></span>
-                <span class="point-mark" style="--file: 7; --rank: 2"></span>
-                <span class="point-mark point-edge-left" style="--file: 0; --rank: 3"></span>
-                <span class="point-mark" style="--file: 2; --rank: 3"></span>
-                <span class="point-mark" style="--file: 4; --rank: 3"></span>
-                <span class="point-mark" style="--file: 6; --rank: 3"></span>
-                <span class="point-mark point-edge-right" style="--file: 8; --rank: 3"></span>
-                <span class="point-mark point-edge-left" style="--file: 0; --rank: 6"></span>
-                <span class="point-mark" style="--file: 2; --rank: 6"></span>
-                <span class="point-mark" style="--file: 4; --rank: 6"></span>
-                <span class="point-mark" style="--file: 6; --rank: 6"></span>
-                <span class="point-mark point-edge-right" style="--file: 8; --rank: 6"></span>
-                <span class="point-mark" style="--file: 1; --rank: 7"></span>
-                <span class="point-mark" style="--file: 7; --rank: 7"></span>
-                <div class="file-labels file-labels-south" aria-hidden="true">
-                  <span class="file-label" style="--file: 0">九</span>
-                  <span class="file-label" style="--file: 1">八</span>
-                  <span class="file-label" style="--file: 2">七</span>
-                  <span class="file-label" style="--file: 3">六</span>
-                  <span class="file-label" style="--file: 4">五</span>
-                  <span class="file-label" style="--file: 5">四</span>
-                  <span class="file-label" style="--file: 6">三</span>
-                  <span class="file-label" style="--file: 7">二</span>
-                  <span class="file-label" style="--file: 8">一</span>
-                </div>
+    <div class="app" id="app">
+      <!-- ============ BOARD ============ -->
+      <main class="stage">
+        <div class="board-frame" id="boardFrame">
+          <div class="board-felt">
+            <div class="board-area" id="boardArea">
+              <svg class="grid" viewBox="0 0 8 9" preserveAspectRatio="none" aria-hidden="true">
+                <rect class="grid-edge" x="0" y="0" width="8" height="9" />
+                <path class="grid-line" d="M0 1H8 M0 2H8 M0 3H8 M0 6H8 M0 7H8" />
+                <path class="grid-line" d="M0 4H8 M0 5H8" />
+                <path class="grid-line" d="M1 0V4 M1 5V9 M2 0V4 M2 5V9 M3 0V4 M3 5V9 M4 0V4 M4 5V9 M5 0V4 M5 5V9 M6 0V4 M6 5V9 M7 0V4 M7 5V9" />
+                <path class="grid-line river-edge" d="M0 4V5 M8 4V5" />
+                <path class="grid-palace" d="M3 0L5 2 M5 0L3 2 M3 7L5 9 M5 7L3 9" />
+              </svg>
+              <div class="river" aria-hidden="true">
+                <span>楚 河</span><span>漢 界</span>
               </div>
-              <div class="board" id="board"></div>
+              <div class="files files-top" id="filesTop" aria-hidden="true"></div>
+              <div class="files files-bottom" id="filesBottom" aria-hidden="true"></div>
+              <div class="points" id="board" role="grid" aria-label="棋盘"></div>
             </div>
           </div>
-          <div class="selected-moves" id="selectedMoves" hidden></div>
-        </div>
-
-        <div class="command-panel">
-          <div class="topbar">
-            <div>
-              <h1 data-i18n="appTitle">中国象棋</h1>
-              <p id="gameStatus">启动中...</p>
-            </div>
-            <div class="turn-pill" id="turnPill">红方</div>
+          <div class="thinking" id="thinking" hidden>
+            <span class="spinner" aria-hidden="true"></span>
+            <span id="thinkingText">引擎思考中…</span>
           </div>
-
-          <section class="controls" aria-label="对局控制" data-i18n-aria-label="controlsAria">
-            <div class="control-row">
-              <label for="localeSelect" data-i18n="language">语言</label>
-              <select id="localeSelect">
-                <option value="zh-CN">中文（简体）</option>
-                <option value="zh-TW">中文（繁體）</option>
-                <option value="en">English</option>
-              </select>
-            </div>
-            <div class="control-row">
-              <label for="sideSelect" data-i18n="side">执方</label>
-              <select id="sideSelect">
-                <option value="red">红方</option>
-                <option value="black">黑方</option>
-              </select>
-            </div>
-            <div class="button-row">
-              <button id="newButton" type="button" data-i18n="newGame">新局</button>
-              <button id="undoButton" type="button" data-i18n="undo">悔棋</button>
-            </div>
-            <div class="button-row">
-              <button id="hintButton" type="button" data-i18n="hint">提示</button>
-              <button id="bestButton" type="button" data-i18n="best">最佳</button>
-            </div>
-          </section>
-
-          <section class="panel-block engine-panel">
-            <h2 data-i18n="engine">引擎</h2>
-            <div id="engineInfo" class="meta-list"></div>
-          </section>
-
-          <section class="panel-block last-move-panel">
-            <h2 data-i18n="lastMove">上回合</h2>
-            <div id="lastMovePanel" class="stack muted">尚未走棋。</div>
-          </section>
-
-          <section class="panel-block reasoning-panel">
-            <h2 data-i18n="reasoning">双方思路</h2>
-            <div id="reasoningPanel" class="stack muted">可查看最佳、提示，或直接走棋。</div>
-          </section>
         </div>
+      </main>
+
+      <!-- ============ SIDE PANEL ============ -->
+      <aside class="panel">
+        <header class="panel-head">
+          <div class="brand">
+            <h1 data-i18n="appTitle">中国象棋</h1>
+            <span class="engine-badge" id="engineBadge">—</span>
+          </div>
+          <div class="turn" id="turnPill"><span class="dot"></span><span id="turnText">—</span></div>
+        </header>
+
+        <p class="status" id="gameStatus" data-i18n="booting">启动中…</p>
+
+        <div class="actions">
+          <button class="btn primary" id="newButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M20 20v-6h-6M20 8a8 8 0 0 0-14-3M4 16a8 8 0 0 0 14 3"/></svg>
+            <span data-i18n="newGame">新局</span>
+          </button>
+          <button class="btn" id="undoButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/></svg>
+            <span data-i18n="undo">悔棋</span>
+          </button>
+          <button class="btn" id="hintButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12c.7.7 1 1.3 1 3h6c0-1.7.3-2.3 1-3a7 7 0 0 0-4-12z"/></svg>
+            <span data-i18n="hint">提示</span>
+          </button>
+          <button class="btn" id="bestButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.8 5.9 21.4l1.4-6.8L2.2 9.9l6.9-.8z"/></svg>
+            <span data-i18n="best">最佳</span>
+          </button>
+        </div>
+
+        <!-- Coach / reasoning -->
+        <section class="card coach" id="coachCard">
+          <div class="card-head">
+            <h2 id="coachTitle" data-i18n="coach">教练分析</h2>
+            <span class="card-tag" id="coachTag" hidden></span>
+          </div>
+          <div class="card-body" id="coachBody">
+            <p class="muted" data-i18n="coachEmpty">走一步棋，或点“提示 / 最佳”查看分析。</p>
+          </div>
+        </section>
+
+        <!-- Move list -->
+        <section class="card moves">
+          <div class="card-head">
+            <h2 data-i18n="moves">着法</h2>
+            <div class="head-tools">
+              <button class="mini-btn" id="reviewButton" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M5 12h7a4 4 0 0 1 4 4v2M12 12V8a4 4 0 0 1 4-4h2"/></svg>
+                <span data-i18n="review">复盘</span>
+              </button>
+              <span class="card-tag" id="moveCount">0</span>
+            </div>
+          </div>
+          <div class="movelist" id="moveList" role="list"></div>
+        </section>
+
+        <!-- Settings -->
+        <details class="card settings" id="settings">
+          <summary><span data-i18n="settings">设置</span></summary>
+          <div class="setting-row">
+            <label for="sideSelect" data-i18n="side">执方</label>
+            <select id="sideSelect">
+              <option value="red" data-i18n="red">红方</option>
+              <option value="black" data-i18n="black">黑方</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="levelSelect" data-i18n="level">难度</label>
+            <select id="levelSelect">
+              <option value="beginner" data-i18n="lvlBeginner">入门</option>
+              <option value="casual" data-i18n="lvlCasual">休闲</option>
+              <option value="club" data-i18n="lvlClub">棋友</option>
+              <option value="expert" data-i18n="lvlExpert">高手</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="localeSelect" data-i18n="language">语言</label>
+            <select id="localeSelect">
+              <option value="zh-CN">中文（简体）</option>
+              <option value="zh-TW">中文（繁體）</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+          <p class="hint-note" id="settingsNote" data-i18n="settingsNote">更改执方或难度将开始新对局。</p>
+        </details>
+      </aside>
+
+      <div class="toast" id="toast" hidden></div>
+
+      <!-- ============ FLOATING REVIEW TREE ============ -->
+      <section class="review-window" id="reviewWindow" hidden aria-label="复盘">
+        <header class="rw-head" id="rwHead">
+          <span class="rw-title"><span data-i18n="reviewTitle">复盘 · 变化树</span></span>
+          <div class="rw-tools">
+            <button class="rw-icon" id="rwZoomOut" type="button" aria-label="zoom out">−</button>
+            <button class="rw-icon" id="rwZoomIn" type="button" aria-label="zoom in">+</button>
+            <button class="rw-icon" id="rwFit" type="button" title="适配" aria-label="fit">⤢</button>
+            <button class="rw-icon" id="rwCollapse" type="button" title="折叠分支" aria-label="collapse">⤓</button>
+            <button class="rw-icon rw-close" id="rwClose" type="button" aria-label="close">✕</button>
+          </div>
+        </header>
+        <div class="rw-hint" id="rwHint" data-i18n="reviewHelp">点小棋盘跳到该局面 · 点 ▸ 展开引擎候选分支</div>
+        <div class="rw-body" id="reviewTree"></div>
+        <div class="rw-resize" id="rwResize" aria-hidden="true"></div>
       </section>
-
-      <section class="panel-block tree-panel">
-        <div class="tree-panel-head">
-          <h2 data-i18n="moveTree">变化树</h2>
-          <div class="tree-toolbar" aria-label="树视图控制">
-            <button id="treeFitButton" class="tree-tool-button" type="button" data-i18n="treeFit" data-i18n-title="treeFit" aria-label="适配">适配</button>
-            <button id="treeZoomOutButton" class="tree-tool-button" type="button" data-i18n-title="treeZoomOut" aria-label="缩小">−</button>
-            <button id="treeZoomInButton" class="tree-tool-button" type="button" data-i18n-title="treeZoomIn" aria-label="放大">+</button>
-            <button id="treeResetButton" class="tree-tool-button" type="button" data-i18n="treeReset" data-i18n-title="treeReset" aria-label="重置">重置</button>
-          </div>
-        </div>
-        <div id="treeViewport" class="tree-viewport">
-          <div id="historyList" class="move-tree-canvas" role="tree"></div>
-        </div>
-      </section>
-    </main>
-
-    <template id="pieceTemplate">
-      <span class="piece"></span>
-    </template>
+    </div>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

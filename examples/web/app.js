@@ -1,2840 +1,852 @@
-const files = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
-const ranks = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
-const chineseNumerals = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
-const blackFileLabels = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
-const DEFAULT_CLIENT_REQUEST_TIMEOUT_MS = 15 * 60 * 1000;
-const CLIENT_REQUEST_TIMEOUT_BUFFER_MS = 5000;
-const CLIENT_STATE_REFRESH_TIMEOUT_MS = 15000;
-const PENDING_STATUS_INTERVAL_MS = 1000;
-const TEACHING_REVIEW_HOLD_MS = 8000;
-const TREE_NODE_WIDTH = 188;
-const TREE_NODE_HEIGHT = 96;
-const TREE_LEVEL_GAP = 96;
-const TREE_SIBLING_GAP = 34;
-const TREE_LAYOUT_PADDING = 44;
-const TREE_MIN_SCALE = 0.35;
-const TREE_MAX_SCALE = 1.8;
+// ============================================================
+// Xiangqi web UI — polished client (talks to the existing server API)
+// ============================================================
 
-const pieceNames = {
+const I18N = {
   "zh-CN": {
-    red: {
-      king: "帅",
-      general: "帅",
-      advisor: "仕",
-      elephant: "相",
-      horse: "马",
-      rook: "车",
-      cannon: "炮",
-      pawn: "兵"
-    },
-    black: {
-      king: "将",
-      general: "将",
-      advisor: "士",
-      elephant: "象",
-      horse: "马",
-      rook: "车",
-      cannon: "炮",
-      pawn: "卒"
-    }
+    appTitle: "中国象棋", booting: "启动中…",
+    newGame: "新局", undo: "悔棋", hint: "提示", best: "最佳",
+    coach: "教练分析", coachEmpty: "走一步棋，或点“提示 / 最佳”查看分析。",
+    moves: "着法", settings: "设置", side: "执方", red: "红方", black: "黑方",
+    level: "难度", lvlBeginner: "入门", lvlCasual: "休闲", lvlClub: "棋友", lvlExpert: "高手",
+    language: "语言", settingsNote: "更改执方或难度将开始新对局。",
+    thinking: "引擎思考中…", yourTurn: "轮到你了", check: "将军！",
+    youWin: "你赢了！", youLose: "你输了", draw: "和棋", redToMove: "红方走棋", blackToMove: "黑方走棋",
+    youPlayed: "你的着法", engineReplied: "引擎应着", enginePlan: "引擎计划",
+    bestMove: "最佳着法", expectedReply: "预计应着",
+    loss: "损失", cp: "分", bestTag: "最佳", hintTag: "提示",
+    reviewPending: "复盘中…", noMoves: "尚未走子。",
+    cls_best: "最佳", cls_brilliant: "精彩", cls_excellent: "极佳", cls_good: "良好",
+    cls_inaccuracy: "欠精确", cls_mistake: "失误", cls_blunder: "漏着", cls_book: "定式",
+    review: "复盘", reviewTitle: "复盘 · 变化树", reviewCollapse: "折叠全部分支",
+    reviewHelp: "点小棋盘跳到该局面 · 点 ▸ 展开引擎候选分支",
+    startPos: "起始局面", noGameYet: "尚无棋局可复盘。",
+    errMove: "无法走子", errGeneric: "出错了"
   },
   "zh-TW": {
-    red: {
-      king: "帥",
-      general: "帥",
-      advisor: "仕",
-      elephant: "相",
-      horse: "傌",
-      rook: "俥",
-      cannon: "炮",
-      pawn: "兵"
-    },
-    black: {
-      king: "將",
-      general: "將",
-      advisor: "士",
-      elephant: "象",
-      horse: "馬",
-      rook: "車",
-      cannon: "砲",
-      pawn: "卒"
-    }
+    appTitle: "中國象棋", booting: "啟動中…",
+    newGame: "新局", undo: "悔棋", hint: "提示", best: "最佳",
+    coach: "教練分析", coachEmpty: "走一步棋，或點「提示 / 最佳」查看分析。",
+    moves: "著法", settings: "設定", side: "執方", red: "紅方", black: "黑方",
+    level: "難度", lvlBeginner: "入門", lvlCasual: "休閒", lvlClub: "棋友", lvlExpert: "高手",
+    language: "語言", settingsNote: "更改執方或難度將開始新對局。",
+    thinking: "引擎思考中…", yourTurn: "輪到你了", check: "將軍！",
+    youWin: "你贏了！", youLose: "你輸了", draw: "和棋", redToMove: "紅方走棋", blackToMove: "黑方走棋",
+    youPlayed: "你的著法", engineReplied: "引擎應著", enginePlan: "引擎計劃",
+    bestMove: "最佳著法", expectedReply: "預計應著",
+    loss: "損失", cp: "分", bestTag: "最佳", hintTag: "提示",
+    reviewPending: "覆盤中…", noMoves: "尚未走子。",
+    cls_best: "最佳", cls_brilliant: "精彩", cls_excellent: "極佳", cls_good: "良好",
+    cls_inaccuracy: "欠精確", cls_mistake: "失誤", cls_blunder: "漏著", cls_book: "定式",
+    review: "覆盤", reviewTitle: "覆盤 · 變化樹", reviewCollapse: "摺疊全部分支",
+    reviewHelp: "點小棋盤跳到該局面 · 點 ▸ 展開引擎候選分支",
+    startPos: "起始局面", noGameYet: "尚無棋局可覆盤。",
+    errMove: "無法走子", errGeneric: "出錯了"
   },
   en: {
-    red: {
-      king: "Red general",
-      general: "Red general",
-      advisor: "Red advisor",
-      elephant: "Red elephant",
-      horse: "Red horse",
-      rook: "Red chariot",
-      cannon: "Red cannon",
-      pawn: "Red soldier"
-    },
-    black: {
-      king: "Black general",
-      general: "Black general",
-      advisor: "Black advisor",
-      elephant: "Black elephant",
-      horse: "Black horse",
-      rook: "Black chariot",
-      cannon: "Black cannon",
-      pawn: "Black soldier"
-    }
+    appTitle: "Xiangqi", booting: "Starting…",
+    newGame: "New", undo: "Undo", hint: "Hint", best: "Best",
+    coach: "Coach", coachEmpty: "Make a move, or tap Hint / Best for analysis.",
+    moves: "Moves", settings: "Settings", side: "Side", red: "Red", black: "Black",
+    level: "Level", lvlBeginner: "Beginner", lvlCasual: "Casual", lvlClub: "Club", lvlExpert: "Expert",
+    language: "Language", settingsNote: "Changing side or level starts a new game.",
+    thinking: "Engine thinking…", yourTurn: "Your move", check: "Check!",
+    youWin: "You win!", youLose: "You lost", draw: "Draw", redToMove: "Red to move", blackToMove: "Black to move",
+    youPlayed: "You played", engineReplied: "Engine replied", enginePlan: "Engine plan",
+    bestMove: "Best move", expectedReply: "Expected reply",
+    loss: "loss", cp: "cp", bestTag: "Best", hintTag: "Hint",
+    reviewPending: "Reviewing…", noMoves: "No moves yet.",
+    cls_best: "Best", cls_brilliant: "Brilliant", cls_excellent: "Excellent", cls_good: "Good",
+    cls_inaccuracy: "Inaccuracy", cls_mistake: "Mistake", cls_blunder: "Blunder", cls_book: "Book",
+    review: "Review", reviewTitle: "Review · Variation Tree", reviewCollapse: "Collapse all",
+    reviewHelp: "Click a mini-board to jump · click ▸ to expand engine variations",
+    startPos: "Start", noGameYet: "No game to review yet.",
+    errMove: "Illegal move", errGeneric: "Something went wrong"
   }
 };
 
-const localeMeta = {
-  "zh-CN": {
-    lang: "zh-CN",
-    river: ["楚河", "汉界"],
-    redAbbrev: "红",
-    blackAbbrev: "黑"
-  },
-  "zh-TW": {
-    lang: "zh-Hant",
-    river: ["楚河", "漢界"],
-    redAbbrev: "紅",
-    blackAbbrev: "黑"
-  },
-  en: {
-    lang: "en",
-    river: ["Chu River", "Han Border"],
-    redAbbrev: "Red",
-    blackAbbrev: "Black"
-  }
+// Difficulty is time-based, never a fixed depth cap: a hard shallow depth makes
+// the engine pick odd openings (depth 4 → b2g2), whereas even a short movetime
+// lets iterative deepening converge to sound play (h2e2). Shorter time = weaker.
+const LEVELS = {
+  beginner: { timeLimitMs: 250, lines: 2 },
+  casual: { timeLimitMs: 800, lines: 2 },
+  club: { timeLimitMs: 2000, lines: 2 },
+  expert: { timeLimitMs: 5000, lines: 2 }
 };
 
-const simplifiedChineseMap = Object.freeze({
-  "與": "与",
-  "帥": "帅",
-  "將": "将",
-  "傌": "马",
-  "馬": "马",
-  "俥": "车",
-  "車": "车",
-  "砲": "炮",
-  "進": "进",
-  "後": "后",
-  "著": "着",
-  "紅": "红",
-  "漢": "汉",
-  "語": "语",
-  "體": "体",
-  "啟": "启",
-  "動": "动",
-  "級": "级",
-  "備": "备",
-  "暫": "暂",
-  "無": "无",
-  "選": "选",
-  "擇": "择",
-  "覆": "复",
-  "損": "损",
-  "開": "开",
-  "庫": "库",
-  "預": "预",
-  "應": "应",
-  "續": "续",
-  "題": "题",
-  "薦": "荐",
-  "評": "评",
-  "為": "为",
-  "戰": "战",
-  "術": "术",
-  "狀": "状",
-  "態": "态",
-  "沒": "没",
-  "壓": "压",
-  "線": "线",
-  "點": "点",
-  "權": "权",
-  "較": "较",
-  "領": "领",
-  "計": "计",
-  "畫": "画",
-  "牽": "牵",
-  "約": "约",
-  "從": "从",
-  "實": "实",
-  "議": "议",
-  "慮": "虑",
-  "強": "强",
-  "協": "协",
-  "調": "调",
-  "關": "关",
-  "係": "系",
-  "製": "制",
-  "威": "威",
-  "脅": "胁",
-  "靜": "静",
-  "勢": "势",
-  "護": "护",
-  "躍": "跃",
-  "練": "练",
-  "掃": "扫",
-  "麼": "么",
-  "雙": "双",
-  "對": "对"
-});
-
-const traditionalChineseMap = Object.freeze({
-  "与": "與",
-  "帅": "帥",
-  "将": "將",
-  "马": "馬",
-  "车": "車",
-  "进": "進",
-  "后": "後",
-  "着": "著",
-  "红": "紅",
-  "汉": "漢",
-  "语": "語",
-  "体": "體",
-  "启": "啟",
-  "动": "動",
-  "级": "級",
-  "备": "備",
-  "暂": "暫",
-  "无": "無",
-  "选": "選",
-  "择": "擇",
-  "复": "覆",
-  "损": "損",
-  "开": "開",
-  "库": "庫",
-  "预": "預",
-  "应": "應",
-  "续": "續",
-  "题": "題",
-  "荐": "薦",
-  "评": "評",
-  "为": "為",
-  "战": "戰",
-  "术": "術",
-  "状": "狀",
-  "态": "態",
-  "没": "沒",
-  "压": "壓",
-  "线": "線",
-  "点": "點",
-  "权": "權",
-  "较": "較",
-  "领": "領",
-  "计": "計",
-  "画": "畫",
-  "实": "實",
-  "议": "議",
-  "虑": "慮",
-  "强": "強",
-  "协": "協",
-  "调": "調",
-  "关": "關",
-  "系": "係",
-  "制": "製",
-  "胁": "脅",
-  "牵": "牽",
-  "约": "約",
-  "从": "從",
-  "静": "靜",
-  "势": "勢",
-  "护": "護",
-  "跃": "躍",
-  "练": "練",
-  "扫": "掃",
-  "么": "麼",
-  "双": "雙",
-  "对": "對"
-});
-
-const practiceFocusTranslations = Object.freeze({
-  "zh-CN": {
-    "missed-material": ["子力战术", "练习在走安静棋前先扫描强制吃子。"],
-    "unsafe-capture": ["吃子安全", "练习吃子前检查反吃和保护关系。"],
-    "missed-check": ["强制将军", "练习优先看将军，特别是对方将帅暴露时。"],
-    "missed-threat": ["建立先手", "练习寻找能制造直接威胁的着法。"],
-    "allowed-threat": ["防守威胁", "练习每步之后先问对手威胁什么。"],
-    "positional-drift": ["子力协调", "练习从活跃度、保护和长期压力比较安静候选。"]
-  },
-  "zh-TW": {
-    "missed-material": ["子力戰術", "練習在走安靜棋前先掃描強制吃子。"],
-    "unsafe-capture": ["吃子安全", "練習吃子前檢查反吃和保護關係。"],
-    "missed-check": ["強制將軍", "練習優先看將軍，特別是對方將帥暴露時。"],
-    "missed-threat": ["建立先手", "練習尋找能製造直接威脅的著法。"],
-    "allowed-threat": ["防守威脅", "練習每步之後先問對手威脅什麼。"],
-    "positional-drift": ["子力協調", "練習從活躍度、保護和長期壓力比較安靜候選。"]
-  }
-});
-
-const zhTwTranslations = {
-  appTitle: "中國象棋",
-  boardAria: "象棋棋盤",
-  controlsAria: "對局控制",
-  language: "語言",
-  localeSimplified: "中文（簡體）",
-  localeTraditional: "中文（繁體）",
-  localeEnglish: "English",
-  side: "執方",
-  red: "紅方",
-  black: "黑方",
-  newGame: "新局",
-  undo: "悔棋",
-  hint: "提示",
-  best: "最佳著法",
-  engine: "引擎",
-  lastMove: "上回合",
-  reasoning: "双方思路",
-  history: "棋譜",
-  moveTree: "變化樹",
-  starting: "啟動中...",
-  noMoves: "尚未走棋。",
-  treeEmpty: "尚未形成棋樹。",
-  mainLine: "主線",
-  alternativeLine: "變化",
-  branchPoint: "分岔點",
-  currentPosition: "當前",
-  expand: "展開",
-  fold: "收合",
-  selectedNode: "已選",
-  restorePoint: "回到此處",
-  recomputeNode: "重新計算分支",
-  recomputingNode: "正在計算分支...",
-  generatedBranches: "新分支",
-  analysisBranch: "分析分支",
-  branchRank: "第 {rank} 選",
-  treeFit: "適配",
-  treeZoomIn: "放大",
-  treeZoomOut: "縮小",
-  treeReset: "重置",
-  variationPreview: "預覽局面",
-  askPrompt: "可查看最佳、提示，或直接走棋。",
-  redToMove: "紅方走棋",
-  blackToMove: "黑方走棋",
-  inCheck: "（被將軍）",
-  gameOver: "終局",
-  repetition: "重複局面和棋",
-  wins: "勝",
-  level: "級別",
-  depth: "深度",
-  time: "用時",
-  lines: "候選",
-  fallback: "備援",
-  confidence: "信心",
-  bestMove: "最佳著法",
-  whyNot: "為何不選",
-  noHint: "暫無提示。",
-  noDecision: "尚無決策。",
-  engineSelected: "引擎已選擇一手。",
-  moveReviewed: "已覆盤此手。",
-  reviewPending: "正在覆盤你的上一手...",
-  replyPending: "引擎正在思考應手...",
-  reviewHoldReady: "已保留你的上一手評價。",
-  moveWaitingReview: "已落子，等待評價。",
-  noPlayerMove: "你尚未走棋。",
-  noEngineMove: "引擎尚未落子。",
-  yourLastMove: "你的上一手",
-  engineLastMove: "引擎上一手",
-  teachingTurn: "本回合覆盤",
-  thinking: "引擎思考中...",
-  thinkingShort: "思考中",
-  requestTimedOut: "請求等待時間過長，請重試。",
-  requestFailed: "連線中斷，請重試。",
-  stateRefreshed: "已重新同步當前局面。",
-  legalMoves: "合法著法",
-  legalMovesSuffix: "的合法著法",
-  candidate: "候選",
-  expectedReply: "預期",
-  loss: "損失",
-  scorePrefix: "評分",
-  bookSource: "開局庫",
-  searchSource: "搜索",
-  suggests: "建議",
-  bestAgreement: "與最佳著法一致",
-  bestAlternative: "最佳應為",
-  player: "你",
-  engineActor: "引擎",
-  emptyPoint: "空位"
-};
-
-const zhCnTranslations = {
-  ...zhTwTranslations,
-  appTitle: "中国象棋",
-  boardAria: "象棋棋盘",
-  controlsAria: "对局控制",
-  language: "语言",
-  localeSimplified: "中文（简体）",
-  localeTraditional: "中文（繁体）",
-  side: "执方",
-  red: "红方",
-  black: "黑方",
-  best: "最佳着法",
-  history: "棋谱",
-  moveTree: "变化树",
-  starting: "启动中...",
-  noMoves: "尚未走棋。",
-  treeEmpty: "尚未形成棋树。",
-  mainLine: "主线",
-  alternativeLine: "变化",
-  branchPoint: "分岔点",
-  currentPosition: "当前",
-  expand: "展开",
-  fold: "收起",
-  selectedNode: "已选",
-  restorePoint: "回到此处",
-  recomputeNode: "重新计算分支",
-  recomputingNode: "正在计算分支...",
-  generatedBranches: "新分支",
-  analysisBranch: "分析分支",
-  branchRank: "第 {rank} 选",
-  treeFit: "适配",
-  treeZoomIn: "放大",
-  treeZoomOut: "缩小",
-  treeReset: "重置",
-  variationPreview: "预览局面",
-  askPrompt: "可查看最佳着法、提示，或直接走棋。",
-  redToMove: "红方走棋",
-  blackToMove: "黑方走棋",
-  inCheck: "（被将军）",
-  gameOver: "终局",
-  repetition: "重复局面和棋",
-  wins: "胜",
-  level: "级别",
-  depth: "深度",
-  time: "用时",
-  lines: "候选",
-  fallback: "备用",
-  confidence: "信心",
-  bestMove: "最佳着法",
-  whyNot: "为何不选",
-  noHint: "暂无提示。",
-  noDecision: "尚无决策。",
-  engineSelected: "引擎已选择一手。",
-  moveReviewed: "已复盘此手。",
-  reviewPending: "正在复盘你的上一手...",
-  replyPending: "引擎正在思考应手...",
-  reviewHoldReady: "已保留你的上一手评价。",
-  moveWaitingReview: "已落子，等待评价。",
-  noPlayerMove: "你尚未走棋。",
-  noEngineMove: "引擎尚未落子。",
-  teachingTurn: "本回合复盘",
-  thinking: "引擎思考中...",
-  thinkingShort: "思考中",
-  requestTimedOut: "请求等待时间过长，请重试。",
-  requestFailed: "连接中断，请重试。",
-  stateRefreshed: "已重新同步当前局面。",
-  legalMoves: "合法着法",
-  legalMovesSuffix: "的合法着法",
-  candidate: "候选",
-  expectedReply: "预期",
-  loss: "损失",
-  scorePrefix: "评分",
-  bookSource: "开局库",
-  searchSource: "搜索",
-  suggests: "建议",
-  bestAgreement: "与最佳着法一致",
-  bestAlternative: "最佳应为",
-  player: "你",
-  engineActor: "引擎",
-  emptyPoint: "空位"
-};
-
-const translations = {
-  "zh-CN": zhCnTranslations,
-  "zh-TW": zhTwTranslations,
-  en: {
-    appTitle: "Xiangqi",
-    boardAria: "Xiangqi board",
-    controlsAria: "Game controls",
-    language: "Language",
-    localeSimplified: "Chinese (Simplified)",
-    localeTraditional: "Chinese (Traditional)",
-    localeEnglish: "English",
-    side: "Side",
-    red: "Red",
-    black: "Black",
-    newGame: "New",
-    undo: "Undo",
-    hint: "Hint",
-    best: "Best",
-    engine: "Engine",
-    lastMove: "Last Turn",
-    reasoning: "Both Sides",
-    history: "History",
-    moveTree: "Move Tree",
-    starting: "Starting...",
-    noMoves: "No moves yet.",
-    treeEmpty: "No tree yet.",
-    mainLine: "main",
-    alternativeLine: "variation",
-    branchPoint: "branch point",
-    currentPosition: "current",
-    expand: "Expand",
-    fold: "Collapse",
-    selectedNode: "selected",
-    restorePoint: "Restore here",
-    recomputeNode: "Recompute branches",
-    recomputingNode: "Computing branches...",
-    generatedBranches: "new branches",
-    analysisBranch: "analysis branch",
-    branchRank: "line {rank}",
-    treeFit: "Fit",
-    treeZoomIn: "Zoom in",
-    treeZoomOut: "Zoom out",
-    treeReset: "Reset",
-    variationPreview: "preview position",
-    askPrompt: "Ask for Best, Hint, or make a move.",
-    redToMove: "Red to move",
-    blackToMove: "Black to move",
-    inCheck: " in check",
-    gameOver: "Game over",
-    repetition: "Repetition draw",
-    wins: "wins",
-    level: "Level",
-    depth: "Depth",
-    time: "Time",
-    lines: "Lines",
-    fallback: "Fallback",
-    confidence: "Confidence",
-    bestMove: "Best",
-    whyNot: "Why not",
-    noHint: "No hint available.",
-    noDecision: "No decision yet.",
-    engineSelected: "Engine selected a move.",
-    moveReviewed: "Move reviewed.",
-    reviewPending: "Reviewing your last move...",
-    replyPending: "Engine is thinking about the reply...",
-    reviewHoldReady: "Your last-move review is preserved.",
-    moveWaitingReview: "Move played; waiting for review.",
-    noPlayerMove: "You have not moved yet.",
-    noEngineMove: "The engine has not moved yet.",
-    thinking: "Engine thinking...",
-    thinkingShort: "Thinking",
-    requestTimedOut: "The request waited too long. Please try again.",
-    requestFailed: "The connection was interrupted. Please try again.",
-    stateRefreshed: "Current position resynced.",
-    legalMoves: "Legal moves",
-    legalMovesSuffix: " legal moves",
-    candidate: "candidate",
-    expectedReply: "expects",
-    loss: "loss",
-    scorePrefix: "score",
-    bookSource: "opening book",
-    searchSource: "search",
-    suggests: "suggests",
-    bestAgreement: "matches the best move",
-    bestAlternative: "best was",
-    player: "player",
-    yourLastMove: "Your last move",
-    engineLastMove: "Engine last move",
-    teachingTurn: "Turn review",
-    engineActor: "engine",
-    emptyPoint: "empty point"
-  }
-};
-
-const elements = {
-  board: document.querySelector("#board"),
-  boardWrap: document.querySelector("#boardWrap"),
-  selectedMoves: document.querySelector("#selectedMoves"),
-  gameStatus: document.querySelector("#gameStatus"),
-  turnPill: document.querySelector("#turnPill"),
-  localeSelect: document.querySelector("#localeSelect"),
-  sideSelect: document.querySelector("#sideSelect"),
-  newButton: document.querySelector("#newButton"),
-  undoButton: document.querySelector("#undoButton"),
-  hintButton: document.querySelector("#hintButton"),
-  bestButton: document.querySelector("#bestButton"),
-  engineInfo: document.querySelector("#engineInfo"),
-  lastMovePanel: document.querySelector("#lastMovePanel"),
-  reasoningPanel: document.querySelector("#reasoningPanel"),
-  historyList: document.querySelector("#historyList"),
-  treeViewport: document.querySelector("#treeViewport"),
-  treeFitButton: document.querySelector("#treeFitButton"),
-  treeZoomInButton: document.querySelector("#treeZoomInButton"),
-  treeZoomOutButton: document.querySelector("#treeZoomOutButton"),
-  treeResetButton: document.querySelector("#treeResetButton")
-};
+const FILE_DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+const FILE_HANZI = ["九", "八", "七", "六", "五", "四", "三", "二", "一"];
 
 const state = {
   sessionId: null,
+  locale: "zh-CN",
+  side: "red",
+  level: "club",
   game: null,
   selected: null,
-  pending: false,
-  pendingStage: null,
-  pendingSince: null,
-  errorMessage: null,
-  panel: null,
-  teachingTurnFocusId: null,
-  preservedTeachingPair: null,
-  treeCollapsed: new Set(),
-  treeSelectedId: null,
-  treeAnalysis: new Map(),
-  treeAnalysisPendingId: null,
-  treeView: {
-    x: 24,
-    y: 24,
-    scale: 1,
-    layoutWidth: 0,
-    layoutHeight: 0,
-    userPositioned: false
-  },
-  locale: loadLocale()
+  busy: false,
+  coachOverride: null // { kind: 'hint'|'best', data }
 };
 
-let pendingRenderTimer = null;
-let treeDrag = null;
+// Floating review tree: branches keyed by FEN so they survive re-renders and
+// live game updates. expanded = set of FENs whose children are shown.
+const review = {
+  open: false,
+  branches: new Map(), // node id -> [childNode]
+  expanded: new Set(), // node id
+  loading: new Set(),  // node id currently fetching
+  nodeIndex: new Map(), // node id -> node (rebuilt each render)
+  view: { scale: 0.8, fitted: false }
+};
 
-elements.newButton.addEventListener("click", () => newGame());
-elements.undoButton.addEventListener("click", () => undoMove());
-elements.hintButton.addEventListener("click", () => requestHint());
-elements.bestButton.addEventListener("click", () => requestBest());
-elements.treeFitButton.addEventListener("click", () => fitTreeView({ userInitiated: true }));
-elements.treeZoomInButton.addEventListener("click", () => zoomTreeView(1.16));
-elements.treeZoomOutButton.addEventListener("click", () => zoomTreeView(1 / 1.16));
-elements.treeResetButton.addEventListener("click", () => resetTreeView());
-elements.treeViewport.addEventListener("pointerdown", handleTreePointerDown);
-elements.treeViewport.addEventListener("pointermove", handleTreePointerMove);
-elements.treeViewport.addEventListener("pointerup", handleTreePointerUp);
-elements.treeViewport.addEventListener("pointercancel", handleTreePointerUp);
-elements.treeViewport.addEventListener("wheel", handleTreeWheel, { passive: false });
-elements.sideSelect.addEventListener("change", () => newGame());
-elements.localeSelect.addEventListener("change", () => {
-  state.locale = normalizeLocale(elements.localeSelect.value);
-  saveLocale(state.locale);
-  applyLocale();
-});
+const el = {};
+function cache() {
+  for (const id of [
+    "board", "boardArea", "filesTop", "filesBottom", "thinking", "thinkingText",
+    "engineBadge", "turnPill", "turnText", "gameStatus",
+    "newButton", "undoButton", "hintButton", "bestButton",
+    "coachCard", "coachTitle", "coachTag", "coachBody",
+    "moveList", "moveCount", "sideSelect", "levelSelect", "localeSelect",
+    "settings", "settingsNote", "toast",
+    "reviewButton", "reviewWindow", "rwHead", "rwClose", "rwCollapse", "rwResize", "reviewTree", "rwHint",
+    "rwZoomIn", "rwZoomOut", "rwFit"
+  ]) el[id] = document.getElementById(id);
+}
 
-elements.localeSelect.value = state.locale;
-applyLocale();
-newGame();
+const t = (key) => I18N[state.locale]?.[key] ?? I18N["zh-CN"][key] ?? key;
+const isZh = () => state.locale.startsWith("zh");
 
+// ---- coordinate helpers (square = rank*9 + file; coord like "e2") ----
+const fileOfSq = (sq) => sq % 9;
+const rankOfSq = (sq) => Math.floor(sq / 9);
+function coordToSquare(coord) {
+  if (!coord || coord.length < 2) return null;
+  const file = coord.charCodeAt(0) - 97; // 'a'
+  const rank = Number(coord[1]);
+  if (Number.isNaN(rank) || file < 0 || file > 8) return null;
+  return rank * 9 + file;
+}
+function visualPoint(sq, side) {
+  let file = fileOfSq(sq);
+  let rank = rankOfSq(sq);
+  if (side === "black") { file = 8 - file; rank = 9 - rank; }
+  return { file, rank };
+}
+function parseMoveSquares(notation) {
+  if (!notation) return null;
+  const m = String(notation).toLowerCase().replace(/-/g, "");
+  if (!/^[a-i][0-9][a-i][0-9]$/.test(m)) return null;
+  return { from: coordToSquare(m.slice(0, 2)), to: coordToSquare(m.slice(2, 4)) };
+}
+
+// ---- API ----
+async function api(path, payload) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload ?? {})
+  });
+  let data = {};
+  try { data = await res.json(); } catch { /* ignore */ }
+  if (!res.ok || data.ok === false) throw new Error(data.error || `${res.status}`);
+  return data;
+}
+
+function showToast(msg) {
+  el.toast.textContent = msg;
+  el.toast.hidden = false;
+  requestAnimationFrame(() => el.toast.classList.add("show"));
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => {
+    el.toast.classList.remove("show");
+    setTimeout(() => { el.toast.hidden = true; }, 250);
+  }, 2600);
+}
+
+// ============================================================
+// Rendering
+// ============================================================
+function render() {
+  const g = state.game;
+  applyChrome();
+  if (!g) return;
+
+  renderTurnStatus(g);
+  renderBoard(g);
+  renderMoveList(g);
+  renderCoach(g);
+  renderControls(g);
+  if (review.open) renderReviewTree();
+}
+
+function applyChrome() {
+  document.documentElement.lang = state.locale;
+  document.title = `${t("appTitle")} · Xiangqi`;
+  for (const node of document.querySelectorAll("[data-i18n]")) {
+    const key = node.getAttribute("data-i18n");
+    if (I18N[state.locale]?.[key] !== undefined || I18N["zh-CN"][key] !== undefined) node.textContent = t(key);
+  }
+  el.thinkingText.textContent = t("thinking");
+  // localized file labels (depend on view side)
+  renderFileLabels();
+}
+
+function renderFileLabels() {
+  const side = state.game?.playerSide ?? state.side;
+  // top = opponent's numbering, bottom = player's. Keep it simple: bottom hanzi(player red convention), top arabic.
+  const top = FILE_DIGITS;
+  const bottom = side === "black" ? FILE_DIGITS.slice().reverse() : FILE_HANZI;
+  el.filesTop.innerHTML = top.map((d) => `<span>${d}</span>`).join("");
+  el.filesBottom.innerHTML = bottom.map((d) => `<span>${d}</span>`).join("");
+}
+
+function sideName(side) { return side === "red" ? t("red") : t("black"); }
+
+function renderTurnStatus(g) {
+  const turn = g.turn;
+  el.turnPill.classList.toggle("black", turn === "black");
+  el.turnText.textContent = sideName(turn) + (g.playerTurn ? " · " + t("yourTurn") : "");
+
+  el.gameStatus.className = "status";
+  const s = g.status?.state;
+  if (s === "checkmate" || s === "stalemate") {
+    const playerWon = g.status.winner === g.playerSide;
+    el.gameStatus.textContent = playerWon ? t("youWin") : t("youLose");
+    el.gameStatus.classList.add(playerWon ? "win" : "lose");
+  } else if (s === "repetition") {
+    el.gameStatus.textContent = t("draw");
+  } else if (g.status?.inCheck) {
+    el.gameStatus.textContent = t("check");
+    el.gameStatus.classList.add("check");
+  } else if (state.busy && !g.playerTurn) {
+    el.gameStatus.textContent = t("thinking");
+  } else {
+    el.gameStatus.textContent = turn === "red" ? t("redToMove") : t("blackToMove");
+  }
+
+  const backend = g.backend?.name ?? "";
+  el.engineBadge.textContent = `${backend.split(" with ")[0]} · ${t("lvl" + cap(state.level))}`;
+}
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function renderBoard(g) {
+  const side = g.playerSide;
+  const selected = state.selected;
+  const targets = new Map(); // toSquare -> isCapture
+  if (selected != null) {
+    for (const m of g.legalMoves) {
+      if (m.from === selected) targets.set(m.to, Boolean(m.captured));
+    }
+  }
+  const last = parseMoveSquares(g.lastMove?.notation);
+  let checkSq = null;
+  if (g.status?.inCheck) {
+    const k = g.board.find((c) => c.piece && c.piece.type === "king" && c.piece.side === g.turn);
+    if (k) checkSq = k.square;
+  }
+  const canSelect = g.playerTurn && !state.busy;
+
+  let html = "";
+  for (const cell of g.board) {
+    const sq = cell.square;
+    const { file, rank } = visualPoint(sq, side);
+    const classes = ["point"];
+    const isTarget = targets.has(sq);
+    if (isTarget) { classes.push("target"); if (targets.get(sq)) classes.push("capture"); }
+    if (sq === selected) classes.push("selected");
+    if (last && sq === last.from) classes.push("last-from");
+    if (last && sq === last.to) classes.push("last-to");
+    if (sq === checkSq) classes.push("in-check");
+    const ownPiece = cell.piece && cell.piece.side === side;
+    if ((canSelect && ownPiece) || isTarget) classes.push("actionable");
+
+    const inner = cell.piece
+      ? `<span class="piece ${cell.piece.side}">${cell.piece.symbol}</span>`
+      : `<span class="marker"></span>`;
+    const markerForOccupied = isTarget && cell.piece ? `<span class="marker"></span>` : "";
+    html += `<div class="${classes.join(" ")}" data-square="${sq}" style="--file:${file};--rank:${rank}">${inner}${markerForOccupied}</div>`;
+  }
+  el.board.innerHTML = html;
+}
+
+function scoreClass(cp) { return cp > 30 ? "pos" : cp < -30 ? "neg" : "even"; }
+function fmtScore(cp, text) {
+  if (text && !/^[-+]?\d/.test(String(text))) return text; // verbose like "winning by force"
+  const v = Math.round(cp ?? 0);
+  return `${v >= 0 ? "+" : ""}${(v / 100).toFixed(2)}`;
+}
+function pvHtml(pv) {
+  if (!pv || !pv.length) return "";
+  return `<div class="pv">${pv.slice(0, 6).map((m) => `<span class="pv-move">${esc(m)}</span>`).join("")}</div>`;
+}
+function reasonsHtml(reasons) {
+  if (!reasons || !reasons.length) return "";
+  return `<ul class="reasons">${reasons.slice(0, 4).map((r) => `<li>${esc(r)}</li>`).join("")}</ul>`;
+}
+function classBadge(classification, isBest) {
+  const c = (classification || (isBest ? "best" : "neutral")).toLowerCase();
+  const label = t("cls_" + c) || c;
+  const known = ["best", "brilliant", "excellent", "good", "inaccuracy", "mistake", "blunder"];
+  const cls = known.includes(c) ? c : "neutral";
+  return `<span class="badge ${cls}">${esc(label)}</span>`;
+}
+
+function renderCoach(g) {
+  el.coachTag.hidden = true;
+
+  if (state.coachOverride?.kind === "best") {
+    const d = state.coachOverride.data;
+    el.coachTitle.textContent = t("coach");
+    setTag(t("bestTag"));
+    const mv = isZh() ? (d.zhBestMove || d.bestMove) : d.bestMove;
+    const pv = isZh() ? (d.zhPrincipalVariation?.length ? d.zhPrincipalVariation : d.principalVariation) : d.principalVariation;
+    el.coachBody.innerHTML = `
+      <div class="coach-block">
+        <div class="coach-line"><span class="who">${esc(t("bestMove"))}</span>
+          <span class="move-chip ${g.turn}">${esc(mv || "—")}</span>
+          <span class="score ${scoreClass(d.score)}">${esc(fmtScore(d.score, d.scoreText))}</span></div>
+        ${(!isZh() && d.summary) ? `<p class="coach-summary">${esc(d.summary)}</p>` : ""}
+        ${reasonsHtml(isZh() ? (d.zhReasons?.length ? d.zhReasons : d.reasons) : d.reasons)}
+        ${pvHtml(pv)}
+      </div>`;
+    return;
+  }
+
+  if (state.coachOverride?.kind === "hint") {
+    const h = state.coachOverride.data;
+    el.coachTitle.textContent = t("coach");
+    setTag(t("hintTag"));
+    const levels = isZh() ? (h.zhLevels?.length ? h.zhLevels : h.levels) : h.levels;
+    const items = (levels || []).map((lv, i) => `
+      <details class="level" ${i === 0 ? "open" : ""}>
+        <summary>${esc(lv.title || ("· " + (i + 1)))}</summary>
+        <p>${esc(lv.text || "")}</p>
+      </details>`).join("");
+    el.coachBody.innerHTML = `<div class="levels">${items || `<p class="muted">${esc(t("coachEmpty"))}</p>`}</div>`;
+    return;
+  }
+
+  // default: the latest teaching turn (your move review + engine reply)
+  el.coachTitle.textContent = t("coach");
+  const turn = g.latestPlayerTeachingTurn || g.currentTeachingTurn;
+  if (!turn || (!turn.playerMove && !turn.engineMove && !turn.engineThinking)) {
+    el.coachBody.innerHTML = `<p class="muted">${esc(t("coachEmpty"))}</p>`;
+    return;
+  }
+
+  let html = "";
+  // your move + review
+  if (turn.playerMove) {
+    const pm = turn.playerMove;
+    const review = turn.playerReview;
+    const mv = isZh() ? (pm.zhNotation || pm.notation) : pm.notation;
+    let badge = "", lossChip = "", detail = "";
+    if (review) {
+      badge = classBadge(review.classification, review.isBestMove);
+      if (review.centipawnLoss > 5 && !review.isBestMove) {
+        lossChip = `<span class="score neg">−${(review.centipawnLoss / 100).toFixed(2)}</span>`;
+      }
+      const rreasons = isZh() ? (review.zhReasons?.length ? review.zhReasons : review.reasons) : review.reasons;
+      const sLine = (!isZh() && review.summary) ? `<p class="coach-summary">${esc(review.summary)}</p>` : "";
+      detail = sLine + reasonsHtml(rreasons);
+    } else if (turn.playerReviewPending) {
+      badge = `<span class="badge neutral">${esc(t("reviewPending"))}</span>`;
+    }
+    html += `<div class="coach-block">
+      <div class="coach-line"><span class="who">${esc(t("youPlayed"))}</span>
+        <span class="move-chip ${pm.side}">${esc(mv)}</span>${badge}${lossChip}</div>
+      ${detail}
+    </div>`;
+  }
+
+  // engine reply / plan
+  if (turn.engineThinking) {
+    html += `<div class="coach-block"><div class="coach-line"><span class="who">${esc(t("engineReplied"))}</span><span class="muted">${esc(t("thinking"))}</span></div></div>`;
+  } else if (turn.engineMove) {
+    const em = turn.engineMove;
+    const dec = em.decision;
+    const mv = isZh() ? (em.zhNotation || em.notation) : em.notation;
+    const summary = dec?.summary;
+    const reasons = isZh() ? (dec?.zhReasons?.length ? dec.zhReasons : dec?.reasons) : dec?.reasons;
+    const pv = isZh() ? (dec?.zhPrincipalVariation?.length ? dec.zhPrincipalVariation : dec?.principalVariation) : dec?.principalVariation;
+    html += `<div class="coach-block">
+      <div class="coach-line"><span class="who">${esc(t("engineReplied"))}</span>
+        <span class="move-chip ${em.side}">${esc(mv)}</span>
+        ${dec ? `<span class="score ${scoreClass(dec.score)}">${esc(fmtScore(dec.score, dec.scoreText))}</span>` : ""}</div>
+      ${(!isZh() && summary) ? `<p class="coach-summary">${esc(summary)}</p>` : ""}
+      ${reasonsHtml(reasons)}
+      ${pvHtml(pv)}
+    </div>`;
+  }
+
+  el.coachBody.innerHTML = html || `<p class="muted">${esc(t("coachEmpty"))}</p>`;
+}
+function setTag(text) { el.coachTag.textContent = text; el.coachTag.hidden = false; }
+
+function renderMoveList(g) {
+  const hist = g.history || [];
+  el.moveCount.textContent = String(hist.length);
+  if (!hist.length) {
+    el.moveList.innerHTML = `<p class="muted empty-note">${esc(t("noMoves"))}</p>`;
+    return;
+  }
+  // group into rows by moveNumber (red, black)
+  const rows = new Map();
+  for (const m of hist) {
+    const n = m.moveNumber;
+    if (!rows.has(n)) rows.set(n, { red: null, black: null });
+    rows.get(n)[m.side] = m;
+  }
+  const currentPly = hist.length;
+  let html = "";
+  for (const [n, row] of rows) {
+    html += `<div class="move-row"><span class="no">${n}.</span>${plyCell(row.red, currentPly)}${plyCell(row.black, currentPly)}</div>`;
+  }
+  el.moveList.innerHTML = html;
+}
+function plyCell(m, currentPly) {
+  if (!m) return `<span class="ply empty">·</span>`;
+  const label = isZh() ? (m.zhNotation || m.notation) : m.notation;
+  const cls = m.ply === currentPly ? "ply current" : "ply";
+  const tick = m.review?.classification
+    ? `<span class="tick ${m.review.classification}">${tickGlyph(m.review.classification)}</span>` : "";
+  return `<button class="${cls}" data-ply="${m.ply}">${esc(label)}${tick}</button>`;
+}
+function tickGlyph(c) {
+  if (["mistake", "blunder"].includes(c)) return "✕";
+  if (c === "inaccuracy") return "?";
+  if (["best", "brilliant", "excellent", "good"].includes(c)) return "✓";
+  return "";
+}
+
+function renderControls(g) {
+  const playing = g.status?.state === "playing";
+  el.undoButton.disabled = state.busy || !g.canUndo;
+  el.hintButton.disabled = state.busy || !g.playerTurn || !playing;
+  el.bestButton.disabled = state.busy || !playing;
+  el.newButton.disabled = state.busy;
+}
+
+function setBusy(b) {
+  state.busy = b;
+  el.thinking.hidden = !b;
+  if (state.game) renderControls(state.game);
+}
+
+const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ESC[c]); }
+
+// ============================================================
+// Floating review tree — visual node-link graph with mini-boards
+// ============================================================
+const RW = { NW: 132, NH: 180, GX: 46, GY: 26 };
+
+function turnFromFen(fen) {
+  const tok = String(fen || "").trim().split(/\s+/)[1];
+  return tok === "b" ? "black" : "red";
+}
+
+// Render a tiny board from a serialized 90-cell array, oriented to the view side.
+function miniBoard(board, viewSide, { jumpable = false, ply = null } = {}) {
+  if (!board) return "";
+  let cells = "";
+  for (let r = 0; r < 10; r += 1) {
+    for (let f = 0; f < 9; f += 1) {
+      const file = viewSide === "black" ? 8 - f : f;
+      const rank = viewSide === "black" ? 9 - r : r;
+      const sq = rank * 9 + file;
+      const piece = board[sq]?.piece;
+      cells += `<span class="mc">${piece ? `<span class="mp ${piece.side}">${esc(piece.symbol)}</span>` : ""}</span>`;
+    }
+  }
+  const jumpAttr = jumpable && ply != null ? ` data-jump="${ply}"` : "";
+  return `<div class="mini${jumpable ? " jumpable" : ""}"${jumpAttr}><span class="river-mini"></span>${cells}</div>`;
+}
+
+function scoreChip(score) {
+  if (score == null || !Number.isFinite(score)) return "";
+  const cls = score > 30 ? "pos" : score < -30 ? "neg" : "even";
+  return `<span class="node-score ${cls}">${score >= 0 ? "+" : ""}${(score / 100).toFixed(2)}</span>`;
+}
+
+// Build a tree of node objects from the mainline history plus any expanded
+// branches. Nodes get stable ids (m0,m1,… for mainline; parentId>move for
+// branches) so expand state survives re-renders and live game updates.
+function buildReviewModel() {
+  const g = state.game;
+  const hist = g.history || [];
+  const index = new Map();
+  const startBoard = hist[0]?.boardBefore ?? g.board;
+  const startFen = hist[0]?.positionBefore ?? g.fen;
+  const root = { id: "m0", fen: startFen, board: startBoard, ply: 0, isMainline: true, children: [] };
+  index.set(root.id, root);
+
+  let prev = root;
+  hist.forEach((m) => {
+    const node = {
+      id: `m${m.ply}`, fen: m.positionAfter, board: m.boardAfter, ply: m.ply,
+      moveNumber: m.moveNumber, side: m.side,
+      label: isZh() ? (m.zhNotation || m.notation) : m.notation,
+      score: m.decision?.score ?? null, isMainline: true, children: []
+    };
+    index.set(node.id, node);
+    prev._mainNext = node;
+    prev = node;
+  });
+
+  (function attach(node) {
+    const kids = [];
+    if (node._mainNext) kids.push(node._mainNext);
+    if (review.expanded.has(node.id) && review.branches.has(node.id)) {
+      for (const b of review.branches.get(node.id)) {
+        const child = {
+          id: `${node.id}>${b.move}`, fen: b.fen, board: b.board, move: b.move,
+          label: b.label, side: b.side, score: b.score, isMainline: false, children: []
+        };
+        index.set(child.id, child);
+        kids.push(child);
+      }
+    }
+    node.children = kids;
+    kids.forEach(attach);
+  })(root);
+
+  review.nodeIndex = index;
+  return root;
+}
+
+// Layered layout: depth → column (x), mainline stays on its row, each extra
+// branch reserves a fresh row below everything placed so far.
+function layoutReview(root) {
+  let maxRow = 0, maxCol = 0;
+  (function assign(node, col, row) {
+    node.col = col; node.row = row;
+    node.x = col * (RW.NW + RW.GX);
+    node.y = row * (RW.NH + RW.GY);
+    if (row > maxRow) maxRow = row;
+    if (col > maxCol) maxCol = col;
+    node.children.forEach((child, i) => {
+      if (i === 0) assign(child, col + 1, row);
+      else { maxRow += 1; assign(child, col + 1, maxRow); }
+    });
+  })(root, 0, 0);
+  root._maxRow = maxRow; root._maxCol = maxCol;
+}
+
+function edgePath(parent, child) {
+  const x1 = parent.x + RW.NW, y1 = parent.y + RW.NH / 2;
+  const x2 = child.x, y2 = child.y + RW.NH / 2;
+  const dx = Math.max(22, (x2 - x1) / 2);
+  const cls = child.isMainline ? "edge main" : "edge branch";
+  return `<path class="${cls}" d="M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}"/>`;
+}
+
+function gnodeHtml(node, viewSide) {
+  const open = review.expanded.has(node.id);
+  const loading = review.loading.has(node.id);
+  const current = node.isMainline && node.ply === state.game.moveCount && node.ply > 0;
+  const expandCls = `gnode-exp${open ? " open" : ""}${loading ? " loading" : ""}`;
+  let cap;
+  if (node.isMainline && node.ply === 0) {
+    cap = `<span class="node-label start">${esc(t("startPos"))}</span>`;
+  } else {
+    const no = node.moveNumber ? `<span class="node-no">${node.moveNumber}.</span>` : "";
+    cap = `${no}<span class="node-label ${node.side}">${esc(node.label)}</span>${scoreChip(node.score)}`;
+  }
+  return `<div class="gnode${node.isMainline ? " mainline" : " branch"}${current ? " current" : ""}" style="left:${node.x}px;top:${node.y}px;width:${RW.NW}px;">
+      ${miniBoard(node.board, viewSide, { jumpable: node.isMainline, ply: node.ply })}
+      <div class="gnode-cap">${cap}<button class="${expandCls}" data-expand="${esc(node.id)}" aria-label="expand">▸</button></div>
+    </div>`;
+}
+
+function renderReviewTree() {
+  const g = state.game;
+  el.rwHint.textContent = t("reviewHelp");
+  document.querySelector("#reviewWindow .rw-title span").textContent = t("reviewTitle");
+  if (!g) { el.reviewTree.innerHTML = `<p class="rw-empty">${esc(t("noGameYet"))}</p>`; return; }
+
+  const root = buildReviewModel();
+  layoutReview(root);
+  const nodes = [...review.nodeIndex.values()];
+  const W = (root._maxCol + 1) * (RW.NW + RW.GX);
+  const H = (root._maxRow + 1) * (RW.NH + RW.GY);
+  const s = review.view.scale;
+
+  let edges = "";
+  for (const n of nodes) for (const c of n.children) edges += edgePath(n, c);
+  let cards = "";
+  for (const n of nodes) cards += gnodeHtml(n, g.playerSide);
+
+  el.reviewTree.innerHTML =
+    `<div class="rw-viewport" style="width:${Math.round(W * s)}px;height:${Math.round(H * s)}px;">
+       <div class="rw-world" style="width:${W}px;height:${H}px;transform:scale(${s});">
+         <svg class="rw-edges" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${edges}</svg>
+         ${cards}
+       </div>
+     </div>`;
+}
+
+async function expandReviewNode(id) {
+  if (review.expanded.has(id)) { review.expanded.delete(id); renderReviewTree(); return; }
+  if (review.branches.has(id)) { review.expanded.add(id); renderReviewTree(); return; }
+  const node = review.nodeIndex.get(id);
+  if (!node) return;
+
+  review.loading.add(id);
+  renderReviewTree();
+  try {
+    const apiNode = node.isMainline ? { kind: "main", ply: node.ply } : { fen: node.fen };
+    const data = await api("/api/analyze-node", { sessionId: state.sessionId, node: apiNode });
+    const moverSide = turnFromFen(node.fen);
+    // Drop the alternative that equals the actually-played continuation so the
+    // mainline isn't duplicated as a branch.
+    const playedNext = node.isMainline ? (state.game.history?.[node.ply]?.notation ?? null) : null;
+    const children = (data.analysis?.branches || [])
+      .map((b) => ({
+        fen: b.fenAfter, board: b.boardAfter, move: b.move,
+        label: isZh() ? (b.zhMove || b.move) : b.move, side: moverSide, score: b.score
+      }))
+      .filter((c) => c.fen && c.board && c.move !== playedNext);
+    review.branches.set(id, children);
+    review.expanded.add(id);
+  } catch (e) {
+    showToast(t("errGeneric"));
+  } finally {
+    review.loading.delete(id);
+    renderReviewTree();
+  }
+}
+
+function setReviewScale(scale) {
+  review.view.scale = Math.max(0.3, Math.min(1.5, scale));
+  renderReviewTree();
+}
+
+function fitReviewTree() {
+  const vp = el.reviewTree;
+  const world = vp.querySelector(".rw-world");
+  if (!world) return;
+  const W = world.offsetWidth, H = world.offsetHeight;
+  if (W <= 0 || H <= 0) return;
+  const s = Math.min((vp.clientWidth - 24) / W, (vp.clientHeight - 24) / H, 1.2);
+  setReviewScale(s);
+  vp.scrollLeft = 0; vp.scrollTop = 0;
+}
+
+function toggleReview() {
+  review.open = !review.open;
+  el.reviewWindow.hidden = !review.open;
+  if (review.open) { renderReviewTree(); requestAnimationFrame(fitReviewTree); }
+}
+
+// drag/resize the floating window; pan/zoom/click the graph canvas
+function setupReviewWindowControls() {
+  let drag = null, resize = null, pan = null;
+
+  el.rwHead.addEventListener("mousedown", (ev) => {
+    if (ev.target.closest(".rw-icon")) return;
+    const rect = el.reviewWindow.getBoundingClientRect();
+    el.reviewWindow.style.transform = "none";
+    el.reviewWindow.style.left = `${rect.left}px`;
+    el.reviewWindow.style.top = `${rect.top}px`;
+    drag = { x: ev.clientX, y: ev.clientY, left: rect.left, top: rect.top };
+    ev.preventDefault();
+  });
+  el.rwResize.addEventListener("mousedown", (ev) => {
+    const rect = el.reviewWindow.getBoundingClientRect();
+    resize = { x: ev.clientX, y: ev.clientY, w: rect.width, h: rect.height };
+    ev.preventDefault(); ev.stopPropagation();
+  });
+  el.reviewTree.addEventListener("mousedown", (ev) => {
+    if (ev.target.closest(".gnode")) return; // node interactions handle themselves
+    pan = { x: ev.clientX, y: ev.clientY, sl: el.reviewTree.scrollLeft, st: el.reviewTree.scrollTop };
+    el.reviewTree.classList.add("panning");
+    ev.preventDefault();
+  });
+
+  window.addEventListener("mousemove", (ev) => {
+    if (drag) {
+      el.reviewWindow.style.left = `${Math.max(0, drag.left + ev.clientX - drag.x)}px`;
+      el.reviewWindow.style.top = `${Math.max(0, drag.top + ev.clientY - drag.y)}px`;
+    } else if (resize) {
+      el.reviewWindow.style.width = `${Math.max(360, resize.w + ev.clientX - resize.x)}px`;
+      el.reviewWindow.style.height = `${Math.max(280, resize.h + ev.clientY - resize.y)}px`;
+    } else if (pan) {
+      el.reviewTree.scrollLeft = pan.sl - (ev.clientX - pan.x);
+      el.reviewTree.scrollTop = pan.st - (ev.clientY - pan.y);
+    }
+  });
+  window.addEventListener("mouseup", () => {
+    drag = null; resize = null;
+    if (pan) { pan = null; el.reviewTree.classList.remove("panning"); }
+  });
+
+  el.reviewTree.addEventListener("click", (ev) => {
+    const expandBtn = ev.target.closest("[data-expand]");
+    if (expandBtn) { expandReviewNode(expandBtn.dataset.expand); return; }
+    const jump = ev.target.closest("[data-jump]");
+    if (jump) jumpToPly(Number(jump.dataset.jump));
+  });
+}
+
+// ============================================================
+// Actions
+// ============================================================
 async function newGame() {
+  setBusy(true);
+  try {
+    const data = await api("/api/new", { side: state.side, ...LEVELS[state.level] });
+    state.sessionId = data.state.sessionId;
+    state.selected = null;
+    state.coachOverride = null;
+    review.expanded.clear();
+    review.branches.clear();
+    state.game = data.state;
+  } catch (e) {
+    showToast(t("errGeneric") + ": " + e.message);
+  } finally {
+    setBusy(false);
+    render();
+  }
+}
+
+async function sendMove(notation) {
+  setBusy(true);
   state.selected = null;
-  state.panel = null;
-  state.teachingTurnFocusId = null;
-  state.preservedTeachingPair = null;
-  state.treeCollapsed.clear();
-  state.treeSelectedId = null;
-  state.treeAnalysis.clear();
-  state.treeAnalysisPendingId = null;
-  resetTreeView({ autoFit: true });
-  await runRequest(async () => {
-    const result = await api("/api/new", {
-      side: elements.sideSelect.value
-    });
-    setGame(result.state);
-  });
-}
-
-async function playMove(notation) {
-  await runRequest(async () => {
-    state.pendingStage = "player-review";
-    const optimisticMove = renderOptimisticPlayerMove(notation);
-    await waitForNextPaint();
-    const result = await api("/api/move", {
-      sessionId: state.sessionId,
-      move: notation,
-      reviewPlayer: false,
-      deferEngine: true
-    });
-    focusTeachingTurnForMove(result.state, optimisticMove);
-    focusLatestMainlineTeachingView(result.state);
-    setGame(result.state);
-    state.pendingStage = "player-review";
-    renderStatus();
-    const reviewed = await api("/api/review-last-player-move", {
-      sessionId: state.sessionId
-    });
-    focusLatestMainlineTeachingView(reviewed.state);
-    setGame(reviewed.state);
-    state.pendingStage = "teaching-hold";
-    renderStatus();
-    await holdTeachingReviewBeforeEngineReply(reviewed.state);
-    await requestEngineMoveIfNeeded(reviewed.state);
-  });
-}
-
-async function requestEngineMoveIfNeeded(game = state.game) {
-  if (!shouldRequestEngineMove(game)) return;
-  state.pendingStage = "engine-reply";
-  renderStatus();
-  const result = await api("/api/engine-move", {
-    sessionId: state.sessionId
-  });
-  focusLatestMainlineTeachingView(result.state);
-  setGame(result.state);
-}
-
-function focusLatestMainlineTeachingView(game) {
-  focusLatestPlayerTeachingTurn(game);
-  state.treeSelectedId = latestMainlineNodeId(game);
-  state.panel = panelFromVisibleTeachingPair(game) ?? panelFromTeachingFocus(game) ?? panelFromMove(game);
-}
-
-function shouldRequestEngineMove(game) {
-  return game?.status?.state === "playing" && game.turn === game.engineSide;
-}
-
-async function holdTeachingReviewBeforeEngineReply(game) {
-  if (!shouldHoldTeachingReview(game)) return;
-  await delay(TEACHING_REVIEW_HOLD_MS);
-}
-
-function shouldHoldTeachingReview(game) {
-  if (!shouldRequestEngineMove(game)) return false;
-  const pair = activeTeachingPair(game);
-  return Boolean(pair?.playerMove && pair.playerReview && !pair.engineMove && pair.engineThinking);
-}
-
-function delay(ms) {
-  return new Promise((resolveDelay) => {
-    window.setTimeout(resolveDelay, ms);
-  });
-}
-
-function waitForNextPaint() {
-  return new Promise((resolvePaint) => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(resolvePaint);
-    });
-  });
-}
-
-function renderOptimisticPlayerMove(notation) {
-  const game = state.game;
-  const move = game?.legalMoves?.find((candidate) => candidate.notation === notation);
-  if (!game || !move) return;
-
-  const board = game.board.map((cell) => ({
-    ...cell,
-    piece: cell.piece ? { ...cell.piece } : null
-  }));
-  const from = board.find((cell) => cell.coord === move.fromCoord);
-  const to = board.find((cell) => cell.coord === move.toCoord);
-  if (!from || !to || !from.piece) return;
-
-  const boardBefore = game.board.map((cell) => ({
-    ...cell,
-    piece: cell.piece ? { ...cell.piece } : null
-  }));
-  to.piece = { ...from.piece };
-  from.piece = null;
-  const ply = (game.history?.length ?? game.moveCount ?? 0) + 1;
-  const optimisticMove = {
-    ply,
-    moveNumber: Math.floor((ply + 1) / 2),
-    side: move.piece?.side ?? game.playerSide,
-    actor: "player",
-    notation: move.notation,
-    zhNotation: move.zhNotation,
-    boardBefore,
-    boardAfter: board
-  };
-  state.game = {
-    ...game,
-    board,
-    turn: oppositeSide(game.turn),
-    history: [
-      ...(game.history ?? []),
-      optimisticMove
-    ],
-    lastMove: optimisticMove,
-    moveCount: ply,
-    legalMoves: [],
-    playerTurn: false
-  };
-  state.selected = null;
-  state.teachingTurnFocusId = teachingTurnIdForMove(optimisticMove);
-  state.treeSelectedId = mainlineNodeId(ply);
-  state.panel = {
-    kind: "teachingPair",
-    id: state.teachingTurnFocusId,
-    preserveLatestHuman: true,
-    playerMove: optimisticMove,
-    playerReview: null,
-    playerReviewPending: true,
-    engineMove: null,
-    engineDecision: null,
-    engineThinking: true
-  };
-  state.preservedTeachingPair = normalizeTeachingPair(state.panel);
+  state.coachOverride = null;
   render();
-  return optimisticMove;
+  try {
+    const data = await api("/api/move", { sessionId: state.sessionId, move: notation });
+    state.game = data.state;
+  } catch (e) {
+    showToast(t("errMove"));
+  } finally {
+    setBusy(false);
+    render();
+  }
 }
 
-async function undoMove() {
-  await runRequest(async () => {
-    const result = await api("/api/undo", {
-      sessionId: state.sessionId
-    });
-    state.treeSelectedId = latestMainlineNodeId(result.state);
-    state.panel = null;
-    setGame(result.state);
-  });
+async function undo() {
+  setBusy(true);
+  try {
+    // undo engine reply + player move (two pops) when possible
+    let data = await api("/api/undo", { sessionId: state.sessionId });
+    if (data.state && !data.state.playerTurn && data.state.canUndo) {
+      data = await api("/api/undo", { sessionId: state.sessionId });
+    }
+    state.selected = null;
+    state.coachOverride = null;
+    state.game = data.state;
+  } catch (e) {
+    showToast(t("errGeneric"));
+  } finally {
+    setBusy(false);
+    render();
+  }
 }
 
 async function requestHint() {
-  await runRequest(async () => {
-    const result = await api("/api/hint", {
-      sessionId: state.sessionId
-    });
-    state.panel = {
-      kind: "hint",
-      hint: result.hint
-    };
-    setGame(result.state);
-  });
+  setBusy(true);
+  try {
+    const data = await api("/api/hint", { sessionId: state.sessionId });
+    state.game = data.state;
+    state.coachOverride = { kind: "hint", data: data.hint };
+  } catch (e) {
+    showToast(t("errGeneric"));
+  } finally {
+    setBusy(false);
+    render();
+  }
 }
 
 async function requestBest() {
-  await runRequest(async () => {
-    const result = await api("/api/best", {
-      sessionId: state.sessionId
-    });
-    state.panel = {
-      kind: "best",
-      decision: result.best
-    };
-    setGame(result.state);
-  });
-}
-
-async function runRequest(task) {
-  if (state.pending) return;
-  state.pending = true;
-  state.pendingStage = null;
-  state.pendingSince = Date.now();
-  state.errorMessage = null;
-  startPendingTicker();
-  renderStatus();
-  updateDisabled();
+  setBusy(true);
   try {
-    await task();
-  } catch (error) {
-    const refreshed = await refreshStateAfterFailure();
-    state.errorMessage = refreshed
-      ? `${error.message} ${t("stateRefreshed")}`
-      : error.message;
+    const data = await api("/api/best", { sessionId: state.sessionId });
+    state.game = data.state;
+    state.coachOverride = { kind: "best", data: data.best };
+  } catch (e) {
+    showToast(t("errGeneric"));
   } finally {
-    state.pending = false;
-    state.pendingStage = null;
-    state.pendingSince = null;
-    stopPendingTicker();
-    if (state.game) render();
-    else {
-      updateDisabled();
-      if (state.errorMessage) renderError(state.errorMessage);
-    }
-  }
-}
-
-async function api(path, payload) {
-  const timeoutMs = currentRequestTimeoutMs();
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
-  let response;
-
-  try {
-    response = await fetch(path, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload ?? {}),
-      signal: controller.signal
-    });
-  } catch (error) {
-    throw normalizeRequestError(error, timeoutMs);
-  } finally {
-    window.clearTimeout(timeout);
-  }
-
-  let result;
-  try {
-    result = await response.json();
-  } catch {
-    throw new Error(`Request failed: ${response.status}`);
-  }
-
-  if (!response.ok || result.ok === false) {
-    throw new Error(result.error ?? `Request failed: ${response.status}`);
-  }
-  return result;
-}
-
-async function fetchState() {
-  if (!state.sessionId) return null;
-
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), CLIENT_STATE_REFRESH_TIMEOUT_MS);
-  try {
-    const response = await fetch(`/api/state?session=${encodeURIComponent(state.sessionId)}`, {
-      cache: "no-store",
-      signal: controller.signal
-    });
-    const result = await response.json();
-    if (!response.ok || result.ok === false) return null;
-    return result.state ?? null;
-  } catch {
-    return null;
-  } finally {
-    window.clearTimeout(timeout);
-  }
-}
-
-async function refreshStateAfterFailure() {
-  const latest = await fetchState();
-  if (!latest) return false;
-  setGame(latest);
-  return true;
-}
-
-function currentRequestTimeoutMs() {
-  const serverBudget = Number(state.game?.web?.requestTimeoutMs);
-  if (Number.isFinite(serverBudget) && serverBudget > 0) {
-    return serverBudget + CLIENT_REQUEST_TIMEOUT_BUFFER_MS;
-  }
-  return DEFAULT_CLIENT_REQUEST_TIMEOUT_MS;
-}
-
-function normalizeRequestError(error, timeoutMs) {
-  if (error?.name === "AbortError") {
-    return new Error(`${t("requestTimedOut")} (${formatDuration(timeoutMs)})`);
-  }
-  return new Error(t("requestFailed"));
-}
-
-function startPendingTicker() {
-  stopPendingTicker();
-  pendingRenderTimer = window.setInterval(() => {
-    if (state.pending) renderStatus();
-  }, PENDING_STATUS_INTERVAL_MS);
-}
-
-function stopPendingTicker() {
-  if (!pendingRenderTimer) return;
-  window.clearInterval(pendingRenderTimer);
-  pendingRenderTimer = null;
-}
-
-function setGame(game) {
-  state.game = game;
-  state.sessionId = game.sessionId;
-  updatePreservedTeachingPair(game);
-  syncTreeSelection();
-  syncTeachingFocus();
-  if (state.panel?.kind === "teachingPair") {
-    state.panel = state.panel.preserveLatestHuman === false
-      ? panelFromTeachingFocus(game) ?? panelFromTreeSelection() ?? panelFromMove(game)
-      : panelFromVisibleTeachingPair(game) ?? panelFromTeachingFocus(game) ?? panelFromTreeSelection() ?? panelFromMove(game);
-  }
-  if (!state.panel) {
-    state.panel = panelFromTreeSelection() ?? panelFromVisibleTeachingPair(game) ?? panelFromMove(game);
-  }
-  render();
-}
-
-function render() {
-  renderStatus();
-  renderBoard();
-  renderSelectedMoves();
-  renderEngineInfo();
-  renderLastMove();
-  renderReasoning();
-  renderHistory();
-  updateDisabled();
-}
-
-function renderStatus() {
-  const game = state.game;
-  if (!game) return;
-
-  if (state.pending) {
-    elements.gameStatus.textContent = pendingStatusText();
-    elements.turnPill.textContent = t("thinkingShort");
-    elements.turnPill.className = "turn-pill thinking";
-    return;
-  }
-
-  const status = game.status;
-  const check = status.inCheck ? t("inCheck") : "";
-  const suffix = status.state === "playing"
-    ? `${t(`${game.turn}ToMove`)}${check}`
-    : gameOverText(status);
-
-  elements.gameStatus.textContent = suffix;
-  elements.turnPill.textContent = status.state === "playing" ? sideName(game.turn) : t("gameOver");
-  elements.turnPill.className = `turn-pill ${game.turn}`;
-}
-
-function renderBoard() {
-  const game = state.game;
-  if (!game) return;
-
-  const boardView = boardCellsForTreeSelection();
-  const previewing = isTreeBoardPreview();
-  const cellsByCoord = new Map(boardView.map((cell) => [cell.coord, cell]));
-  const legalFrom = previewing ? new Set() : legalMovesFrom();
-  const legalTargetMoves = previewing ? new Map() : selectedTargetMoves();
-  const legalTargets = new Set(legalTargetMoves.keys());
-
-  elements.boardWrap.classList.toggle("black-view", game.playerSide === "black");
-  elements.boardWrap.classList.toggle("tree-preview", previewing);
-  renderBoardLabels(game.playerSide);
-  elements.board.innerHTML = "";
-
-  for (const rank of ranks) {
-    for (const file of files) {
-      const coord = `${file}${rank}`;
-      const cell = cellsByCoord.get(coord);
-      const point = visualPoint(coord, game.playerSide);
-      const targetMove = legalTargetMoves.get(coord);
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "cell";
-      button.dataset.coord = coord;
-      button.style.setProperty("--file", point.file);
-      button.style.setProperty("--rank", point.rank);
-      button.disabled = state.pending || previewing || !game.playerTurn;
-      button.title = cellTitle(cell, coord, targetMove);
-      button.setAttribute("aria-label", cellTitle(cell, coord, targetMove));
-      if (state.selected === coord) button.classList.add("selected");
-      if (legalTargets.has(coord)) button.classList.add("target");
-
-      if (cell?.piece) {
-        const piece = document.createElement("span");
-        piece.className = `piece ${cell.piece.side}`;
-        piece.title = cellTitle(cell, coord);
-        const glyph = document.createElement("span");
-        glyph.className = "piece-glyph";
-        glyph.textContent = pieceSymbol(cell.piece);
-        piece.append(glyph);
-        button.append(piece);
-      }
-      if (targetMove) {
-        const moveLabel = document.createElement("span");
-        moveLabel.className = `move-label ${point.file % 2 === 0 ? "move-label-high" : "move-label-low"}`;
-        moveLabel.textContent = moveLabelText(targetMove.notation, targetMove.zhNotation);
-        button.append(moveLabel);
-      }
-
-      if (game.playerTurn && (cell?.piece?.side === game.playerSide || legalTargets.has(coord) || legalFrom.has(coord))) {
-        button.addEventListener("click", () => handleCellClick(coord));
-      }
-      elements.board.append(button);
-    }
-  }
-}
-
-function renderEngineInfo() {
-  const backend = state.game?.backend;
-  if (!backend) return;
-
-  const settings = backend.settings ?? {};
-  elements.engineInfo.innerHTML = [
-    `<span><strong>${escapeHtml(backend.name)}</strong> (${escapeHtml(backend.kind)})</span>`,
-    settings.playLevel ? `<span>${t("level")}: ${escapeHtml(settings.playLevel)}</span>` : "",
-    Number.isFinite(settings.depth) ? `<span>${t("depth")}: ${settings.depth}</span>` : "",
-    Number.isFinite(settings.timeLimitMs) ? `<span>${t("time")}: ${settings.timeLimitMs} ms</span>` : "",
-    Number.isFinite(settings.lines) ? `<span>${t("lines")}: ${settings.lines}</span>` : "",
-    backend.status?.fallbackActive ? `<span class="status-error">${t("fallback")}: ${escapeHtml(backend.status.fallbackReason ?? "active")}</span>` : ""
-  ].filter(Boolean).join("");
-}
-
-function renderLastMove() {
-  const treeNode = selectedTreeNode();
-  if (treeNode?.kind === "analysis") {
-    renderAnalysisBranchSummary(treeNode);
-    return;
-  }
-  if (treeNode && state.treeAnalysis.has(treeNode.id)) {
-    renderTreeAnalysisSummary(treeNode);
-    return;
-  }
-  if (treeNode?.kind === "alternative") {
-    renderAlternativeSummary(treeNode);
-    return;
-  }
-
-  const teachingPair = teachingPairForSelectedTreeNode(treeNode);
-  if (teachingPair) {
-    renderTeachingPairSummary(teachingPair, treeNode?.kind === "main" ? treeNode : null, {
-      preserveLatestHuman: shouldPreserveHumanTeachingForNode(treeNode)
-    });
-    return;
-  }
-
-  const last = treeNode?.kind === "main" ? treeNode.move : state.game?.lastMove;
-  if (!last) {
-    elements.lastMovePanel.className = "stack muted";
-    elements.lastMovePanel.textContent = t("noMoves");
-    return;
-  }
-
-  const review = last.review;
-  const decision = last.decision;
-  const details = [];
-  details.push(`<div class="line"><strong>${escapeHtml(sideName(last.side))}</strong> ${formatMoveHtml(last.notation, last.zhNotation)} <span class="score">${escapeHtml(actorName(last.actor))}</span></div>`);
-  if (decision) details.push(`<div>${escapeHtml(localizedDecisionSummary(decision))}</div>`);
-  if (review) details.push(`<div>${escapeHtml(localizedReviewSummary(review))}</div>`);
-  if (review?.practiceFocus) {
-    const focus = localizedPracticeFocus(review.practiceFocus);
-    details.push(`<div class="line"><strong>${escapeHtml(focus.title)}</strong><br>${escapeHtml(focus.text)}</div>`);
-  }
-  if (review?.planComparison?.summary) {
-    details.push(`<div class="line">${escapeHtml(localizedPlanComparisonSummary(review.planComparison))}</div>`);
-  }
-  if (treeNode?.kind === "main") details.push(renderSelectedNodeActions(treeNode));
-
-  elements.lastMovePanel.className = "stack";
-  elements.lastMovePanel.innerHTML = details.join("");
-  bindTreeRestoreAction();
-  bindTreeRecomputeActions(elements.lastMovePanel);
-}
-
-function renderTeachingPairSummary(pair, node = null, options = {}) {
-  const teachingPair = options.preserveLatestHuman
-    ? pairWithPreservedHumanMove(pair, state.game)
-    : node
-      ? normalizeTeachingPair(pair)
-      : pairWithPreservedHumanMove(pair, state.game);
-  const cards = renderTeachingPairCards(teachingPair, {
-    compact: true,
-    summary: true,
-    stableLanes: true
-  });
-
-  elements.lastMovePanel.className = "stack teaching-stack";
-  elements.lastMovePanel.innerHTML = cards.length
-    ? [
-      `<div class="teaching-turn-title">${escapeHtml(t("teachingTurn"))}</div>`,
-      `<div class="teaching-pair-grid teaching-pair-summary">${cards.join("")}</div>`,
-      node ? renderSelectedNodeActions(node) : ""
-    ].join("")
-    : t("noMoves");
-  bindTreeRestoreAction();
-  bindTreeRecomputeActions(elements.lastMovePanel);
-}
-
-function renderTreeAnalysisSummary(node) {
-  const analysis = state.treeAnalysis.get(node.id);
-  const best = analysis?.best;
-  const details = [
-    `<div class="line"><strong>${escapeHtml(t("generatedBranches"))}</strong> <span class="score">${escapeHtml(treeNodePrefix(node))}</span></div>`
-  ];
-  if (best?.bestMove) {
-    details.push(`<div>${escapeHtml(localizedDecisionSummary(best))}</div>`);
-  }
-  if (analysis?.branches?.length) {
-    details.push(`<div class="score">${analysis.branches.length} ${escapeHtml(t("generatedBranches"))}</div>`);
-  }
-  details.push(renderSelectedNodeActions(node));
-
-  elements.lastMovePanel.className = "stack";
-  elements.lastMovePanel.innerHTML = details.join("");
-  bindTreeRestoreAction();
-  bindTreeRecomputeActions(elements.lastMovePanel);
-}
-
-function renderAlternativeSummary(node) {
-  const alternative = node.alternative;
-  const details = [
-    `<div class="line"><strong>${escapeHtml(t("alternativeLine"))}</strong> ${formatMoveHtml(alternative.move, alternative.zhMove)} <span class="score">${escapeHtml(t("branchPoint"))}: ${formatMoveHtml(node.parentMove.notation, node.parentMove.zhNotation)}</span></div>`
-  ];
-  if (alternative.boardAfter) {
-    details.push(`<div class="score">${escapeHtml(t("variationPreview"))}: ${formatMoveHtml(alternative.move, alternative.zhMove)}</div>`);
-  }
-  const reply = alternative.expectedReply
-    ? `<div class="score">${escapeHtml(t("expectedReply"))}: ${formatMoveHtml(alternative.expectedReply, alternative.zhExpectedReply)}</div>`
-    : "";
-  const loss = Number.isFinite(alternative.centipawnLoss)
-    ? `<div class="score">${escapeHtml(t("loss"))}: ${Math.round(alternative.centipawnLoss)} cp</div>`
-    : "";
-  const score = alternative.scoreDetail?.text ?? (Number.isFinite(alternative.score) ? formatCentipawns(alternative.score) : "");
-  if (score) details.push(`<div class="score">${escapeHtml(t("scorePrefix"))}: ${escapeHtml(score)}</div>`);
-  if (reply) details.push(reply);
-  if (loss) details.push(loss);
-  details.push(renderSelectedNodeActions(node));
-
-  elements.lastMovePanel.className = "stack";
-  elements.lastMovePanel.innerHTML = details.join("");
-  bindTreeRecomputeActions(elements.lastMovePanel);
-}
-
-function renderAnalysisBranchSummary(node) {
-  const branch = node.branch;
-  const details = [
-    `<div class="line"><strong>${escapeHtml(t("analysisBranch"))}</strong> ${formatMoveHtml(branch.move, branch.zhMove)} <span class="score">${escapeHtml(treeNodePrefix(node))}</span></div>`
-  ];
-  const summary = analysisBranchSummaryText(branch);
-  if (summary) details.push(`<div class="score">${escapeHtml(summary)}</div>`);
-  if (branch.summary) details.push(`<div>${escapeHtml(localizedChineseText(branch.summary))}</div>`);
-  details.push(renderSelectedNodeActions(node));
-
-  elements.lastMovePanel.className = "stack";
-  elements.lastMovePanel.innerHTML = details.join("");
-  bindTreeRecomputeActions(elements.lastMovePanel);
-}
-
-function renderSelectedNodeActions(node) {
-  const actions = [
-    `<button class="tree-restore-button" type="button" data-tree-recompute="${escapeHtml(node.id)}">${escapeHtml(t("recomputeNode"))}</button>`
-  ];
-  if (canRestoreTreeNode(node)) {
-    actions.unshift(`<button class="tree-restore-button" type="button" data-tree-restore="${escapeHtml(node.id)}">${escapeHtml(t("restorePoint"))}</button>`);
-  }
-  return `<div class="tree-action-row">${actions.join("")}</div>`;
-}
-
-function canRestoreTreeNode(node) {
-  if (!node) return false;
-  if (node.kind === "main") return node.id !== latestMainlineNodeId();
-  return Boolean(analysisRequestForTreeNode(node));
-}
-
-function renderReasoning() {
-  if (state.errorMessage) {
-    renderError(state.errorMessage);
-    return;
-  }
-
-  const panel = state.panel;
-  if (!panel) {
-    renderReasoningPrompt();
-    return;
-  }
-
-  if (panel.kind === "hint") {
-    renderHint(panel.hint);
-    return;
-  }
-  if (panel.kind === "best") {
-    renderDecision(panel.decision);
-    return;
-  }
-  if (panel.kind === "move" && panel.decision) {
-    renderDecision(panel.decision);
-    return;
-  }
-  if (panel.kind === "move" && panel.review) {
-    renderReview(panel.review);
-    return;
-  }
-  if (panel.kind === "teachingPair") {
-    renderTeachingPairReasoning(panel);
-    return;
-  }
-  if (panel.kind === "treeAlternative") {
-    renderAlternativeReasoning(panel.node);
-    return;
-  }
-  if (panel.kind === "treeAnalysis") {
-    renderTreeAnalysisReasoning(panel.nodeId);
-    return;
-  }
-  if (panel.kind === "treeBranch") {
-    renderAnalysisBranchReasoning(panel.nodeId);
-    return;
-  }
-
-  renderReasoningPrompt();
-}
-
-function renderReasoningPrompt() {
-  elements.reasoningPanel.className = "stack muted";
-  elements.reasoningPanel.textContent = t("askPrompt");
-}
-
-function renderTreeAnalysisReasoning(nodeId) {
-  const analysis = state.treeAnalysis.get(nodeId);
-  if (!analysis?.best) {
-    elements.reasoningPanel.className = "stack muted";
-    elements.reasoningPanel.textContent = t("noDecision");
-    return;
-  }
-  renderDecision(analysis.best);
-}
-
-function renderAnalysisBranchReasoning(nodeId) {
-  const node = findTreeNode(nodeId);
-  const branch = node?.branch;
-  if (!branch) {
-    elements.reasoningPanel.className = "stack muted";
-    elements.reasoningPanel.textContent = t("noDecision");
-    return;
-  }
-
-  const parts = [
-    `<div>${formatMoveHtml(branch.move, branch.zhMove)} <span class="score">${escapeHtml(analysisBranchSummaryText(branch))}</span></div>`
-  ];
-  if (branch.expectedReply) {
-    parts.push(`<div class="line"><strong>${escapeHtml(t("expectedReply"))}</strong> ${formatMoveHtml(branch.expectedReply, branch.zhExpectedReply)}</div>`);
-  }
-  if (branch.summary) {
-    parts.push(`<div class="line">${escapeHtml(localizedChineseText(branch.summary))}</div>`);
-  }
-  if (branch.reasons?.length) {
-    parts.push(`<ul class="reason-list">${branch.reasons.slice(0, 4).map((reason) => `<li>${escapeHtml(localizedChineseText(reason))}</li>`).join("")}</ul>`);
-  }
-
-  elements.reasoningPanel.className = "stack";
-  elements.reasoningPanel.innerHTML = parts.join("");
-}
-
-function renderAlternativeReasoning(node) {
-  const alternative = node?.alternative;
-  if (!alternative) {
-    elements.reasoningPanel.className = "stack muted";
-    elements.reasoningPanel.textContent = t("noDecision");
-    return;
-  }
-
-  const parts = [
-    `<div>${formatMoveHtml(alternative.move, alternative.zhMove)} <span class="score">${escapeHtml(alternativeSummaryText(alternative))}</span></div>`
-  ];
-  if (alternative.boardAfter) {
-    parts.push(`<div class="score">${escapeHtml(t("variationPreview"))}: ${formatMoveHtml(alternative.move, alternative.zhMove)}</div>`);
-  }
-  const comparisonSummary = localizedPlanComparisonSummary(alternative.planComparison);
-  if (comparisonSummary) {
-    parts.push(`<div class="line">${escapeHtml(comparisonSummary)}</div>`);
-  }
-  if (alternative.expectedReply) {
-    parts.push(`<div class="line"><strong>${escapeHtml(t("expectedReply"))}</strong> ${formatMoveHtml(alternative.expectedReply, alternative.zhExpectedReply)}</div>`);
-  }
-
-  elements.reasoningPanel.className = "stack";
-  elements.reasoningPanel.innerHTML = parts.join("");
-}
-
-function renderTeachingPairReasoning(pair) {
-  const teachingPair = pair.preserveLatestHuman === false
-    ? normalizeTeachingPair(pair)
-    : pairWithPreservedHumanMove(pair, state.game);
-  const cards = renderTeachingPairCards(teachingPair, {
-    stableLanes: true
-  });
-
-  elements.reasoningPanel.className = "stack teaching-stack";
-  elements.reasoningPanel.innerHTML = cards.length
-    ? [
-      `<div class="teaching-turn-title">${escapeHtml(t("teachingTurn"))}</div>`,
-      `<div class="teaching-pair-grid teaching-pair-reasoning">${cards.join("")}</div>`
-    ].join("")
-    : t("noDecision");
-}
-
-function renderTeachingPairCards(pair, options = {}) {
-  const cards = [];
-  const compact = Boolean(options.compact);
-  const summary = Boolean(options.summary);
-  const stableLanes = Boolean(options.stableLanes);
-  const hasTeachingContent = Boolean(
-    pair?.playerMove
-    || pair?.playerReview
-    || pair?.engineMove
-    || pair?.engineDecision
-    || pair?.engineThinking
-  );
-  if (pair?.playerMove) {
-    cards.push(renderTeachingMoveCard({
-      kind: "player",
-      label: t("yourLastMove"),
-      move: pair.playerMove,
-      pending: pair.playerReviewPending,
-      compact,
-      body: pair.playerReview
-        ? summary
-          ? teachingReviewSummaryParts(pair.playerReview)
-          : teachingReviewParts(pair.playerReview)
-        : [escapeHtml(t(pair.playerReviewPending ? "reviewPending" : "moveWaitingReview"))]
-    }));
-  } else if (stableLanes && hasTeachingContent) {
-    cards.push(renderTeachingMoveCard({
-      kind: "player placeholder",
-      label: t("yourLastMove"),
-      metaText: actorName("player"),
-      compact,
-      body: [escapeHtml(t("noPlayerMove"))]
-    }));
-  }
-  if (pair?.engineMove) {
-    cards.push(renderTeachingMoveCard({
-      kind: "engine",
-      label: t("engineLastMove"),
-      move: pair.engineMove,
-      compact,
-      body: pair.engineDecision
-        ? summary
-          ? teachingDecisionSummaryParts(pair.engineDecision)
-          : teachingDecisionParts(pair.engineDecision)
-        : [escapeHtml(t("noDecision"))]
-    }));
-  } else if (pair?.engineThinking) {
-    cards.push(renderTeachingMoveCard({
-      kind: "engine",
-      label: t("engineLastMove"),
-      pending: true,
-      compact,
-      body: [escapeHtml(t("replyPending"))]
-    }));
-  } else if (stableLanes && hasTeachingContent) {
-    cards.push(renderTeachingMoveCard({
-      kind: "engine placeholder",
-      label: t("engineLastMove"),
-      metaText: actorName("engine"),
-      compact,
-      body: [escapeHtml(t("noEngineMove"))]
-    }));
-  }
-  return cards;
-}
-
-function renderTeachingMoveCard({ kind, label, move = null, body = [], pending = false, compact = false, metaText = null }) {
-  const meta = metaText ?? (move ? `${sideName(move.side)} · ${actorName(move.actor)}` : pending ? t("thinkingShort") : "");
-  const content = body.filter(Boolean);
-  const moveHtml = move
-    ? compact
-      ? `<span class="move-notation">${escapeHtml(moveText(move.notation, move.zhNotation))}</span>`
-      : formatMoveHtml(move.notation, move.zhNotation)
-    : "";
-  return [
-    `<section class="teaching-card ${escapeHtml(kind)}${pending ? " pending" : ""}${compact ? " compact" : ""}">`,
-    `<div class="teaching-card-head">`,
-    `<strong>${escapeHtml(label)}</strong>`,
-    meta ? `<span class="score">${escapeHtml(meta)}</span>` : "",
-    `</div>`,
-    moveHtml ? `<div class="teaching-card-move">${moveHtml}</div>` : "",
-    content.length ? `<div class="teaching-card-body">${content.map((part) => `<div>${part}</div>`).join("")}</div>` : "",
-    `</section>`
-  ].join("");
-}
-
-function teachingReviewSummaryParts(review) {
-  const parts = [
-    escapeHtml(localizedReviewSummary(review))
-  ];
-  const score = teachingReviewScoreText(review);
-  if (score) parts.push(escapeHtml(score));
-  const comparison = localizedPlanComparisonSummary(review.planComparison);
-  if (comparison) parts.push(escapeHtml(comparison));
-  return parts;
-}
-
-function teachingReviewParts(review) {
-  const parts = [
-    escapeHtml(localizedReviewSummary(review))
-  ];
-  if (review.planComparison?.summary) parts.push(escapeHtml(localizedPlanComparisonSummary(review.planComparison)));
-  const score = teachingReviewScoreText(review);
-  if (score) parts.push(escapeHtml(score));
-  if (review.practiceFocus) {
-    const focus = localizedPracticeFocus(review.practiceFocus);
-    parts.push(`<strong>${escapeHtml(focus.title)}</strong> ${escapeHtml(focus.text)}`);
-  }
-  const reasons = localizedReviewReasons(review).slice(0, 2);
-  if (reasons.length) {
-    parts.push(`<ul class="teaching-reason-list">${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>`);
-  }
-  return parts;
-}
-
-function teachingReviewScoreText(review) {
-  const played = review.playedScoreDetail?.text
-    ?? (Number.isFinite(review.playedScore) ? formatCentipawns(review.playedScore) : "");
-  const best = review.bestScoreDetail?.text
-    ?? (Number.isFinite(review.bestScore) ? formatCentipawns(review.bestScore) : "");
-  if (!played && !best) return "";
-  if (played && best && played !== best) {
-    return `${t("scorePrefix")} ${played} · ${t("bestAlternative")} ${best}`;
-  }
-  return `${t("scorePrefix")} ${played || best}`;
-}
-
-function teachingDecisionSummaryParts(decision) {
-  const parts = [
-    escapeHtml(localizedDecisionSummary(decision))
-  ];
-  const linePlanSummary = localizedLinePlanSummary(decision.linePlan);
-  if (linePlanSummary) parts.push(escapeHtml(linePlanSummary));
-  return parts;
-}
-
-function teachingDecisionParts(decision) {
-  const parts = [
-    escapeHtml(localizedDecisionSummary(decision))
-  ];
-  const linePlanSummary = localizedLinePlanSummary(decision.linePlan);
-  if (linePlanSummary) parts.push(escapeHtml(linePlanSummary));
-  if (decision.confidence?.label) {
-    parts.push(`${escapeHtml(t("confidence"))}: ${escapeHtml(confidenceLabel(decision.confidence))} (${Math.round(decision.confidence.score ?? 0)}/100)`);
-  }
-  const reasons = localizedReasons(decision).slice(0, 2);
-  if (reasons.length) {
-    parts.push(`<ul class="teaching-reason-list">${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>`);
-  }
-  return parts;
-}
-
-function renderDecision(decision) {
-  if (!decision) {
-    elements.reasoningPanel.className = "stack muted";
-    elements.reasoningPanel.textContent = t("noDecision");
-    return;
-  }
-
-  const parts = decisionDetailParts(decision);
-  elements.reasoningPanel.className = "stack";
-  elements.reasoningPanel.innerHTML = parts.join("");
-}
-
-function decisionDetailParts(decision, options = {}) {
-  const includeBestMove = options.includeBestMove !== false;
-  const parts = [];
-  if (includeBestMove && decision.bestMove) {
-    parts.push(`<div class="line"><strong>${t("bestMove")}</strong> ${formatMoveHtml(decision.bestMove, decision.zhBestMove)}</div>`);
-  }
-  parts.push(`<div>${escapeHtml(localizedDecisionSummary(decision))}</div>`);
-  const linePlanSummary = localizedLinePlanSummary(decision.linePlan);
-  if (linePlanSummary) parts.push(`<div class="line">${escapeHtml(linePlanSummary)}</div>`);
-  if (decision.comparison?.reason && !isChineseLocale()) parts.push(`<div class="line">${escapeHtml(decision.comparison.reason)}</div>`);
-  if (decision.confidence?.label) {
-    parts.push(`<div class="score">${t("confidence")}: ${escapeHtml(confidenceLabel(decision.confidence))} (${Math.round(decision.confidence.score ?? 0)}/100)</div>`);
-  }
-  if (decision.alternatives?.length) {
-    parts.push(renderAlternatives(decision.alternatives));
-  }
-  const reasons = localizedReasons(decision);
-  if (reasons.length) {
-    parts.push(`<ul class="reason-list">${reasons.slice(0, 5).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>`);
-  }
-  return parts;
-}
-
-function renderReview(review) {
-  const parts = reviewDetailParts(review);
-  elements.reasoningPanel.className = "stack";
-  elements.reasoningPanel.innerHTML = parts.join("");
-}
-
-function reviewDetailParts(review, options = {}) {
-  const includeMove = options.includeMove !== false;
-  const parts = [
-    `<div>${escapeHtml(localizedReviewSummary(review))}</div>`
-  ];
-  if (includeMove && review.move) parts.unshift(`<div class="line">${formatMoveHtml(review.move, review.zhMove)}</div>`);
-  if (review.planComparison?.summary) parts.push(`<div class="line">${escapeHtml(localizedPlanComparisonSummary(review.planComparison))}</div>`);
-  if (review.practiceFocus) {
-    const focus = localizedPracticeFocus(review.practiceFocus);
-    parts.push(`<div class="line"><strong>${escapeHtml(focus.title)}</strong><br>${escapeHtml(focus.text)}</div>`);
-  }
-  const reasons = localizedReviewReasons(review);
-  if (reasons.length) {
-    parts.push(`<ul class="reason-list">${reasons.slice(0, 4).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>`);
-  }
-  return parts;
-}
-
-function renderHint(hint) {
-  const levels = isChineseLocale() && hint?.zhLevels?.length ? hint.zhLevels : hint?.levels ?? [];
-  const parts = levels.slice(0, 4).map((level) => (
-    `<div class="line"><strong>${escapeHtml(localizedChineseText(level.title ?? `Hint ${level.level}`))}</strong><br>${escapeHtml(localizedChineseText(level.text ?? ""))}</div>`
-  ));
-  if (hint?.bestMove) parts.push(`<div class="score">${t("bestMove")}: ${formatMoveHtml(hint.bestMove, hint.zhBestMove)}</div>`);
-
-  elements.reasoningPanel.className = "stack";
-  elements.reasoningPanel.innerHTML = parts.length ? parts.join("") : t("noHint");
-}
-
-function renderAlternatives(alternatives) {
-  const rows = alternatives.slice(0, 4).map((alternative) => {
-    const score = alternative.scoreDetail?.text ?? (Number.isFinite(alternative.score) ? formatCentipawns(alternative.score) : "unscored");
-    const loss = Number.isFinite(alternative.centipawnLoss) ? `, ${t("loss")} ${alternative.centipawnLoss} cp` : "";
-    const reply = alternative.expectedReply ? `, ${t("expectedReply")} ${moveText(alternative.expectedReply, alternative.zhExpectedReply)}` : "";
-    const why = alternative.planComparison?.summary
-      ? `<div class="score">${t("whyNot")}: ${escapeHtml(localizedPlanComparisonSummary(alternative.planComparison))}</div>`
-      : "";
-    const verdict = isChineseLocale() && (!alternative.verdict || alternative.verdict === "candidate")
-      ? t("candidate")
-      : alternative.verdict ?? t("candidate");
-    return `<li><strong>${formatMoveHtml(alternative.move, alternative.zhMove)}</strong> <span class="score">${escapeHtml(verdict)}, ${escapeHtml(score)}${escapeHtml(loss)}${escapeHtml(reply)}</span>${why}</li>`;
-  });
-  return `<ol class="alternative-list">${rows.join("")}</ol>`;
-}
-
-function renderHistory() {
-  const tree = buildMoveTree();
-  if (!tree.length) {
-    state.treeView.layoutWidth = 0;
-    state.treeView.layoutHeight = 0;
-    elements.historyList.className = "move-tree-canvas muted";
-    elements.historyList.style.width = "";
-    elements.historyList.style.height = "";
-    elements.historyList.innerHTML = `<div class="move-tree-empty">${escapeHtml(t("treeEmpty"))}</div>`;
-    applyTreeTransform();
-    return;
-  }
-
-  const layout = layoutMoveTree(tree);
-  state.treeView.layoutWidth = layout.width;
-  state.treeView.layoutHeight = layout.height;
-  elements.historyList.className = "move-tree-canvas";
-  elements.historyList.style.width = `${layout.width}px`;
-  elements.historyList.style.height = `${layout.height}px`;
-  elements.historyList.style.setProperty("--tree-node-width", `${TREE_NODE_WIDTH}px`);
-  elements.historyList.style.setProperty("--tree-node-height", `${TREE_NODE_HEIGHT}px`);
-  elements.historyList.innerHTML = [
-    renderTreeEdges(layout),
-    layout.edges.map(renderTreeEdgeLabel).join(""),
-    layout.nodes.map(renderTreeNode).join("")
-  ].join("");
-  elements.historyList.querySelectorAll("[data-tree-node]").forEach((button) => {
-    button.addEventListener("click", () => selectTreeNode(button.dataset.treeNode));
-  });
-  elements.historyList.querySelectorAll("[data-tree-toggle]").forEach((button) => {
-    button.addEventListener("click", () => toggleTreeNode(button.dataset.treeToggle));
-  });
-  elements.historyList.querySelectorAll("[data-tree-recompute]").forEach((button) => {
-    button.addEventListener("click", () => recomputeTreeNode(button.dataset.treeRecompute));
-  });
-  window.requestAnimationFrame(() => {
-    if (state.treeView.userPositioned) applyTreeTransform();
-    else fitTreeView();
-  });
-}
-
-function buildMoveTree() {
-  const history = state.game?.history ?? [];
-  if (!history.length) return [];
-
-  const mainline = history.map((move) => ({
-      id: mainlineNodeId(move.ply),
-      kind: "main",
-      move,
-      children: []
-  }));
-
-  mainline.forEach((node, index) => {
-    const next = mainline[index + 1];
-    node.children = next ? moveOptionsForPly(next) : [];
-  });
-
-  return moveOptionsForPly(mainline[0]).map(attachAnalyzedChildren);
-}
-
-function moveOptionsForPly(mainNode) {
-  return [
-    mainNode,
-    ...treeAlternativesForMove(mainNode.move, mainNode.id)
-  ];
-}
-
-function treeAlternativesForMove(move, siblingOfId) {
-  const sources = [{
-    kind: "decision",
-    alternatives: move.decision?.alternatives ?? []
-  }, {
-    kind: "review",
-    alternatives: move.review?.bestAlternatives ?? []
-  }];
-  const seen = new Set([move.notation]);
-  const alternatives = [];
-
-  for (const source of sources) {
-    source.alternatives.forEach((alternative, index) => {
-      if (!alternative?.move || seen.has(alternative.move)) return;
-      seen.add(alternative.move);
-      alternatives.push({
-        id: `alt-${move.ply}-${source.kind}-${index}`,
-        kind: "alternative",
-        siblingOfId,
-        parentMove: move,
-        source: source.kind,
-        alternative,
-        children: []
-      });
-    });
-  }
-
-  return alternatives.slice(0, 4);
-}
-
-function attachAnalyzedChildren(node) {
-  const analysis = state.treeAnalysis.get(node.id) ?? null;
-  const existingChildren = (node.children ?? []).map(attachAnalyzedChildren);
-  const generated = (analysis?.branches ?? []).map((branch, index) => attachAnalyzedChildren({
-    id: analysisNodeId(node.id, branch, index),
-    kind: "analysis",
-    parentId: node.id,
-    branch,
-    children: []
-  }));
-  return {
-    ...node,
-    analysis,
-    children: [
-      ...existingChildren,
-      ...generated
-    ]
-  };
-}
-
-function analysisNodeId(parentId, branch, index) {
-  const rank = Number.isFinite(branch?.rank) ? branch.rank : index + 1;
-  return `${parentId}-line-${rank}-${sanitizeTreeId(branch?.move)}`;
-}
-
-function sanitizeTreeId(value) {
-  return String(value ?? "node").replace(/[^a-zA-Z0-9_-]+/g, "_");
-}
-
-function layoutMoveTree(roots) {
-  let leafCursor = 0;
-  const nodes = [];
-  const edges = [];
-
-  function place(node, depth) {
-    const hasChildren = (node.children ?? []).length > 0;
-    const expanded = !state.treeCollapsed.has(node.id);
-    const visibleChildren = hasChildren && expanded ? node.children : [];
-    const childItems = visibleChildren.map((child) => place(child, depth + 1));
-    const y = childItems.length
-      ? (childItems[0].y + childItems.at(-1).y) / 2
-      : TREE_LAYOUT_PADDING + allocateLeafY();
-    const item = {
-      node,
-      x: TREE_LAYOUT_PADDING + depth * (TREE_NODE_WIDTH + TREE_LEVEL_GAP),
-      y,
-      depth,
-      hasChildren,
-      expanded
-    };
-
-    nodes.push(item);
-    childItems.forEach((childItem) => {
-      edges.push({
-        from: item,
-        to: childItem,
-        child: childItem.node
-      });
-    });
-    return item;
-  }
-
-  function allocateLeafY() {
-    const y = leafCursor;
-    leafCursor += TREE_NODE_HEIGHT + TREE_SIBLING_GAP;
-    return y;
-  }
-
-  roots.forEach((root) => place(root, 0));
-  const width = Math.max(...nodes.map((item) => item.x + TREE_NODE_WIDTH), 0) + TREE_LAYOUT_PADDING;
-  const height = Math.max(...nodes.map((item) => item.y + TREE_NODE_HEIGHT), 0) + TREE_LAYOUT_PADDING;
-
-  return {
-    nodes,
-    edges,
-    width,
-    height
-  };
-}
-
-function renderTreeEdges(layout) {
-  const paths = layout.edges.map((edge) => {
-    const x1 = edge.from.x + TREE_NODE_WIDTH;
-    const y1 = edge.from.y + TREE_NODE_HEIGHT / 2;
-    const x2 = edge.to.x;
-    const y2 = edge.to.y + TREE_NODE_HEIGHT / 2;
-    const handle = Math.max(44, (x2 - x1) * 0.46);
-    const d = `M${x1} ${y1} C${x1 + handle} ${y1} ${x2 - handle} ${y2} ${x2} ${y2}`;
-    return `<path class="move-tree-edge ${escapeHtml(edge.child.kind)}" d="${d}"></path>`;
-  });
-  return `<svg class="move-tree-edges" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}" aria-hidden="true">${paths.join("")}</svg>`;
-}
-
-function renderTreeEdgeLabel(edge) {
-  const x1 = edge.from.x + TREE_NODE_WIDTH;
-  const y1 = edge.from.y + TREE_NODE_HEIGHT / 2;
-  const x2 = edge.to.x;
-  const y2 = edge.to.y + TREE_NODE_HEIGHT / 2;
-  const labelX = x1 + (x2 - x1) * 0.5;
-  const labelY = y1 + (y2 - y1) * 0.5 - 14;
-  return `<span class="move-tree-edge-label ${escapeHtml(edge.child.kind)}" style="left:${labelX}px;top:${labelY}px">${escapeHtml(treeNodeMoveText(edge.child))}</span>`;
-}
-
-function renderTreeNode(item) {
-  const node = item.node;
-  const selected = state.treeSelectedId === node.id;
-  const current = node.kind === "main" && node.id === latestMainlineNodeId();
-  const cardClasses = [
-    "move-tree-node-card",
-    `move-tree-${node.kind}`,
-    selected ? "selected" : "",
-    current ? "current" : ""
-  ].filter(Boolean).join(" ");
-  const ariaExpanded = item.hasChildren ? ` aria-expanded="${item.expanded ? "true" : "false"}"` : "";
-
-  return `<div class="${cardClasses}" style="--tree-x:${item.x}px;--tree-y:${item.y}px" role="treeitem" aria-selected="${selected ? "true" : "false"}"${ariaExpanded}>${[
-    renderTreeNodeButton(node, selected, current, item.hasChildren, item.expanded),
-    renderTreeNodeActions(node, item)
-  ].join("")}</div>`;
-}
-
-function renderTreeNodeButton(node, selected, current, hasChildren, expanded) {
-  const ariaExpanded = hasChildren ? ` aria-expanded="${expanded ? "true" : "false"}"` : "";
-  const tags = [
-    `<span class="move-tree-tag">${escapeHtml(treeNodeKindLabel(node))}</span>`,
-    current ? `<span class="move-tree-tag current">${escapeHtml(t("currentPosition"))}</span>` : "",
-    selected ? `<span class="move-tree-tag selected">${escapeHtml(t("selectedNode"))}</span>` : "",
-    node.analysis?.branches?.length ? `<span class="move-tree-tag generated">${escapeHtml(`${node.analysis.branches.length} ${t("generatedBranches")}`)}</span>` : ""
-  ].filter(Boolean).join("");
-
-  return `<button class="move-tree-node ${escapeHtml(node.kind)}" type="button" data-tree-node="${escapeHtml(node.id)}"${ariaExpanded}>${[
-    renderMiniBoard(treeNodeBoard(node)),
-    `<span class="move-tree-copy">` + [
-      `<span class="move-tree-ply">${escapeHtml(treeNodePrefix(node))}</span>`,
-      `<span class="move-tree-move">${treeNodeMoveHtml(node)}</span>`,
-      `<span class="move-tree-meta">${escapeHtml(treeNodeSummaryText(node))}${tags}</span>`
-    ].join("") + `</span>`
-  ].join("")}</button>`;
-}
-
-function renderTreeNodeActions(node, item) {
-  const toggle = item.hasChildren
-    ? `<button class="move-tree-toggle" type="button" data-tree-toggle="${escapeHtml(node.id)}" title="${escapeHtml(item.expanded ? t("fold") : t("expand"))}" aria-label="${escapeHtml(item.expanded ? t("fold") : t("expand"))}">${item.expanded ? "−" : "+"}</button>`
-    : "";
-  const className = item.hasChildren ? "move-tree-node-actions" : "move-tree-node-actions single";
-  return `<span class="${className}">${toggle}${renderTreeRecomputeButton(node)}</span>`;
-}
-
-function renderTreeRecomputeButton(node) {
-  const pending = state.pending && state.treeAnalysisPendingId === node.id;
-  return `<button class="move-tree-recompute" type="button" data-tree-recompute="${escapeHtml(node.id)}" title="${escapeHtml(t("recomputeNode"))}" aria-label="${escapeHtml(t("recomputeNode"))}"${state.pending ? " disabled" : ""}>${pending ? "…" : "↻"}</button>`;
-}
-
-function renderMiniBoard(board) {
-  const cells = Array.isArray(board) ? board : [];
-  const pieces = cells
-    .filter((cell) => cell?.piece)
-    .map((cell) => {
-      const point = visualPoint(cell.coord, state.game?.playerSide ?? "red");
-      return `<span class="mini-piece ${escapeHtml(cell.piece.side)}" style="--file:${point.file};--rank:${point.rank}">${escapeHtml(pieceSymbol(cell.piece))}</span>`;
-    });
-  return `<span class="mini-board" aria-hidden="true">${pieces.join("")}</span>`;
-}
-
-function treeNodeKindLabel(node) {
-  if (node.kind === "main") return t("mainLine");
-  if (node.kind === "alternative") return t("alternativeLine");
-  return t("analysisBranch");
-}
-
-function treeNodePrefix(node) {
-  if (node.kind === "main") {
-    const move = node.move;
-    return move.side === "black" ? `${move.moveNumber}...` : `${move.moveNumber}.`;
-  }
-  if (node.kind === "analysis") {
-    return t("branchRank").replace("{rank}", String(node.branch?.rank ?? ""));
-  }
-  return t("alternativeLine");
-}
-
-function treeNodeMoveHtml(node) {
-  if (node.kind === "main") return formatMoveHtml(node.move.notation, node.move.zhNotation);
-  if (node.kind === "analysis") return formatMoveHtml(node.branch.move, node.branch.zhMove);
-  return formatMoveHtml(node.alternative.move, node.alternative.zhMove);
-}
-
-function treeNodeMoveText(node) {
-  if (node.kind === "main") return moveText(node.move.notation, node.move.zhNotation);
-  if (node.kind === "analysis") return moveText(node.branch.move, node.branch.zhMove);
-  return moveText(node.alternative.move, node.alternative.zhMove);
-}
-
-function treeNodeSummaryText(node) {
-  if (node.kind === "main") return actorName(node.move.actor);
-  if (node.kind === "analysis") return analysisBranchSummaryText(node.branch);
-  return alternativeSummaryText(node.alternative);
-}
-
-function treeNodeBoard(node) {
-  if (node?.kind === "main") return node.move.boardAfter ?? state.game?.board ?? [];
-  if (node?.kind === "alternative") return node.alternative.boardAfter ?? node.parentMove.boardBefore ?? state.game?.board ?? [];
-  if (node?.kind === "analysis") return node.branch.boardAfter ?? state.game?.board ?? [];
-  return state.game?.board ?? [];
-}
-
-function alternativeSummaryText(alternative) {
-  const parts = [];
-  if (alternative.expectedReply) {
-    parts.push(`${t("expectedReply")} ${moveText(alternative.expectedReply, alternative.zhExpectedReply)}`);
-  }
-  if (Number.isFinite(alternative.centipawnLoss)) {
-    parts.push(`${t("loss")} ${Math.round(alternative.centipawnLoss)} cp`);
-  } else if (Number.isFinite(alternative.score)) {
-    parts.push(`${t("scorePrefix")} ${formatCentipawns(alternative.score)}`);
-  }
-  if (!parts.length && alternative.verdict) parts.push(localizedChineseText(alternative.verdict));
-  return parts.join(" · ");
-}
-
-function analysisBranchSummaryText(branch) {
-  const parts = [];
-  if (branch.expectedReply) {
-    parts.push(`${t("expectedReply")} ${moveText(branch.expectedReply, branch.zhExpectedReply)}`);
-  }
-  if (Number.isFinite(branch.centipawnLoss)) {
-    parts.push(`${t("loss")} ${Math.round(branch.centipawnLoss)} cp`);
-  } else if (Number.isFinite(branch.score)) {
-    parts.push(`${t("scorePrefix")} ${formatCentipawns(branch.score)}`);
-  }
-  return parts.join(" · ");
-}
-
-async function selectTreeNode(id) {
-  if (!id) return;
-  const node = findTreeNode(id);
-  if (!node) return;
-
-  state.treeSelectedId = id;
-  if (node.kind === "main") {
-    state.teachingTurnFocusId = teachingTurnIdForMove(node.move, state.game);
-  }
-  state.panel = panelFromTreeSelection() ?? panelFromMove(state.game);
-  state.selected = null;
-  render();
-}
-
-async function recomputeTreeNode(id) {
-  const node = findTreeNode(id);
-  const requestNode = analysisRequestForTreeNode(node);
-  if (!requestNode) return;
-
-  state.treeAnalysisPendingId = id;
-  await runRequest(async () => {
-    const result = await api("/api/analyze-node", {
-      sessionId: state.sessionId,
-      node: requestNode
-    });
-    state.treeAnalysis.set(id, result.analysis);
-    state.treeSelectedId = id;
-    state.panel = {
-      kind: "treeAnalysis",
-      nodeId: id
-    };
-    state.selected = null;
-    setGame(result.state);
-  });
-  state.treeAnalysisPendingId = null;
-  if (state.game) render();
-}
-
-function analysisRequestForTreeNode(node) {
-  if (!node) return null;
-  if (node.kind === "main") {
-    return {
-      kind: "main",
-      ply: node.move.ply
-    };
-  }
-  if (node.kind === "alternative") {
-    return {
-      kind: "alternative",
-      parentPly: node.parentMove.ply,
-      move: node.alternative.move
-    };
-  }
-  if (node.kind === "analysis" && node.branch.fenAfter) {
-    return {
-      kind: "fen",
-      fen: node.branch.fenAfter
-    };
-  }
-  return null;
-}
-
-async function restoreTreeNode(id) {
-  const node = findTreeNode(id);
-  const requestNode = analysisRequestForTreeNode(node);
-  if (!requestNode) return;
-
-  await runRequest(async () => {
-    const result = node.kind === "main"
-      ? await api("/api/jump", {
-        sessionId: state.sessionId,
-        ply: node.move.ply,
-        deferEngine: true
-      })
-      : await api("/api/select-node", {
-        sessionId: state.sessionId,
-        node: requestNode
-      });
-    state.treeSelectedId = latestMainlineNodeId(result.state);
-    state.panel = panelFromMove(result.state);
-    state.selected = null;
-    setGame(result.state);
-    await holdTeachingReviewBeforeEngineReply(result.state);
-    await requestEngineMoveIfNeeded(result.state);
-  });
-}
-
-function bindTreeRestoreAction() {
-  elements.lastMovePanel.querySelectorAll("[data-tree-restore]").forEach((button) => {
-    button.addEventListener("click", () => restoreTreeNode(button.dataset.treeRestore));
-  });
-}
-
-function bindTreeRecomputeActions(root) {
-  root.querySelectorAll("[data-tree-recompute]").forEach((button) => {
-    button.addEventListener("click", () => recomputeTreeNode(button.dataset.treeRecompute));
-  });
-}
-
-function toggleTreeNode(id) {
-  if (!id) return;
-  if (state.treeCollapsed.has(id)) state.treeCollapsed.delete(id);
-  else state.treeCollapsed.add(id);
-  renderHistory();
-}
-
-function applyTreeTransform() {
-  elements.historyList.style.transform = `translate(${state.treeView.x}px, ${state.treeView.y}px) scale(${state.treeView.scale})`;
-}
-
-function fitTreeView(options = {}) {
-  const viewport = elements.treeViewport;
-  const width = state.treeView.layoutWidth;
-  const height = state.treeView.layoutHeight;
-  if (!viewport || !width || !height) {
-    applyTreeTransform();
-    return;
-  }
-
-  const rect = viewport.getBoundingClientRect();
-  if (!rect.width || !rect.height) {
-    applyTreeTransform();
-    return;
-  }
-
-  const padding = 34;
-  const fittedScale = Math.min(
-    (rect.width - padding * 2) / width,
-    (rect.height - padding * 2) / height
-  );
-  const scale = clamp(fittedScale, TREE_MIN_SCALE, Math.min(1.08, TREE_MAX_SCALE));
-  state.treeView.scale = scale;
-  state.treeView.x = Math.round((rect.width - width * scale) / 2);
-  state.treeView.y = Math.round((rect.height - height * scale) / 2);
-  if (options.userInitiated) state.treeView.userPositioned = true;
-  applyTreeTransform();
-}
-
-function zoomTreeView(factor, origin = null) {
-  const viewport = elements.treeViewport;
-  if (!viewport) return;
-
-  const rect = viewport.getBoundingClientRect();
-  const originX = origin?.x ?? rect.width / 2;
-  const originY = origin?.y ?? rect.height / 2;
-  const beforeX = (originX - state.treeView.x) / state.treeView.scale;
-  const beforeY = (originY - state.treeView.y) / state.treeView.scale;
-  const nextScale = clamp(state.treeView.scale * factor, TREE_MIN_SCALE, TREE_MAX_SCALE);
-
-  state.treeView.scale = nextScale;
-  state.treeView.x = originX - beforeX * nextScale;
-  state.treeView.y = originY - beforeY * nextScale;
-  state.treeView.userPositioned = true;
-  applyTreeTransform();
-}
-
-function resetTreeView(options = {}) {
-  state.treeView.x = 24;
-  state.treeView.y = 24;
-  state.treeView.scale = 1;
-  state.treeView.userPositioned = Boolean(options.autoFit) ? false : true;
-  applyTreeTransform();
-}
-
-function handleTreePointerDown(event) {
-  if (event.button !== 0 || event.target.closest("button")) return;
-  treeDrag = {
-    pointerId: event.pointerId,
-    startX: event.clientX,
-    startY: event.clientY,
-    viewX: state.treeView.x,
-    viewY: state.treeView.y
-  };
-  state.treeView.userPositioned = true;
-  elements.treeViewport.classList.add("dragging");
-  elements.treeViewport.setPointerCapture(event.pointerId);
-}
-
-function handleTreePointerMove(event) {
-  if (!treeDrag || treeDrag.pointerId !== event.pointerId) return;
-  state.treeView.x = treeDrag.viewX + event.clientX - treeDrag.startX;
-  state.treeView.y = treeDrag.viewY + event.clientY - treeDrag.startY;
-  applyTreeTransform();
-}
-
-function handleTreePointerUp(event) {
-  if (!treeDrag || treeDrag.pointerId !== event.pointerId) return;
-  treeDrag = null;
-  elements.treeViewport.classList.remove("dragging");
-  if (elements.treeViewport.hasPointerCapture(event.pointerId)) {
-    elements.treeViewport.releasePointerCapture(event.pointerId);
-  }
-}
-
-function handleTreeWheel(event) {
-  event.preventDefault();
-  const rect = elements.treeViewport.getBoundingClientRect();
-  const factor = event.deltaY > 0 ? 0.9 : 1.1;
-  zoomTreeView(factor, {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top
-  });
-}
-
-function syncTreeSelection() {
-  const tree = buildMoveTree();
-  const ids = new Set();
-  for (const node of tree) {
-    collectTreeNodeIds(node, ids);
-  }
-  for (const id of state.treeAnalysis.keys()) {
-    if (!ids.has(id)) state.treeAnalysis.delete(id);
-  }
-  if (!state.treeSelectedId || !ids.has(state.treeSelectedId)) {
-    state.treeSelectedId = latestMainlineNodeId();
-  }
-}
-
-function collectTreeNodeIds(node, ids) {
-  if (!node) return;
-  ids.add(node.id);
-  node.children?.forEach((child) => collectTreeNodeIds(child, ids));
-}
-
-function latestMainlineNodeId(game = state.game) {
-  const last = game?.history?.at(-1);
-  return last ? mainlineNodeId(last.ply) : null;
-}
-
-function mainlineNodeId(ply) {
-  return `main-${ply}`;
-}
-
-function selectedTreeNode() {
-  if (!state.treeSelectedId) return null;
-  return findTreeNode(state.treeSelectedId);
-}
-
-function findTreeNode(id) {
-  for (const node of buildMoveTree()) {
-    const found = findTreeNodeInSubtree(node, id);
-    if (found) return found;
-  }
-  return null;
-}
-
-function findTreeNodeInSubtree(node, id) {
-  if (!node) return null;
-  if (node.id === id) return node;
-  for (const child of node.children ?? []) {
-    const found = findTreeNodeInSubtree(child, id);
-    if (found) return found;
-  }
-  return null;
-}
-
-function panelFromTreeSelection() {
-  const node = selectedTreeNode();
-  if (!node) return null;
-  if (state.treeAnalysis.has(node.id)) return { kind: "treeAnalysis", nodeId: node.id };
-  if (node.kind === "main") {
-    const pair = teachingPairForMainlineNode(state.game, node);
-    if (pair) return teachingPairPanel(pair, {
-      preserveLatestHuman: shouldPreserveHumanTeachingForNode(node)
-    });
-    if (node.id === latestMainlineNodeId()) return null;
-  }
-  if (node.kind === "analysis") return { kind: "treeBranch", nodeId: node.id };
-  if (node.kind === "alternative") return { kind: "treeAlternative", node };
-  if (node.move?.decision) return { kind: "move", decision: node.move.decision };
-  if (node.move?.review) return { kind: "move", review: node.move.review };
-  return null;
-}
-
-function shouldPreserveHumanTeachingForNode(node = selectedTreeNode()) {
-  if (!node) return true;
-  return node.kind === "main" && node.id === latestMainlineNodeId(state.game);
-}
-
-function boardCellsForTreeSelection() {
-  const node = selectedTreeNode();
-  if (node) return treeNodeBoard(node);
-  return state.game?.board ?? [];
-}
-
-function isTreeBoardPreview() {
-  const node = selectedTreeNode();
-  if (!node) return false;
-  if (node.kind === "alternative") return true;
-  return node.id !== latestMainlineNodeId();
-}
-
-function renderError(message) {
-  elements.reasoningPanel.className = "stack";
-  elements.reasoningPanel.innerHTML = `<div class="line status-error">${escapeHtml(message)}</div>`;
-}
-
-function handleCellClick(coord) {
-  const game = state.game;
-  if (!game?.playerTurn) return;
-
-  const cell = game.board.find((item) => item.coord === coord);
-  const legalFrom = legalMovesFrom();
-  const targets = selectedTargets();
-
-  if (state.selected && targets.has(coord)) {
-    playMove(`${state.selected}-${coord}`);
-    state.selected = null;
-    renderBoard();
-    renderSelectedMoves();
-    return;
-  }
-
-  if (cell?.piece?.side === game.playerSide && legalFrom.has(coord)) {
-    state.selected = coord;
-    renderBoard();
-    renderSelectedMoves();
-    return;
-  }
-
-  state.selected = null;
-  renderBoard();
-  renderSelectedMoves();
-}
-
-function legalMovesFrom() {
-  return new Set((state.game?.legalMoves ?? []).map((move) => move.fromCoord));
-}
-
-function selectedTargets() {
-  return new Set(selectedTargetMoves().keys());
-}
-
-function selectedTargetMoves() {
-  if (!state.selected) return new Map();
-  return new Map(
-    (state.game?.legalMoves ?? [])
-      .filter((move) => move.fromCoord === state.selected)
-      .map((move) => [move.toCoord, move])
-  );
-}
-
-function renderSelectedMoves() {
-  const panel = elements.selectedMoves;
-  if (!panel) return;
-
-  const game = state.game;
-  const moves = [...selectedTargetMoves().values()];
-  const selectedCell = game?.board.find((item) => item.coord === state.selected);
-  if (!game || !state.selected || moves.length === 0 || !selectedCell?.piece) {
-    panel.hidden = true;
-    panel.innerHTML = "";
-    return;
-  }
-
-  panel.hidden = false;
-  const selectedName = pieceName(selectedCell.piece);
-  const selectedHeading = `${selectedName}${t("legalMovesSuffix")}`;
-  const chips = moves.map((move) => {
-    const label = moveTitleText(move.notation, move.zhNotation);
-    return `<button class="move-chip" type="button" data-move="${escapeHtml(move.notation)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${formatMoveHtml(move.notation, move.zhNotation)}</button>`;
-  });
-  panel.innerHTML = [
-    `<div class="selected-moves-heading">${escapeHtml(selectedHeading)}</div>`,
-    `<div class="selected-moves-grid">${chips.join("")}</div>`
-  ].join("");
-  panel.querySelectorAll("[data-move]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const notation = button.dataset.move;
-      state.selected = null;
-      renderBoard();
-      renderSelectedMoves();
-      playMove(notation);
-    });
-  });
-}
-
-function panelFromMove(game) {
-  const pair = latestTeachingPair(game);
-  if (pair) return teachingPairPanel(pair, { preserveLatestHuman: true });
-  const last = game?.lastMove;
-  if (last?.decision) return { kind: "move", decision: last.decision };
-  if (last?.review) return { kind: "move", review: last.review };
-  if (game?.lastEngineDecision) return { kind: "move", decision: game.lastEngineDecision };
-  if (game?.lastPlayerReview) return { kind: "move", review: game.lastPlayerReview };
-  return null;
-}
-
-function panelFromLatestPlayerTeaching(game) {
-  const pair = latestPlayerTeachingPair(game);
-  return pair ? teachingPairPanel(pair, { preserveLatestHuman: true }) : null;
-}
-
-function panelFromVisibleTeachingPair(game) {
-  const pair = visibleTeachingPair(game);
-  return pair ? teachingPairPanel(pair, { preserveLatestHuman: true }) : null;
-}
-
-function teachingPairForSelectedTreeNode(node = selectedTreeNode()) {
-  if (node?.kind === "main") {
-    return teachingPairForMainlineNode(state.game, node);
-  }
-  if (!node) return latestTeachingPair(state.game);
-  return null;
-}
-
-function teachingPairForMainlineNode(game, node) {
-  if (!node || node.kind !== "main") return null;
-  const pair = teachingPairForMove(game, node.move);
-  if (pair) return pair;
-  return node.id === latestMainlineNodeId(game) ? latestTeachingPair(game) : null;
-}
-
-function latestTeachingPair(game) {
-  const focused = focusedTeachingPair(game);
-  const latestPlayer = latestPlayerTeachingPair(game);
-  if (focused && hasHumanTeachingMove(focused)) return focused;
-  return latestPlayer ?? focused ?? activeTeachingPair(game);
-}
-
-function visibleTeachingPair(game) {
-  return latestPlayerTeachingPair(game) ?? focusedTeachingPair(game) ?? activeTeachingPair(game);
-}
-
-function panelFromTeachingFocus(game) {
-  const pair = focusedTeachingPair(game);
-  return pair ? teachingPairPanel(pair, { preserveLatestHuman: true }) : null;
-}
-
-function teachingPairPanel(pair, options = {}) {
-  const normalized = normalizeTeachingPair(pair);
-  if (!normalized) return null;
-  return {
-    kind: "teachingPair",
-    preserveLatestHuman: options.preserveLatestHuman !== false,
-    ...normalized
-  };
-}
-
-function focusedTeachingPair(game) {
-  if (!state.teachingTurnFocusId) return null;
-  return teachingTurnById(game, state.teachingTurnFocusId);
-}
-
-function focusTeachingTurnForMove(game, moveOrPly) {
-  const id = teachingTurnIdForMove(moveOrPly, game);
-  if (id) state.teachingTurnFocusId = id;
-}
-
-function focusLatestPlayerTeachingTurn(game) {
-  const pair = latestPlayerTeachingPair(game);
-  if (pair?.id) state.teachingTurnFocusId = pair.id;
-}
-
-function syncTeachingFocus() {
-  if (!state.teachingTurnFocusId) return;
-  if (!teachingTurnById(state.game, state.teachingTurnFocusId)) {
-    state.teachingTurnFocusId = null;
-  }
-}
-
-function teachingTurnById(game, id) {
-  if (!id) return null;
-  return normalizeTeachingTurns(game?.teachingTurns).find((turn) => turn.id === id) ?? null;
-}
-
-function teachingTurnIdForMove(moveOrPly, game = null) {
-  const ply = Number.isFinite(moveOrPly?.ply) ? moveOrPly.ply : Number(moveOrPly);
-  if (!Number.isFinite(ply)) return null;
-  const turn = normalizeTeachingTurns(game?.teachingTurns)
-    .find((item) => item.playerMove?.ply === ply || item.engineMove?.ply === ply);
-  if (turn?.id) return turn.id;
-  const actor = moveOrPly?.actor;
-  return actor === "engine" ? `turn-engine-${ply}` : `turn-${ply}`;
-}
-
-function activeTeachingPair(game, anchorMove = null) {
-  const serializedPair = teachingTurnFromState(game, anchorMove);
-  if (serializedPair) return serializedPair;
-
-  const history = game?.history ?? [];
-  if (!history.length) return null;
-
-  const anchor = anchorMove
-    ?? latestActorMove(history, "player")
-    ?? history.at(-1);
-  return teachingPairForMove(game, anchor);
-}
-
-function latestPlayerTeachingPair(game) {
-  return latestPlayerTeachingPairFromGame(game) ?? state.preservedTeachingPair ?? null;
-}
-
-function latestPlayerTeachingPairFromGame(game) {
-  const latestPlayerTurn = normalizeTeachingPair(game?.latestPlayerTeachingTurn);
-  if (latestPlayerTurn) return latestPlayerTurn;
-  return [...normalizeTeachingTurns(game?.teachingTurns)]
-    .reverse()
-    .find((turn) => turn.playerMove || turn.playerReview)
-    ?? null;
-}
-
-function updatePreservedTeachingPair(game) {
-  if (!game?.history?.length) {
-    state.preservedTeachingPair = null;
-    return;
-  }
-
-  const latestPlayer = latestPlayerTeachingPairFromGame(game);
-  if (latestPlayer?.playerMove || latestPlayer?.playerReview) {
-    state.preservedTeachingPair = latestPlayer;
-  }
-}
-
-function pairWithPreservedHumanMove(pair, game = state.game) {
-  const current = normalizeTeachingPair(pair);
-  const latestPlayer = latestPlayerTeachingPair(game);
-  if (!current) return latestPlayer ?? activeTeachingPair(game);
-  if (hasHumanTeachingMove(current) || !latestPlayer) return current;
-  return normalizeTeachingPair({
-    ...current,
-    moveNumber: current.moveNumber ?? latestPlayer.moveNumber,
-    playerMove: latestPlayer.playerMove,
-    playerReview: latestPlayer.playerReview,
-    playerReviewPending: latestPlayer.playerReviewPending
-  });
-}
-
-function hasHumanTeachingMove(pair) {
-  return Boolean(pair?.playerMove || pair?.playerReview);
-}
-
-function teachingPairForMove(game, anchorMove) {
-  const serializedPair = teachingTurnFromState(game, anchorMove);
-  if (serializedPair) return serializedPair;
-
-  const history = game?.history ?? [];
-  if (!anchorMove || !history.length) return null;
-
-  const anchor = history.find((move) => move.ply === anchorMove.ply) ?? anchorMove;
-  const playerMove = anchor.actor === "player"
-    ? anchor
-    : actorMoveAtPly(history, "player", anchor.ply - 1);
-  const engineMove = anchor.actor === "engine"
-    ? anchor
-    : actorMoveAtPly(history, "engine", anchor.ply + 1);
-  const engineThinking = Boolean(
-    playerMove
-    && !engineMove
-    && game?.status?.state === "playing"
-    && game.turn === game.engineSide
-  );
-
-  if (!playerMove && !engineMove && !engineThinking) return null;
-  return {
-    id: teachingTurnIdForPair(playerMove, engineMove),
-    moveNumber: playerMove?.moveNumber ?? engineMove?.moveNumber ?? null,
-    playerMove,
-    playerReview: playerMove?.review ?? null,
-    playerReviewPending: Boolean(playerMove && !playerMove.review),
-    engineMove,
-    engineDecision: engineMove?.decision ?? null,
-    engineThinking
-  };
-}
-
-function teachingTurnIdForPair(playerMove, engineMove) {
-  if (playerMove?.ply) return `turn-${playerMove.ply}`;
-  if (engineMove?.ply) return `turn-engine-${engineMove.ply}`;
-  return null;
-}
-
-function teachingTurnFromState(game, anchorMove = null) {
-  if (!game) return null;
-  if (!anchorMove) {
-    return normalizeTeachingPair(game.currentTeachingTurn ?? game.teachingTurn ?? game.teachingPair)
-      ?? normalizeTeachingTurns(game.teachingTurns).at(-1)
-      ?? null;
-  }
-
-  const anchorPly = anchorMove.ply;
-  if (!Number.isFinite(anchorPly)) return null;
-  return normalizeTeachingTurns(game.teachingTurns)
-    .find((turn) => turn.playerMove?.ply === anchorPly || turn.engineMove?.ply === anchorPly)
-    ?? null;
-}
-
-function normalizeTeachingTurns(turns) {
-  if (!Array.isArray(turns)) return [];
-  return turns
-    .map(normalizeTeachingPair)
-    .filter(Boolean);
-}
-
-function latestActorMove(history, actor) {
-  return [...history].reverse().find((move) => move.actor === actor) ?? null;
-}
-
-function actorMoveAtPly(history, actor, ply) {
-  return history.find((move) => move.actor === actor && move.ply === ply) ?? null;
-}
-
-function normalizeTeachingPair(pair) {
-  if (!pair) return null;
-  const playerMove = pair.playerMove ?? null;
-  const engineMove = pair.engineMove ?? null;
-  const engineThinking = Boolean(pair.engineThinking);
-  if (!playerMove && !engineMove && !engineThinking) return null;
-  return {
-    id: pair.id ?? teachingTurnIdForPair(playerMove, engineMove),
-    moveNumber: pair.moveNumber ?? playerMove?.moveNumber ?? engineMove?.moveNumber ?? null,
-    playerMove,
-    playerReview: pair.playerReview ?? playerMove?.review ?? null,
-    playerReviewPending: Boolean(pair.playerReviewPending ?? (playerMove && !playerMove.review)),
-    engineMove,
-    engineDecision: pair.engineDecision ?? engineMove?.decision ?? null,
-    engineThinking
-  };
-}
-
-function updateDisabled() {
-  const disabled = state.pending || !state.game;
-  elements.newButton.disabled = state.pending;
-  elements.undoButton.disabled = disabled || !state.game?.canUndo;
-  elements.hintButton.disabled = disabled || state.game?.status?.state !== "playing";
-  elements.bestButton.disabled = disabled || state.game?.status?.state !== "playing";
-  elements.sideSelect.disabled = state.pending;
-  elements.localeSelect.disabled = state.pending;
-}
-
-function applyLocale() {
-  document.documentElement.lang = localeMeta[state.locale]?.lang ?? "en";
-  document.title = t("appTitle");
-  document.querySelectorAll("[data-i18n]").forEach((element) => {
-    const key = element.dataset.i18n;
-    element.textContent = t(key);
-  });
-  document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
-    const key = element.dataset.i18nAriaLabel;
-    element.setAttribute("aria-label", t(key));
-  });
-  document.querySelectorAll("[data-i18n-title]").forEach((element) => {
-    const key = element.dataset.i18nTitle;
-    element.setAttribute("title", t(key));
-    element.setAttribute("aria-label", t(key));
-  });
-  setOptionText(elements.localeSelect, "zh-CN", t("localeSimplified"));
-  setOptionText(elements.localeSelect, "zh-TW", t("localeTraditional"));
-  setOptionText(elements.localeSelect, "en", t("localeEnglish"));
-  setOptionText(elements.sideSelect, "red", sideName("red"));
-  setOptionText(elements.sideSelect, "black", sideName("black"));
-  renderBoardLabels(state.game?.playerSide ?? elements.sideSelect.value);
-
-  if (state.game) {
+    setBusy(false);
     render();
-    return;
+  }
+}
+
+async function jumpToPly(ply) {
+  setBusy(true);
+  try {
+    const data = await api("/api/jump", { sessionId: state.sessionId, ply, deferEngine: true });
+    state.selected = null;
+    state.coachOverride = null;
+    state.game = data.state;
+  } catch (e) {
+    showToast(t("errGeneric"));
+  } finally {
+    setBusy(false);
+    render();
+  }
+}
+
+// ============================================================
+// Board interaction
+// ============================================================
+function onBoardClick(ev) {
+  const point = ev.target.closest(".point");
+  if (!point) return;
+  const g = state.game;
+  if (!g || state.busy || !g.playerTurn) return;
+  const sq = Number(point.dataset.square);
+
+  // is this a legal target of the current selection?
+  if (state.selected != null) {
+    const move = g.legalMoves.find((m) => m.from === state.selected && m.to === sq);
+    if (move) { sendMove(move.notation); return; }
   }
 
-  elements.gameStatus.textContent = t("starting");
-  elements.turnPill.textContent = sideName("red");
-  elements.lastMovePanel.textContent = t("noMoves");
-  elements.reasoningPanel.textContent = t("askPrompt");
-}
-
-function gameOverText(status) {
-  if (status.state === "repetition") return t("repetition");
-  if (status.winner) {
-    return isChineseLocale()
-      ? `${sideName(status.winner)}${t("wins")}`
-      : `${capitalize(status.state)}. ${capitalize(status.winner)} ${t("wins")}`;
+  // otherwise (re)select an own piece
+  const cell = g.board[sq];
+  if (cell?.piece && cell.piece.side === g.playerSide) {
+    state.selected = state.selected === sq ? null : sq;
+    renderBoard(g);
+  } else {
+    state.selected = null;
+    renderBoard(g);
   }
-  return capitalize(status.state);
 }
 
-function pendingStatusText() {
-  const elapsedMs = state.pendingSince ? Date.now() - state.pendingSince : 0;
-  const label = pendingStageLabel();
-  if (elapsedMs < PENDING_STATUS_INTERVAL_MS) return label;
-  return `${label} ${formatDuration(elapsedMs)}`;
-}
+// ============================================================
+// Init
+// ============================================================
+function init() {
+  cache();
+  el.localeSelect.value = state.locale;
+  el.sideSelect.value = state.side;
+  el.levelSelect.value = state.level;
 
-function pendingStageLabel() {
-  if (state.pendingStage === "player-review") return t("reviewPending");
-  if (state.pendingStage === "teaching-hold") return t("reviewHoldReady");
-  if (state.pendingStage === "engine-reply") return t("replyPending");
-  return t("thinking");
-}
-
-function formatDuration(ms) {
-  const totalSeconds = Math.max(0, Math.round(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-
-  if (isChineseLocale()) {
-    return minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`;
-  }
-  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-}
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function t(key) {
-  return translations[state.locale]?.[key] ?? translations.en[key] ?? key;
-}
-
-function isChineseLocale() {
-  return state.locale === "zh-CN" || state.locale === "zh-TW";
-}
-
-function renderBoardLabels(playerSide = "red") {
-  const viewSide = playerSide === "black" ? "black" : "red";
-  const northSide = viewSide === "black" ? "red" : "black";
-  const southSide = viewSide === "black" ? "black" : "red";
-  const [riverLeft, riverRight] = localeMeta[state.locale]?.river ?? localeMeta.en.river;
-
-  document.querySelector(".river-left").textContent = riverLeft;
-  document.querySelector(".river-right").textContent = riverRight;
-  renderFileLabels(".file-labels-north .file-label", northSide, viewSide);
-  renderFileLabels(".file-labels-south .file-label", southSide, viewSide);
-}
-
-function renderFileLabels(selector, side, viewSide) {
-  document.querySelectorAll(selector).forEach((label, visualFile) => {
-    const file = viewSide === "black" ? files.length - 1 - visualFile : visualFile;
-    label.textContent = fileLabel(side, file);
+  el.board.addEventListener("click", onBoardClick);
+  el.newButton.addEventListener("click", newGame);
+  el.undoButton.addEventListener("click", undo);
+  el.hintButton.addEventListener("click", requestHint);
+  el.bestButton.addEventListener("click", requestBest);
+  el.moveList.addEventListener("click", (ev) => {
+    const btn = ev.target.closest(".ply[data-ply]");
+    if (btn) jumpToPly(Number(btn.dataset.ply));
   });
+  el.localeSelect.addEventListener("change", () => { state.locale = el.localeSelect.value; render(); });
+  el.sideSelect.addEventListener("change", () => { state.side = el.sideSelect.value; newGame(); });
+  el.levelSelect.addEventListener("change", () => { state.level = el.levelSelect.value; newGame(); });
+
+  el.reviewButton.addEventListener("click", toggleReview);
+  el.rwClose.addEventListener("click", toggleReview);
+  el.rwCollapse.addEventListener("click", () => { review.expanded.clear(); review.branches.clear(); renderReviewTree(); });
+  el.rwZoomIn.addEventListener("click", () => setReviewScale(review.view.scale * 1.2));
+  el.rwZoomOut.addEventListener("click", () => setReviewScale(review.view.scale / 1.2));
+  el.rwFit.addEventListener("click", fitReviewTree);
+  setupReviewWindowControls();
+
+  newGame();
 }
 
-function fileLabel(side, file) {
-  if (side === "black") return blackFileLabels[file] ?? String(file + 1);
-  if (!isChineseLocale()) return String(files.length - file);
-  return chineseNumerals[files.length - 1 - file] ?? String(files.length - file);
-}
-
-function setOptionText(select, value, text) {
-  const option = Array.from(select.options).find((candidate) => candidate.value === value);
-  if (option) option.textContent = text;
-}
-
-function visualPoint(coord, playerSide) {
-  const file = files.indexOf(coord[0]);
-  const rank = ranks.indexOf(coord[1]);
-  return {
-    file: playerSide === "black" ? files.length - 1 - file : file,
-    rank: playerSide === "black" ? ranks.length - 1 - rank : rank
-  };
-}
-
-function cellTitle(cell, coord, targetMove = null) {
-  const point = localizedPoint(coord);
-  const separator = isChineseLocale() ? "，" : ", ";
-  const move = targetMove ? `${separator}${moveTitleText(targetMove.notation, targetMove.zhNotation)}` : "";
-  if (!cell?.piece) return `${t("emptyPoint")} ${point}${move}`;
-  return `${pieceName(cell.piece)} ${point}${move}`;
-}
-
-function pieceName(piece) {
-  if (isChineseLocale()) {
-    return `${sideName(piece.side)}${pieceSymbol(piece)}`;
-  }
-  return piece.label ?? pieceNames.en[piece.side]?.[piece.type] ?? piece.symbol ?? "";
-}
-
-function pieceSymbol(piece) {
-  const glyphLocale = isChineseLocale() ? state.locale : "zh-TW";
-  return pieceNames[glyphLocale]?.[piece.side]?.[piece.type]
-    ?? pieceNames["zh-TW"]?.[piece.side]?.[piece.type]
-    ?? piece.symbol
-    ?? "";
-}
-
-function sideName(side) {
-  return side === "black" ? t("black") : t("red");
-}
-
-function oppositeSide(side) {
-  return side === "black" ? "red" : "black";
-}
-
-function actorName(actor) {
-  if (actor === "engine") return t("engineActor");
-  if (actor === "player") return t("player");
-  return actor ?? "";
-}
-
-function localizedPoint(coord) {
-  if (!isChineseLocale()) return coord;
-  const file = files.indexOf(coord[0]);
-  if (file === -1) return coord;
-  const meta = localeMeta[state.locale] ?? localeMeta["zh-CN"];
-  return `${coord}（${meta.redAbbrev}${chineseNumerals[files.length - 1 - file]}路／${meta.blackAbbrev}${file + 1}路）`;
-}
-
-function localizedDecisionSummary(decision) {
-  if (!isChineseLocale()) return decision.summary ?? t("engineSelected");
-  const move = moveText(decision.bestMove, decision.zhBestMove);
-  const source = decision.source === "book" || decision.source?.startsWith("opening") || /book move|opening book/i.test(decision.summary ?? "")
-    ? t("bookSource")
-    : t("searchSource");
-  const score = Number.isFinite(decision.score) ? `，${t("scorePrefix")} ${formatCentipawns(decision.score)}` : "";
-  return move ? `${source}${t("suggests")} ${move}${score}。` : t("engineSelected");
-}
-
-function localizedReviewSummary(review) {
-  if (!isChineseLocale()) return review.summary ?? t("moveReviewed");
-  const move = moveText(review.move, review.zhMove);
-  if (review.isBestMove) return localizedChineseText(move ? `${move}${t("bestAgreement")}。` : t("moveReviewed"));
-  const best = moveText(review.bestMove, review.zhBestMove);
-  const loss = Number.isFinite(review.centipawnLoss) ? `，${t("loss")}約 ${review.centipawnLoss} cp` : "";
-  const summary = move && best ? `${move}：${t("bestAlternative")} ${best}${loss}。` : t("moveReviewed");
-  return localizedChineseText(summary);
-}
-
-function moveText(notation, zhNotation) {
-  if (isChineseLocale() && zhNotation) return localizedChineseNotation(zhNotation);
-  return notation ?? zhNotation ?? "";
-}
-
-function moveLabelText(notation, zhNotation) {
-  if (zhNotation) return localizedChineseNotation(zhNotation);
-  return notation ?? "";
-}
-
-function moveTitleText(notation, zhNotation) {
-  const primary = moveText(notation, zhNotation);
-  const secondary = isChineseLocale() ? notation : localizedChineseNotation(zhNotation);
-  if (!secondary || secondary === primary) return primary;
-  return `${primary} / ${secondary}`;
-}
-
-function localizedChineseNotation(text) {
-  return localizedChineseText(text);
-}
-
-function localizedLinePlanSummary(linePlan) {
-  if (!linePlan) return "";
-  const text = isChineseLocale() ? linePlan.zhSummary ?? linePlan.summary ?? "" : linePlan.summary ?? linePlan.zhSummary ?? "";
-  return localizedChineseText(text);
-}
-
-function localizedReasons(decision) {
-  if (isChineseLocale() && decision.zhReasons?.length) return decision.zhReasons.map(localizedChineseText);
-  return decision.reasons ?? [];
-}
-
-function localizedReviewReasons(review) {
-  if (isChineseLocale() && review.zhReasons?.length) return review.zhReasons.map(localizedChineseText);
-  return review.reasons ?? [];
-}
-
-function localizedPlanComparisonSummary(comparison) {
-  if (!comparison) return "";
-  const text = isChineseLocale()
-    ? comparison.zhSummary ?? (hasChineseText(comparison.summary) ? comparison.summary : "")
-    : comparison.summary ?? comparison.zhSummary ?? "";
-  return localizedChineseText(text);
-}
-
-function hasChineseText(text) {
-  return /[\u3400-\u9fff]/.test(String(text ?? ""));
-}
-
-function localizedPracticeFocus(focus) {
-  if (!focus || !isChineseLocale()) return focus;
-  const [title, text] = practiceFocusTranslations[state.locale]?.[focus.category] ?? [];
-  return {
-    ...focus,
-    title: title ?? localizedChineseText(focus.title ?? ""),
-    text: text ?? localizedChineseText(focus.text ?? "")
-  };
-}
-
-function localizedChineseText(text) {
-  const value = String(text ?? "");
-  if (state.locale === "zh-CN") {
-    return value
-      .replace(/計畫|计画/g, "计划")
-      .replace(/[\u3400-\u9fff]/g, (char) => simplifiedChineseMap[char] ?? char);
-  }
-  if (state.locale === "zh-TW") return value.replace(/[\u3400-\u9fff]/g, (char) => traditionalChineseMap[char] ?? char);
-  return value;
-}
-
-function confidenceLabel(confidence) {
-  if (!isChineseLocale()) return confidence.label;
-  return {
-    "very-high": "信心很高",
-    high: "信心高",
-    medium: "信心中等",
-    low: "信心偏低"
-  }[confidence.level] ?? confidence.label;
-}
-
-function formatMoveHtml(notation, zhNotation) {
-  const primary = moveText(notation, zhNotation);
-  const secondary = isChineseLocale() ? notation : localizedChineseNotation(zhNotation);
-  if (!primary) return "";
-  const secondaryHtml = secondary && secondary !== primary
-    ? `<span class="notation-secondary">${escapeHtml(secondary)}</span>`
-    : "";
-  return `<span class="move-notation">${escapeHtml(primary)}</span>${secondaryHtml}`;
-}
-
-function loadLocale() {
-  try {
-    return normalizeLocale(localStorage.getItem("xiangqi.locale"));
-  } catch {
-    return "zh-CN";
-  }
-}
-
-function saveLocale(locale) {
-  try {
-    localStorage.setItem("xiangqi.locale", locale);
-  } catch {
-    // Local storage can be unavailable in strict browser contexts.
-  }
-}
-
-function normalizeLocale(locale) {
-  if (locale === "zh-TW" || locale === "zh-Hant") return "zh-TW";
-  if (locale === "zh-CN" || locale === "zh-Hans" || locale === "zh") return "zh-CN";
-  if (locale === "en") return "en";
-  return "zh-CN";
-}
-
-function formatCentipawns(value) {
-  const rounded = Math.round(value ?? 0);
-  return `${rounded >= 0 ? "+" : ""}${rounded} cp`;
-}
-
-function capitalize(text) {
-  const value = String(text ?? "");
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+init();
