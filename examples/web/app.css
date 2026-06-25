@@ -292,6 +292,24 @@ body {
 .status.lose { color: var(--bad); }
 .status.check { color: var(--warn); }
 
+/* continue (let the engine move from a reviewed position) */
+.btn-continue {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 11px;
+  border: 0; border-radius: 12px;
+  background: linear-gradient(160deg, var(--accent-soft), var(--accent));
+  color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
+  box-shadow: var(--shadow-md);
+  animation: continuepulse 1.7s ease-in-out infinite;
+}
+.btn-continue[hidden] { display: none; }
+.btn-continue svg { width: 17px; height: 17px; fill: #fff; }
+.btn-continue:hover { filter: brightness(1.06); }
+@keyframes continuepulse {
+  0%, 100% { box-shadow: var(--shadow-md); }
+  50% { box-shadow: 0 0 0 4px rgba(47, 111, 79, 0.25), var(--shadow-md); }
+}
+
 /* actions */
 .actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .btn {

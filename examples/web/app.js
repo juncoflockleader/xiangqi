@@ -18,6 +18,7 @@ const I18N = {
     reviewPending: "复盘中…", noMoves: "尚未走子。",
     cls_best: "最佳", cls_brilliant: "精彩", cls_excellent: "极佳", cls_good: "良好",
     cls_inaccuracy: "欠精确", cls_mistake: "失误", cls_blunder: "漏着", cls_book: "定式",
+    continue: "继续",
     review: "复盘", reviewTitle: "复盘 · 变化树", reviewCollapse: "折叠全部分支",
     reviewHelp: "点小棋盘跳到该局面 · 点 ▸ 展开引擎候选分支",
     startPos: "起始局面", noGameYet: "尚无棋局可复盘。",
@@ -38,6 +39,7 @@ const I18N = {
     reviewPending: "覆盤中…", noMoves: "尚未走子。",
     cls_best: "最佳", cls_brilliant: "精彩", cls_excellent: "極佳", cls_good: "良好",
     cls_inaccuracy: "欠精確", cls_mistake: "失誤", cls_blunder: "漏著", cls_book: "定式",
+    continue: "繼續",
     review: "覆盤", reviewTitle: "覆盤 · 變化樹", reviewCollapse: "摺疊全部分支",
     reviewHelp: "點小棋盤跳到該局面 · 點 ▸ 展開引擎候選分支",
     startPos: "起始局面", noGameYet: "尚無棋局可覆盤。",
@@ -58,6 +60,7 @@ const I18N = {
     reviewPending: "Reviewing…", noMoves: "No moves yet.",
     cls_best: "Best", cls_brilliant: "Brilliant", cls_excellent: "Excellent", cls_good: "Good",
     cls_inaccuracy: "Inaccuracy", cls_mistake: "Mistake", cls_blunder: "Blunder", cls_book: "Book",
+    continue: "Continue",
     review: "Review", reviewTitle: "Review · Variation Tree", reviewCollapse: "Collapse all",
     reviewHelp: "Click a mini-board to jump · click ▸ to expand engine variations",
     startPos: "Start", noGameYet: "No game to review yet.",
@@ -112,7 +115,7 @@ function cache() {
   for (const id of [
     "board", "boardArea", "filesTop", "filesBottom", "thinking", "thinkingText",
     "engineBadge", "turnPill", "turnText", "gameStatus",
-    "newButton", "undoButton", "hintButton", "bestButton",
+    "newButton", "undoButton", "hintButton", "bestButton", "continueButton",
     "coachCard", "coachTitle", "coachTag", "coachBody",
     "moveList", "moveCount", "sideSelect", "levelSelect", "localeSelect",
     "settings", "settingsNote", "toast",
@@ -434,6 +437,9 @@ function renderControls(g) {
   el.hintButton.disabled = state.busy || !g.playerTurn || !playing;
   el.bestButton.disabled = state.busy || !playing;
   el.newButton.disabled = state.busy;
+  // After navigating the review tree to an engine-to-move position, nothing auto-
+  // plays — offer a Continue button to let the engine move from there.
+  el.continueButton.hidden = !(playing && !g.playerTurn && !state.busy);
 }
 
 function setBusy(b) {
@@ -807,6 +813,20 @@ async function undo() {
   }
 }
 
+async function continueEngine() {
+  setBusy(true);
+  try {
+    const data = await api("/api/engine-move", { sessionId: state.sessionId });
+    state.coachOverride = null;
+    state.game = data.state;
+  } catch (e) {
+    showToast(t("errGeneric"));
+  } finally {
+    setBusy(false);
+    render();
+  }
+}
+
 async function requestHint() {
   setBusy(true);
   try {
@@ -891,6 +911,7 @@ function init() {
   el.undoButton.addEventListener("click", undo);
   el.hintButton.addEventListener("click", requestHint);
   el.bestButton.addEventListener("click", requestBest);
+  el.continueButton.addEventListener("click", continueEngine);
   el.moveList.addEventListener("click", (ev) => {
     const btn = ev.target.closest(".ply[data-ply]");
     if (btn) jumpToPly(Number(btn.dataset.ply));
