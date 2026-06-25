@@ -22,6 +22,7 @@ import {
   moveToChineseNotation,
   moveHistory,
   opponent,
+  parseChineseMoveNotation,
   parseFen,
   parseMoveNotation,
   pieceLabel,
@@ -259,6 +260,35 @@ async function handleApiPost(context, url) {
     return sendJson(context.response, 200, { ok: true, state: serializeState(session, context.engine, context.config) });
   }
 
+  if (url.pathname === "/api/import") {
+    const side = normalizeSide(body.side, context.config.playerSide);
+    const moveTexts = parseImportMoves(body.moves);
+    let game = createGame(textOrNull(body.fen) ? parseFen(String(body.fen)) : undefined);
+    let applied = 0;
+    let error = null;
+    for (const text of moveTexts) {
+      const mover = game.position.turn;
+      const move = resolveImportMove(game.position, text);
+      if (!move) { error = text; break; }
+      try {
+        // Coordinate parsing is purely syntactic, so an illegal-but-well-formed
+        // token only fails here — stop cleanly and report where, never 500.
+        game = await playGameMoveAsync(game, context.engine, move, {
+          actor: mover === side ? "player" : "engine",
+          review: false
+        });
+      } catch { error = text; break; }
+      applied += 1;
+    }
+    const session = createSession(context.config, { side });
+    session.game = game;
+    context.sessions.set(session.id, session);
+    return sendJson(context.response, 200, {
+      ok: true, applied, total: moveTexts.length, error,
+      state: serializeState(session, context.engine, context.config)
+    });
+  }
+
   if (url.pathname === "/api/move") {
     const session = requireSession(context.sessions, body.sessionId);
     await enqueueSession(session, async () => {
@@ -321,6 +351,8 @@ async function handleApiPost(context, url) {
       const target = resolveTreeAnalysisTarget(session.game, body.node ?? body);
       const result = await context.engine.analyzePosition(target.position, {
         ...searchOptions(session),
+        ...(numberOrNull(body.timeLimitMs) ? { timeLimitMs: numberOrNull(body.timeLimitMs) } : {}),
+        ...(numberOrNull(body.depth) ? { depth: numberOrNull(body.depth) } : {}),
         history: target.history,
         initialPosition: session.game.initialPosition,
         moveHistory: target.moveHistory
@@ -487,6 +519,24 @@ export function resolveWebPlayerReviewOptions(session) {
 export function resolveWebPlayerReviewCommandTimeoutMs(timeLimitMs = PLAYER_REVIEW_TIME_CAP_MS) {
   const timeBudget = (numberOrNull(timeLimitMs) ?? 0) * COMMAND_TIMEOUT_TIME_MULTIPLIER;
   return Math.max(DEFAULT_COMMAND_TIMEOUT_MS, timeBudget);
+}
+
+// Split pasted game text into move tokens: strip move numbers, bracketed
+// comments, and result markers; keep zh ("炮二平五") or coordinate ("h7-e7") moves.
+function parseImportMoves(raw) {
+  return String(raw ?? "")
+    .replace(/[（(【\[][^）)】\]]*[）)】\]]/g, " ")
+    .split(/[\s,;，；、]+/)
+    .map((token) => token.replace(/^\d+\s*[.．。、:：]?\s*/, "").trim())
+    .filter(Boolean)
+    .filter((token) => !/^(1-0|0-1|1\/2(-1\/2)?|½|\*|红胜|紅勝|黑胜|黑勝|和棋|和局|和|胜|負|负)$/.test(token));
+}
+
+// Resolve one move token (Chinese notation first, then coordinate) to a move.
+function resolveImportMove(position, text) {
+  try { return parseChineseMoveNotation(position, text); } catch { /* not zh */ }
+  try { return parseMoveNotation(text); } catch { /* not coord */ }
+  return null;
 }
 
 function parsePly(value, maxPly) {

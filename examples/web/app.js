@@ -25,6 +25,14 @@ const I18N = {
     review: "复盘", reviewTitle: "复盘 · 变化树", reviewCollapse: "折叠全部分支",
     reviewHelp: "点小棋盘跳到该局面 · 点 ▸ 展开引擎候选分支",
     startPos: "起始局面", noGameYet: "尚无棋局可复盘。",
+    stepPrev: "上一步", stepNext: "下一步",
+    importMoves: "从着法导入（名谱）", importSide: "起始执方", importMovesBtn: "导入着法",
+    importNote: "支持中文（炮二平五）或坐标（h2e2）记谱，自动忽略回合编号与注释。",
+    importPlaceholder: "粘贴着法，如：\n1. 炮二平五 马8进7\n2. 马二进三 卒7进1",
+    importEmpty: "请先粘贴着法。", importDoneN: "已导入 {n}/{total} 手",
+    importBadAt: "第 {n} 手无法解析：{move}",
+    playedMove: "走子评价", aiSuggests: "引擎建议", positionRead: "局面评估", bestReply: "最佳应对",
+    evaluating: "评估中…", scoreLoss: "失分", atStart: "已在起始局面", atEnd: "已是最后一手",
     errMove: "无法走子", errGeneric: "出错了"
   },
   "zh-TW": {
@@ -49,6 +57,14 @@ const I18N = {
     review: "覆盤", reviewTitle: "覆盤 · 變化樹", reviewCollapse: "摺疊全部分支",
     reviewHelp: "點小棋盤跳到該局面 · 點 ▸ 展開引擎候選分支",
     startPos: "起始局面", noGameYet: "尚無棋局可覆盤。",
+    stepPrev: "上一步", stepNext: "下一步",
+    importMoves: "從著法匯入（名譜）", importSide: "起始執方", importMovesBtn: "匯入著法",
+    importNote: "支援中文（炮二平五）或座標（h2e2）記譜，自動忽略回合編號與註釋。",
+    importPlaceholder: "貼上著法，如：\n1. 炮二平五 馬8進7\n2. 馬二進三 卒7進1",
+    importEmpty: "請先貼上著法。", importDoneN: "已匯入 {n}/{total} 手",
+    importBadAt: "第 {n} 手無法解析：{move}",
+    playedMove: "走子評價", aiSuggests: "引擎建議", positionRead: "局面評估", bestReply: "最佳應對",
+    evaluating: "評估中…", scoreLoss: "失分", atStart: "已在起始局面", atEnd: "已是最後一手",
     errMove: "無法走子", errGeneric: "出錯了"
   },
   en: {
@@ -73,6 +89,14 @@ const I18N = {
     review: "Review", reviewTitle: "Review · Variation Tree", reviewCollapse: "Collapse all",
     reviewHelp: "Click a mini-board to jump · click ▸ to expand engine variations",
     startPos: "Start", noGameYet: "No game to review yet.",
+    stepPrev: "Prev", stepNext: "Next",
+    importMoves: "Import from notation", importSide: "Side to start", importMovesBtn: "Import moves",
+    importNote: "Accepts Chinese (炮二平五) or coordinate (h2e2) notation; move numbers and comments are ignored.",
+    importPlaceholder: "Paste moves, e.g.\n1. h2e2 h9g7\n2. b0c2 c6c5",
+    importEmpty: "Paste some moves first.", importDoneN: "Imported {n}/{total} moves",
+    importBadAt: "Move {n} could not be parsed: {move}",
+    playedMove: "Move played", aiSuggests: "Engine suggests", positionRead: "Position", bestReply: "Best reply",
+    evaluating: "Evaluating…", scoreLoss: "loss", atStart: "At the start", atEnd: "At the last move",
     errMove: "Illegal move", errGeneric: "Something went wrong"
   }
 };
@@ -125,16 +149,19 @@ function cache() {
     "board", "boardArea", "filesTop", "filesBottom", "thinking", "thinkingText",
     "engineBadge", "turnPill", "turnText", "gameStatus",
     "newButton", "undoButton", "hintButton", "bestButton", "continueButton",
+    "replayBar", "stepPrevButton", "stepNextButton", "replayPos",
     "coachCard", "coachTitle", "coachTag", "coachBody",
     "moveList", "moveCount", "sideSelect", "levelSelect", "localeSelect",
     "settings", "settingsNote", "toast",
     "reviewButton", "reviewWindow", "rwHead", "rwClose", "rwCollapse", "rwResize", "reviewTree", "rwHint",
     "rwZoomIn", "rwZoomOut", "rwFit",
-    "recordsButton", "recordsModal", "recordsBackdrop", "recordsClose", "saveRecordButton", "importRecordInput", "recordsList"
+    "recordsButton", "recordsModal", "recordsBackdrop", "recordsClose", "saveRecordButton", "importRecordInput", "recordsList",
+    "importPaste", "importMovesText", "importSideSelect", "importMovesButton"
   ]) el[id] = document.getElementById(id);
 }
 
 const t = (key) => I18N[state.locale]?.[key] ?? I18N["zh-CN"][key] ?? key;
+const tpl = (s, vars) => String(s).replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? ""));
 const isZh = () => state.locale.startsWith("zh");
 
 // ---- coordinate helpers (square = rank*9 + file; coord like "e2") ----
@@ -209,6 +236,7 @@ function applyChrome() {
     if (I18N[state.locale]?.[key] !== undefined || I18N["zh-CN"][key] !== undefined) node.textContent = t(key);
   }
   el.thinkingText.textContent = t("thinking");
+  if (el.importMovesText) el.importMovesText.placeholder = t("importPlaceholder");
   // localized file labels (depend on view side)
   renderFileLabels();
 }
@@ -348,6 +376,51 @@ function renderCoach(g) {
     return;
   }
 
+  if (state.coachOverride?.kind === "replay") {
+    const d = state.coachOverride.data;
+    const node = d.node;
+    const moverSide = node.move.side;
+    const playedMv = isZh() ? (node.move.zhNotation || node.move.notation) : node.move.notation;
+    el.coachTitle.textContent = t("coach");
+    setTag(t("review"));
+    if (d.pending) {
+      el.coachBody.innerHTML = `<div class="coach-block">
+        <div class="coach-line"><span class="who">${esc(t("playedMove"))}</span>
+          <span class="move-chip ${moverSide}">${esc(playedMv)}</span>
+          <span class="muted">${esc(t("evaluating"))}</span></div></div>`;
+      return;
+    }
+    const badge = classBadge(classifyLoss(d.loss), d.isBest);
+    const lossChip = (d.loss != null && d.loss > 8 && !d.isBest)
+      ? `<span class="score neg">−${(d.loss / 100).toFixed(2)}</span>` : "";
+    const valChip = Number.isFinite(d.moveValue)
+      ? `<span class="score ${scoreClass(d.moveValue)}">${esc(fmtScore(d.moveValue))}</span>` : "";
+    let html = `<div class="coach-block">
+      <div class="coach-line"><span class="who">${esc(t("playedMove"))}</span>
+        <span class="move-chip ${moverSide}">${esc(playedMv)}</span>${badge}${lossChip}${valChip}</div></div>`;
+    const best = d.parent?.best;
+    if (best?.bestMove && !d.isBest) {
+      const bm = isZh() ? (best.zhBestMove || best.bestMove) : best.bestMove;
+      const pv = isZh() ? (best.zhPrincipalVariation?.length ? best.zhPrincipalVariation : best.principalVariation) : best.principalVariation;
+      html += `<div class="coach-block">
+        <div class="coach-line"><span class="who">${esc(t("aiSuggests"))}</span>
+          <span class="move-chip ${moverSide}">${esc(bm)}</span>
+          <span class="score ${scoreClass(best.score)}">${esc(fmtScore(best.score, best.scoreText))}</span></div>
+        ${pvHtml(pv)}</div>`;
+    }
+    const reply = d.child?.best;
+    if (reply?.bestMove) {
+      const oppSide = moverSide === "red" ? "black" : "red";
+      const rm = isZh() ? (reply.zhBestMove || reply.bestMove) : reply.bestMove;
+      html += `<div class="coach-block">
+        <div class="coach-line"><span class="who">${esc(t("bestReply"))}</span>
+          <span class="move-chip ${oppSide}">${esc(rm)}</span>
+          <span class="score ${scoreClass(reply.score)}">${esc(fmtScore(reply.score, reply.scoreText))}</span></div></div>`;
+    }
+    el.coachBody.innerHTML = html;
+    return;
+  }
+
   // default: the latest teaching turn (your move review + engine reply)
   el.coachTitle.textContent = t("coach");
   const turn = g.latestPlayerTeachingTurn || g.currentTeachingTurn;
@@ -450,6 +523,28 @@ function renderControls(g) {
   // After navigating the review tree to an engine-to-move position, nothing auto-
   // plays — offer a Continue button to let the engine move from there.
   el.continueButton.hidden = !(playing && !g.playerTurn && !state.busy);
+
+  // Replay bar: step through the recorded line without the engine playing. Shown
+  // whenever the tree holds moves to walk (a played or imported game).
+  const hasLine = review.gameTree.size > 1;
+  el.replayBar.hidden = !hasLine;
+  if (hasLine) {
+    const cur = review.gameTree.get(g.fen);
+    const atStart = !cur?.parentFen;
+    const atEnd = !mainlineChild(g.fen);
+    el.stepPrevButton.disabled = state.busy || atStart;
+    el.stepNextButton.disabled = state.busy || atEnd;
+    el.replayPos.textContent = `${pathLength(g.fen)} / ${pathLength(deepestFen())}`;
+  }
+}
+
+// Deepest FEN along the first-child (mainline) chain from the root — used to show
+// the replay position as "current / total".
+function deepestFen() {
+  let f = review.rootFen;
+  if (!f) return state.game?.fen;
+  for (let next = mainlineChild(f); next; next = mainlineChild(f)) f = next;
+  return f;
 }
 
 function setBusy(b) {
@@ -691,6 +786,68 @@ async function navigateToFen(fen) {
     setBusy(false);
     render();
   }
+  updateReplayEval(fen); // async: fills in the cached per-move evaluation
+}
+
+// ============================================================
+// Replay stepping (上一步 / 下一步) + cached per-move evaluation
+// ============================================================
+// First-added child of a tree node = the line as actually played / imported.
+function mainlineChild(fen) {
+  const n = review.gameTree.get(fen);
+  if (!n || !n.children.size) return null;
+  return [...n.children][0];
+}
+function stepNext() {
+  const next = mainlineChild(state.game?.fen);
+  if (next) navigateToFen(next); else showToast(t("atEnd"));
+}
+function stepPrev() {
+  const n = review.gameTree.get(state.game?.fen);
+  if (n?.parentFen) navigateToFen(n.parentFen); else showToast(t("atStart"));
+}
+
+// Cache analyze-node results by FEN so re-stepping is instant. A modest movetime
+// keeps stepping snappy; the play levels can be much slower.
+const analysisCache = new Map(); // fen -> analysis ({best, branches, ...})
+let navToken = 0;
+async function cachedAnalysis(fen) {
+  if (analysisCache.has(fen)) return analysisCache.get(fen);
+  const data = await api("/api/analyze-node", { sessionId: state.sessionId, node: { fen }, timeLimitMs: 700 });
+  analysisCache.set(fen, data.analysis);
+  return data.analysis;
+}
+
+// Value of the move that reached `fen`, from the mover's POV, is -bestScore at the
+// child position (negamax). cp loss vs the parent's best = how good the move was.
+async function updateReplayEval(fen) {
+  const node = review.gameTree.get(fen);
+  if (!node || !node.parentFen || !node.move) return; // root: nothing to grade
+  const myToken = ++navToken;
+  state.coachOverride = { kind: "replay", data: { node, pending: true } };
+  if (state.game) renderCoach(state.game);
+  try {
+    const child = await cachedAnalysis(fen);            // opponent's best reply now
+    const parent = await cachedAnalysis(node.parentFen); // mover's options before
+    if (myToken !== navToken) return;                    // user stepped on; discard
+    const moveValue = Number.isFinite(child?.best?.score) ? -child.best.score : null;
+    const bestScore = Number.isFinite(parent?.best?.score) ? parent.best.score : null;
+    const loss = (moveValue != null && bestScore != null) ? Math.max(0, bestScore - moveValue) : null;
+    const isBest = parent?.best?.bestMove && node.move.notation === parent.best.bestMove;
+    state.coachOverride = { kind: "replay", data: { node, parent, child, moveValue, loss, isBest } };
+    if (state.game) renderCoach(state.game);
+  } catch {
+    if (myToken === navToken) { state.coachOverride = null; if (state.game) renderCoach(state.game); }
+  }
+}
+
+function classifyLoss(loss) {
+  if (loss == null) return "neutral";
+  if (loss <= 8) return "best";
+  if (loss <= 25) return "good";
+  if (loss <= 60) return "inaccuracy";
+  if (loss <= 150) return "mistake";
+  return "blunder";
 }
 
 function setReviewScale(scale) {
@@ -898,6 +1055,38 @@ function importRecordFile(file) {
   reader.readAsText(file);
 }
 
+// Import a game from pasted notation (Chinese or coordinate). Builds the
+// persistent tree, then rewinds to the opening so the user can step forward and
+// see each move's cached AI evaluation.
+async function importGameFromText() {
+  const raw = el.importMovesText.value || "";
+  if (!raw.trim()) { showToast(t("importEmpty")); return; }
+  const side = el.importSideSelect.value || state.side;
+  setBusy(true);
+  try {
+    const data = await api("/api/import", { side, moves: raw });
+    state.sessionId = data.state.sessionId;
+    state.side = side; el.sideSelect.value = side;
+    review.gameTree.clear(); review.expanded.clear(); review.branches.clear();
+    review.rootFen = null;
+    analysisCache.clear();
+    state.game = data.state;
+    state.selected = null; state.coachOverride = null;
+    accumulateGameTree();
+    const startFen = review.rootFen;
+    closeRecords();
+    render();
+    if (data.error) showToast(tpl(t("importBadAt"), { n: data.applied + 1, move: data.error }));
+    else showToast(tpl(t("importDoneN"), { n: data.applied, total: data.total }));
+    if (startFen && startFen !== state.game.fen) await navigateToFen(startFen);
+  } catch (e) {
+    showToast(t("errGeneric"));
+  } finally {
+    setBusy(false);
+    render();
+  }
+}
+
 function renderRecords() {
   const recs = loadRecords();
   if (!recs.length) { el.recordsList.innerHTML = `<p class="records-empty">${esc(t("noRecords"))}</p>`; return; }
@@ -1083,6 +1272,8 @@ function init() {
   el.hintButton.addEventListener("click", requestHint);
   el.bestButton.addEventListener("click", requestBest);
   el.continueButton.addEventListener("click", continueEngine);
+  el.stepPrevButton.addEventListener("click", stepPrev);
+  el.stepNextButton.addEventListener("click", stepNext);
   el.moveList.addEventListener("click", (ev) => {
     const btn = ev.target.closest(".ply[data-ply]");
     if (btn) jumpToPly(Number(btn.dataset.ply));
@@ -1105,6 +1296,7 @@ function init() {
   el.recordsClose.addEventListener("click", closeRecords);
   el.recordsBackdrop.addEventListener("click", closeRecords);
   el.saveRecordButton.addEventListener("click", saveCurrentRecord);
+  el.importMovesButton.addEventListener("click", importGameFromText);
   el.importRecordInput.addEventListener("change", (ev) => {
     const file = ev.target.files?.[0];
     if (file) importRecordFile(file);

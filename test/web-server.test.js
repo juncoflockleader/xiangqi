@@ -506,6 +506,66 @@ test("web server preserves teaching turns when the engine opens first", async ()
   }
 });
 
+test("web server imports a game from Chinese notation and exposes replay UI", async () => {
+  const app = await startWebServer({
+    port: 0,
+    native: false,
+    depth: 1,
+    timeLimitMs: 50,
+    lines: 2,
+    useBook: false
+  });
+
+  try {
+    const page = await fetchText(`${app.url}/`);
+    const script = await fetchText(`${app.url}/app.js`);
+
+    // ---- replay + import UI is wired into the page/client ----
+    assert.match(page, /id="replayBar"/);
+    assert.match(page, /id="stepNextButton"/);
+    assert.match(page, /id="stepPrevButton"/);
+    assert.match(page, /id="importMovesText"/);
+    assert.match(page, /id="importMovesButton"/);
+    assert.match(script, /"\/api\/import"/);
+    assert.match(script, /function stepNext/);
+    assert.match(script, /function cachedAnalysis/);
+
+    // ---- /api/import parses mixed Chinese + coordinate notation ----
+    const imported = await postJson(`${app.url}/api/import`, {
+      side: "red",
+      moves: "1. 炮二平五 馬8進7 2. 傌二進三 卒7進1 3. b9-c7"
+    });
+    assert.equal(imported.ok, true);
+    assert.equal(imported.applied, 5);
+    assert.equal(imported.total, 5);
+    assert.equal(imported.error, null);
+    assert.equal(imported.state.history.length, 5);
+    assert.equal(imported.state.history[0].zhNotation, "炮二平五");
+    assert.equal(imported.state.history[1].zhNotation, "馬8進7");
+    assert.equal(imported.state.history[4].notation, "b9-c7");
+
+    // ---- a well-formed but illegal token stops cleanly (no 500) ----
+    const illegal = await postJson(`${app.url}/api/import`, {
+      side: "red",
+      moves: "炮二平五 馬8進7 a0-a5"
+    });
+    assert.equal(illegal.ok, true);
+    assert.equal(illegal.applied, 2);
+    assert.equal(illegal.error, "a0-a5");
+
+    // ---- a bad token stops cleanly and reports where ----
+    const partial = await postJson(`${app.url}/api/import`, {
+      side: "red",
+      moves: "炮二平五 馬8進7 这不是着法 傌二進三"
+    });
+    assert.equal(partial.applied, 2);
+    assert.equal(partial.error, "这不是着法");
+    assert.equal(partial.state.history.length, 2);
+  } finally {
+    await app.close();
+  }
+});
+
 async function fetchText(url) {
   const response = await fetch(url);
   assert.equal(response.status, 200);

@@ -54,6 +54,18 @@
           <span data-i18n="continue">继续</span>
         </button>
 
+        <div class="replay-bar" id="replayBar" hidden>
+          <button class="btn step" id="stepPrevButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+            <span data-i18n="stepPrev">上一步</span>
+          </button>
+          <span class="replay-pos" id="replayPos">—</span>
+          <button class="btn step" id="stepNextButton" type="button">
+            <span data-i18n="stepNext">下一步</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+
         <div class="actions">
           <button class="btn primary" id="newButton" type="button">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M20 20v-6h-6M20 8a8 8 0 0 0-14-3M4 16a8 8 0 0 0 14 3"/></svg>
@@ -166,6 +178,19 @@
             <label class="btn" for="importRecordInput"><span data-i18n="importRecord">导入</span></label>
             <input id="importRecordInput" type="file" accept="application/json,.json" hidden>
           </div>
+          <details class="import-paste" id="importPaste">
+            <summary data-i18n="importMoves">从着法导入（名谱）</summary>
+            <textarea id="importMovesText" rows="4" spellcheck="false"></textarea>
+            <div class="import-row">
+              <label for="importSideSelect" data-i18n="importSide">起始执方</label>
+              <select id="importSideSelect">
+                <option value="red" data-i18n="red">红方</option>
+                <option value="black" data-i18n="black">黑方</option>
+              </select>
+              <button class="btn primary" id="importMovesButton" type="button"><span data-i18n="importMovesBtn">导入着法</span></button>
+            </div>
+            <p class="import-note" data-i18n="importNote">支持中文（炮二平五）或坐标（h2e2）记谱，自动忽略回合编号与注释。</p>
+          </details>
           <div class="records-list" id="recordsList"></div>
         </div>
       </div>

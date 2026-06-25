@@ -310,6 +310,13 @@ body {
   50% { box-shadow: 0 0 0 4px rgba(47, 111, 79, 0.25), var(--shadow-md); }
 }
 
+/* replay stepping bar */
+.replay-bar { display: flex; align-items: center; gap: 8px; }
+.replay-bar[hidden] { display: none; }
+.replay-bar .btn.step { flex: 1; flex-direction: row; gap: 6px; padding: 9px 8px; }
+.replay-bar .btn.step svg { width: 16px; height: 16px; }
+.replay-pos { flex: none; min-width: 52px; text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
 /* actions */
 .actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .btn {
@@ -657,6 +664,25 @@ body {
 .modal-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
 .modal-actions { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--card-line); }
 .modal-actions .btn { flex-direction: row; gap: 6px; padding: 9px 14px; }
+
+/* paste-to-import block inside the records modal */
+.import-paste { padding: 10px 16px 12px; border-bottom: 1px solid var(--card-line); }
+.import-paste > summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--accent); list-style: none; user-select: none; }
+.import-paste > summary::-webkit-details-marker { display: none; }
+.import-paste > summary::before { content: "＋ "; }
+.import-paste[open] > summary::before { content: "－ "; }
+.import-paste textarea {
+  width: 100%; margin-top: 10px; padding: 9px 11px; box-sizing: border-box;
+  border: 1px solid var(--card-line); border-radius: 10px; background: #fff;
+  font-family: var(--font); font-size: 13px; line-height: 1.6; color: var(--ink); resize: vertical; min-height: 84px;
+}
+.import-paste textarea:focus { outline: none; border-color: var(--accent-soft); box-shadow: 0 0 0 3px rgba(47, 111, 79, 0.15); }
+.import-row { display: flex; align-items: center; gap: 8px; margin-top: 9px; }
+.import-row label { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.import-row select { padding: 7px 10px; border: 1px solid var(--card-line); border-radius: 9px; background: #fff; font: inherit; font-size: 13px; color: var(--ink); }
+.import-row .btn.primary { flex: 1; flex-direction: row; padding: 8px 12px; }
+.import-note { margin: 8px 0 0; font-size: 11.5px; color: var(--ink-faint); line-height: 1.5; }
+
 .records-list { overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .records-empty { text-align: center; color: var(--ink-faint); font-size: 13px; padding: 28px; }
 
