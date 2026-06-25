@@ -96,10 +96,14 @@ const state = {
 // live game updates. expanded = set of FENs whose children are shown.
 const review = {
   open: false,
-  branches: new Map(), // node id -> [childNode]
-  expanded: new Set(), // node id
-  loading: new Set(),  // node id currently fetching
-  nodeIndex: new Map(), // node id -> node (rebuilt each render)
+  // Persistent game tree of everything actually played this session, keyed by
+  // FEN, so navigating back never erases forward lines — they become branches.
+  gameTree: new Map(), // fen -> { fen, board, parentFen, move, children:Set<fen> }
+  rootFen: null,
+  branches: new Map(), // fen -> [engine-candidate child] (on-demand analyze)
+  expanded: new Set(), // fen with engine candidates shown
+  loading: new Set(),  // fen currently fetching
+  nodeIndex: new Map(), // fen -> display node (rebuilt each render)
   view: { scale: 0.8, fitted: false }
 };
 
@@ -180,6 +184,7 @@ function render() {
   renderMoveList(g);
   renderCoach(g);
   renderControls(g);
+  accumulateGameTree(); // record played lines even while the review window is closed
   if (review.open) renderReviewTree();
 }
 
@@ -451,7 +456,7 @@ function turnFromFen(fen) {
 }
 
 // Render a tiny board from a serialized 90-cell array, oriented to the view side.
-function miniBoard(board, viewSide, { jumpable = false, ply = null } = {}) {
+function miniBoard(board, viewSide, { navFen = null } = {}) {
   if (!board) return "";
   let cells = "";
   for (let r = 0; r < 10; r += 1) {
@@ -463,8 +468,8 @@ function miniBoard(board, viewSide, { jumpable = false, ply = null } = {}) {
       cells += `<span class="mc">${piece ? `<span class="mp ${piece.side}">${esc(piece.symbol)}</span>` : ""}</span>`;
     }
   }
-  const jumpAttr = jumpable && ply != null ? ` data-jump="${ply}"` : "";
-  return `<div class="mini${jumpable ? " jumpable" : ""}"${jumpAttr}><span class="river-mini"></span>${cells}</div>`;
+  const navAttr = navFen ? ` data-nav="${esc(navFen)}"` : "";
+  return `<div class="mini${navFen ? " jumpable" : ""}"${navAttr}><span class="river-mini"></span>${cells}</div>`;
 }
 
 function scoreChip(score) {
@@ -473,48 +478,82 @@ function scoreChip(score) {
   return `<span class="node-score ${cls}">${score >= 0 ? "+" : ""}${(score / 100).toFixed(2)}</span>`;
 }
 
-// Build a tree of node objects from the mainline history plus any expanded
-// branches. Nodes get stable ids (m0,m1,… for mainline; parentId>move for
-// branches) so expand state survives re-renders and live game updates.
+// Fold the current game's move list into the persistent game tree. Called on
+// every state update, so lines played before a jump-back survive as branches.
+function accumulateGameTree() {
+  const g = state.game;
+  if (!g) return;
+  const hist = g.history || [];
+  const ensure = (fen, board) => {
+    if (!fen) return null;
+    let n = review.gameTree.get(fen);
+    if (!n) { n = { fen, board: board ?? null, parentFen: null, move: null, children: new Set() }; review.gameTree.set(fen, n); }
+    else if (board && !n.board) n.board = board;
+    return n;
+  };
+  const rootFen = hist[0]?.positionBefore ?? g.fen;
+  ensure(rootFen, hist[0]?.boardBefore ?? g.board);
+  if (!review.rootFen) review.rootFen = rootFen;
+  for (const m of hist) {
+    const child = ensure(m.positionAfter, m.boardAfter);
+    if (!child) continue;
+    child.parentFen = m.positionBefore;
+    child.move = {
+      notation: m.notation, zhNotation: m.zhNotation, side: m.side,
+      moveNumber: m.moveNumber, score: m.decision?.score ?? null
+    };
+    ensure(m.positionBefore, m.boardBefore)?.children.add(m.positionAfter);
+  }
+}
+
+// Build the display tree from the persistent game tree (played lines) plus any
+// expanded engine-candidate branches. Current line = path from the live
+// position back to the root; it forms the straight spine.
 function buildReviewModel() {
   const g = state.game;
-  const hist = g.history || [];
   const index = new Map();
-  const startBoard = hist[0]?.boardBefore ?? g.board;
-  const startFen = hist[0]?.positionBefore ?? g.fen;
-  const root = { id: "m0", fen: startFen, board: startBoard, ply: 0, isMainline: true, children: [] };
-  index.set(root.id, root);
+  const rootFen = review.rootFen ?? g.fen;
 
-  let prev = root;
-  hist.forEach((m) => {
+  const onPath = new Set();
+  for (let f = g.fen; f && review.gameTree.has(f); f = review.gameTree.get(f).parentFen) onPath.add(f);
+
+  function build(fen, seen) {
+    if (seen.has(fen)) return null; // guard against transposition cycles
+    seen.add(fen);
+    const tn = review.gameTree.get(fen);
+    if (!tn) return null;
     const node = {
-      id: `m${m.ply}`, fen: m.positionAfter, board: m.boardAfter, ply: m.ply,
-      moveNumber: m.moveNumber, side: m.side,
-      label: isZh() ? (m.zhNotation || m.notation) : m.notation,
-      score: m.decision?.score ?? null, isMainline: true, children: []
+      id: fen, fen, board: tn.board,
+      isStart: !tn.move,
+      label: tn.move ? (isZh() ? (tn.move.zhNotation || tn.move.notation) : tn.move.notation) : null,
+      side: tn.move?.side, moveNumber: tn.move?.moveNumber, score: tn.move?.score,
+      onPath: onPath.has(fen), isCurrent: fen === g.fen, isEngine: false, children: []
     };
-    index.set(node.id, node);
-    prev._mainNext = node;
-    prev = node;
-  });
+    index.set(fen, node);
 
-  (function attach(node) {
-    const kids = [];
-    if (node._mainNext) kids.push(node._mainNext);
-    if (review.expanded.has(node.id) && review.branches.has(node.id)) {
-      for (const b of review.branches.get(node.id)) {
+    // Played children: the on-path one first so the current line stays straight.
+    const kids = [...tn.children].sort((a, b) => (onPath.has(b) ? 1 : 0) - (onPath.has(a) ? 1 : 0));
+    for (const ck of kids) { const c = build(ck, seen); if (c) node.children.push(c); }
+
+    // Engine-candidate branches (preview-only, one level): shown when expanded,
+    // skipping any that coincide with a real played child.
+    if (review.expanded.has(fen) && review.branches.has(fen)) {
+      for (const b of review.branches.get(fen)) {
+        if (!b.fen || tn.children.has(b.fen)) continue;
         const child = {
-          id: `${node.id}>${b.move}`, fen: b.fen, board: b.board, move: b.move,
-          label: b.label, side: b.side, score: b.score, isMainline: false, children: []
+          id: `eng:${fen}>${b.move}`, fen: b.fen, board: b.board, label: b.label,
+          side: b.side, score: b.score, isEngine: true, onPath: false, isStart: false, children: []
         };
         index.set(child.id, child);
-        kids.push(child);
+        node.children.push(child);
       }
     }
-    node.children = kids;
-    kids.forEach(attach);
-  })(root);
+    seen.delete(fen);
+    return node;
+  }
 
+  const root = build(rootFen, new Set()) ?? { id: rootFen, fen: rootFen, board: g.board, isStart: true, onPath: true, isCurrent: g.fen === rootFen, children: [] };
+  if (!index.has(root.fen)) index.set(root.fen, root);
   review.nodeIndex = index;
   return root;
 }
@@ -541,25 +580,29 @@ function edgePath(parent, child) {
   const x1 = parent.x + RW.NW, y1 = parent.y + RW.NH / 2;
   const x2 = child.x, y2 = child.y + RW.NH / 2;
   const dx = Math.max(22, (x2 - x1) / 2);
-  const cls = child.isMainline ? "edge main" : "edge branch";
+  const cls = child.onPath ? "edge main" : "edge branch";
   return `<path class="${cls}" d="M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}"/>`;
 }
 
 function gnodeHtml(node, viewSide) {
-  const open = review.expanded.has(node.id);
-  const loading = review.loading.has(node.id);
-  const current = node.isMainline && node.ply === state.game.moveCount && node.ply > 0;
+  const open = review.expanded.has(node.fen);
+  const loading = review.loading.has(node.fen);
   const expandCls = `gnode-exp${open ? " open" : ""}${loading ? " loading" : ""}`;
   let cap;
-  if (node.isMainline && node.ply === 0) {
+  if (node.isStart) {
     cap = `<span class="node-label start">${esc(t("startPos"))}</span>`;
   } else {
     const no = node.moveNumber ? `<span class="node-no">${node.moveNumber}.</span>` : "";
     cap = `${no}<span class="node-label ${node.side}">${esc(node.label)}</span>${scoreChip(node.score)}`;
   }
-  return `<div class="gnode${node.isMainline ? " mainline" : " branch"}${current ? " current" : ""}" style="left:${node.x}px;top:${node.y}px;width:${RW.NW}px;">
-      ${miniBoard(node.board, viewSide, { jumpable: node.isMainline, ply: node.ply })}
-      <div class="gnode-cap">${cap}<button class="${expandCls}" data-expand="${esc(node.id)}" aria-label="expand">▸</button></div>
+  const cls = node.isEngine ? "branch engine" : node.onPath ? "mainline" : "branch";
+  // Played positions are navigable (jump the live game there) and expandable for
+  // engine candidates; engine previews are neither.
+  const navFen = node.isEngine ? null : node.fen;
+  const expandBtn = node.isEngine ? "" : `<button class="${expandCls}" data-expand="${esc(node.fen)}" aria-label="expand">▸</button>`;
+  return `<div class="gnode ${cls}${node.isCurrent ? " current" : ""}" style="left:${node.x}px;top:${node.y}px;width:${RW.NW}px;">
+      ${miniBoard(node.board, viewSide, { navFen })}
+      <div class="gnode-cap">${cap}${expandBtn}</div>
     </div>`;
 }
 
@@ -590,34 +633,47 @@ function renderReviewTree() {
      </div>`;
 }
 
-async function expandReviewNode(id) {
-  if (review.expanded.has(id)) { review.expanded.delete(id); renderReviewTree(); return; }
-  if (review.branches.has(id)) { review.expanded.add(id); renderReviewTree(); return; }
-  const node = review.nodeIndex.get(id);
-  if (!node) return;
+async function expandReviewNode(fen) {
+  if (review.expanded.has(fen)) { review.expanded.delete(fen); renderReviewTree(); return; }
+  if (review.branches.has(fen)) { review.expanded.add(fen); renderReviewTree(); return; }
 
-  review.loading.add(id);
+  review.loading.add(fen);
   renderReviewTree();
   try {
-    const apiNode = node.isMainline ? { kind: "main", ply: node.ply } : { fen: node.fen };
-    const data = await api("/api/analyze-node", { sessionId: state.sessionId, node: apiNode });
-    const moverSide = turnFromFen(node.fen);
-    // Drop the alternative that equals the actually-played continuation so the
-    // mainline isn't duplicated as a branch.
-    const playedNext = node.isMainline ? (state.game.history?.[node.ply]?.notation ?? null) : null;
+    const data = await api("/api/analyze-node", { sessionId: state.sessionId, node: { fen } });
+    const moverSide = turnFromFen(fen);
     const children = (data.analysis?.branches || [])
       .map((b) => ({
         fen: b.fenAfter, board: b.boardAfter, move: b.move,
         label: isZh() ? (b.zhMove || b.move) : b.move, side: moverSide, score: b.score
       }))
-      .filter((c) => c.fen && c.board && c.move !== playedNext);
-    review.branches.set(id, children);
-    review.expanded.add(id);
+      .filter((c) => c.fen && c.board);
+    review.branches.set(fen, children);
+    review.expanded.add(fen);
   } catch (e) {
     showToast(t("errGeneric"));
   } finally {
-    review.loading.delete(id);
+    review.loading.delete(fen);
     renderReviewTree();
+  }
+}
+
+// Navigate the live game to any position in the tree (by FEN). The server starts
+// a fresh continuable game from that position; the persistent tree keeps every
+// other line, so playing a different move here just adds a branch.
+async function navigateToFen(fen) {
+  if (!fen || fen === state.game?.fen) return;
+  setBusy(true);
+  try {
+    const data = await api("/api/select-node", { sessionId: state.sessionId, node: { fen } });
+    state.selected = null;
+    state.coachOverride = null;
+    state.game = data.state;
+  } catch (e) {
+    showToast(t("errGeneric"));
+  } finally {
+    setBusy(false);
+    render();
   }
 }
 
@@ -688,8 +744,8 @@ function setupReviewWindowControls() {
   el.reviewTree.addEventListener("click", (ev) => {
     const expandBtn = ev.target.closest("[data-expand]");
     if (expandBtn) { expandReviewNode(expandBtn.dataset.expand); return; }
-    const jump = ev.target.closest("[data-jump]");
-    if (jump) jumpToPly(Number(jump.dataset.jump));
+    const nav = ev.target.closest("[data-nav]");
+    if (nav) navigateToFen(nav.dataset.nav);
   });
 }
 
@@ -705,6 +761,8 @@ async function newGame() {
     state.coachOverride = null;
     review.expanded.clear();
     review.branches.clear();
+    review.gameTree.clear();
+    review.rootFen = null;
     state.game = data.state;
   } catch (e) {
     showToast(t("errGeneric") + ": " + e.message);
@@ -841,6 +899,7 @@ function init() {
   el.sideSelect.addEventListener("change", () => { state.side = el.sideSelect.value; newGame(); });
   el.levelSelect.addEventListener("change", () => { state.level = el.levelSelect.value; newGame(); });
 
+  if (typeof window !== "undefined") window.__xq = { state, review }; // dev inspection
   el.reviewButton.addEventListener("click", toggleReview);
   el.rwClose.addEventListener("click", toggleReview);
   el.rwCollapse.addEventListener("click", () => { review.expanded.clear(); review.branches.clear(); renderReviewTree(); });
