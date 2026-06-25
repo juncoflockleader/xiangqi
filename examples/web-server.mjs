@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
@@ -10,6 +11,7 @@ import {
   chooseAndPlayGameMoveAsync,
   chooseGameMoveAsync,
   createGame,
+  createOpeningBook,
   createLearningEngineBackend,
   describeEngineBackend,
   gameStatus,
@@ -41,6 +43,24 @@ const REQUEST_TIMEOUT_BUFFER_MS = 30000;
 const PLAYER_REVIEW_DEPTH_CAP = 3;
 const PLAYER_REVIEW_TIME_CAP_MS = 1000;
 const JSON_LIMIT_BYTES = 64 * 1024;
+
+// High-quality opening book generated from Pikafish (examples/build-book.mjs).
+// When present it replaces the hand-authored book; off-book opening positions
+// then fall through to a real search instead of the weaker heuristic.
+const GENERATED_BOOK = loadGeneratedBook();
+function loadGeneratedBook() {
+  try {
+    const url = new URL("../data/opening-book.json", import.meta.url);
+    const data = JSON.parse(readFileSync(url, "utf8"));
+    const positions = data.positions ?? data;
+    const book = createOpeningBook({ positions });
+    const count = Object.keys(positions).length;
+    console.log(`Loaded Pikafish opening book: ${count} positions.`);
+    return book;
+  } catch {
+    return null; // fall back to the built-in DEFAULT_OPENING_BOOK
+  }
+}
 
 const PIECE_SYMBOLS = Object.freeze({
   red: Object.freeze({
@@ -439,11 +459,17 @@ function searchOptions(session) {
     ...(session.depth ? { depth: session.depth } : {}),
     ...(session.timeLimitMs ? { timeLimitMs: session.timeLimitMs } : {}),
     lines: session.lines,
-    useBook: session.useBook
+    useBook: session.useBook,
+    // Prefer the Pikafish-generated book; with no built-in book to fall back on,
+    // off-book positions get a real search rather than the weak heuristic.
+    ...(GENERATED_BOOK ? { book: GENERATED_BOOK, openingHeuristics: false } : {})
   };
 }
 
 export function resolveWebPlayerReviewOptions(session) {
+  // Move review is a pure evaluation of the human's move — exclude the opening
+  // book (and heuristic toggle); those belong only in the engine's move choice.
+  const { book, openingHeuristics, ...base } = searchOptions(session);
   const reviewDepth = session.depth
     ? Math.min(session.depth, PLAYER_REVIEW_DEPTH_CAP)
     : PLAYER_REVIEW_DEPTH_CAP;
@@ -451,7 +477,7 @@ export function resolveWebPlayerReviewOptions(session) {
     ? Math.min(session.timeLimitMs, PLAYER_REVIEW_TIME_CAP_MS)
     : PLAYER_REVIEW_TIME_CAP_MS;
   return {
-    ...searchOptions(session),
+    ...base,
     depth: reviewDepth,
     timeLimitMs: reviewTimeLimitMs,
     commandTimeoutMs: resolveWebPlayerReviewCommandTimeoutMs(reviewTimeLimitMs)
