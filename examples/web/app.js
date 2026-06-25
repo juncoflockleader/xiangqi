@@ -34,6 +34,9 @@ const I18N = {
     saveImportPrompt: "保存到棋谱库？输入名称（取消则只回放不保存）：",
     playedMove: "走子评价", aiSuggests: "引擎建议", positionRead: "局面评估", bestReply: "最佳应对",
     evaluating: "评估中…", scoreLoss: "失分", atStart: "已在起始局面", atEnd: "已是最后一手",
+    variations: "变招", variationsTag: "推演", variationsHint: "引擎推演两条变化 · 点 ‹ › 逐手，或并入棋谱",
+    varNone: "此局面没有可推演的变化。", mergeToTree: "并入棋谱", mergedOk: "已并入本局变化",
+    varStartPos: "当前局面",
     errMove: "无法走子", errGeneric: "出错了"
   },
   "zh-TW": {
@@ -67,6 +70,9 @@ const I18N = {
     saveImportPrompt: "保存到棋譜庫？輸入名稱（取消則只回放不保存）：",
     playedMove: "走子評價", aiSuggests: "引擎建議", positionRead: "局面評估", bestReply: "最佳應對",
     evaluating: "評估中…", scoreLoss: "失分", atStart: "已在起始局面", atEnd: "已是最後一手",
+    variations: "變招", variationsTag: "推演", variationsHint: "引擎推演兩條變化 · 點 ‹ › 逐手，或併入棋譜",
+    varNone: "此局面沒有可推演的變化。", mergeToTree: "併入棋譜", mergedOk: "已併入本局變化",
+    varStartPos: "當前局面",
     errMove: "無法走子", errGeneric: "出錯了"
   },
   en: {
@@ -100,6 +106,9 @@ const I18N = {
     saveImportPrompt: "Save to your records? Enter a name (cancel = replay only):",
     playedMove: "Move played", aiSuggests: "Engine suggests", positionRead: "Position", bestReply: "Best reply",
     evaluating: "Evaluating…", scoreLoss: "loss", atStart: "At the start", atEnd: "At the last move",
+    variations: "Lines", variationsTag: "Playout", variationsHint: "Two engine lines · use ‹ › to step, or add to the tree",
+    varNone: "No lines to play out from this position.", mergeToTree: "Add to tree", mergedOk: "Added to the variation tree",
+    varStartPos: "Current",
     errMove: "Illegal move", errGeneric: "Something went wrong"
   }
 };
@@ -153,7 +162,7 @@ function cache() {
     "engineBadge", "turnPill", "turnText", "gameStatus",
     "newButton", "undoButton", "hintButton", "bestButton", "continueButton",
     "replayBar", "stepPrevButton", "stepNextButton", "replayPos",
-    "coachCard", "coachTitle", "coachTag", "coachBody",
+    "coachCard", "coachTitle", "coachTag", "coachBody", "variationsButton",
     "moveList", "moveCount", "sideSelect", "levelSelect", "localeSelect",
     "settings", "settingsNote", "toast",
     "reviewButton", "reviewWindow", "rwHead", "rwClose", "rwCollapse", "rwResize", "reviewTree", "rwHint",
@@ -348,6 +357,20 @@ function classBadge(classification, isBest) {
 
 function renderCoach(g) {
   el.coachTag.hidden = true;
+  clearVariationTimers(); // any re-render cancels a running playout (restarted below if still in view)
+
+  if (state.coachOverride?.kind === "variations") {
+    const d = state.coachOverride.data;
+    el.coachTitle.textContent = t("coach");
+    setTag(t("variationsTag"));
+    if (d.pending) { el.coachBody.innerHTML = `<p class="muted">${esc(t("evaluating"))}</p>`; return; }
+    if (!d.lines.length) { el.coachBody.innerHTML = `<p class="muted">${esc(t("varNone"))}</p>`; return; }
+    const moverSide = turnFromFen(d.fen);
+    const cards = d.lines.map((line, i) => variationCardHtml(line, i, d.viewSide, moverSide)).join("");
+    el.coachBody.innerHTML = `<p class="var-hint">${esc(t("variationsHint"))}</p><div class="var-grid">${cards}</div>`;
+    startVariationAnimation(); // the card DOM exists now (innerHTML just set)
+    return;
+  }
 
   if (state.coachOverride?.kind === "best") {
     const d = state.coachOverride.data;
@@ -556,6 +579,7 @@ function renderControls(g) {
   el.hintButton.disabled = state.busy || !g.playerTurn || !playing;
   el.bestButton.disabled = state.busy || !playing;
   el.newButton.disabled = state.busy;
+  el.variationsButton.disabled = state.busy;
   // After navigating the review tree to an engine-to-move position, nothing auto-
   // plays — offer a Continue button to let the engine move from there.
   el.continueButton.hidden = !(playing && !g.playerTurn && !state.busy);
@@ -787,7 +811,7 @@ async function expandReviewNode(fen) {
   review.loading.add(fen);
   renderReviewTree();
   try {
-    const data = await api("/api/analyze-node", { sessionId: state.sessionId, node: { fen } });
+    const data = await api("/api/analyze-node", { sessionId: state.sessionId, node: { fen }, useBook: false });
     const moverSide = turnFromFen(fen);
     const children = (data.analysis?.branches || [])
       .map((b) => ({
@@ -849,7 +873,7 @@ const analysisCache = new Map(); // fen -> analysis ({best, branches, ...})
 let navToken = 0;
 async function cachedAnalysis(fen) {
   if (analysisCache.has(fen)) return analysisCache.get(fen);
-  const data = await api("/api/analyze-node", { sessionId: state.sessionId, node: { fen }, timeLimitMs: 700 });
+  const data = await api("/api/analyze-node", { sessionId: state.sessionId, node: { fen }, timeLimitMs: 700, useBook: false });
   analysisCache.set(fen, data.analysis);
   return data.analysis;
 }
@@ -884,6 +908,170 @@ function classifyLoss(loss) {
   if (loss <= 60) return "inaccuracy";
   if (loss <= 150) return "mistake";
   return "blunder";
+}
+
+// ============================================================
+// Variation playout (变招推演) — two engine lines as stepping mini-boards
+// ============================================================
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+let variationTimers = [];
+function clearVariationTimers() { variationTimers.forEach(clearInterval); variationTimers = []; }
+
+// Analyze the current position, take the engine's top two lines, and show each
+// as a mini-board that plays out the principal variation.
+async function showVariations() {
+  const g = state.game;
+  if (!g) return;
+  const fen = g.fen;
+  setBusy(true);
+  clearVariationTimers();
+  state.coachOverride = { kind: "variations", data: { fen, viewSide: g.playerSide, lines: [], pending: true } };
+  render();
+  try {
+    const data = await api("/api/analyze-node", { sessionId: state.sessionId, node: { fen }, lines: 2, timeLimitMs: 1200, useBook: false });
+    if (state.game?.fen !== fen) return; // navigated away mid-think
+    const lines = (data.analysis?.branches || [])
+      .filter((b) => Array.isArray(b.pvBoards) && b.pvBoards.length)
+      .slice(0, 2)
+      .map((b) => ({ ...b, step: 0 }));
+    state.coachOverride = { kind: "variations", data: { fen, viewSide: g.playerSide, lines } };
+  } catch {
+    showToast(t("errGeneric"));
+    state.coachOverride = null;
+  } finally {
+    setBusy(false);
+    render();
+  }
+}
+
+function varCaption(line, step) {
+  const pv = (isZh() ? line.zhPrincipalVariation : line.principalVariation) || [];
+  return pv[step] ? `${step + 1}. ${pv[step]}` : t("varStartPos");
+}
+
+function variationCardHtml(line, i, viewSide, moverSide) {
+  const n = line.pvBoards.length;
+  const step = clamp(line.step ?? 0, 0, n - 1);
+  const mv = isZh() ? (line.zhMove || line.move) : line.move;
+  const badge = classBadge(classifyLoss(line.centipawnLoss ?? 0), i === 0);
+  const pv = (isZh() ? line.zhPrincipalVariation : line.principalVariation) || [];
+  const chips = pv.map((m, k) =>
+    `<button class="pv-chip ${k === step ? "on" : ""}" data-var="${i}" data-step="${k}">${esc(m)}</button>`).join("");
+  return `<div class="var-card">
+    <div class="var-head">
+      <span class="move-chip ${moverSide}">${esc(mv)}</span>
+      <span class="score ${scoreClass(line.score)}">${esc(fmtScore(line.score))}</span>
+      ${badge}
+    </div>
+    <div class="var-board" id="var-board-${i}">${miniBoard(line.pvBoards[step], viewSide)}</div>
+    <div class="var-cap" id="var-cap-${i}">${esc(varCaption(line, step))}</div>
+    <div class="var-ctrl">
+      <button class="var-step" data-var="${i}" data-dir="-1" aria-label="prev">‹</button>
+      <span class="var-count" id="var-count-${i}">${step + 1} / ${n}</span>
+      <button class="var-step" data-var="${i}" data-dir="1" aria-label="next">›</button>
+    </div>
+    <div class="var-pv" id="var-pv-${i}">${chips}</div>
+    <button class="btn-merge" data-merge="${i}">${esc(t("mergeToTree"))}</button>
+  </div>`;
+}
+
+// Re-paint a single variation card's board/caption/chip without a full render,
+// so the playout animation and manual stepping stay smooth.
+function paintVariationStep(i) {
+  const d = state.coachOverride?.data;
+  if (!d?.lines?.[i]) return;
+  const line = d.lines[i];
+  const n = line.pvBoards.length;
+  line.step = clamp(line.step ?? 0, 0, n - 1);
+  const boardEl = document.getElementById(`var-board-${i}`);
+  if (boardEl) boardEl.innerHTML = miniBoard(line.pvBoards[line.step], d.viewSide);
+  const capEl = document.getElementById(`var-cap-${i}`);
+  if (capEl) capEl.textContent = varCaption(line, line.step);
+  const countEl = document.getElementById(`var-count-${i}`);
+  if (countEl) countEl.textContent = `${line.step + 1} / ${n}`;
+  const pvEl = document.getElementById(`var-pv-${i}`);
+  if (pvEl) pvEl.querySelectorAll(".pv-chip").forEach((chip, k) => chip.classList.toggle("on", k === line.step));
+}
+
+function startVariationAnimation() {
+  clearVariationTimers();
+  const d = state.coachOverride?.data;
+  if (!d || state.coachOverride.kind !== "variations") return;
+  d.lines.forEach((line, i) => {
+    const n = line.pvBoards?.length || 0;
+    if (n <= 1) return;
+    line.step = 0;
+    paintVariationStep(i);
+    const tm = setInterval(() => {
+      if (state.coachOverride?.kind !== "variations") { clearInterval(tm); return; }
+      if ((line.step ?? 0) >= n - 1) { clearInterval(tm); return; }
+      line.step = (line.step ?? 0) + 1;
+      paintVariationStep(i);
+    }, 900);
+    variationTimers.push(tm);
+  });
+}
+
+function onCoachClick(ev) {
+  const stepBtn = ev.target.closest(".var-step[data-var]");
+  if (stepBtn) {
+    clearVariationTimers();
+    const i = Number(stepBtn.dataset.var);
+    const line = state.coachOverride?.data?.lines?.[i];
+    if (line) { line.step = (line.step ?? 0) + Number(stepBtn.dataset.dir); paintVariationStep(i); }
+    return;
+  }
+  const chip = ev.target.closest(".pv-chip[data-var]");
+  if (chip) {
+    clearVariationTimers();
+    const i = Number(chip.dataset.var);
+    const line = state.coachOverride?.data?.lines?.[i];
+    if (line) { line.step = Number(chip.dataset.step); paintVariationStep(i); }
+    return;
+  }
+  const merge = ev.target.closest(".btn-merge[data-merge]");
+  if (merge) mergeVariation(Number(merge.dataset.merge));
+}
+
+function nextMoveNumber(parentFen) {
+  const node = review.gameTree.get(parentFen);
+  if (!node?.move) return 1;
+  return node.move.side === "black" ? node.move.moveNumber + 1 : node.move.moveNumber;
+}
+
+// Graft a variation's principal variation into the persistent tree as a branch
+// off the analyzed position, so it shows up in the 棋谱 / review tree.
+function mergeVariation(i) {
+  const d = state.coachOverride?.data;
+  const line = d?.lines?.[i];
+  if (!d || !line || !line.pvFens?.length) return;
+  const parentFen = d.fen;
+  if (!review.gameTree.has(parentFen)) {
+    review.gameTree.set(parentFen, { fen: parentFen, board: state.game?.board ?? null, parentFen: null, move: null, children: new Set() });
+    if (!review.rootFen) review.rootFen = parentFen;
+  }
+  const pv = line.principalVariation || [];
+  const zh = line.zhPrincipalVariation || [];
+  let prevFen = parentFen;
+  let turn = turnFromFen(parentFen);
+  let num = nextMoveNumber(parentFen);
+  for (let k = 0; k < line.pvFens.length; k += 1) {
+    const fen = line.pvFens[k];
+    if (k > 0 && turn === "red") num += 1;
+    let node = review.gameTree.get(fen);
+    if (!node) {
+      node = { fen, board: line.pvBoards[k], parentFen: prevFen, move: null, children: new Set() };
+      review.gameTree.set(fen, node);
+    } else if (!node.board) node.board = line.pvBoards[k];
+    node.parentFen = node.parentFen ?? prevFen;
+    if (!node.move) node.move = { notation: pv[k], zhNotation: zh[k] || pv[k], side: turn, moveNumber: num, score: null };
+    review.gameTree.get(prevFen)?.children.add(fen);
+    prevFen = fen;
+    turn = turn === "red" ? "black" : "red";
+  }
+  showToast(t("mergedOk"));
+  render();
+  if (review.open) renderReviewTree();
 }
 
 function setReviewScale(scale) {
@@ -1310,6 +1498,8 @@ function init() {
   el.continueButton.addEventListener("click", continueEngine);
   el.stepPrevButton.addEventListener("click", stepPrev);
   el.stepNextButton.addEventListener("click", stepNext);
+  el.variationsButton.addEventListener("click", showVariations);
+  el.coachBody.addEventListener("click", onCoachClick);
   el.moveList.addEventListener("click", (ev) => {
     const btn = ev.target.closest(".ply[data-fen]");
     if (btn) navigateToFen(btn.dataset.fen);

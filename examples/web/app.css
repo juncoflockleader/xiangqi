@@ -600,6 +600,38 @@ body {
 .mini .mp.red { color: var(--red); } .mini .mp.black { color: var(--black); }
 .mini .river-mini { grid-column: 1 / -1; grid-row: 5 / 7; border-top: 1px solid rgba(90,56,22,.3); border-bottom: 1px solid rgba(90,56,22,.3); }
 
+/* variation playout cards (变招推演) in the coach panel */
+.var-hint { font-size: 11.5px; color: var(--ink-faint); margin: 0 0 2px; line-height: 1.5; }
+.var-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.var-card {
+  display: flex; flex-direction: column; gap: 7px; align-items: stretch;
+  padding: 9px; border: 1px solid var(--card-line); border-radius: 11px; background: #fffdf8;
+}
+.var-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.var-head .score { margin-left: auto; }
+.var-board { display: flex; justify-content: center; }
+.var-card .mini { width: 100%; max-width: 150px; cursor: default; }
+.var-cap { font-size: 12px; font-weight: 700; color: var(--ink-soft); text-align: center; min-height: 15px; font-family: var(--serif); }
+.var-ctrl { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.var-step {
+  width: 26px; height: 24px; border: 1px solid var(--card-line); border-radius: 8px;
+  background: var(--card); cursor: pointer; font-size: 15px; line-height: 1; color: var(--ink-soft);
+}
+.var-step:hover { background: var(--parchment-2); border-color: var(--accent-soft); }
+.var-count { font-size: 11.5px; color: var(--ink-faint); font-variant-numeric: tabular-nums; min-width: 42px; text-align: center; }
+.var-pv { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+.pv-chip {
+  font-size: 10.5px; padding: 1px 5px; border: 1px solid var(--card-line); border-radius: 6px;
+  background: var(--card); color: var(--ink-soft); cursor: pointer; font-family: var(--serif);
+}
+.pv-chip.on { background: var(--accent); color: #fff; border-color: transparent; }
+.btn-merge {
+  margin-top: 2px; padding: 7px; border: 1px solid var(--accent); border-radius: 9px;
+  background: transparent; color: var(--accent); font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.btn-merge:hover { background: var(--accent); color: #fff; }
+@media (max-width: 400px) { .var-grid { grid-template-columns: 1fr; } }
+
 .rw-empty { color: var(--ink-faint); font-size: 13px; text-align: center; padding: 30px; }
 .branch-note { font-size: 11.5px; color: var(--ink-faint); padding: 2px 0 0; }
 

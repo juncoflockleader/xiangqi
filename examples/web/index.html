@@ -89,7 +89,13 @@
         <section class="card coach" id="coachCard">
           <div class="card-head">
             <h2 id="coachTitle" data-i18n="coach">教练分析</h2>
-            <span class="card-tag" id="coachTag" hidden></span>
+            <div class="head-tools">
+              <button class="mini-btn" id="variationsButton" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2.4"/><circle cx="18" cy="5" r="2.4"/><circle cx="6" cy="19" r="2.4"/><path d="M6 7.4v9.2M18 7.4v3.4a5 5 0 0 1-5 5H6"/></svg>
+                <span data-i18n="variations">变招</span>
+              </button>
+              <span class="card-tag" id="coachTag" hidden></span>
+            </div>
           </div>
           <div class="card-body" id="coachBody">
             <p class="muted" data-i18n="coachEmpty">走一步棋，或点“提示 / 最佳”查看分析。</p>

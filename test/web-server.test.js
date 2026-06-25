@@ -201,6 +201,14 @@ test("web server plays a player move, engine reply, hints, best move, and undo",
     assert.equal(analyzedNode.analysis.branches.length, 2);
     assert.equal(analyzedNode.analysis.branches[0].boardAfter.length, 90);
     assert.equal(typeof analyzedNode.analysis.branches[0].zhMove, "string");
+    // each line carries its PV played out as boards + FENs (for variation playout)
+    assert.ok(Array.isArray(analyzedNode.analysis.branches[0].pvBoards));
+    assert.ok(Array.isArray(analyzedNode.analysis.branches[0].pvFens));
+    assert.equal(analyzedNode.analysis.branches[0].pvBoards.length, analyzedNode.analysis.branches[0].pvFens.length);
+    if (analyzedNode.analysis.branches[0].pvBoards.length) {
+      assert.equal(analyzedNode.analysis.branches[0].pvBoards[0].length, 90);
+      assert.equal(typeof analyzedNode.analysis.branches[0].pvFens[0], "string");
+    }
     assert.equal(analyzedNode.state.history.length, 2);
     assert.equal(undone.ok, true);
     assert.equal(undone.state.history.length, 0);
@@ -526,9 +534,12 @@ test("web server imports a game from Chinese notation and exposes replay UI", as
     assert.match(page, /id="stepPrevButton"/);
     assert.match(page, /id="importMovesText"/);
     assert.match(page, /id="importMovesButton"/);
+    assert.match(page, /id="variationsButton"/);
     assert.match(script, /"\/api\/import"/);
     assert.match(script, /function stepNext/);
     assert.match(script, /function cachedAnalysis/);
+    assert.match(script, /function showVariations/);
+    assert.match(script, /function mergeVariation/);
 
     // ---- /api/import parses mixed Chinese + coordinate notation ----
     const imported = await postJson(`${app.url}/api/import`, {
@@ -552,6 +563,17 @@ test("web server imports a game from Chinese notation and exposes replay UI", as
     assert.equal(illegal.ok, true);
     assert.equal(illegal.applied, 2);
     assert.equal(illegal.error, "a0-a5");
+
+    // ---- analyze-node honors lines + useBook overrides for variation playout ----
+    const variations = await postJson(`${app.url}/api/analyze-node`, {
+      sessionId: imported.state.sessionId,
+      node: { fen: imported.state.fen },
+      lines: 2,
+      useBook: false
+    });
+    assert.equal(variations.ok, true);
+    assert.ok(variations.analysis.branches.length >= 1);
+    assert.ok(variations.analysis.branches.every((b) => Array.isArray(b.pvBoards) && Array.isArray(b.pvFens)));
 
     // ---- a bad token stops cleanly and reports where ----
     const partial = await postJson(`${app.url}/api/import`, {

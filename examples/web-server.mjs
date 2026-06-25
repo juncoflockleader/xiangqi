@@ -349,14 +349,19 @@ async function handleApiPost(context, url) {
     const session = requireSession(context.sessions, body.sessionId);
     const analysis = await enqueueSession(session, async () => {
       const target = resolveTreeAnalysisTarget(session.game, body.node ?? body);
-      const result = await context.engine.analyzePosition(target.position, {
+      const options = {
         ...searchOptions(session),
         ...(numberOrNull(body.timeLimitMs) ? { timeLimitMs: numberOrNull(body.timeLimitMs) } : {}),
         ...(numberOrNull(body.depth) ? { depth: numberOrNull(body.depth) } : {}),
+        ...(numberOrNull(body.lines) ? { lines: numberOrNull(body.lines) } : {}),
         history: target.history,
         initialPosition: session.game.initialPosition,
         moveHistory: target.moveHistory
-      });
+      };
+      // Analysis for teaching should be a real search, not a book stub — the book
+      // only serves the engine's own move choice. Callers pass useBook:false.
+      if (body.useBook === false) { delete options.book; delete options.openingHeuristics; options.useBook = false; }
+      const result = await context.engine.analyzePosition(target.position, options);
       return summarizeTreeAnalysis(result, target.position);
     });
     return sendJson(context.response, 200, {
@@ -916,6 +921,19 @@ function summarizeAnalysisLine(line, position, index) {
   const afterMove = positionAfterMove(position, move);
   const afterReply = afterMove ? positionAfterMove(afterMove, expectedReply) : null;
 
+  // Walk the principal variation, capturing the board + FEN after each ply so the
+  // client can step/animate through the line ("推演") and merge it into the tree.
+  const pvBoards = [];
+  const pvFens = [];
+  let walk = position;
+  for (const mv of principalVariation.slice(0, 14)) {
+    const next = positionAfterMove(walk, mv);
+    if (!next) break;
+    pvBoards.push(serializeBoard(next));
+    pvFens.push(toFen(next));
+    walk = next;
+  }
+
   return {
     rank: line.rank ?? index + 1,
     source: "analysis",
@@ -932,6 +950,8 @@ function summarizeAnalysisLine(line, position, index) {
     replyBoardAfter: afterReply ? serializeBoard(afterReply) : null,
     fenAfter: afterMove ? toFen(afterMove) : null,
     fenReplyAfter: afterReply ? toFen(afterReply) : null,
+    pvBoards,
+    pvFens,
     summary: line.explanation?.summary ?? "",
     reasons: [...(line.explanation?.reasons ?? [])]
   };
