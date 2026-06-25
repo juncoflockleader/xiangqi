@@ -469,7 +469,7 @@ function miniBoard(board, viewSide, { navFen = null } = {}) {
     }
   }
   const navAttr = navFen ? ` data-nav="${esc(navFen)}"` : "";
-  return `<div class="mini${navFen ? " jumpable" : ""}"${navAttr}><span class="river-mini"></span>${cells}</div>`;
+  return `<div class="mini${navFen ? " jumpable" : ""}"${navAttr}>${cells}</div>`;
 }
 
 function scoreChip(score) {
