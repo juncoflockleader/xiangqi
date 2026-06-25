@@ -31,6 +31,7 @@ const I18N = {
     importPlaceholder: "粘贴着法，如：\n1. 炮二平五 马8进7\n2. 马二进三 卒7进1",
     importEmpty: "请先粘贴着法。", importDoneN: "已导入 {n}/{total} 手",
     importBadAt: "第 {n} 手无法解析：{move}",
+    saveImportPrompt: "保存到棋谱库？输入名称（取消则只回放不保存）：",
     playedMove: "走子评价", aiSuggests: "引擎建议", positionRead: "局面评估", bestReply: "最佳应对",
     evaluating: "评估中…", scoreLoss: "失分", atStart: "已在起始局面", atEnd: "已是最后一手",
     errMove: "无法走子", errGeneric: "出错了"
@@ -63,6 +64,7 @@ const I18N = {
     importPlaceholder: "貼上著法，如：\n1. 炮二平五 馬8進7\n2. 馬二進三 卒7進1",
     importEmpty: "請先貼上著法。", importDoneN: "已匯入 {n}/{total} 手",
     importBadAt: "第 {n} 手無法解析：{move}",
+    saveImportPrompt: "保存到棋譜庫？輸入名稱（取消則只回放不保存）：",
     playedMove: "走子評價", aiSuggests: "引擎建議", positionRead: "局面評估", bestReply: "最佳應對",
     evaluating: "評估中…", scoreLoss: "失分", atStart: "已在起始局面", atEnd: "已是最後一手",
     errMove: "無法走子", errGeneric: "出錯了"
@@ -95,6 +97,7 @@ const I18N = {
     importPlaceholder: "Paste moves, e.g.\n1. h2e2 h9g7\n2. b0c2 c6c5",
     importEmpty: "Paste some moves first.", importDoneN: "Imported {n}/{total} moves",
     importBadAt: "Move {n} could not be parsed: {move}",
+    saveImportPrompt: "Save to your records? Enter a name (cancel = replay only):",
     playedMove: "Move played", aiSuggests: "Engine suggests", positionRead: "Position", bestReply: "Best reply",
     evaluating: "Evaluating…", scoreLoss: "loss", atStart: "At the start", atEnd: "At the last move",
     errMove: "Illegal move", errGeneric: "Something went wrong"
@@ -219,12 +222,14 @@ function render() {
   applyChrome();
   if (!g) return;
 
+  // Fold the live line into the persistent tree first — the move list, replay
+  // bar, and review tree all read from it.
+  accumulateGameTree();
   renderTurnStatus(g);
   renderBoard(g);
   renderMoveList(g);
   renderCoach(g);
   renderControls(g);
-  accumulateGameTree(); // record played lines even while the review window is closed
   if (review.open) renderReviewTree();
 }
 
@@ -478,34 +483,65 @@ function renderCoach(g) {
 }
 function setTag(text) { el.coachTag.textContent = text; el.coachTag.hidden = false; }
 
+// The linear line through the current position: root → … → current → … → tip
+// (following the recorded mainline). Lets the move list navigate non-
+// destructively by FEN, just like the replay bar and review tree.
+function activeLineFens() {
+  const g = state.game;
+  if (!g || !review.gameTree.has(g.fen)) return [];
+  const up = [];
+  for (let f = g.fen; f && review.gameTree.has(f); f = review.gameTree.get(f).parentFen) up.push(f);
+  up.reverse(); // root … current
+  const down = [];
+  for (let f = mainlineChild(g.fen); f; f = mainlineChild(f)) down.push(f);
+  return [...up, ...down];
+}
+
 function renderMoveList(g) {
-  const hist = g.history || [];
-  el.moveCount.textContent = String(hist.length);
-  if (!hist.length) {
+  const moves = activeLineFens()
+    .map((fen) => ({ fen, node: review.gameTree.get(fen) }))
+    .filter((x) => x.node?.move);
+  el.moveCount.textContent = String(moves.length);
+  if (!moves.length) {
     el.moveList.innerHTML = `<p class="muted empty-note">${esc(t("noMoves"))}</p>`;
     return;
   }
   // group into rows by moveNumber (red, black)
   const rows = new Map();
-  for (const m of hist) {
-    const n = m.moveNumber;
+  for (const { fen, node } of moves) {
+    const n = node.move.moveNumber;
     if (!rows.has(n)) rows.set(n, { red: null, black: null });
-    rows.get(n)[m.side] = m;
+    rows.get(n)[node.move.side] = { fen, move: node.move };
   }
-  const currentPly = hist.length;
   let html = "";
   for (const [n, row] of rows) {
-    html += `<div class="move-row"><span class="no">${n}.</span>${plyCell(row.red, currentPly)}${plyCell(row.black, currentPly)}</div>`;
+    html += `<div class="move-row"><span class="no">${n}.</span>${plyCell(row.red, g.fen)}${plyCell(row.black, g.fen)}</div>`;
   }
   el.moveList.innerHTML = html;
 }
-function plyCell(m, currentPly) {
-  if (!m) return `<span class="ply empty">·</span>`;
+function plyCell(cell, currentFen) {
+  if (!cell) return `<span class="ply empty">·</span>`;
+  const m = cell.move;
   const label = isZh() ? (m.zhNotation || m.notation) : m.notation;
-  const cls = m.ply === currentPly ? "ply current" : "ply";
-  const tick = m.review?.classification
-    ? `<span class="tick ${m.review.classification}">${tickGlyph(m.review.classification)}</span>` : "";
-  return `<button class="${cls}" data-ply="${m.ply}">${esc(label)}${tick}</button>`;
+  const cls = cell.fen === currentFen ? "ply current" : "ply";
+  const c = cachedMoveClass(cell.fen);
+  const tick = c ? `<span class="tick ${c}">${tickGlyph(c)}</span>` : "";
+  return `<button class="${cls}" data-fen="${esc(cell.fen)}">${esc(label)}${tick}</button>`;
+}
+
+// Classification of the move reaching `fen`, derived from cached analyses (only
+// once both the position and its parent have been evaluated during replay).
+function cachedMoveClass(fen) {
+  const node = review.gameTree.get(fen);
+  if (!node?.parentFen || !node.move) return null;
+  const child = analysisCache.get(fen);
+  const parent = analysisCache.get(node.parentFen);
+  if (!child?.best || !parent?.best) return null;
+  const moveValue = Number.isFinite(child.best.score) ? -child.best.score : null;
+  const bestScore = Number.isFinite(parent.best.score) ? parent.best.score : null;
+  if (moveValue == null || bestScore == null) return null;
+  if (parent.best.bestMove && node.move.notation === parent.best.bestMove) return "best";
+  return classifyLoss(Math.max(0, bestScore - moveValue));
 }
 function tickGlyph(c) {
   if (["mistake", "blunder"].includes(c)) return "✕";
@@ -835,9 +871,9 @@ async function updateReplayEval(fen) {
     const loss = (moveValue != null && bestScore != null) ? Math.max(0, bestScore - moveValue) : null;
     const isBest = parent?.best?.bestMove && node.move.notation === parent.best.bestMove;
     state.coachOverride = { kind: "replay", data: { node, parent, child, moveValue, loss, isBest } };
-    if (state.game) renderCoach(state.game);
+    if (state.game) render(); // refresh the coach + move-list eval ticks now cached
   } catch {
-    if (myToken === navToken) { state.coachOverride = null; if (state.game) renderCoach(state.game); }
+    if (myToken === navToken) { state.coachOverride = null; if (state.game) render(); }
   }
 }
 
@@ -970,14 +1006,12 @@ function defaultRecordName() {
   return `${t("untitled")} ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-function saveCurrentRecord() {
+// Snapshot the persistent tree into a saveable record. moveCount reflects the
+// full recorded line (not just where we currently are, e.g. rewound for replay).
+function recordFromCurrentTree(name) {
   const g = state.game;
-  if (!g) return;
-  accumulateGameTree();
-  const name = window.prompt(t("namePrompt"), defaultRecordName());
-  if (name === null) return;
   const tree = [...review.gameTree.values()].map((n) => ({ fen: n.fen, parentFen: n.parentFen, move: n.move }));
-  const rec = {
+  return {
     id: `g${Date.now()}`,
     name: name.trim() || defaultRecordName(),
     savedAt: new Date().toISOString(),
@@ -986,14 +1020,26 @@ function saveCurrentRecord() {
     locale: state.locale,
     result: g.status?.state ?? "playing",
     winner: g.status?.winner ?? null,
-    moveCount: pathLength(g.fen),
+    moveCount: pathLength(deepestFen()),
     rootFen: review.rootFen,
     currentFen: g.fen,
     tree
   };
+}
+function persistRecord(rec) {
   const recs = loadRecords();
   recs.unshift(rec);
-  if (saveRecords(recs)) { renderRecords(); showToast(t("savedOk")); }
+  if (saveRecords(recs)) { renderRecords(); showToast(t("savedOk")); return true; }
+  return false;
+}
+
+function saveCurrentRecord() {
+  const g = state.game;
+  if (!g) return;
+  accumulateGameTree();
+  const name = window.prompt(t("namePrompt"), defaultRecordName());
+  if (name === null) return;
+  persistRecord(recordFromCurrentTree(name));
 }
 
 async function loadRecord(rec) {
@@ -1079,6 +1125,11 @@ async function importGameFromText() {
     if (data.error) showToast(tpl(t("importBadAt"), { n: data.applied + 1, move: data.error }));
     else showToast(tpl(t("importDoneN"), { n: data.applied, total: data.total }));
     if (startFen && startFen !== state.game.fen) await navigateToFen(startFen);
+    // offer to keep the imported game in the records list (cancel = just replay)
+    if (data.applied > 0) {
+      const name = window.prompt(t("saveImportPrompt"), defaultRecordName());
+      if (name !== null) persistRecord(recordFromCurrentTree(name));
+    }
   } catch (e) {
     showToast(t("errGeneric"));
   } finally {
@@ -1215,21 +1266,6 @@ async function requestBest() {
   }
 }
 
-async function jumpToPly(ply) {
-  setBusy(true);
-  try {
-    const data = await api("/api/jump", { sessionId: state.sessionId, ply, deferEngine: true });
-    state.selected = null;
-    state.coachOverride = null;
-    state.game = data.state;
-  } catch (e) {
-    showToast(t("errGeneric"));
-  } finally {
-    setBusy(false);
-    render();
-  }
-}
-
 // ============================================================
 // Board interaction
 // ============================================================
@@ -1275,8 +1311,8 @@ function init() {
   el.stepPrevButton.addEventListener("click", stepPrev);
   el.stepNextButton.addEventListener("click", stepNext);
   el.moveList.addEventListener("click", (ev) => {
-    const btn = ev.target.closest(".ply[data-ply]");
-    if (btn) jumpToPly(Number(btn.dataset.ply));
+    const btn = ev.target.closest(".ply[data-fen]");
+    if (btn) navigateToFen(btn.dataset.fen);
   });
   el.localeSelect.addEventListener("change", () => { state.locale = el.localeSelect.value; render(); });
   el.sideSelect.addEventListener("change", () => { state.side = el.sideSelect.value; newGame(); });

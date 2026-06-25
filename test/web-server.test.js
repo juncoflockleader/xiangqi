@@ -98,7 +98,7 @@ test("web server serves the browser game and starts a session", async () => {
     assert.match(script, /"\/api\/hint"/);
     assert.match(script, /"\/api\/best"/);
     assert.match(script, /"\/api\/undo"/);
-    assert.match(script, /"\/api\/jump"/);
+    assert.match(script, /"\/api\/select-node"/); // move list + replay navigate non-destructively
     assert.match(script, /--file:\$\{file\}/);
     // ---- redesigned UI: stylesheet ----
     assert.match(stylesheet, /\.board-felt/);
