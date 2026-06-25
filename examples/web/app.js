@@ -19,6 +19,9 @@ const I18N = {
     cls_best: "最佳", cls_brilliant: "精彩", cls_excellent: "极佳", cls_good: "良好",
     cls_inaccuracy: "欠精确", cls_mistake: "失误", cls_blunder: "漏着", cls_book: "定式",
     continue: "继续",
+    records: "棋谱", recordsTitle: "棋谱管理", saveRecord: "保存当前棋谱", importRecord: "导入",
+    noRecords: "暂无保存的棋谱。", loadAction: "载入", delAction: "删除", exportAction: "导出",
+    namePrompt: "棋谱名称：", savedOk: "已保存", confirmDel: "删除此棋谱？", untitled: "未命名对局", movesUnit: "手",
     review: "复盘", reviewTitle: "复盘 · 变化树", reviewCollapse: "折叠全部分支",
     reviewHelp: "点小棋盘跳到该局面 · 点 ▸ 展开引擎候选分支",
     startPos: "起始局面", noGameYet: "尚无棋局可复盘。",
@@ -40,6 +43,9 @@ const I18N = {
     cls_best: "最佳", cls_brilliant: "精彩", cls_excellent: "極佳", cls_good: "良好",
     cls_inaccuracy: "欠精確", cls_mistake: "失誤", cls_blunder: "漏著", cls_book: "定式",
     continue: "繼續",
+    records: "棋譜", recordsTitle: "棋譜管理", saveRecord: "保存當前棋譜", importRecord: "匯入",
+    noRecords: "暫無保存的棋譜。", loadAction: "載入", delAction: "刪除", exportAction: "匯出",
+    namePrompt: "棋譜名稱：", savedOk: "已保存", confirmDel: "刪除此棋譜？", untitled: "未命名對局", movesUnit: "手",
     review: "覆盤", reviewTitle: "覆盤 · 變化樹", reviewCollapse: "摺疊全部分支",
     reviewHelp: "點小棋盤跳到該局面 · 點 ▸ 展開引擎候選分支",
     startPos: "起始局面", noGameYet: "尚無棋局可覆盤。",
@@ -61,6 +67,9 @@ const I18N = {
     cls_best: "Best", cls_brilliant: "Brilliant", cls_excellent: "Excellent", cls_good: "Good",
     cls_inaccuracy: "Inaccuracy", cls_mistake: "Mistake", cls_blunder: "Blunder", cls_book: "Book",
     continue: "Continue",
+    records: "Records", recordsTitle: "Game Records", saveRecord: "Save current game", importRecord: "Import",
+    noRecords: "No saved records yet.", loadAction: "Load", delAction: "Delete", exportAction: "Export",
+    namePrompt: "Record name:", savedOk: "Saved", confirmDel: "Delete this record?", untitled: "Untitled game", movesUnit: "moves",
     review: "Review", reviewTitle: "Review · Variation Tree", reviewCollapse: "Collapse all",
     reviewHelp: "Click a mini-board to jump · click ▸ to expand engine variations",
     startPos: "Start", noGameYet: "No game to review yet.",
@@ -120,7 +129,8 @@ function cache() {
     "moveList", "moveCount", "sideSelect", "levelSelect", "localeSelect",
     "settings", "settingsNote", "toast",
     "reviewButton", "reviewWindow", "rwHead", "rwClose", "rwCollapse", "rwResize", "reviewTree", "rwHint",
-    "rwZoomIn", "rwZoomOut", "rwFit"
+    "rwZoomIn", "rwZoomOut", "rwFit",
+    "recordsButton", "recordsModal", "recordsBackdrop", "recordsClose", "saveRecordButton", "importRecordInput", "recordsList"
   ]) el[id] = document.getElementById(id);
 }
 
@@ -756,6 +766,167 @@ function setupReviewWindowControls() {
 }
 
 // ============================================================
+// Game records (棋谱) — saved to localStorage
+// ============================================================
+const RECORDS_KEY = "xiangqi.records";
+const FEN_TYPE = { k: "king", a: "advisor", e: "elephant", h: "horse", r: "rook", c: "cannon", p: "pawn" };
+const FEN_SYMBOL = {
+  red: { k: "帥", a: "仕", e: "相", h: "傌", r: "俥", c: "炮", p: "兵" },
+  black: { k: "將", a: "士", e: "象", h: "馬", r: "車", c: "砲", p: "卒" }
+};
+
+// Reconstruct a board (array indexed by square, matching the server shape that
+// miniBoard reads) from a FEN, so loaded records can render their mini-boards.
+function parseFenBoard(fen) {
+  const rows = String(fen).trim().split(/\s+/)[0].split("/");
+  const board = Array.from({ length: 90 }, () => ({ piece: null }));
+  for (let r = 0; r < rows.length; r += 1) {
+    let f = 0;
+    for (const ch of rows[r]) {
+      if (/[0-9]/.test(ch)) { f += Number(ch); continue; }
+      const side = ch === ch.toUpperCase() ? "red" : "black";
+      const key = ch.toLowerCase();
+      if (FEN_TYPE[key] && f < 9 && r < 10) {
+        board[r * 9 + f] = { piece: { side, type: FEN_TYPE[key], symbol: FEN_SYMBOL[side][key] } };
+      }
+      f += 1;
+    }
+  }
+  return board;
+}
+
+function loadRecords() {
+  try { return JSON.parse(localStorage.getItem(RECORDS_KEY)) || []; } catch { return []; }
+}
+function saveRecords(recs) {
+  try { localStorage.setItem(RECORDS_KEY, JSON.stringify(recs)); return true; }
+  catch { showToast(t("errGeneric")); return false; }
+}
+function pathLength(fen) {
+  let n = 0;
+  for (let f = fen; f && review.gameTree.get(f)?.parentFen; f = review.gameTree.get(f).parentFen) n += 1;
+  return n;
+}
+function defaultRecordName() {
+  const d = new Date();
+  const p = (x) => String(x).padStart(2, "0");
+  return `${t("untitled")} ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function saveCurrentRecord() {
+  const g = state.game;
+  if (!g) return;
+  accumulateGameTree();
+  const name = window.prompt(t("namePrompt"), defaultRecordName());
+  if (name === null) return;
+  const tree = [...review.gameTree.values()].map((n) => ({ fen: n.fen, parentFen: n.parentFen, move: n.move }));
+  const rec = {
+    id: `g${Date.now()}`,
+    name: name.trim() || defaultRecordName(),
+    savedAt: new Date().toISOString(),
+    playerSide: g.playerSide,
+    level: state.level,
+    locale: state.locale,
+    result: g.status?.state ?? "playing",
+    winner: g.status?.winner ?? null,
+    moveCount: pathLength(g.fen),
+    rootFen: review.rootFen,
+    currentFen: g.fen,
+    tree
+  };
+  const recs = loadRecords();
+  recs.unshift(rec);
+  if (saveRecords(recs)) { renderRecords(); showToast(t("savedOk")); }
+}
+
+async function loadRecord(rec) {
+  setBusy(true);
+  try {
+    const created = await api("/api/new", { side: rec.playerSide || state.side, ...LEVELS[rec.level || state.level] });
+    state.sessionId = created.state.sessionId;
+    // restore the persistent tree (boards re-derived from FENs)
+    review.gameTree.clear(); review.expanded.clear(); review.branches.clear();
+    review.rootFen = rec.rootFen;
+    for (const n of rec.tree) {
+      review.gameTree.set(n.fen, { fen: n.fen, parentFen: n.parentFen, board: parseFenBoard(n.fen), move: n.move, children: new Set() });
+    }
+    for (const n of rec.tree) {
+      if (n.parentFen && review.gameTree.has(n.parentFen)) review.gameTree.get(n.parentFen).children.add(n.fen);
+    }
+    // set the live game to the saved position
+    const nav = await api("/api/select-node", { sessionId: state.sessionId, node: { fen: rec.currentFen } });
+    state.game = nav.state;
+    state.selected = null; state.coachOverride = null;
+    if (rec.playerSide) { state.side = rec.playerSide; el.sideSelect.value = rec.playerSide; }
+    if (rec.level) { state.level = rec.level; el.levelSelect.value = rec.level; }
+  } catch (e) {
+    showToast(t("errGeneric"));
+  } finally {
+    setBusy(false);
+    closeRecords();
+    render();
+  }
+}
+
+function deleteRecord(id) {
+  if (!window.confirm(t("confirmDel"))) return;
+  saveRecords(loadRecords().filter((r) => r.id !== id));
+  renderRecords();
+}
+
+function exportRecord(rec) {
+  const blob = new Blob([JSON.stringify(rec)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${rec.name.replace(/[^\w一-龥-]+/g, "_")}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importRecordFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const rec = JSON.parse(reader.result);
+      if (!rec || !Array.isArray(rec.tree) || !rec.currentFen) throw new Error("bad record");
+      rec.id = `g${Date.now()}`;
+      const recs = loadRecords(); recs.unshift(rec); saveRecords(recs);
+      renderRecords(); showToast(t("savedOk"));
+    } catch { showToast(t("errGeneric")); }
+  };
+  reader.readAsText(file);
+}
+
+function renderRecords() {
+  const recs = loadRecords();
+  if (!recs.length) { el.recordsList.innerHTML = `<p class="records-empty">${esc(t("noRecords"))}</p>`; return; }
+  el.recordsList.innerHTML = recs.map((r) => {
+    const date = new Date(r.savedAt).toLocaleString(state.locale);
+    let resCls = "", resTxt = "";
+    if (r.result === "checkmate" || r.result === "stalemate") {
+      const won = r.winner === r.playerSide;
+      resCls = won ? "res-win" : "res-lose";
+      resTxt = won ? t("youWin") : t("youLose");
+    } else if (r.result === "repetition") resTxt = t("draw");
+    return `<div class="record">
+      <div class="record-main">
+        <div class="record-name">${esc(r.name)}</div>
+        <div class="record-meta"><span>${esc(date)}</span><span>${r.moveCount} ${esc(t("movesUnit"))}</span>${resTxt ? `<span class="${resCls}">${esc(resTxt)}</span>` : ""}</div>
+      </div>
+      <div class="record-buttons">
+        <button class="load" data-load="${esc(r.id)}">${esc(t("loadAction"))}</button>
+        <button data-export="${esc(r.id)}">${esc(t("exportAction"))}</button>
+        <button class="del" data-del="${esc(r.id)}">${esc(t("delAction"))}</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function showRecords() { renderRecords(); el.recordsModal.hidden = false; }
+function closeRecords() { el.recordsModal.hidden = true; }
+
+// ============================================================
 // Actions
 // ============================================================
 async function newGame() {
@@ -928,6 +1099,25 @@ function init() {
   el.rwZoomOut.addEventListener("click", () => setReviewScale(review.view.scale / 1.2));
   el.rwFit.addEventListener("click", fitReviewTree);
   setupReviewWindowControls();
+
+  // record manager
+  el.recordsButton.addEventListener("click", showRecords);
+  el.recordsClose.addEventListener("click", closeRecords);
+  el.recordsBackdrop.addEventListener("click", closeRecords);
+  el.saveRecordButton.addEventListener("click", saveCurrentRecord);
+  el.importRecordInput.addEventListener("change", (ev) => {
+    const file = ev.target.files?.[0];
+    if (file) importRecordFile(file);
+    ev.target.value = "";
+  });
+  el.recordsList.addEventListener("click", (ev) => {
+    const load = ev.target.closest("[data-load]");
+    if (load) { const r = loadRecords().find((x) => x.id === load.dataset.load); if (r) loadRecord(r); return; }
+    const exp = ev.target.closest("[data-export]");
+    if (exp) { const r = loadRecords().find((x) => x.id === exp.dataset.export); if (r) exportRecord(r); return; }
+    const del = ev.target.closest("[data-del]");
+    if (del) deleteRecord(del.dataset.del);
+  });
 
   newGame();
 }

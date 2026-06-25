@@ -89,6 +89,10 @@
           <div class="card-head">
             <h2 data-i18n="moves">着法</h2>
             <div class="head-tools">
+              <button class="mini-btn" id="recordsButton" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                <span data-i18n="records">棋谱</span>
+              </button>
               <button class="mini-btn" id="reviewButton" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M5 12h7a4 4 0 0 1 4 4v2M12 12V8a4 4 0 0 1 4-4h2"/></svg>
                 <span data-i18n="review">复盘</span>
@@ -148,6 +152,23 @@
         <div class="rw-body" id="reviewTree"></div>
         <div class="rw-resize" id="rwResize" aria-hidden="true"></div>
       </section>
+
+      <!-- ============ RECORD MANAGER (棋谱) ============ -->
+      <div class="modal" id="recordsModal" hidden>
+        <div class="modal-backdrop" id="recordsBackdrop"></div>
+        <div class="modal-card" role="dialog" aria-modal="true">
+          <header class="modal-head">
+            <h2 data-i18n="recordsTitle">棋谱管理</h2>
+            <button class="rw-icon rw-close" id="recordsClose" type="button" aria-label="close">✕</button>
+          </header>
+          <div class="modal-actions">
+            <button class="btn primary" id="saveRecordButton" type="button"><span data-i18n="saveRecord">保存当前棋谱</span></button>
+            <label class="btn" for="importRecordInput"><span data-i18n="importRecord">导入</span></label>
+            <input id="importRecordInput" type="file" accept="application/json,.json" hidden>
+          </div>
+          <div class="records-list" id="recordsList"></div>
+        </div>
+      </div>
     </div>
     <script type="module" src="/app.js"></script>
   </body>
